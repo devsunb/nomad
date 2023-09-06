@@ -45,7 +45,7 @@ impl Mad {
 
     /// Registers a new plugin.
     #[inline]
-    pub fn with_plugin<P: Plugin>(mut self, _plugin: P) -> Self {
+    pub fn with_plugin<P: Plugin>(mut self) -> Self {
         let plugin = P::init();
         self.api.insert(P::NAME, plugin.api());
         self.runtime.add_plugin(plugin);
