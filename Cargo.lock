@@ -117,6 +117,7 @@ version = "0.1.0"
 dependencies = [
  "nvim-oxi",
  "serde",
+ "serde_path_to_error",
 ]
 
 [[package]]
@@ -389,6 +390,7 @@ name = "seph"
 version = "0.1.0"
 dependencies = [
  "common",
+ "serde",
 ]
 
 [[package]]

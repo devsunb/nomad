@@ -1,4 +1,13 @@
+use crate::*;
+
+/// TODO: docs
 pub enum Message {
-    Open,
-    Toggle,
+    /// TODO: docs
+    Close,
+
+    /// TODO: docs
+    Disable,
+
+    /// TODO: docs
+    Open(Option<WindowConfig>),
 }

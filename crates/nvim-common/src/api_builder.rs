@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 use std::convert::Infallible;
 
-use crate::nvim::{lua::Poppable, Dictionary, Function, Object};
+use serde::de::DeserializeOwned;
+
+use crate::nvim::{self, Dictionary, Function, Object};
 use crate::sender::Sender;
 use crate::Plugin;
 
@@ -55,14 +57,26 @@ impl<'a, 'builder, P: Plugin> OnExecuteApiBuilder<'a, 'builder, P> {
     /// TODO: docs
     pub fn on_execute<A, F>(self, func: F) -> &'builder mut ApiBuilder<'a, P>
     where
-        A: Poppable,
+        A: DeserializeOwned,
         F: Fn(A) -> P::Message + 'static,
     {
         let sender = self.builder.sender.clone();
-        let func = move |args| {
+
+        let func = move |args: Object| {
+            let args = match serde_path_to_error::deserialize::<_, A>(
+                nvim::serde::Deserializer::new(args),
+            ) {
+                Ok(args) => args,
+
+                Err(err) => {
+                    crate::display_error(err, Some(P::NAME));
+                    return Ok::<_, Infallible>(());
+                },
+            };
             sender.send(func(args));
             Ok::<_, Infallible>(())
         };
+
         let func = Function::from_fn(func);
         self.builder.current.as_mut().unwrap().func = Some(Object::from(func));
         self.builder
