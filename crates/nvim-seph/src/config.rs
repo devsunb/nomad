@@ -128,28 +128,7 @@ mod custom_deserialize {
                     Ok(ScreenUnit::Percent(value as f32))
                 }
 
-                fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
-                where
-                    E: Error,
-                {
-                    Ok(ScreenUnit::Cells(value as u16))
-                }
-
-                fn visit_u16<E>(self, value: u16) -> Result<Self::Value, E>
-                where
-                    E: Error,
-                {
-                    Ok(ScreenUnit::Cells(value))
-                }
-
-                fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
-                where
-                    E: Error,
-                {
-                    Ok(ScreenUnit::Cells(value as u16))
-                }
-
-                fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+                fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
                 where
                     E: Error,
                 {
