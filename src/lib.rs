@@ -6,6 +6,7 @@ fn mad() -> nvim::Result<nvim::Dictionary> {
     Ok(Mad::new()
         // .with_plugin::<completion::Completion>()
         // .with_plugin::<lsp::Lsp>()
+        .with_plugin::<colorschemes::Colorschemes>()
         .with_plugin::<seph::Seph>()
         .api())
 }

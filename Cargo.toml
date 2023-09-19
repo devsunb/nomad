@@ -13,6 +13,7 @@ neovim-0-9 = ["common/neovim-0-9"]
 neovim-nightly = ["common/neovim-nightly"]
 
 [dependencies]
+colorschemes = { path = "crates/colorschemes" }
 common = { path = "crates/common" }
 mad = { path = "crates/mad" }
 seph = { path = "crates/seph" }
