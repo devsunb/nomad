@@ -12,3 +12,4 @@ pub use colorschemes::Colorschemes;
 use hex::hex;
 use highlight_group::HighlightGroup;
 use loadable_colorscheme::LoadableColorscheme;
+use palette::Palette;

@@ -12,7 +12,7 @@ pub trait Palette {
 /// The [`Colorscheme`] trait is made up of several sub-traits that correspond
 /// to the different types of highlight groups that can be applied to the UI.
 ///
-/// Some sub-traits like [`BaseColorscheme`] or [`DiagnosticColorscheme`] refer
+/// Some sub-traits like [`BuiltinColorscheme`] or [`DiagnosticColorscheme`] refer
 /// to highlight groups builtin to Neovim, while others like
 /// [`NomadColorscheme`] or [`TelescopeColorscheme`] are specific to 3rd-party
 /// plugins.
@@ -35,7 +35,8 @@ pub trait Palette {
 /// ```
 pub trait Colorscheme:
     Default
-    + BaseColorscheme
+    + BuiltinColorscheme
+    + SyntaxColorscheme
     + DiagnosticColorscheme
     + LspColorscheme
     + TreeSitterColorscheme
@@ -51,7 +52,7 @@ pub trait Colorscheme:
 /// See [this page][builtin] for more infos.
 ///
 /// [builtin]: https://neovim.io/doc/user/syntax.html#highlight-default
-pub trait BaseColorscheme: Palette {
+pub trait BuiltinColorscheme: Palette {
     /// The highlighting applied to the [`ColorColumn`][cc] highlight group.
     ///
     /// [cc]: https://neovim.io/doc/user/syntax.html#hl-ColorColumn
@@ -67,6 +68,18 @@ pub trait BaseColorscheme: Palette {
             .with_foreground(Self::PALETTE.foreground)
             .with_background(Self::PALETTE.background)
             .into_some()
+    }
+}
+
+/// This trait sets the highlight groups that are linked to syntax groups.
+///
+/// See [this page][syntax] for more infos.
+///
+/// [syntax]: https://neovim.io/doc/user/syntax.html#group-name
+pub trait SyntaxColorscheme: Palette {
+    /// The highlighting applied to the `String` highlight group.
+    fn string(&self) -> Option<HighlightGroup> {
+        HighlightGroup::new().with_foreground(Self::PALETTE.string).into_some()
     }
 }
 

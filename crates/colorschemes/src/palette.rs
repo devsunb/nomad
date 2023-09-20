@@ -4,4 +4,5 @@ use crate::Color;
 pub struct Palette {
     pub background: Color,
     pub foreground: Color,
+    pub string: Color,
 }
