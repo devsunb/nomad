@@ -6,3 +6,5 @@ edition.workspace = true
 [dependencies]
 common = { path = "../common" }
 hex = { path = "hex" }
+
+once_cell = { workspace = true }

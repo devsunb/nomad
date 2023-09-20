@@ -31,6 +31,8 @@ authors = ["Riccardo Mazzarini <me@noib3.dev>"]
 
 [workspace.dependencies]
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
+once_cell = { version = "1.18" }
+phf = { version = "0.11" }
 serde = { version = "1.0" }
 serde_path_to_error = "0.1"
 thiserror = { version = "1.0" }

@@ -3,44 +3,28 @@ use common::nvim;
 use crate::{Colorscheme, HighlightGroup};
 
 /// TODO: docs
-pub trait LoadableColorscheme: Send + Sync {
+pub(crate) trait LoadableColorscheme: Send + Sync {
     /// TODO: docs
-    fn name(&self) -> &'static str;
-
-    /// TODO: docs
-    fn api_name(&self) -> &'static str;
-
-    /// TODO: docs
-    fn load(&self) -> Result<(), Box<dyn std::error::Error>>;
+    fn load(&self) -> nvim::Result<()>;
 }
 
-impl<C> LoadableColorscheme for C
+impl<C: Colorscheme + Send + Sync> LoadableColorscheme for C {
+    fn load(&self) -> nvim::Result<()> {
+        load_colorscheme(self)
+    }
+}
+
+fn load_colorscheme<C>(colorscheme: &C) -> nvim::Result<()>
 where
-    C: Send + Sync + Colorscheme,
+    C: Colorscheme,
 {
-    fn name(&self) -> &'static str {
-        C::NAME
+    if let Some(normal) = colorscheme.normal() {
+        set_hl("Normal", normal)?;
     }
-
-    fn api_name(&self) -> &'static str {
-        C::NAME
-            .chars()
-            .map(|c| if c == ' ' { '_' } else { c })
-            .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
-            .map(|c| c.to_ascii_lowercase())
-            .collect::<String>()
-            .leak()
+    if let Some(color_column) = colorscheme.color_column() {
+        set_hl("ColorColumn", color_column)?;
     }
-
-    fn load(&self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(normal) = self.normal() {
-            set_hl("Normal", normal)?;
-        }
-        if let Some(color_column) = self.color_column() {
-            set_hl("ColorColumn", color_column)?;
-        }
-        Ok(())
-    }
+    Ok(())
 }
 
 fn set_hl(hl_name: &str, hl_group: HighlightGroup) -> nvim::Result<()> {
