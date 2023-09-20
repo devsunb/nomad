@@ -218,7 +218,7 @@ fn create_colors_dir(
             .with_extension("lua");
 
         let contents = format!(
-            "require(\"mad\").colorschemes.load(\"{}\")",
+            "require(\"mad\").colorscheme.load(\"{}\")",
             colorscheme.colorscheme_name
         );
 

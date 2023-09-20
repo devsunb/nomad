@@ -19,7 +19,7 @@ pub enum Message {
 }
 
 impl Plugin for Colorschemes {
-    const NAME: &'static str = "colorschemes";
+    const NAME: &'static str = "colorscheme";
 
     type Message = Message;
 
@@ -43,7 +43,7 @@ impl Plugin for Colorschemes {
             .on_execute(|colorscheme: String| Message::Load(colorscheme))
             .build();
 
-        builder.function("open").on_execute(|()| Message::Open).build();
+        builder.function("choose").on_execute(|()| Message::Open).build();
     }
 
     fn update_config(&mut self, config: Enable<Config>) {
