@@ -8,7 +8,7 @@ use common::{
     runtime::{self, Runtime},
     *,
 };
-use tracing::Subscriber;
+use tracing::{error, Subscriber};
 
 use crate::config;
 
@@ -50,10 +50,11 @@ impl Mad {
     }
 
     /// TODO: docs
-    pub fn with_tracing_subscriber<S>(mut self, subscriber: S) -> Self
+    pub fn with_tracing_subscriber<S>(self, subscriber: S) -> Self
     where
-        S: Subscriber,
+        S: Subscriber + Send + Sync + 'static,
     {
+        tracing::subscriber::set_global_default(subscriber).unwrap();
         self
     }
 
@@ -62,6 +63,11 @@ impl Mad {
     pub fn init(self) -> Api {
         let Self { api, runtime } = self;
         runtime::init(runtime);
+
+        std::panic::set_hook(Box::new(|infos| {
+            error!("{}", infos);
+        }));
+
         api
     }
 }

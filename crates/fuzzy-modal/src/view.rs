@@ -1,12 +1,14 @@
+use common::*;
+
 use crate::*;
 
 pub(crate) struct View {
     prompt: Prompt,
-    results: Results,
+    // results: Results,
 }
 
 impl View {
-    pub fn new(config: FuzzyConfig) -> Self {
+    pub fn new(config: FuzzyConfig, window_config: WindowConfig) -> Self {
         let FuzzyConfig {
             items,
             on_confirm,
@@ -16,24 +18,25 @@ impl View {
             starting_selected,
         } = config;
 
-        // let len = self.items.len();
-        //
-        // let prompt = Prompt::new(
-        //     self.starting_text.clone(),
-        //     self.items.len() as _,
-        //     move |query| {
-        //         nvim::print!("new query is {query}");
-        //         len as _
-        //     },
-        // );
-        //
-        // self.prompt = Some(prompt);
+        let (prompt_config, _) = window_config.bisect_vertical(1);
 
-        todo!();
+        let len = items.len();
+
+        let prompt = Prompt::new(
+            starting_text.clone(),
+            prompt_config,
+            items.len() as _,
+            move |query| {
+                nvim::print!("new query is {query}");
+                len as _
+            },
+        );
+
+        Self { prompt }
     }
 
     pub fn close(self) {
         self.prompt.close();
-        self.results.close();
+        // self.results.close();
     }
 }

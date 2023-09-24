@@ -67,9 +67,9 @@ impl FuzzyModal {
         FuzzyBuilder::new((*self.sender).clone())
     }
 
-    fn open(&mut self, config: FuzzyConfig) {
+    fn open(&mut self, fuzzy_config: FuzzyConfig) {
         self.close_view();
-        self.view = Some(View::new(config));
+        self.view = Some(View::new(fuzzy_config, self.config.window.clone()));
     }
 
     fn close_view(&mut self) {

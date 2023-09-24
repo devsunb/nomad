@@ -4,17 +4,19 @@ use common::nvim::{
     self,
     api::{opts::*, types::*, Buffer, Window},
 };
+use common::WindowConfig;
 
 type OnQueryChange = Arc<dyn Fn(&str) -> u64 + 'static>;
 
 /// TODO: docs
 pub(crate) struct Prompt {
-    buffer: Buffer,
     current_text: String,
     default_text: Option<String>,
     matched_items: u64,
     total_items: u64,
     on_query_change: OnQueryChange,
+    buffer: Buffer,
+    window: Window,
 }
 
 impl Prompt {
@@ -24,17 +26,23 @@ impl Prompt {
 
     pub fn new<F>(
         default_text: Option<String>,
+        window_config: WindowConfig,
         total_items: u64,
         on_query_change: F,
     ) -> Self
     where
         F: Fn(&str) -> u64 + 'static,
     {
-        let (buffer, text_extmark_id, matched_items_extmark_id) =
+        let (buffer, _text_extmark_id, _matched_items_extmark_id) =
             open_buffer(default_text.as_deref(), total_items);
+
+        let window =
+            nvim::api::open_win(&buffer, true, &((&window_config).into()))
+                .unwrap();
 
         Self {
             buffer,
+            window,
             current_text: String::new(),
             default_text,
             matched_items: total_items,
