@@ -9,8 +9,7 @@ pub struct FuzzyModal {
     is_disabled: bool,
     config: Config,
     sender: LateInit<Sender<Message>>,
-    view: Option<View>,
-    id_counter: ModalId,
+    view: LateInit<View>,
 }
 
 impl Plugin for FuzzyModal {
@@ -29,6 +28,7 @@ impl Plugin for FuzzyModal {
         sender: &Sender<Self::Message>,
     ) -> Result<(), Infallible> {
         self.sender.init(sender.clone());
+        self.view.init(View::new(sender.clone()));
         Ok(())
     }
 
@@ -52,7 +52,7 @@ impl Plugin for FuzzyModal {
         }
 
         match msg {
-            Message::Close => self.close_view(),
+            Message::Close => self.view.close(),
             Message::Open(config) => self.open(config),
             _ => todo!(),
         };
@@ -68,19 +68,13 @@ impl FuzzyModal {
     }
 
     fn open(&mut self, fuzzy_config: FuzzyConfig) {
-        self.close_view();
-        self.view = Some(View::new(fuzzy_config, self.config.window.clone()));
-    }
-
-    fn close_view(&mut self) {
-        if let Some(view) = self.view.take() {
-            view.close();
-        }
+        self.view.close();
+        self.view.open(fuzzy_config, self.config.window.clone());
     }
 
     fn disable(&mut self) {
         self.is_disabled = true;
-        self.close_view();
+        self.view.close();
     }
 
     fn send(&mut self, msg: Message) {

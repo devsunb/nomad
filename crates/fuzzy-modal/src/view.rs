@@ -8,7 +8,11 @@ pub(crate) struct View {
 }
 
 impl View {
-    pub fn new(config: FuzzyConfig, window_config: WindowConfig) -> Self {
+    pub fn new(sender: Sender<Message>) -> Self {
+        Self { prompt: Prompt::new(sender) }
+    }
+
+    pub fn open(&mut self, config: FuzzyConfig, window_config: WindowConfig) {
         let FuzzyConfig {
             items,
             on_confirm,
@@ -20,22 +24,10 @@ impl View {
 
         let (prompt_config, _) = window_config.bisect_vertical(1);
 
-        let len = items.len();
-
-        let prompt = Prompt::new(
-            starting_text.clone(),
-            prompt_config,
-            items.len() as _,
-            move |query| {
-                nvim::print!("new query is {query}");
-                len as _
-            },
-        );
-
-        Self { prompt }
+        // self.prompt.open(prompt_config, window_config);
     }
 
-    pub fn close(self) {
+    pub fn close(&mut self) {
         self.prompt.close();
         // self.results.close();
     }

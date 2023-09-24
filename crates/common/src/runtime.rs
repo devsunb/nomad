@@ -36,7 +36,7 @@ impl<P: Plugin> ConfigurablePlugin for P {
 #[derive(Default)]
 pub struct Runtime {
     plugins: HashMap<&'static str, Rc<RefCell<dyn ConfigurablePlugin>>>,
-    plugin: HashMap<&'static str, Rc<RefCell<dyn Any>>>,
+    plugins_as_any: HashMap<&'static str, Rc<RefCell<dyn Any>>>,
 }
 
 impl Runtime {
@@ -46,7 +46,7 @@ impl Runtime {
         P: Plugin,
         F: FnOnce(&P) -> R,
     {
-        let Some(plugin) = self.plugin.get(P::NAME) else {
+        let Some(plugin) = self.plugins_as_any.get(P::NAME) else {
             panic!("Plugin not registered")
         };
 
@@ -61,7 +61,7 @@ impl Runtime {
 
     pub fn add_plugin<P: Plugin>(&mut self, plugin: Rc<RefCell<P>>) {
         self.plugins.insert(P::NAME, Rc::clone(&plugin) as _);
-        self.plugin.insert(P::NAME, plugin as _);
+        self.plugins_as_any.insert(P::NAME, plugin as _);
     }
 
     pub fn is_registered(&self, plugin: &str) -> bool {

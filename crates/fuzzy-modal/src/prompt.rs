@@ -1,99 +1,147 @@
-use std::sync::Arc;
+use common::{nvim, WindowConfig, *};
+use nvim::api::{opts::*, types::*, Buffer, Window};
 
-use common::nvim::{
-    self,
-    api::{opts::*, types::*, Buffer, Window},
-};
-use common::WindowConfig;
+use crate::*;
 
-type OnQueryChange = Arc<dyn Fn(&str) -> u64 + 'static>;
+#[derive(Default)]
+pub(crate) struct PromptConfig {
+    /// A placeholder text to display when the prompt is empty.
+    placeholder_text: Option<String>,
+
+    /// The size of the result space over which the prompt query is matched.
+    /// This remains constant between [`Prompt::open`] calls and is displayed
+    /// at the end of the prompt together with the current number of matched
+    /// results.
+    total_results: u64,
+}
 
 /// TODO: docs
 pub(crate) struct Prompt {
-    current_text: String,
-    default_text: Option<String>,
-    matched_items: u64,
-    total_items: u64,
-    on_query_change: OnQueryChange,
+    /// The current value of the prompt, which is used as the query to filter
+    /// the results. Its "rest" value should always match the one of the
+    /// [`Results::query`] field.
+    value: String,
+
+    /// The number of results that match the current prompt. This is updated
+    /// as the user types and it's displayed at the end of the prompt together
+    /// with the total number of results.
+    matched_results: u64,
+
+    /// A sender used to send [`Message::PromptChanged`] messages to the parent
+    /// plugin when the prompt changes.
+    sender: Sender<Message>,
+
+    /// The current configuration of the prompt, which changes every time the
+    /// prompt is opened.
+    config: PromptConfig,
+
+    /// The buffer used to display the prompt.
     buffer: Buffer,
-    window: Window,
+
+    /// The window that houses the buffer. This is only set when the prompt is
+    /// open.
+    window: Option<Window>,
+
+    /// TODO: docs.
+    namespace_id: u32,
+
+    /// TODO: docs.
+    placeholder_extmark_id: u32,
+
+    /// TODO: docs.
+    matched_on_total_extmark_id: u32,
 }
 
 impl Prompt {
-    pub fn close(self) {
+    /// TODO: docs
+    pub fn close(&mut self) {
+        self.update_placeholder("");
+
+        if let Some(window) = self.window.take() {
+            window.close(true).unwrap();
+        }
+    }
+
+    /// TODO: docs
+    pub fn open(&mut self, config: PromptConfig, window_config: WindowConfig) {
+        if let Some(placeholder) = config.placeholder_text.as_ref() {
+            self.update_placeholder(placeholder);
+        }
+
+        self.update_total(config.total_results);
+
+        self.update_matched(config.total_results);
+
+        // TODO: enter Insert mode.
+
+        let window_config = (&window_config).into();
+
+        let window =
+            nvim::api::open_win(&self.buffer, true, &window_config).unwrap();
+
+        self.window = Some(window);
+
+        self.config = config;
+    }
+
+    /// Initializes the prompt.
+    ///
+    /// TODO: docs.
+    pub fn new(sender: Sender<Message>) -> Self {
+        let mut buffer = nvim::api::create_buf(false, true).unwrap();
+
+        // Create an anonymous namespace for the prompt.
+        let namespace_id = nvim::api::create_namespace("");
+
+        let placeholder_extmark_id = buffer
+            .set_extmark(
+                namespace_id,
+                0,
+                0,
+                &SetExtmarkOpts::builder()
+                    .virt_text([("", highlights::PROMPT_PLACEHOLDER)])
+                    .virt_text_pos(ExtmarkVirtTextPosition::Overlay)
+                    .build(),
+            )
+            .unwrap();
+
+        let matched_on_total_extmark_id = buffer
+            .set_extmark(
+                namespace_id,
+                0,
+                0,
+                &SetExtmarkOpts::builder()
+                    .virt_text([("", highlights::PROMPT_MATCHED_ON_TOTAL)])
+                    .virt_text_pos(ExtmarkVirtTextPosition::RightAlign)
+                    .build(),
+            )
+            .unwrap();
+
+        Self {
+            value: String::new(),
+            matched_results: 0,
+            sender,
+            config: PromptConfig::default(),
+            buffer,
+            window: None,
+            namespace_id,
+            placeholder_extmark_id,
+            matched_on_total_extmark_id,
+        }
+    }
+
+    /// TODO: docs
+    fn update_matched(&mut self, new_matched_results: u64) {
         todo!();
     }
 
-    pub fn new<F>(
-        default_text: Option<String>,
-        window_config: WindowConfig,
-        total_items: u64,
-        on_query_change: F,
-    ) -> Self
-    where
-        F: Fn(&str) -> u64 + 'static,
-    {
-        let (buffer, _text_extmark_id, _matched_items_extmark_id) =
-            open_buffer(default_text.as_deref(), total_items);
-
-        let window =
-            nvim::api::open_win(&buffer, true, &((&window_config).into()))
-                .unwrap();
-
-        Self {
-            buffer,
-            window,
-            current_text: String::new(),
-            default_text,
-            matched_items: total_items,
-            total_items,
-            on_query_change: Arc::new(on_query_change),
-        }
+    /// TODO: docs
+    fn update_placeholder(&mut self, new_placeholder: &str) {
+        todo!();
     }
-}
 
-fn open_buffer(
-    default_text: Option<&str>,
-    total_items: u64,
-) -> (Buffer, Option<u32>, u32) {
-    let mut buffer = nvim::api::create_buf(false, true).unwrap();
-
-    // Create an anonymous namespace for the prompt.
-    let ns_id = nvim::api::create_namespace("");
-
-    let text_extmark_id = default_text.map(|text| {
-        create_extmark(&mut buffer, ns_id, ExtmarkPosition::Start, text, "")
-    });
-
-    let matched_items_extmark_id = {
-        let text = format!("{}/{}", total_items, total_items);
-        create_extmark(&mut buffer, ns_id, ExtmarkPosition::Start, &text, "")
-    };
-
-    (buffer, text_extmark_id, matched_items_extmark_id)
-}
-
-enum ExtmarkPosition {
-    Start,
-    End,
-}
-
-fn create_extmark(
-    buffer: &mut Buffer,
-    ns_id: u32,
-    position: ExtmarkPosition,
-    text: &str,
-    hl_group: &'static str,
-) -> u32 {
-    let position = match position {
-        ExtmarkPosition::Start => ExtmarkVirtTextPosition::Overlay,
-        ExtmarkPosition::End => ExtmarkVirtTextPosition::RightAlign,
-    };
-
-    let opts = SetExtmarkOpts::builder()
-        .virt_text([(text, hl_group)])
-        .virt_text_pos(position)
-        .build();
-
-    buffer.set_extmark(ns_id, 0, 0, &opts).unwrap()
+    /// TODO: docs
+    fn update_total(&mut self, new_total_results: u64) {
+        todo!();
+    }
 }
