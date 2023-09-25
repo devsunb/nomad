@@ -3,6 +3,21 @@ use nvim::api::{opts::*, types::*, Buffer, Window};
 
 use crate::*;
 
+type OnBytesArgs = (
+    String,
+    Buffer,
+    u32,
+    usize,
+    usize,
+    usize,
+    usize,
+    usize,
+    usize,
+    usize,
+    usize,
+    usize,
+);
+
 #[derive(Default)]
 pub(crate) struct PromptConfig {
     /// A placeholder text to display when the prompt is empty.
@@ -56,7 +71,7 @@ impl Prompt {
     /// TODO: docs
     pub fn close(&mut self) {
         if let Some(window) = self.window.take() {
-            // This will fail if the window is already closed.
+            // This fails if the window is already closed.
             let _ = window.close(true);
         }
 
@@ -95,17 +110,44 @@ impl Prompt {
     ///
     /// TODO: docs.
     pub fn new(sender: Sender<Message>) -> Self {
+        let buffer = nvim::api::create_buf(false, true).unwrap();
+
+        buffer
+            .attach(
+                false,
+                &BufAttachOpts::builder()
+                    .on_bytes(on_bytes(sender.clone()))
+                    .build(),
+            )
+            .unwrap();
+
         Self {
             value: String::new(),
             matched_results: 0,
             sender,
             config: PromptConfig::default(),
-            buffer: nvim::api::create_buf(false, true).unwrap(),
+            buffer,
             window: None,
             // Create an anonymous namespace for the prompt.
             namespace_id: nvim::api::create_namespace(""),
             placeholder_extmark_id: None,
             matched_on_total_extmark_id: None,
+        }
+    }
+
+    /// TODO: docs
+    pub fn remove_placeholder(&mut self) {
+        if let Some(old_extmark) = self.placeholder_extmark_id {
+            self.buffer.del_extmark(self.namespace_id, old_extmark).unwrap();
+        }
+
+        self.placeholder_extmark_id = None;
+    }
+
+    /// TODO: docs
+    pub fn show_placeholder(&mut self) {
+        if let Some(placeholder) = self.config.placeholder_text.as_ref() {
+            self.update_placeholder(placeholder.clone().as_ref());
         }
     }
 
@@ -144,14 +186,12 @@ impl Prompt {
             )
             .unwrap();
 
-        self.placeholder_extmark_id = Some(new_extmark);
+        self.matched_on_total_extmark_id = Some(new_extmark);
     }
 
     /// TODO: docs
     fn update_placeholder(&mut self, new_placeholder: &str) {
-        if let Some(old_extmark) = self.placeholder_extmark_id {
-            self.buffer.del_extmark(self.namespace_id, old_extmark).unwrap();
-        }
+        self.remove_placeholder();
 
         let new_extmark = self
             .buffer
@@ -190,4 +230,71 @@ fn format_matched_on_total(
 ) -> impl Into<nvim::String> {
     let formatted = format!("{}/{}", matched, total);
     nvim::String::from(formatted.as_str())
+}
+
+fn on_bytes(
+    sender: Sender<Message>,
+) -> impl Fn(OnBytesArgs) -> Result<bool, nvim::api::Error> {
+    move |(
+        // The string "bytes".
+        _bytes,
+        // The prompt's buffer.
+        buffer,
+        // The buffer's changedtick.
+        _changedtick,
+        // The row where the change started. Always 0 because we immediately
+        // close the prompt if the user tries to insert a newline.
+        _start_row,
+        // The column where the change started. Equal to `byte_offset` because
+        // the prompt has a single line.
+        _start_col,
+        // The byte offset where the change started.
+        byte_offset,
+        // The row containing the last changed byte before the change. Always
+        // 0 because the prompt has a single line.
+        _old_end_row,
+        // The column containing the last changed byte before the change. Equal
+        // to `old_end_len` because the prompt always has a single line.
+        _old_end_col,
+        old_end_len,
+        // The row containing the last changed byte after the change. Always 0.
+        _new_end_row,
+        // The column containing the last changed byte after the change. Equal
+        // to `new_end_len` because the prompt always has a single line.
+        _new_end_col,
+        new_end_len,
+    ): (
+        String,
+        Buffer,
+        u32,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+        usize,
+    )| {
+        let new_len = buffer.get_offset(1).unwrap() - 1;
+
+        let was_empty = new_end_len == new_len;
+
+        if was_empty {
+            sender.send(Message::HidePlaceholder);
+        }
+
+        let is_empty = new_len == 0;
+
+        if is_empty {
+            sender.send(Message::ShowPlaceholder);
+        }
+
+        nvim::print!(
+            "{:?}",
+            (byte_offset, old_end_len, new_end_len, new_len,)
+        );
+        Ok(false)
+    }
 }

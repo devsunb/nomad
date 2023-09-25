@@ -14,6 +14,9 @@ pub enum Message {
     Confirmed,
 
     /// TODO: docs
+    HidePlaceholder,
+
+    /// TODO: docs
     Open(FuzzyConfig),
 
     /// TODO: docs
@@ -24,6 +27,9 @@ pub enum Message {
 
     /// TODO: docs
     SelectPrevItem,
+
+    /// TODO: docs
+    ShowPlaceholder,
 
     /// TODO: docs
     UpdateConfig(Option<WindowConfig>),

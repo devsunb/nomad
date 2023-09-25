@@ -8,6 +8,11 @@ pub(crate) struct View {
 }
 
 impl View {
+    pub fn close(&mut self) {
+        self.prompt.close();
+        // self.results.close();
+    }
+
     pub fn new(sender: Sender<Message>) -> Self {
         Self { prompt: Prompt::new(sender) }
     }
@@ -21,8 +26,7 @@ impl View {
         self.prompt.open(prompt, &prompt_window_config);
     }
 
-    pub fn close(&mut self) {
-        self.prompt.close();
-        // self.results.close();
+    pub fn prompt_mut(&mut self) -> &mut Prompt {
+        &mut self.prompt
     }
 }

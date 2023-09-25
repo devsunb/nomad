@@ -54,6 +54,8 @@ impl Plugin for FuzzyModal {
         match msg {
             Message::Close => self.view.close(),
             Message::Open(config) => self.open(config),
+            Message::HidePlaceholder => self.hide_placeholder(),
+            Message::ShowPlaceholder => self.show_placeholder(),
             _ => (),
         };
 
@@ -77,7 +79,15 @@ impl FuzzyModal {
         self.view.close();
     }
 
+    fn hide_placeholder(&mut self) {
+        self.view.prompt_mut().remove_placeholder();
+    }
+
     fn send(&mut self, msg: Message) {
         self.sender.send(msg);
+    }
+
+    fn show_placeholder(&mut self) {
+        self.view.prompt_mut().show_placeholder();
     }
 }
