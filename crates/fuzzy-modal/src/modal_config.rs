@@ -18,8 +18,8 @@ pub struct FuzzyConfig {
     pub(crate) on_confirm: Option<OnConfirm>,
     pub(crate) on_cancel: Option<OnExit>,
     pub(crate) on_select: Option<OnSelect>,
-    pub(crate) starting_text: Option<String>,
     pub(crate) starting_selected: Option<usize>,
+    pub(crate) prompt: PromptConfig,
 }
 
 impl FuzzyBuilder {
@@ -89,19 +89,20 @@ impl FuzzyBuilder {
         Items: IntoIterator<Item = Item>,
     {
         self.config.items.extend(items.into_iter().map(Into::into));
+        self.config.prompt.total_results = self.config.items.len() as _;
         self
     }
 
-    /// Set the default text that's displayed on the query line when there's no
+    /// Set the placeholder text that's displayed in the prompt when there's no
     /// query.
     ///
     /// # Panics
     ///
     /// Panics if the text contains a newline.
-    pub fn with_starting_text(mut self, text: impl Into<String>) -> Self {
+    pub fn with_placeholder_text(mut self, text: impl Into<String>) -> Self {
         let text = text.into();
         assert!(!text.contains('\n'));
-        self.config.starting_text = Some(text);
+        self.config.prompt.placeholder_text = Some(text);
         self
     }
 }

@@ -13,18 +13,12 @@ impl View {
     }
 
     pub fn open(&mut self, config: FuzzyConfig, window_config: WindowConfig) {
-        let FuzzyConfig {
-            items,
-            on_confirm,
-            on_cancel,
-            on_select,
-            starting_text,
-            starting_selected,
-        } = config;
+        let FuzzyConfig { prompt, .. } = config;
 
-        let (prompt_config, _) = window_config.bisect_vertical(1);
+        let (prompt_window_config, _results_window_config) =
+            window_config.bisect_vertical(1);
 
-        // self.prompt.open(prompt_config, window_config);
+        self.prompt.open(prompt, &prompt_window_config);
     }
 
     pub fn close(&mut self) {

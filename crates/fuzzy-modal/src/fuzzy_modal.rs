@@ -54,7 +54,7 @@ impl Plugin for FuzzyModal {
         match msg {
             Message::Close => self.view.close(),
             Message::Open(config) => self.open(config),
-            _ => todo!(),
+            _ => (),
         };
 
         Ok(())

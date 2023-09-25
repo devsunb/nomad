@@ -6,13 +6,13 @@ use crate::*;
 #[derive(Default)]
 pub(crate) struct PromptConfig {
     /// A placeholder text to display when the prompt is empty.
-    placeholder_text: Option<String>,
+    pub placeholder_text: Option<String>,
 
     /// The size of the result space over which the prompt query is matched.
     /// This remains constant between [`Prompt::open`] calls and is displayed
     /// at the end of the prompt together with the current number of matched
     /// results.
-    total_results: u64,
+    pub total_results: u64,
 }
 
 /// TODO: docs
@@ -46,10 +46,10 @@ pub(crate) struct Prompt {
     namespace_id: u32,
 
     /// TODO: docs.
-    placeholder_extmark_id: u32,
+    placeholder_extmark_id: Option<u32>,
 
     /// TODO: docs.
-    matched_on_total_extmark_id: u32,
+    matched_on_total_extmark_id: Option<u32>,
 }
 
 impl Prompt {
@@ -63,21 +63,27 @@ impl Prompt {
     }
 
     /// TODO: docs
-    pub fn open(&mut self, config: PromptConfig, window_config: WindowConfig) {
+    pub fn open(
+        &mut self,
+        config: PromptConfig,
+        window_config: &WindowConfig,
+    ) {
         if let Some(placeholder) = config.placeholder_text.as_ref() {
             self.update_placeholder(placeholder);
         }
 
-        self.update_total(config.total_results);
-
-        self.update_matched(config.total_results);
+        self.update_matched_on_total(
+            config.total_results,
+            config.total_results,
+        );
 
         // TODO: enter Insert mode.
 
-        let window_config = (&window_config).into();
-
         let window =
-            nvim::api::open_win(&self.buffer, true, &window_config).unwrap();
+            nvim::api::open_win(&self.buffer, true, &window_config.into())
+                .unwrap();
+
+        self.matched_results = config.total_results;
 
         self.window = Some(window);
 
@@ -88,60 +94,99 @@ impl Prompt {
     ///
     /// TODO: docs.
     pub fn new(sender: Sender<Message>) -> Self {
-        let mut buffer = nvim::api::create_buf(false, true).unwrap();
-
-        // Create an anonymous namespace for the prompt.
-        let namespace_id = nvim::api::create_namespace("");
-
-        let placeholder_extmark_id = buffer
-            .set_extmark(
-                namespace_id,
-                0,
-                0,
-                &SetExtmarkOpts::builder()
-                    .virt_text([("", highlights::PROMPT_PLACEHOLDER)])
-                    .virt_text_pos(ExtmarkVirtTextPosition::Overlay)
-                    .build(),
-            )
-            .unwrap();
-
-        let matched_on_total_extmark_id = buffer
-            .set_extmark(
-                namespace_id,
-                0,
-                0,
-                &SetExtmarkOpts::builder()
-                    .virt_text([("", highlights::PROMPT_MATCHED_ON_TOTAL)])
-                    .virt_text_pos(ExtmarkVirtTextPosition::RightAlign)
-                    .build(),
-            )
-            .unwrap();
-
         Self {
             value: String::new(),
             matched_results: 0,
             sender,
             config: PromptConfig::default(),
-            buffer,
+            buffer: nvim::api::create_buf(false, true).unwrap(),
             window: None,
-            namespace_id,
-            placeholder_extmark_id,
-            matched_on_total_extmark_id,
+            // Create an anonymous namespace for the prompt.
+            namespace_id: nvim::api::create_namespace(""),
+            placeholder_extmark_id: None,
+            matched_on_total_extmark_id: None,
         }
     }
 
     /// TODO: docs
     fn update_matched(&mut self, new_matched_results: u64) {
-        todo!();
+        self.matched_results = new_matched_results;
+
+        self.update_matched_on_total(
+            self.matched_results,
+            self.config.total_results,
+        );
+    }
+
+    /// TODO: docs
+    fn update_matched_on_total(&mut self, new_matched: u64, new_total: u64) {
+        if let Some(old_extmark) = self.matched_on_total_extmark_id {
+            self.buffer.del_extmark(self.namespace_id, old_extmark).unwrap();
+        }
+
+        let new_matched_on_total =
+            format_matched_on_total(new_matched, new_total);
+
+        let new_extmark = self
+            .buffer
+            .set_extmark(
+                self.namespace_id,
+                0,
+                0,
+                &SetExtmarkOpts::builder()
+                    .virt_text([(
+                        new_matched_on_total,
+                        highlights::PROMPT_MATCHED_ON_TOTAL,
+                    )])
+                    .virt_text_pos(ExtmarkVirtTextPosition::RightAlign)
+                    .build(),
+            )
+            .unwrap();
+
+        self.placeholder_extmark_id = Some(new_extmark);
     }
 
     /// TODO: docs
     fn update_placeholder(&mut self, new_placeholder: &str) {
-        todo!();
+        if let Some(old_extmark) = self.placeholder_extmark_id {
+            self.buffer.del_extmark(self.namespace_id, old_extmark).unwrap();
+        }
+
+        let new_extmark = self
+            .buffer
+            .set_extmark(
+                self.namespace_id,
+                0,
+                0,
+                &SetExtmarkOpts::builder()
+                    .virt_text([(
+                        new_placeholder,
+                        highlights::PROMPT_PLACEHOLDER,
+                    )])
+                    .virt_text_pos(ExtmarkVirtTextPosition::Overlay)
+                    .build(),
+            )
+            .unwrap();
+
+        self.placeholder_extmark_id = Some(new_extmark);
     }
 
     /// TODO: docs
     fn update_total(&mut self, new_total_results: u64) {
-        todo!();
+        self.config.total_results = new_total_results;
+
+        self.update_matched_on_total(
+            self.matched_results,
+            self.config.total_results,
+        );
     }
+}
+
+/// TODO: docs
+fn format_matched_on_total(
+    matched: u64,
+    total: u64,
+) -> impl Into<nvim::String> {
+    let formatted = format!("{}/{}", matched, total);
+    nvim::String::from(formatted.as_str())
 }

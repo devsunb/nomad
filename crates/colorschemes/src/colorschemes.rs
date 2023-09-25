@@ -97,7 +97,7 @@ impl Colorschemes {
 
         let modal = ctx
             .with_plugin::<FuzzyModal, _, _>(FuzzyModal::builder)
-            .with_starting_text("Choose colorscheme...")
+            .with_placeholder_text("Choose colorscheme...")
             .with_items(
                 schemes::colorschemes().keys().copied().map(FuzzyItem::new),
             )
