@@ -7,7 +7,7 @@ fn mad() -> nvim::Result<nvim::Dictionary> {
         .with_plugin::<colorschemes::Colorschemes>()
         .with_plugin::<fuzzy_modal::FuzzyModal>()
         .with_plugin::<seph::Seph>()
-        .with_tracing_subscriber(tracing_subscriber::fmt().finish())
+        .with_tracing_subscriber(tracing_subscriber::Subscriber::new())
         .init()
         .api())
 }

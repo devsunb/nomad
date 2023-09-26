@@ -18,9 +18,9 @@ common = { path = "crates/common" }
 fuzzy-modal = { path = "crates/fuzzy-modal" }
 mad = { path = "crates/mad" }
 seph = { path = "crates/seph" }
+tracing-subscriber = { path = "crates/tracing-subscriber" }
 
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
-tracing-subscriber = { version = "0.3", features = ["fmt"] }
 
 [workspace]
 members = ["crates/*"]

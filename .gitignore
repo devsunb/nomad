@@ -1,4 +1,5 @@
-/init.lua
+/colors
 /lua
 /target
-/colors
+init.lua
+nomad.log
