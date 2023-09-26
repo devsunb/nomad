@@ -55,8 +55,9 @@ impl Plugin for FuzzyModal {
         match msg {
             Message::AddResults(items) => self.view.add_results(items),
             Message::Close => self.view.close(),
-            Message::Open(config) => self.open(config),
+            Message::DoneFiltering(matched) => self.done_filtering(matched),
             Message::HidePlaceholder => self.hide_placeholder(),
+            Message::Open(config) => self.open(config),
             Message::ShowPlaceholder => self.show_placeholder(),
             _ => (),
         };
@@ -69,6 +70,10 @@ impl FuzzyModal {
     /// TODO: docs
     pub fn builder(&self) -> FuzzyBuilder {
         FuzzyBuilder::new((*self.sender).clone())
+    }
+
+    fn done_filtering(&mut self, matched: u64) {
+        self.view.prompt_mut().update_matched(matched);
     }
 
     fn open(&mut self, fuzzy_config: FuzzyConfig) {

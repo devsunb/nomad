@@ -14,6 +14,9 @@ pub enum Message {
     Confirmed,
 
     /// TODO: docs
+    DoneFiltering(u64),
+
+    /// TODO: docs
     HidePlaceholder,
 
     /// TODO: docs
