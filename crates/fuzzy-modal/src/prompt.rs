@@ -320,14 +320,14 @@ fn handle_on_bytes(
 ) {
     let new_len = buffer.get_offset(1).unwrap() - 1;
 
-    let was_empty = (new_end_offset - start_offset) == new_len;
-
     let is_empty = new_len == 0;
 
-    if was_empty {
-        sender.send(Message::HidePlaceholder);
-    } else if is_empty {
+    let was_empty = !is_empty && (new_end_offset - start_offset) == new_len;
+
+    if is_empty {
         sender.send(Message::ShowPlaceholder);
+    } else if was_empty {
+        sender.send(Message::HidePlaceholder);
     }
 
     let diff = match old_end_offset.cmp(&new_end_offset) {
@@ -371,7 +371,7 @@ fn handle_on_bytes(
         },
     };
 
-    nvim::print!("diff: {diff:?}");
+    // nvim::print!("diff: {diff:?}");
 
     sender.send(Message::PromptChanged(diff));
 }
