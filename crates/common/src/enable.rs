@@ -2,6 +2,7 @@ use core::ops::Deref;
 
 /// TODO: docs
 #[derive(Debug, Clone, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Enable<T> {
     #[serde(default = "yes")]
     enable: bool,
