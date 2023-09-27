@@ -318,6 +318,11 @@ fn handle_on_bytes(
     new_end_offset: usize,
     sender: &Sender<Message>,
 ) {
+    if buffer.line_count().unwrap() > 1 {
+        sender.send(Message::Close);
+        return;
+    }
+
     let new_len = buffer.get_offset(1).unwrap() - 1;
 
     let is_empty = new_len == 0;
