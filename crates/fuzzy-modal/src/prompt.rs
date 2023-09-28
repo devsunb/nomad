@@ -4,7 +4,6 @@ use std::ops::Range;
 
 use common::{nvim, WindowConfig, *};
 use nvim::api::{opts::*, types::*, Buffer, Window};
-use tracing::*;
 
 use crate::*;
 
@@ -57,13 +56,8 @@ pub(crate) struct Prompt {
     /// open.
     window: Option<Window>,
 
+    /// TODO: docs.
     augroup_id: u32,
-
-    /// TODO: docs.
-    win_close_autocmd_id: Option<u32>,
-
-    /// TODO: docs.
-    win_leave_autocmd_id: Option<u32>,
 
     /// TODO: docs.
     namespace_id: u32,
@@ -95,7 +89,7 @@ impl Prompt {
             })
             .build();
 
-        let win_close_id = nvim::api::create_autocmd(
+        nvim::api::create_autocmd(
             std::iter::once("WinClosed"),
             &win_close_opts,
         )
@@ -111,14 +105,11 @@ impl Prompt {
             })
             .build();
 
-        let win_leave_id = nvim::api::create_autocmd(
+        nvim::api::create_autocmd(
             std::iter::once("WinLeave"),
             &win_leave_opts,
         )
         .unwrap();
-
-        self.win_close_autocmd_id = Some(win_close_id);
-        self.win_leave_autocmd_id = Some(win_leave_id);
     }
 
     /// TODO: docs
@@ -229,8 +220,6 @@ impl Prompt {
             buffer,
             window: None,
             augroup_id,
-            win_close_autocmd_id: None,
-            win_leave_autocmd_id: None,
             // Create an anonymous namespace for the prompt.
             namespace_id: nvim::api::create_namespace(""),
             placeholder_extmark_id: None,
