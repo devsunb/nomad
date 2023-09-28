@@ -229,11 +229,9 @@ impl Prompt {
 
     /// TODO: docs
     pub fn remove_placeholder(&mut self) {
-        if let Some(old_extmark) = self.placeholder_extmark_id {
+        if let Some(old_extmark) = self.placeholder_extmark_id.take() {
             self.buffer.del_extmark(self.namespace_id, old_extmark).unwrap();
         }
-
-        self.placeholder_extmark_id = None;
     }
 
     /// TODO: docs
