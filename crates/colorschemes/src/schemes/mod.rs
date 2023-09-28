@@ -2,6 +2,7 @@
 
 mod ayu_mirage;
 mod dracula;
+mod one_dark;
 
 mod _static;
 
