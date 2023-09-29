@@ -52,6 +52,11 @@ impl View {
             if let Some(on_confirm) = self.on_confirm.take() {
                 on_confirm(selected_result);
             }
+
+            // After successfully confirming the view will be closed. If we
+            // don't clear this callback it will be called by `Self::close`.
+            self.on_cancel = None;
+
             ConfirmResult::Confirmed
         } else {
             ConfirmResult::Ignored
