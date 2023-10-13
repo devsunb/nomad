@@ -11,6 +11,10 @@ const UPPER_RIGHT_STRAIGHT_CORNER: char = '┌';
 
 const UPPER_LEFT_STRAIGHT_CORNER: char = '┐';
 
+const LOWER_RIGHT_STRAIGHT_CORNER: char = '┘';
+
+const LOWER_LEFT_STRAIGHT_CORNER: char = '└';
+
 const HORIZONTAL_EDGE: char = '─';
 
 const VERTICAL_EDGE: char = '│';
@@ -162,8 +166,8 @@ impl Default for Prompt {
 
         config
             .anchor(WindowAnchor::NorthWest)
-            .col(2)
-            .row(1)
+            .col(1)
+            .row(0)
             .focusable(true)
             .style(WindowStyle::Minimal)
             .zindex(OUTER_PROMPT_Z_INDEX);
@@ -214,13 +218,24 @@ impl Default for OuterResults {
     fn default() -> Self {
         let buffer = nvim::api::create_buf(false, true).unwrap();
 
+        let border = WindowBorder::Anal(
+            None.into(),
+            None.into(),
+            None.into(),
+            VERTICAL_EDGE.into(),
+            LOWER_RIGHT_STRAIGHT_CORNER.into(),
+            HORIZONTAL_EDGE.into(),
+            LOWER_LEFT_STRAIGHT_CORNER.into(),
+            VERTICAL_EDGE.into(),
+        );
+
         let mut config = WindowConfig::builder();
 
         config
             .anchor(WindowAnchor::NorthWest)
-            .col(0)
-            .row(1)
-            .border(WindowBorder::Single)
+            .col(-1)
+            .row(2)
+            .border(border)
             .focusable(false)
             .style(WindowStyle::Minimal)
             .zindex(OUTER_RESULTS_Z_INDEX);
@@ -249,7 +264,7 @@ impl OuterResults {
 
         self.window = Some(window);
 
-        Ok(rectangle.shrink_horizontally(4).shrink_vertically(4))
+        Ok(rectangle.shrink_horizontally(2))
     }
 
     fn close(&mut self) {
@@ -271,8 +286,8 @@ impl Default for Results {
 
         config
             .anchor(WindowAnchor::NorthWest)
-            .col(2)
-            .row(2)
+            .col(1)
+            .row(0)
             .focusable(false)
             .style(WindowStyle::Minimal)
             .zindex(OUTER_RESULTS_Z_INDEX);
