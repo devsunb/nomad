@@ -297,7 +297,6 @@ dependencies = [
 [[package]]
 name = "nvim-oxi"
 version = "0.3.0"
-source = "git+https://github.com/noib3/nvim-oxi#9bca19399ce345ee8a524ae5945a1d42189516c5"
 dependencies = [
  "oxi-api",
  "oxi-libuv",
@@ -322,7 +321,6 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 [[package]]
 name = "oxi-api"
 version = "0.3.0"
-source = "git+https://github.com/noib3/nvim-oxi#9bca19399ce345ee8a524ae5945a1d42189516c5"
 dependencies = [
  "oxi-luajit",
  "oxi-types",
@@ -334,7 +332,6 @@ dependencies = [
 [[package]]
 name = "oxi-libuv"
 version = "0.3.0"
-source = "git+https://github.com/noib3/nvim-oxi#9bca19399ce345ee8a524ae5945a1d42189516c5"
 dependencies = [
  "libuv-sys2",
  "once_cell",
@@ -345,7 +342,6 @@ dependencies = [
 [[package]]
 name = "oxi-luajit"
 version = "0.3.0"
-source = "git+https://github.com/noib3/nvim-oxi#9bca19399ce345ee8a524ae5945a1d42189516c5"
 dependencies = [
  "once_cell",
  "thiserror",
@@ -354,7 +350,6 @@ dependencies = [
 [[package]]
 name = "oxi-macros"
 version = "0.3.0"
-source = "git+https://github.com/noib3/nvim-oxi#9bca19399ce345ee8a524ae5945a1d42189516c5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -364,7 +359,6 @@ dependencies = [
 [[package]]
 name = "oxi-types"
 version = "0.3.0"
-source = "git+https://github.com/noib3/nvim-oxi#9bca19399ce345ee8a524ae5945a1d42189516c5"
 dependencies = [
  "libc",
  "oxi-luajit",

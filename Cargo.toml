@@ -1,3 +1,22 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Riccardo Mazzarini <me@noib3.dev>"]
+
+[workspace.dependencies]
+nvim-oxi = { path = "../../nvim-oxi/crates/nvim-oxi" }
+# nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
+once_cell = { version = "1.18" }
+phf = { version = "0.11" }
+serde = { version = "1.0" }
+serde_path_to_error = "0.1"
+thiserror = { version = "1.0" }
+tracing = { version = "0.1" }
+
 [package]
 name = "nomad"
 version = "0.1.0"
@@ -27,22 +46,4 @@ mad = { path = "crates/mad" }
 seph = { path = "crates/seph" }
 tracing-subscriber = { path = "crates/tracing-subscriber" }
 
-nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
-
-[workspace]
-members = ["crates/*"]
-resolver = "2"
-
-[workspace.package]
-version = "0.1.0"
-edition = "2021"
-authors = ["Riccardo Mazzarini <me@noib3.dev>"]
-
-[workspace.dependencies]
-nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
-once_cell = { version = "1.18" }
-phf = { version = "0.11" }
-serde = { version = "1.0" }
-serde_path_to_error = "0.1"
-thiserror = { version = "1.0" }
-tracing = { version = "0.1" }
+nvim-oxi = { workspace = true }

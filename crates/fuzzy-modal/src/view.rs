@@ -44,7 +44,7 @@ impl Modal {
     }
 
     pub fn close(&mut self) {
-        // self.layout.close().unwrap();
+        self.layout.close().unwrap();
 
         self.prompt.close();
 
@@ -103,14 +103,14 @@ impl Modal {
     ) {
         self.close();
 
+        self.layout
+            .open(self.prompt.buffer(), self.results.buffer(), rectangle)
+            .unwrap();
+
         // TODO: switch
         self.results.open(results, modal_id);
 
         self.prompt.open(prompt, modal_id);
-
-        self.layout
-            .open(self.prompt.buffer(), self.results.buffer(), rectangle)
-            .unwrap();
 
         self.ctx = Some(OpenCtx::open(modal_id));
 
