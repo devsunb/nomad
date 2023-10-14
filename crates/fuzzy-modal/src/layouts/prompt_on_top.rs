@@ -368,7 +368,7 @@ impl Results {
 
         if old_selected != self.selected_result {
             if let Some(window) = &mut self.window {
-                if old_selected.is_some() {
+                if old_selected.is_none() {
                     window.set_option("cursorline", true).unwrap();
                 }
                 window.set_cursor(idx + 1, 0).unwrap();

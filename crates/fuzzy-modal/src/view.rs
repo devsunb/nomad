@@ -163,7 +163,7 @@ impl Modal {
     }
 
     pub fn select_prev(&mut self) {
-        if let Some(new_selected) = self.layout.select_next() {
+        if let Some(new_selected) = self.layout.select_prev() {
             if let Some(on_select) = &mut self.on_select {
                 on_select(self.results.displayed(new_selected));
             }
