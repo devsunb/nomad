@@ -14,12 +14,12 @@ use crate::config;
 
 /// TODO: docs
 #[derive(Default)]
-pub struct Mad {
+pub struct Nomad {
     api: Api,
     runtime: Rc<RefCell<Runtime>>,
 }
 
-impl Mad {
+impl Nomad {
     pub fn new() -> Self {
         Self::default()
     }
