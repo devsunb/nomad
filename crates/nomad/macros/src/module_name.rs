@@ -1,9 +1,5 @@
 use proc_macro::TokenStream;
 
-mod module_name;
-
-/// TODO: docs
-#[proc_macro]
 pub fn module_name(input: TokenStream) -> TokenStream {
-    module_name::module_name(input)
+    input
 }
