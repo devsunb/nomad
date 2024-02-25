@@ -13,6 +13,7 @@ neovim-nightly = ["neovim/neovim-nightly"]
 [dependencies]
 macros = { path = "./macros" }
 neovim = { workspace = true }
+serde = { workspace = true }
 
 [lints]
 workspace = true

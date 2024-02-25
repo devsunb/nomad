@@ -7,7 +7,6 @@ license.workspace = true
 publish = false
 
 [dependencies]
-neovim = { workspace = true }
 nomad = { workspace = true }
 
 [lints]
