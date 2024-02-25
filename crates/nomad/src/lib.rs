@@ -1,4 +1,4 @@
-//! # Neovim
+//! # Nomad
 //!
 //! TODO: docs
 
