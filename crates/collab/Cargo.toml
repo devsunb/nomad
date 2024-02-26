@@ -8,6 +8,8 @@ publish = false
 
 [dependencies]
 nomad = { workspace = true }
+serde = { workspace = true }
+url = { version = "2", features = ["serde"] }
 
 [lints]
 workspace = true

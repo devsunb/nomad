@@ -2,6 +2,8 @@ use core::convert::Infallible;
 
 use nomad::prelude::*;
 
+use crate::CollabConfig;
+
 /// TODO: docs.
 pub struct Collab {}
 
@@ -12,7 +14,7 @@ impl DefaultEnable for Collab {
 impl Module for Collab {
     const NAME: ModuleName = module_name!("collab");
 
-    type Config = ();
+    type Config = CollabConfig;
 
     type InitError = Infallible;
 
