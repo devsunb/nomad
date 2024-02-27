@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use crate::prelude::*;
 
 /// TODO: docs
-pub trait Module: DefaultEnable + Sized {
+pub trait Module: 'static + DefaultEnable + Sized {
     /// TODO: docs
     const NAME: ModuleName;
 

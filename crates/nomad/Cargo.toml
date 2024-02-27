@@ -11,6 +11,7 @@ neovim-0-9 = ["neovim/neovim-0-9"]
 neovim-nightly = ["neovim/neovim-nightly"]
 
 [dependencies]
+futures = { workspace = true }
 macros = { path = "./macros" }
 neovim = { workspace = true }
 serde = { workspace = true }

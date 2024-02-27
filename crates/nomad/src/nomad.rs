@@ -3,7 +3,7 @@ use core::cell::RefCell;
 
 use neovim::Ctx;
 
-use crate::prelude::nvim::Dictionary;
+use crate::prelude::nvim::{self, Dictionary};
 use crate::{EnableConfig, Module, ObjectSafeModule};
 
 /// TODO: docs
@@ -14,13 +14,18 @@ pub struct Nomad {
 
     /// TODO: docs
     ctx: Rc<RefCell<Ctx>>,
+
+    /// TODO: docs
+    modules: Vec<Box<dyn ObjectSafeModule>>,
 }
 
 impl Nomad {
     /// TODO: docs
     #[inline]
     pub fn api(self) -> Dictionary {
-        self.api
+        let Self { api, ctx, modules } = self;
+        load(ctx, modules);
+        api
     }
 
     /// TODO: docs
@@ -40,7 +45,7 @@ impl Nomad {
         let (config, _set_config) =
             init_ctx.new_input(EnableConfig::<M>::default());
 
-        let module = Rc::new(M::init(config, init_ctx));
+        let module = M::init(config, init_ctx);
 
         drop(ctx);
 
@@ -50,6 +55,20 @@ impl Nomad {
 
         for _command in module.commands() {}
 
+        self.modules.push(Box::new(module));
+
         self
     }
+}
+
+/// TODO: docs
+fn load(ctx: Rc<RefCell<Ctx>>, modules: Vec<Box<dyn ObjectSafeModule>>) {
+    nvim::schedule(move |()| {
+        let ctx = &mut *ctx.borrow_mut();
+        let set_ctx = ctx.as_set();
+        for module in modules {
+            module.load(set_ctx);
+        }
+        Ok(())
+    });
 }
