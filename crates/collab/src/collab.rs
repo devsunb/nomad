@@ -40,7 +40,7 @@ impl Module for Collab {
 
     #[inline]
     async fn load(&self, _ctx: &mut SetCtx) -> impl MaybeResult<()> {
-        println!("Loading {}...", Self::NAME);
+        nvim::print!("Loading {}...", Self::NAME);
     }
 }
 
@@ -56,7 +56,7 @@ impl Action for Print {
 
     #[inline]
     fn execute(&self, _args: (), ctx: &mut SetCtx) {
-        print!("Collab counter is now {:?}", self.counter.get(ctx))
+        nvim::print!("Collab counter is now {:?}", self.counter.get(ctx))
     }
 }
 
