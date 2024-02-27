@@ -18,6 +18,12 @@ impl core::fmt::Display for ModuleName {
 }
 
 impl ModuleName {
+    /// TODO: docs
+    #[inline]
+    pub(crate) fn as_str(&self) -> &'static str {
+        self.name
+    }
+
     #[doc(hidden)]
     pub const fn from_str(name: &'static str) -> Self {
         Self { name }

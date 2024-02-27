@@ -2,6 +2,8 @@
 //!
 //! TODO: docs
 
+extern crate alloc;
+
 mod action;
 mod action_name;
 mod api;
@@ -11,6 +13,7 @@ mod maybe_result;
 mod module;
 mod module_name;
 mod nomad;
+mod object_safe_module;
 
 pub use action::Action;
 pub use action_name::ActionName;
@@ -22,6 +25,7 @@ pub use maybe_result::MaybeResult;
 pub use module::Module;
 pub use module_name::ModuleName;
 pub use nomad::Nomad;
+use object_safe_module::ObjectSafeModule;
 
 pub mod prelude {
     //! TODO: docs

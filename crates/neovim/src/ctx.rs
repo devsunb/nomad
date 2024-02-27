@@ -6,8 +6,24 @@ use pond::Engine;
 use crate::{Get, Set};
 
 /// TODO: docs
-pub(crate) struct Ctx {
+#[derive(Default)]
+pub struct Ctx {
     engine: Engine,
+}
+
+impl Ctx {
+    /// TODO: docs
+    #[inline]
+    pub fn as_init(&self) -> &InitCtx {
+        // SAFETY: `InitCtx` and `Ctx` have the same layout.
+        unsafe { mem::transmute(self) }
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn new_input<T>(&self, input: T) -> (Get<T>, Set<T>) {
+        self.as_init().new_input(input)
+    }
 }
 
 /// TODO: docs
