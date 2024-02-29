@@ -10,7 +10,19 @@ use pin_project_lite::pin_project;
 /// TODO: docs.
 #[inline]
 pub fn sleep(duration: Duration) -> Sleep {
-    Sleep::new(Instant::now() + duration)
+    let sleep_until = match Instant::now().checked_add(duration) {
+        Some(instant) => instant,
+        None => far_future(),
+    };
+    Sleep::new(sleep_until)
+}
+
+/// Roughly 30 years from now.
+///
+/// This was lifted directly from tokio's `Instant::far_future()` impl.
+#[inline(always)]
+fn far_future() -> Instant {
+    Instant::now() + Duration::from_secs(86400 * 365 * 30)
 }
 
 pin_project! {
