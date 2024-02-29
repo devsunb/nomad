@@ -14,6 +14,7 @@ neovim-nightly = ["neovim/neovim-nightly"]
 futures = { workspace = true }
 macros = { path = "./macros" }
 neovim = { workspace = true }
+pin-project-lite = { workspace = true }
 serde = { workspace = true }
 
 [lints]
