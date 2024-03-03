@@ -14,11 +14,15 @@ neovim-nightly = ["neovim/neovim-nightly"]
 async-task = "4.7"
 concurrent-queue = "2.4"
 futures = { workspace = true }
+home = "0.5"
 macros = { path = "./macros" }
 neovim = { workspace = true }
 pin-project-lite = { workspace = true }
 serde = { workspace = true }
+time = { version = "0.3", features = ["macros"] }
 tracing = "0.1"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["time"] }
 
 [lints]
 workspace = true
