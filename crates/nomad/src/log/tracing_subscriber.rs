@@ -53,6 +53,7 @@ impl NomadTracingSubscriber {
 
         let subscriber = fmt_builder()
             .with_ansi(false)
+            .with_max_level(tracing::Level::DEBUG)
             .with_timer(timer)
             .with_writer(non_blocking)
             .finish();
@@ -121,7 +122,7 @@ impl tracing::Subscriber for NomadTracingSubscriber {
 
 #[inline]
 fn log_dir() -> PathBuf {
-    nvim_data_dir().join("nomad")
+    nvim_data_dir().join("nomad").join("logs")
 }
 
 #[inline]
