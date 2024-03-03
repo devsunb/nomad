@@ -3,6 +3,7 @@ use core::cell::RefCell;
 
 use neovim::Ctx;
 
+use crate::log;
 use crate::prelude::nvim::Dictionary;
 use crate::runtime;
 use crate::{EnableConfig, Module, ObjectSafeModule};
@@ -28,9 +29,17 @@ impl Nomad {
         api
     }
 
+    // We don't derive Default because we want the `new` method to be the only
+    // way to create a `Nomad` instance.
+    #[inline]
+    fn default() -> Self {
+        Self { api: Dictionary::default(), ctx: Rc::default() }
+    }
+
     /// TODO: docs
     #[inline]
     pub fn new() -> Self {
+        log::init();
         Self::default()
     }
 

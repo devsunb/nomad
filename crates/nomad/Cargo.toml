@@ -18,6 +18,7 @@ macros = { path = "./macros" }
 neovim = { workspace = true }
 pin-project-lite = { workspace = true }
 serde = { workspace = true }
+tracing = "0.1"
 
 [lints]
 workspace = true

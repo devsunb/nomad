@@ -9,6 +9,7 @@ mod action_name;
 mod api;
 mod command;
 mod enable;
+pub mod log;
 mod maybe_result;
 mod module;
 mod module_name;
@@ -31,6 +32,7 @@ use object_safe_module::ObjectSafeModule;
 pub mod prelude {
     //! TODO: docs
 
+    pub use log::*;
     pub use neovim::*;
     pub use runtime::*;
 
