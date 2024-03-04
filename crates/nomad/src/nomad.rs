@@ -57,7 +57,7 @@ impl Nomad {
         });
 
         // TODO: docs
-        config::with_module::<M>(set_config, &self.ctx);
+        config::with_module::<M>(set_config, self.ctx.clone());
 
         // Add the module's API to the global API.
         self.api.insert(M::NAME.as_str(), module_api(&module, &self.ctx));

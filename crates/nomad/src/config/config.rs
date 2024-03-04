@@ -1,46 +1,50 @@
 use core::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
 
-use nvim::{serde::Deserializer, Object};
-use serde::de::Deserialize;
+use serde::de::{self, Deserialize};
 
 use super::EnableConfig;
 use crate::ctx::{Ctx, Set};
-use crate::prelude::{nvim, Module, ModuleName};
+use crate::module::{Module, ModuleId};
+use crate::nvim::{serde::Deserializer, Function, Object};
 
 thread_local! {
     /// TODO: docs
-    static DESERIALIZERS: ConfigDeserializers = ConfigDeserializers::new();
+    static DESERIALIZERS: ConfigDeserializers
+        = const { ConfigDeserializers::new() };
 }
 
 /// TODO: docs
-pub(crate) fn config() -> nvim::Function<Object, ()> {
-    todo!();
+pub(crate) fn config() -> Function<Object, ()> {
+    Function::from_fn(|object| {
+        let deserializer = Deserializer::new(object);
+        UpdateConfigs::deserialize(deserializer).unwrap();
+        Ok::<_, core::convert::Infallible>(())
+    })
 }
 
 /// TODO: docs
 #[inline]
-pub(crate) fn with_module<M>(set_config: Set<EnableConfig<M>>, ctx: &Ctx)
+pub(crate) fn with_module<M>(set_config: Set<EnableConfig<M>>, ctx: Ctx)
 where
     M: Module,
 {
-    let deserializer = ConfigDeserializer::new(set_config, ctx.clone());
-
-    DESERIALIZERS.with(move |deserializers| {
-        deserializers.insert(M::NAME, deserializer)
+    DESERIALIZERS.with(|deserializers| {
+        let deserializer = ConfigDeserializer::new(set_config, ctx);
+        deserializers.insert(M::NAME.id(), deserializer)
     });
 }
 
 /// TODO: docs
 struct ConfigDeserializers {
-    deserializers: OnceCell<RefCell<HashMap<ModuleName, ConfigDeserializer>>>,
+    deserializers: OnceCell<RefCell<HashMap<ModuleId, ConfigDeserializer>>>,
 }
 
 impl ConfigDeserializers {
     /// TODO: docs
     #[inline]
-    fn insert(&self, name: ModuleName, deserializer: ConfigDeserializer) {
-        self.with_map(|map| map.insert(name, deserializer));
+    fn insert(&self, id: ModuleId, deserializer: ConfigDeserializer) {
+        self.with_map(|map| map.insert(id, deserializer));
     }
 
     /// TODO: docs
@@ -52,7 +56,7 @@ impl ConfigDeserializers {
     #[inline]
     fn with_map<F, R>(&self, f: F) -> R
     where
-        F: FnOnce(&mut HashMap<ModuleName, ConfigDeserializer>) -> R,
+        F: FnOnce(&mut HashMap<ModuleId, ConfigDeserializer>) -> R,
     {
         let inner = self.deserializers.get_or_init(RefCell::default);
         let map = &mut *inner.borrow_mut();
@@ -87,3 +91,71 @@ impl ConfigDeserializer {
         Self { deserializer: Box::new(deserializer) }
     }
 }
+
+/// TODO: docs
+struct UpdateConfigs;
+
+impl UpdateConfigs {
+    /// TODO: docs
+    #[inline]
+    fn update_config(
+        module_name: String,
+        module_config: Object,
+    ) -> Result<(), InvalidModule> {
+        let module_id = ModuleId::from_module_name(&module_name);
+
+        DESERIALIZERS.with(move |deserializers| {
+            deserializers.with_map(|map| {
+                map.get(&module_id)
+                    .ok_or(InvalidModule(module_name))
+                    .map(|des| des.deserialize(module_config))
+            })
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for UpdateConfigs {
+    #[inline]
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct UpdateConfigsVisitor;
+
+        impl<'de> de::Visitor<'de> for UpdateConfigsVisitor {
+            type Value = UpdateConfigs;
+
+            #[inline]
+            fn expecting(
+                &self,
+                f: &mut std::fmt::Formatter,
+            ) -> std::fmt::Result {
+                f.write_str("a dictionary")
+            }
+
+            #[inline]
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: de::MapAccess<'de>,
+            {
+                while let Some(module_name) = map.next_key::<String>()? {
+                    let module_config = map.next_value::<Object>()?;
+
+                    if let Err(_err) = UpdateConfigs::update_config(
+                        module_name,
+                        module_config,
+                    ) {
+                        todo!();
+                    }
+                }
+
+                Ok(UpdateConfigs)
+            }
+        }
+
+        deserializer.deserialize_map(UpdateConfigsVisitor)
+    }
+}
+
+/// TODO: docs
+struct InvalidModule(String);
