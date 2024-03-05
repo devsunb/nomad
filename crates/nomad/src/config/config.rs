@@ -313,7 +313,7 @@ impl InvalidModuleMsgKind {
 #[inline]
 fn invalid_config_msg<E: core::fmt::Display>(err: E) -> WarningMsg {
     let mut msg = WarningMsg::new();
-    msg.add("couldn't deserialize config: ").add(err.to_string().highlight());
+    msg.add("couldn't deserialize config: ").add(err.to_string());
     msg
 }
 
@@ -324,7 +324,7 @@ where
     A: de::MapAccess<'de>,
 {
     let mut msg = WarningMsg::new();
-    msg.add("couldn't deserialize config key: ").add(err.to_string().as_str());
+    msg.add("couldn't deserialize config key: ").add(err.to_string());
     msg
 }
 
@@ -335,7 +335,7 @@ where
     A: de::MapAccess<'de>,
 {
     let mut msg = WarningMsg::new();
-    msg.add("couldn't deserialize object: ").add(err.to_string().as_str());
+    msg.add("couldn't deserialize object: ").add(err.to_string());
     msg
 }
 
@@ -403,7 +403,7 @@ fn invalid_module_config_msg(err: &DeserializationError) -> WarningMsg {
     msg.add("couldn't deserialize ")
         .add(err.path().to_string().highlight())
         .add(": ")
-        .add(err.inner().to_string().highlight());
+        .add(err.inner().to_string());
 
     msg
 }

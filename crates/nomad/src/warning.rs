@@ -39,7 +39,7 @@ impl Warning {
             .chain(self.msg.chunks)
             .map(Chunk::into_tuple);
 
-        let _ = nvim::api::echo(chunks, true);
+        let _ = nvim::api::echo(chunks, true, &Default::default());
     }
 }
 
@@ -103,6 +103,13 @@ impl From<&str> for Chunk {
     #[inline]
     fn from(text: &str) -> Self {
         Self::new(text, None)
+    }
+}
+
+impl From<String> for Chunk {
+    #[inline]
+    fn from(text: String) -> Self {
+        Self::new(text.as_str(), None)
     }
 }
 
