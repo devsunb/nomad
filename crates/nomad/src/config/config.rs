@@ -13,6 +13,10 @@ thread_local! {
     /// TODO: docs
     static DESERIALIZERS: ConfigDeserializers
         = const { ConfigDeserializers::new() };
+
+    /// TODO: docs
+    static MODULE_NAMES: OnceCell<&'static [ModuleName]>
+        = const { OnceCell::new() };
 }
 
 /// TODO: docs
@@ -26,6 +30,32 @@ pub(crate) fn config() -> Function<Object, ()> {
 
 /// TODO: docs
 #[inline]
+fn valid_modules() -> &'static [ModuleName] {
+    let init_module_names = || {
+        DESERIALIZERS.with(|d| {
+            d.with_map(|map| {
+                let mut vec = map
+                    .values()
+                    .map(ConfigDeserializer::module_name)
+                    .collect::<Vec<_>>();
+
+                // Sort the module names alphabetically. This produces a nicer
+                // message if we need to print the list of valid modules in a
+                // warning.
+                vec.sort_unstable();
+
+                // This isn't a memory leak because we're only leaking the
+                // vector once when this function is called for the first time.
+                &*(vec.leak())
+            })
+        })
+    };
+
+    MODULE_NAMES.with(|names| *names.get_or_init(init_module_names))
+}
+
+/// TODO: docs
+#[inline]
 pub(crate) fn with_module<M>(set_config: Set<EnableConfig<M>>, ctx: Ctx)
 where
     M: Module,
@@ -34,12 +64,6 @@ where
         let deserializer = ConfigDeserializer::new(set_config, ctx);
         deserializers.insert(M::NAME.id(), deserializer)
     });
-}
-
-/// TODO: docs
-#[inline]
-fn valid_modules() -> &'static [ModuleName] {
-    &[]
 }
 
 /// TODO: docs
@@ -74,6 +98,7 @@ impl ConfigDeserializers {
 /// TODO: docs
 struct ConfigDeserializer {
     deserializer: Box<dyn Fn(Object) + 'static>,
+    module_name: ModuleName,
 }
 
 impl ConfigDeserializer {
@@ -81,6 +106,12 @@ impl ConfigDeserializer {
     #[inline]
     fn deserialize(&self, config: Object) {
         (self.deserializer)(config);
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn module_name(&self) -> ModuleName {
+        self.module_name
     }
 
     /// TODO: docs
@@ -95,7 +126,7 @@ impl ConfigDeserializer {
             ctx.with_set(|set_ctx| set_config.set(config, set_ctx));
         };
 
-        Self { deserializer: Box::new(deserializer) }
+        Self { deserializer: Box::new(deserializer), module_name: M::NAME }
     }
 }
 
@@ -218,7 +249,13 @@ impl InvalidModuleMsgKind {
 
         let mut idx_closest = 0;
 
-        for (idx, valid) in valid_modules().iter().enumerate() {
+        let valid_modules = valid_modules();
+
+        if valid_modules.is_empty() {
+            return Self::ListAllModules;
+        }
+
+        for (idx, valid) in valid_modules.iter().enumerate() {
             let distance = strsim::damerau_levenshtein(module, valid.as_str());
 
             if distance < min_distance {
@@ -235,8 +272,7 @@ impl InvalidModuleMsgKind {
         };
 
         if should_suggest_closest {
-            let closest = valid_modules()[idx_closest];
-            Self::SuggestClosest(closest)
+            Self::SuggestClosest(valid_modules[idx_closest])
         } else {
             Self::ListAllModules
         }

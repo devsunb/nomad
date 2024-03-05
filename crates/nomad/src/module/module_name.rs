@@ -2,7 +2,7 @@ use super::ModuleId;
 use crate::warning::Chunk;
 
 /// TODO: docs
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ModuleName {
     name: &'static str,
 }
