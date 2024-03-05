@@ -426,7 +426,7 @@ checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
 [[package]]
 name = "nvim-oxi"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#dfcbfd5b069dcb481a877716e9706089fb35aa52"
+source = "git+https://github.com/noib3/nvim-oxi#5baf1caf62c48aa17ae92b2e8dc10ed91712bb2c"
 dependencies = [
  "nvim-oxi-api",
  "nvim-oxi-libuv",
@@ -439,7 +439,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-api"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#dfcbfd5b069dcb481a877716e9706089fb35aa52"
+source = "git+https://github.com/noib3/nvim-oxi#5baf1caf62c48aa17ae92b2e8dc10ed91712bb2c"
 dependencies = [
  "nvim-oxi-luajit",
  "nvim-oxi-macros",
@@ -452,7 +452,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-libuv"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#dfcbfd5b069dcb481a877716e9706089fb35aa52"
+source = "git+https://github.com/noib3/nvim-oxi#5baf1caf62c48aa17ae92b2e8dc10ed91712bb2c"
 dependencies = [
  "nvim-oxi-luajit",
  "once_cell",
@@ -462,7 +462,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-luajit"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#dfcbfd5b069dcb481a877716e9706089fb35aa52"
+source = "git+https://github.com/noib3/nvim-oxi#5baf1caf62c48aa17ae92b2e8dc10ed91712bb2c"
 dependencies = [
  "once_cell",
  "thiserror",
@@ -471,7 +471,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-macros"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#dfcbfd5b069dcb481a877716e9706089fb35aa52"
+source = "git+https://github.com/noib3/nvim-oxi#5baf1caf62c48aa17ae92b2e8dc10ed91712bb2c"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -481,7 +481,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-types"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#dfcbfd5b069dcb481a877716e9706089fb35aa52"
+source = "git+https://github.com/noib3/nvim-oxi#5baf1caf62c48aa17ae92b2e8dc10ed91712bb2c"
 dependencies = [
  "libc",
  "nvim-oxi-luajit",
@@ -665,9 +665,9 @@ checksum = "5ee073c9e4cd00e28217186dbe12796d692868f432bf2e97ee73bed0c56dfa01"
 
 [[package]]
 name = "syn"
-version = "2.0.50"
+version = "2.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74f1bdc9872430ce9b75da68329d1c1746faf50ffac5f19e02b71e37ff881ffb"
+checksum = "b699d15b36d1f02c3e7c69f8ffef53de37aefae075d8488d4ba1a7788d574a07"
 dependencies = [
  "proc-macro2",
  "quote",
