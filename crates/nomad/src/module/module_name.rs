@@ -1,5 +1,4 @@
 use super::ModuleId;
-use crate::warning::Chunk;
 
 /// TODO: docs
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -20,8 +19,6 @@ impl core::fmt::Display for ModuleName {
         f.write_str(self.name)
     }
 }
-
-impl Chunk for ModuleName {}
 
 impl ModuleName {
     /// TODO: docs

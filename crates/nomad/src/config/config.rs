@@ -7,7 +7,7 @@ use super::EnableConfig;
 use crate::ctx::{Ctx, Set};
 use crate::module::{Module, ModuleId, ModuleName};
 use crate::nvim::{serde::Deserializer, Function, Object};
-use crate::warning::{Chunk, Warning, WarningMsg};
+use crate::warning::{ChunkExt, Warning, WarningMsg};
 
 thread_local! {
     /// TODO: docs
@@ -99,9 +99,7 @@ type DeserializationError = serde_path_to_error::Error<nvim_oxi::serde::Error>;
 
 /// TODO: docs
 struct ConfigDeserializer {
-    deserializer:
-        Box<dyn Fn(Object) -> Result<(), DeserializationError> + 'static>,
-
+    deserializer: Box<dyn Fn(Object) -> Result<(), DeserializationError>>,
     module_name: ModuleName,
 }
 
@@ -338,7 +336,8 @@ fn list_all_modules_msg(invalid: &str) -> WarningMsg {
         [] => return msg,
 
         [one] => {
-            msg.add(", the only valid module is ").add(one.highlight());
+            msg.add(", the only valid module is ")
+                .add(one.as_str().highlight());
             return msg;
         },
 
@@ -346,7 +345,7 @@ fn list_all_modules_msg(invalid: &str) -> WarningMsg {
             msg.add(", the valid modules are ");
 
             for (idx, module) in modules.iter().enumerate() {
-                msg.add(module.highlight());
+                msg.add(module.as_str().highlight());
 
                 let is_last = idx + 1 == modules.len();
 
@@ -376,7 +375,7 @@ fn suggest_closest_msg(invalid: &str, closest: ModuleName) -> WarningMsg {
     msg.add("invalid module ")
         .add(invalid.highlight())
         .add(", did you mean ")
-        .add(closest.highlight())
+        .add(closest.as_str().highlight())
         .add("?");
 
     msg
