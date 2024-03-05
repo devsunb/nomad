@@ -5,25 +5,44 @@ use url::Url;
 
 /// TODO: docs
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct CollabConfig {
     /// TODO: docs
+    #[serde(default = "default_project_dir")]
     project_dir: PathBuf,
 
     /// TODO: docs
-    server_address: Url,
+    #[serde(default = "default_server_addr")]
+    server_addr: Url,
 
     /// TODO: docs
+    #[serde(default = "default_server_port")]
     server_port: u16,
+}
+
+#[inline]
+fn default_project_dir() -> PathBuf {
+    // TODO: this should be a path relative to the `/nomad` path.
+    PathBuf::new()
+}
+
+#[inline]
+fn default_server_addr() -> Url {
+    Url::parse("tcp://collab.nomad.foo").unwrap()
+}
+
+#[inline]
+fn default_server_port() -> u16 {
+    64420
 }
 
 impl Default for CollabConfig {
     #[inline]
     fn default() -> Self {
         Self {
-            // TODO: this should be a path relative to the `/nomad` path.
-            project_dir: PathBuf::new(),
-            server_address: Url::parse("tcp://collab.nomad.foo").unwrap(),
-            server_port: 64420,
+            project_dir: default_project_dir(),
+            server_addr: default_server_addr(),
+            server_port: default_server_port(),
         }
     }
 }
@@ -45,7 +64,7 @@ mod tests {
         let config = CollabConfig::default();
 
         let addrs = config
-            .server_address
+            .server_addr
             .socket_addrs(|| Some(config.server_port))
             .unwrap();
 
