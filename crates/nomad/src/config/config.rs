@@ -95,17 +95,21 @@ impl ConfigDeserializers {
     }
 }
 
+type DeserializationError = serde_path_to_error::Error<nvim_oxi::serde::Error>;
+
 /// TODO: docs
 struct ConfigDeserializer {
-    deserializer: Box<dyn Fn(Object) + 'static>,
+    deserializer:
+        Box<dyn Fn(Object) -> Result<(), DeserializationError> + 'static>,
+
     module_name: ModuleName,
 }
 
 impl ConfigDeserializer {
     /// TODO: docs
     #[inline]
-    fn deserialize(&self, config: Object) {
-        (self.deserializer)(config);
+    fn deserialize(&self, config: Object) -> Result<(), DeserializationError> {
+        (self.deserializer)(config)
     }
 
     /// TODO: docs
@@ -119,11 +123,9 @@ impl ConfigDeserializer {
     fn new<M: Module>(set_config: Set<EnableConfig<M>>, ctx: Ctx) -> Self {
         let deserializer = move |config: Object| {
             let deserializer = Deserializer::new(config);
-            let config = match EnableConfig::<M>::deserialize(deserializer) {
-                Ok(config) => config,
-                Err(_err) => return,
-            };
+            let config = serde_path_to_error::deserialize(deserializer)?;
             ctx.with_set(|set_ctx| set_config.set(config, set_ctx));
+            Ok(())
         };
 
         Self { deserializer: Box::new(deserializer), module_name: M::NAME }
@@ -206,14 +208,21 @@ fn update_config(
         deserializers.with_map(|map| {
             map.get(&module_id)
                 .ok_or(Error::InvalidModule(module_name))
-                .map(|des| des.deserialize(module_config))
+                .and_then(|des| {
+                    des.deserialize(module_config)
+                        .map_err(Error::DeserializeModule)
+                })
         })
     })
 }
 
 /// TODO: docs
 enum Error {
+    /// TODO: docs
     InvalidModule(String),
+
+    /// TODO: docs
+    DeserializeModule(DeserializationError),
 }
 
 impl Error {
@@ -231,6 +240,8 @@ impl Error {
                     },
                 }
             },
+
+            Self::DeserializeModule(de_err) => invalid_config_msg(de_err),
         };
 
         Warning::new().msg(msg)
@@ -245,15 +256,14 @@ enum InvalidModuleMsgKind {
 impl InvalidModuleMsgKind {
     #[inline]
     fn from_str(module: &str) -> Self {
-        let mut min_distance = usize::MAX;
-
-        let mut idx_closest = 0;
-
         let valid_modules = valid_modules();
 
         if valid_modules.is_empty() {
             return Self::ListAllModules;
         }
+
+        let mut min_distance = usize::MAX;
+        let mut idx_closest = 0;
 
         for (idx, valid) in valid_modules.iter().enumerate() {
             let distance = strsim::damerau_levenshtein(module, valid.as_str());
@@ -265,6 +275,7 @@ impl InvalidModuleMsgKind {
         }
 
         let should_suggest_closest = match module.len() {
+            // These ranges and cutoffs are arbitrary.
             3 => min_distance <= 1,
             4..=6 => min_distance <= 2,
             7..=10 => min_distance <= 3,
@@ -281,10 +292,10 @@ impl InvalidModuleMsgKind {
 
 /// TODO: docs
 #[inline]
-fn list_all_modules_msg(module: &str) -> WarningMsg {
+fn list_all_modules_msg(invalid: &str) -> WarningMsg {
     let mut msg = WarningMsg::new();
 
-    msg.add("invalid module ").add(module.highlight());
+    msg.add("invalid module ").add(invalid.highlight());
 
     match valid_modules() {
         [] => return msg,
@@ -322,14 +333,27 @@ fn list_all_modules_msg(module: &str) -> WarningMsg {
 
 /// TODO: docs
 #[inline]
-fn suggest_closest_msg(module: &str, closest: ModuleName) -> WarningMsg {
+fn suggest_closest_msg(invalid: &str, closest: ModuleName) -> WarningMsg {
     let mut msg = WarningMsg::new();
 
     msg.add("invalid module ")
-        .add(module.highlight())
+        .add(invalid.highlight())
         .add(", did you mean ")
         .add(closest.highlight())
         .add("?");
+
+    msg
+}
+
+/// TODO: docs
+#[inline]
+fn invalid_config_msg(err: &DeserializationError) -> WarningMsg {
+    let mut msg = WarningMsg::new();
+
+    msg.add("couldn't deserialize ")
+        .add(err.path().to_string().highlight())
+        .add(": ")
+        .add(err.inner().to_string().highlight());
 
     msg
 }
