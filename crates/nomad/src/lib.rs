@@ -7,6 +7,7 @@ extern crate alloc;
 mod action;
 mod action_name;
 mod api;
+pub mod command;
 mod config;
 pub mod ctx;
 pub mod log;
@@ -27,6 +28,7 @@ pub use nvim_oxi as nvim;
 pub mod prelude {
     //! TODO: docs
 
+    pub use command::*;
     pub use ctx::*;
     pub use log::*;
     pub use module::*;

@@ -7,8 +7,6 @@ use crate::CollabConfig;
 /// TODO: docs.
 pub struct Collab {
     config: Get<CollabConfig>,
-    increment: Increment,
-    print: Print,
 }
 
 impl Module for Collab {
@@ -17,22 +15,22 @@ impl Module for Collab {
     type Config = CollabConfig;
 
     #[inline]
-    fn init(config: Get<Self::Config>, ctx: &InitCtx) -> Self {
+    fn init(config: Get<Self::Config>, ctx: &InitCtx) -> Api<Self> {
         let (counter, set_counter) = ctx.new_input(0u64);
+
         let increment = Increment { set_counter };
+
         let print = Print { counter };
-        Self { config, increment, print }
+
+        Api::new(Self { config })
+            // .with_command(increment.clone())
+            // .with_command(print.clone())
+            .with_function(increment)
+            .with_function(print)
     }
 
     #[inline]
-    fn api(&self) -> Api {
-        Api::new()
-            .with_function(self.increment.clone())
-            .with_function(self.print.clone())
-    }
-
-    #[inline]
-    async fn load(
+    async fn run(
         &self,
         // _ctx: &mut SetCtx,
     ) -> impl MaybeResult<()> {

@@ -98,7 +98,7 @@ impl Chunk {
 
 /// TODO: docs
 #[derive(Default)]
-pub(crate) struct WarningMsg {
+pub struct WarningMsg {
     chunks: Vec<Chunk>,
 }
 

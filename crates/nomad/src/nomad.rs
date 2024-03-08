@@ -1,6 +1,7 @@
+use crate::api::Api;
 use crate::ctx::Ctx;
 use crate::module::Module;
-use crate::nvim::{Dictionary, Function};
+use crate::nvim::Dictionary;
 use crate::{config, log, runtime};
 
 /// TODO: docs
@@ -49,48 +50,32 @@ impl Nomad {
     pub fn with_module<M: Module>(mut self) -> Self {
         // Create a new input for the module's config and initialize the
         // module.
-        let (module, set_config) = self.ctx.with_init(|init_ctx| {
+        let (api, set_config) = self.ctx.with_init(|init_ctx| {
             let (get, set) = init_ctx.new_input(M::Config::default());
-            let module = M::init(get, init_ctx);
-            (module, set)
+            let api = M::init(get, init_ctx);
+            (api, set)
         });
 
         // TODO: docs
         config::with_module::<M>(set_config, self.ctx.clone());
 
+        let Api { module, functions } = api;
+
         // Add the module's API to the global API.
-        self.api.insert(M::NAME.as_str(), module_api(&module, &self.ctx));
+        for (name, function) in functions.into_iter(self.ctx.clone()) {
+            self.api.insert(name, function);
+        }
 
         // TODO: Create the module's commands.
-        // for _command in module.commands() {}
 
         let ctx = self.ctx.clone();
 
         // Spawn a new task that loads the module asynchronously.
         runtime::spawn(async move {
-            let _ = ctx.with_set(|_set_ctx| module.load()).await;
+            let _ = ctx.with_set(|_set_ctx| module.run()).await;
         })
         .detach();
 
         self
     }
-}
-
-/// TODO: docs
-#[inline]
-fn module_api<M: Module>(module: &M, ctx: &Ctx) -> Dictionary {
-    let mut dict = Dictionary::new();
-
-    for (action_name, action) in module.api().into_iter() {
-        let ctx = ctx.clone();
-
-        let function = move |object| {
-            ctx.with_set(|set_ctx| action(object, set_ctx));
-            Ok::<_, core::convert::Infallible>(())
-        };
-
-        dict.insert(action_name.as_str(), Function::from_fn(function));
-    }
-
-    dict
 }
