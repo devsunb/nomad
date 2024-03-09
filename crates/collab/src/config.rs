@@ -24,6 +24,18 @@ pub struct CollabConfig {
     server_port: u16,
 }
 
+impl Default for CollabConfig {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            enable: default_enable(),
+            project_dir: default_project_dir(),
+            server_addr: default_server_addr(),
+            server_port: default_server_port(),
+        }
+    }
+}
+
 #[inline]
 fn default_enable() -> bool {
     true
@@ -37,24 +49,12 @@ fn default_project_dir() -> PathBuf {
 
 #[inline]
 fn default_server_addr() -> Url {
-    Url::parse("tcp://collab.nomad.foo").unwrap()
+    Url::parse("tcp://collab.nomad.foo").expect("address is valid")
 }
 
 #[inline]
 fn default_server_port() -> u16 {
     64420
-}
-
-impl Default for CollabConfig {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            enable: default_enable(),
-            project_dir: default_project_dir(),
-            server_addr: default_server_addr(),
-            server_port: default_server_port(),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -76,7 +76,7 @@ mod tests {
         let addrs = config
             .server_addr
             .socket_addrs(|| Some(config.server_port))
-            .unwrap();
+            .expect("address is valid");
 
         assert_eq!(addrs.len(), 1);
     }

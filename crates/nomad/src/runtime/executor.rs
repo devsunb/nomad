@@ -81,7 +81,7 @@ impl LocalExecutorInner {
 
             Ok::<_, core::convert::Infallible>(())
         })
-        .unwrap();
+        .expect("creating an async handle never fails");
 
         Self { async_handle, state }
     }
@@ -96,7 +96,7 @@ impl LocalExecutorInner {
         move |runnable| {
             let task = Task::new(runnable);
             state.woken_queue.push_back(task);
-            async_handle.send().unwrap();
+            async_handle.send().expect("sending an async handle never fails");
         }
     }
 

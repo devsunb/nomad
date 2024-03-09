@@ -152,7 +152,7 @@ impl From<UnknownAction<'_, '_>> for WarningMsg {
                 msg.add(", the only valid action is ").add(
                     valid_actions
                         .next()
-                        .unwrap()
+                        .expect("there's one valid action")
                         .action_name
                         .as_str()
                         .highlight(),

@@ -64,7 +64,7 @@ impl Future for Sleep {
             waker.wake();
             Ok::<_, core::convert::Infallible>(())
         })
-        .unwrap();
+        .expect("creating a timer never fails");
 
         Poll::Pending
     }
