@@ -86,8 +86,16 @@ pub struct CommandArgs {
 }
 
 impl CommandArgs {
+    fn into_iter(self) -> impl Iterator<Item = String> {
+        self.args.into_iter()
+    }
+
     fn is_empty(&self) -> bool {
         self.args.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.args.len()
     }
 }
 
@@ -107,9 +115,35 @@ impl TryFrom<CommandArgs> for () {
 /// An error indicating a command's arguments were not empty.
 pub struct CommandArgsNotEmtpy(CommandArgs);
 
-impl Into<WarningMsg> for CommandArgsNotEmtpy {
+impl From<CommandArgsNotEmtpy> for WarningMsg {
     #[inline]
-    fn into(self) -> WarningMsg {
-        todo!();
+    fn from(CommandArgsNotEmtpy(args): CommandArgsNotEmtpy) -> WarningMsg {
+        assert!(!args.is_empty());
+
+        let mut msg = WarningMsg::new();
+
+        msg.add("expected no arguments, but got ");
+
+        let num_args = args.len();
+
+        for (idx, arg) in args.into_iter().enumerate() {
+            msg.add(arg.highlight());
+
+            let is_last = idx + 1 == num_args;
+
+            if is_last {
+                break;
+            }
+
+            let is_second_to_last = idx + 2 == num_args;
+
+            if is_second_to_last {
+                msg.add(" and ");
+            } else {
+                msg.add(", ");
+            }
+        }
+
+        msg
     }
 }
