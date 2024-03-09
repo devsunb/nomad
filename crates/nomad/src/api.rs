@@ -1,7 +1,7 @@
 //! TODO: docs
 
 use nvim::{self, Object};
-use serde::de::Deserialize;
+use serde::{de::Deserialize, ser::Serialize};
 
 use crate::prelude::*;
 
@@ -22,7 +22,7 @@ impl<M: Module> Api<M> {
     #[inline]
     pub fn with_command<A>(self, _action: A) -> Self
     where
-        A: Action<M>,
+        A: Action<M, Return = ()>,
         A::Args: TryFrom<CommandArgs>,
         <A::Args as TryFrom<CommandArgs>>::Error: Into<WarningMsg>,
     {
@@ -40,7 +40,9 @@ impl<M: Module> Api<M> {
     }
 }
 
-type Function = Box<dyn Fn(Object, &mut SetCtx)>;
+type Function = Box<
+    dyn Fn(Object, &mut SetCtx) -> Result<Object, core::convert::Infallible>,
+>;
 
 /// TODO: docs
 #[derive(Default)]
@@ -54,16 +56,16 @@ impl Functions {
     pub(crate) fn into_iter(
         self,
         ctx: Ctx,
-    ) -> impl Iterator<Item = (&'static str, nvim::Function<Object, ()>)> {
+    ) -> impl Iterator<Item = (ActionName, nvim::Function<Object, Object>)>
+    {
         self.functions.into_iter().map(move |(name, function)| {
             let ctx = ctx.clone();
 
             let function = nvim::Function::from_fn(move |object: Object| {
-                ctx.with_set(|set_ctx| function(object, set_ctx));
-                Ok::<_, core::convert::Infallible>(())
+                ctx.with_set(|set_ctx| function(object, set_ctx))
             });
 
-            (name.as_str(), function)
+            (name, function)
         })
     }
 
@@ -73,7 +75,10 @@ impl Functions {
         let function = move |args: Object, ctx: &mut SetCtx| {
             let deserializer = nvim::serde::Deserializer::new(args);
             let args = A::Args::deserialize(deserializer).unwrap();
-            action.execute(args, ctx);
+            let ret = action.execute(args, ctx).into_result().unwrap();
+            let serializer = nvim::serde::Serializer::new();
+            let obj = ret.serialize(serializer).unwrap();
+            Ok(obj)
         };
 
         self.functions.push((A::NAME, Box::new(function)));

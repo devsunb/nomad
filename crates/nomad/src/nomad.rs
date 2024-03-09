@@ -62,7 +62,7 @@ impl Nomad {
 
         // Add the module's API to the global API.
         for (name, function) in functions.into_iter(self.ctx.clone()) {
-            self.api.insert(name, function);
+            self.api.insert(name.as_str(), function);
         }
 
         // TODO: Create the module's commands.
