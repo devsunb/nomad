@@ -3,10 +3,10 @@
 use core::convert::Infallible;
 
 use nvim::{self, Object};
-use serde::{de::Deserialize, ser::Serialize};
 
 use crate::command::{CommandArgs, ModuleCommands};
 use crate::prelude::*;
+use crate::serde::{deserialize, serialize};
 
 /// TODO: docs
 pub struct Api<M: Module> {
@@ -79,25 +79,30 @@ impl Functions {
     /// TODO: docs
     #[inline]
     fn add<M: Module, A: Action<M>>(&mut self, action: A) {
-        let function = move |args: Object, ctx: &mut SetCtx| {
-            let deserializer = nvim::serde::Deserializer::new(args);
-            let args = A::Args::deserialize(deserializer).expect("");
-            let ret = match action.execute(args, ctx).into_result() {
-                Ok(v) => v,
-                Err(err) => {
-                    Warning::new()
-                        .module(M::NAME)
-                        .action(A::NAME)
-                        .msg(err.into())
-                        .print();
-                    return Ok(Object::nil());
-                },
-            };
-            let serializer = nvim::serde::Serializer::new();
-            match ret.serialize(serializer) {
-                Ok(obj) => Ok(obj),
-                Err(_err) => todo!(),
-            }
+        fn inner<M: Module, A: Action<M>>(
+            a: &A,
+            obj: Object,
+            ctx: &mut SetCtx,
+        ) -> Result<Object, WarningMsg> {
+            let arg = deserialize::<A::Args>(obj)?;
+            let ret = a.execute(arg, ctx).into_result().map_err(Into::into)?;
+            serialize(&ret).map_err(Into::into)
+        }
+
+        let function = move |args: Object, ctx: &mut SetCtx| match inner(
+            &action, args, ctx,
+        ) {
+            Ok(obj) => Ok(obj),
+
+            Err(err) => {
+                Warning::new()
+                    .module(M::NAME)
+                    .action(A::NAME)
+                    .msg(err)
+                    .print();
+
+                Ok(Object::nil())
+            },
         };
 
         self.functions.push((A::NAME, Box::new(function)));
