@@ -19,9 +19,10 @@ pub(crate) fn deserialize<T: DeserializeOwned>(
 /// TODO: docs
 pub(crate) fn serialize<T: Serialize>(
     value: &T,
+    what: &'static str,
 ) -> Result<Object, SerializeError> {
     serde_path_to_error::serialize(value, Serializer::new())
-        .map_err(SerializeError::new)
+        .map_err(|err| SerializeError::new(err, what))
 }
 
 /// TODO: docs
@@ -98,14 +99,16 @@ impl From<DeserializeError> for WarningMsg {
 /// TODO: docs
 pub(crate) struct SerializeError {
     inner: serde_path_to_error::Error<nvim::serde::SerializeError>,
+    what: &'static str,
 }
 
 impl SerializeError {
     #[inline]
     fn new(
         inner: serde_path_to_error::Error<nvim::serde::SerializeError>,
+        what: &'static str,
     ) -> Self {
-        Self { inner }
+        Self { inner, what }
     }
 }
 
@@ -114,10 +117,16 @@ impl From<SerializeError> for WarningMsg {
     fn from(err: SerializeError) -> WarningMsg {
         let mut msg = WarningMsg::new();
 
-        msg.add("couldn't serialize ")
-            .add(err.inner.path().to_string().highlight())
-            .add(": ")
-            .add(err.inner.to_string().as_str());
+        msg.add("couldn't serialize ");
+
+        if err.inner.path().iter().len() == 0 {
+            msg.add(err.what);
+        } else {
+            msg.add(err.inner.path().to_string().highlight());
+        }
+
+        msg.add(": ").add(err.inner.inner().msg.as_str());
+
         msg
     }
 }

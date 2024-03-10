@@ -72,7 +72,7 @@ impl Functions {
         ) -> Result<Object, WarningMsg> {
             let args = deserialize::<A::Args>(obj, "args")?;
             let ret = a.execute(args).into_result().map_err(Into::into)?;
-            serialize(&ret).map_err(Into::into)
+            serialize(&ret, "result").map_err(Into::into)
         }
 
         let function = move |args: Object| match inner(&action, args) {
