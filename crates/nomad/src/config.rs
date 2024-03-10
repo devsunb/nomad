@@ -188,10 +188,11 @@ impl ConfigDeserializer {
     #[inline]
     fn new<M: Module>(set_config: Set<M::Config>) -> Self {
         let deserializer = move |config: Object| {
-            let config = deserialize(config).map_err(|mut err| {
-                err.set_module_name(M::NAME);
-                err
-            })?;
+            let config =
+                deserialize(config, "config").map_err(|mut err| {
+                    err.set_module_name(M::NAME);
+                    err
+                })?;
             set_config.set(config);
             Ok(())
         };
