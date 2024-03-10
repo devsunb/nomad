@@ -11,8 +11,8 @@ thread_local! {
 
 /// TODO: docs
 #[inline]
-pub fn input<T>(input: T) -> (Get<T>, Set<T>) {
-    CTX.with(|ctx| ctx.inner().input(input))
+pub fn new_input<T>(input: T) -> (Get<T>, Set<T>) {
+    CTX.with(|ctx| ctx.inner().new_input(input))
 }
 
 /// TODO: docs
@@ -95,7 +95,7 @@ impl CtxInner {
     }
 
     #[inline]
-    fn input<T>(&self, value: T) -> (Get<T>, Set<T>) {
+    fn new_input<T>(&self, value: T) -> (Get<T>, Set<T>) {
         let (get, set) = self.engine().var(value);
         (Get::new(get), Set::new(set))
     }

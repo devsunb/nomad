@@ -20,9 +20,8 @@ impl Module for Collab {
 
     type Config = CollabConfig;
 
-    #[inline]
     fn init(config: Get<Self::Config>) -> Api<Self> {
-        let (counter, set_counter) = input(0u64);
+        let (counter, set_counter) = new_input(0u64);
 
         let increment = Increment { set_counter };
 
@@ -35,7 +34,6 @@ impl Module for Collab {
             .with_function(print)
     }
 
-    #[inline]
     async fn run(&self) -> impl MaybeResult<()> {
         let count = 0;
         nvim::print!("{}'s count is {count}", Self::NAME);
@@ -55,7 +53,6 @@ impl Action<Collab> for Print {
 
     type Return = ();
 
-    #[inline]
     fn execute(&self, _args: ()) {
         nvim::print!("Collab counter is now {:?}", self.counter.get())
     }
@@ -73,7 +70,6 @@ impl Action<Collab> for Increment {
 
     type Return = ();
 
-    #[inline]
     fn execute(&self, _args: ()) {
         self.set_counter.update(|counter| *counter += 1)
     }

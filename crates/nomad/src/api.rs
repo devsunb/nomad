@@ -70,28 +70,28 @@ impl Functions {
             a: &A,
             obj: Object,
         ) -> Result<Object, WarningMsg> {
-            let arg = deserialize::<A::Args>(obj)?;
-            let ret = a.execute(arg).into_result().map_err(Into::into)?;
+            let args = deserialize::<A::Args>(obj)?;
+            let ret = a.execute(args).into_result().map_err(Into::into)?;
             serialize(&ret).map_err(Into::into)
         }
 
-        let function =
-            nvim::Function::from_fn::<_, Infallible>(move |args: Object| {
-                match inner(&action, args) {
-                    Ok(obj) => Ok(obj),
+        let function = move |args: Object| match inner(&action, args) {
+            Ok(obj) => Ok(obj),
 
-                    Err(err) => {
-                        Warning::new()
-                            .module(M::NAME)
-                            .action(A::NAME)
-                            .msg(err)
-                            .print();
+            Err(err) => {
+                Warning::new()
+                    .module(M::NAME)
+                    .action(A::NAME)
+                    .msg(err)
+                    .print();
 
-                        Ok(Object::nil())
-                    },
-                }
-            });
+                Ok(Object::nil())
+            },
+        };
 
-        self.functions.insert(A::NAME.as_str(), function);
+        self.functions.insert(
+            A::NAME.as_str(),
+            nvim::Function::from_fn::<_, Infallible>(function),
+        );
     }
 }

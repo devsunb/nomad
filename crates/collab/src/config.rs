@@ -26,7 +26,6 @@ pub struct CollabConfig {
 }
 
 impl Default for CollabConfig {
-    #[inline]
     fn default() -> Self {
         Self {
             enable: default_enable(),
@@ -37,23 +36,19 @@ impl Default for CollabConfig {
     }
 }
 
-#[inline]
 fn default_enable() -> bool {
     true
 }
 
-#[inline]
 fn default_project_dir() -> PathBuf {
     // TODO: this should be a path relative to the `/nomad` path.
     PathBuf::new()
 }
 
-#[inline]
 fn default_server_addr() -> Url {
     Url::parse("tcp://collab.nomad.foo").expect("address is valid")
 }
 
-#[inline]
 fn default_server_port() -> u16 {
     64420
 }

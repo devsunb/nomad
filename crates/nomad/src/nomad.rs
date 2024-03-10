@@ -53,7 +53,8 @@ impl Nomad {
     /// TODO: docs
     #[inline]
     pub fn with_module<M: Module>(mut self) -> Self {
-        let (get_config, set_config) = runtime::input(M::Config::default());
+        let (get_config, set_config) =
+            runtime::new_input(M::Config::default());
 
         let api = M::init(get_config);
 
