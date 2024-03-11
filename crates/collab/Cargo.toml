@@ -10,6 +10,7 @@ publish = false
 async-net = { workspace = true }
 nomad = { workspace = true }
 serde = { workspace = true }
+thiserror = { workspace = true }
 url = { version = "2", features = ["serde"] }
 
 [lints]

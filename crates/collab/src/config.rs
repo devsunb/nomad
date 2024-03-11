@@ -1,6 +1,9 @@
+use core::net::SocketAddr;
 use std::path::PathBuf;
 
+use nomad::prelude::WarningMsg;
 use serde::Deserialize;
+use thiserror::Error as ThisError;
 use url::Url;
 
 /// TODO: docs
@@ -36,6 +39,17 @@ impl Default for CollabConfig {
     }
 }
 
+impl CollabConfig {
+    #[allow(dead_code)]
+    pub(crate) fn server_addr(&self) -> Result<SocketAddr, InvalidServerAddr> {
+        self.server_addr
+            .socket_addrs(|| Some(self.server_port))?
+            .into_iter()
+            .next()
+            .ok_or(InvalidServerAddr::EmptyAddresses)
+    }
+}
+
 fn default_enable() -> bool {
     true
 }
@@ -53,6 +67,24 @@ fn default_server_port() -> u16 {
     64420
 }
 
+#[derive(Debug, ThisError)]
+pub enum InvalidServerAddr {
+    #[error("URL resolved to an empty list of socket addresses")]
+    EmptyAddresses,
+
+    #[error("{0}")]
+    InvalidUrl(#[from] std::io::Error),
+}
+
+impl From<InvalidServerAddr> for WarningMsg {
+    fn from(err: InvalidServerAddr) -> Self {
+        let mut msg = WarningMsg::new();
+        msg.add("couldn't resolve server address: ");
+        msg.add(err.to_string().as_str());
+        msg
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -67,13 +99,6 @@ mod tests {
     /// resolved to a valid `SocketAddr`.
     #[test]
     fn collab_config_resolve_server_addr() {
-        let config = CollabConfig::default();
-
-        let addrs = config
-            .server_addr
-            .socket_addrs(|| Some(config.server_port))
-            .unwrap();
-
-        assert_eq!(addrs.len(), 1);
+        let _addr = CollabConfig::default().server_addr().unwrap();
     }
 }

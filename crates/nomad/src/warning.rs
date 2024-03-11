@@ -62,7 +62,7 @@ impl Warning {
 }
 
 /// TODO: docs
-pub(crate) struct Chunk {
+pub struct Chunk {
     text: nvim::String,
     highlight_group: Option<&'static str>,
 }
@@ -105,14 +105,14 @@ pub struct WarningMsg {
 impl WarningMsg {
     /// TODO: docs
     #[inline]
-    pub(crate) fn add<C: Into<Chunk>>(&mut self, chunk: C) -> &mut Self {
+    pub fn add<C: Into<Chunk>>(&mut self, chunk: C) -> &mut Self {
         self.chunks.push(chunk.into());
         self
     }
 
     /// TODO: docs
     #[inline]
-    pub(crate) fn add_invalid(
+    pub fn add_invalid(
         &mut self,
         invalid: impl AsRef<str>,
         mut valid: impl ExactSizeIterator<Item = impl AsRef<str>> + Clone,
@@ -137,7 +137,7 @@ impl WarningMsg {
 
     /// TODO: docs
     #[inline]
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self::default()
     }
 }

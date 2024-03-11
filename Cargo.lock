@@ -109,6 +109,7 @@ dependencies = [
  "async-net",
  "nomad",
  "serde",
+ "thiserror",
  "url",
 ]
 
