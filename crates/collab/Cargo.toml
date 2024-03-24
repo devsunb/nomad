@@ -13,6 +13,7 @@ nomad = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 url = { version = "2", features = ["serde"] }
+webpki-roots = "0.26"
 
 [lints]
 workspace = true

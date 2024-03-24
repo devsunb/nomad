@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use collab::rustls_pki_types::{self, DnsName};
 use collab::typestate::Optionals;
-use collab::Connector;
+use collab::{rustls, Connector};
 use nomad::prelude::WarningMsg;
 use serde::Deserialize;
 use url::Url;
@@ -30,6 +30,23 @@ pub struct Config {
     server_port: u16,
 }
 
+fn default_enable() -> bool {
+    true
+}
+
+fn default_project_dir() -> PathBuf {
+    // TODO: this should be a path relative to the `/nomad` path.
+    PathBuf::new()
+}
+
+fn default_server_addr() -> Url {
+    Url::parse("tcp://collab.nomad.foo").expect("address is valid")
+}
+
+fn default_server_port() -> u16 {
+    64420
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -48,7 +65,8 @@ impl Config {
         Ok(Connector::new()
             .server_addr(self.server_addr()?)
             .server_dns_name(self.server_dns_name()?)
-            .unwrap())
+            .unwrap()
+            .tls_config(client_config()))
     }
 
     /// Returns the address of the server.
@@ -69,21 +87,15 @@ impl Config {
     }
 }
 
-fn default_enable() -> bool {
-    true
-}
+/// Returns the TLS configuration used to connect to the server.
+fn client_config() -> rustls::ClientConfig {
+    let root_store = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
 
-fn default_project_dir() -> PathBuf {
-    // TODO: this should be a path relative to the `/nomad` path.
-    PathBuf::new()
-}
-
-fn default_server_addr() -> Url {
-    Url::parse("tcp://collab.nomad.foo").expect("address is valid")
-}
-
-fn default_server_port() -> u16 {
-    64420
+    rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth()
 }
 
 #[derive(Debug, thiserror::Error)]
