@@ -12,7 +12,6 @@ impl Join {
     }
 }
 
-#[async_action]
 impl Action<Collab> for Join {
     const NAME: ActionName = action_name!("join");
 
@@ -20,5 +19,5 @@ impl Action<Collab> for Join {
 
     type Return = ();
 
-    async fn execute(&self, _session_id: SessionId) {}
+    fn execute(&self, _session_id: SessionId) {}
 }

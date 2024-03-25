@@ -15,7 +15,21 @@ pub(crate) struct Start {
 }
 
 impl Start {
-    async fn async_execute(&self) -> Result<(), StartError> {
+    pub(crate) fn new(config: Get<Config>) -> Self {
+        let (state, set_state) = new_input(SessionState::Inactive);
+        Self { config, state, set_state }
+    }
+}
+
+#[async_action]
+impl Action<Collab> for Start {
+    const NAME: ActionName = action_name!("join");
+
+    type Args = ();
+
+    type Return = ();
+
+    async fn execute(&self, _: ()) -> Result<(), StartError> {
         if let &SessionState::Active(session_id) = self.state.get() {
             return Err(StartError::ExistingSession(session_id));
         }
@@ -25,26 +39,6 @@ impl Start {
         self.set_state.set(SessionState::Active(session.id()));
 
         Ok(())
-    }
-
-    pub(crate) fn new(config: Get<Config>) -> Self {
-        let (state, set_state) = new_input(SessionState::Inactive);
-        Self { config, state, set_state }
-    }
-}
-
-impl Action<Collab> for Start {
-    const NAME: ActionName = action_name!("join");
-
-    type Args = ();
-
-    type Return = ();
-
-    fn execute(
-        &self,
-        _: (),
-    ) -> impl MaybeFuture<Output = Result<(), StartError>> {
-        MaybeFutureEnum::from(self.async_execute())
     }
 }
 
