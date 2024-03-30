@@ -8,6 +8,7 @@ pub mod action;
 pub mod api;
 mod command;
 mod config;
+pub mod editor;
 pub mod log;
 pub mod maybe_future;
 pub mod maybe_result;
@@ -28,6 +29,7 @@ pub mod prelude {
     pub use crate::action::*;
     pub use crate::api::*;
     pub use crate::command::*;
+    pub use crate::editor::*;
     pub use crate::log::*;
     pub use crate::maybe_future::*;
     pub use crate::maybe_result::*;
