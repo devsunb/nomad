@@ -1,6 +1,10 @@
+use alloc::collections::VecDeque;
+use alloc::rc::Rc;
+use core::cell::RefCell;
+use core::iter;
 use core::ops::Range;
 
-use cola::Replica;
+use cola::{Anchor, Replica};
 use crop::Rope;
 use flume::Sender;
 
@@ -72,6 +76,123 @@ impl Buffer {
     }
 }
 
+/// TODO: docs
+struct BufferInner {
+    /// TODO: docs
+    crdt: Replica,
+
+    /// TODO: docs
+    nvim: nvim::api::Buffer,
+
+    /// TODO: docs
+    text: Rope,
+}
+
+impl BufferInner {
+    /// TODO: docs
+    ///
+    /// # Panics
+    ///
+    /// Panics if the anchor cannot be resolved to a byte offset in the buffer.
+    #[track_caller]
+    #[inline]
+    fn apply_local_insertion(
+        &mut self,
+        insert_at: Anchor,
+        text: String,
+    ) -> cola::Insertion {
+        let Some(byte_offset) = self.crdt.resolve_anchor(insert_at) else {
+            panic!("{insert_at:?} couldn't be resolved");
+        };
+
+        let point = self.point_of_offset(byte_offset);
+
+        self.text.insert(byte_offset, &text);
+
+        let insertion = self.crdt.inserted(byte_offset, text.len());
+
+        let Point { row, col } = point;
+
+        self.nvim
+            .set_text(row..row, col, col, iter::once(&*text))
+            .expect("row and col are within bounds");
+
+        insertion
+    }
+
+    /// Transforms the 1-dimensional byte offset into a 2-dimensional
+    /// [`Point`].
+    #[inline]
+    fn point_of_offset(&self, byte_offset: ByteOffset) -> Point {
+        let row = self.text.line_of_byte(byte_offset);
+        let row_offset = self.text.byte_of_line(row);
+        let col = byte_offset - row_offset;
+        Point { row, col }
+    }
+}
+
+/// TODO: docs
+struct Point {
+    /// TODO: docs
+    row: usize,
+
+    /// TODO: docs
+    col: ByteOffset,
+}
+
+#[derive(Clone)]
+struct EditQueue {
+    inner: Rc<RefCell<VecDeque<PendingEdit>>>,
+}
+
+/// TODO: docs
+enum PendingEdit {
+    Local(PendingLocalEdit),
+    Remote(PendingRemoteEdit),
+}
+
+/// TODO: docs
+enum PendingLocalEdit {
+    Insertion(LocalInsertion),
+    Deletion(LocalDeletion),
+}
+
+/// TODO: docs
+struct LocalInsertion {
+    insert_at: Anchor,
+    text: String,
+}
+
+/// TODO: docs
+struct LocalDeletion {
+    range: Range<Anchor>,
+}
+
+/// TODO: docs
+enum PendingRemoteEdit {
+    Insertion(RemoteInsertion),
+    Deletion(RemoteDeletion),
+}
+
+/// TODO: docs
+struct RemoteInsertion {
+    inner: cola::Insertion,
+    text: String,
+}
+
+/// TODO: docs
+struct RemoteDeletion {
+    inner: cola::Deletion,
+}
+
+fn rope() -> &'static mut Rope {
+    todo!()
+}
+
+fn replica() -> &'static mut Replica {
+    todo!()
+}
+
 type ByteOffset = usize;
 
 /// TODO: docs
@@ -86,12 +207,4 @@ impl ByteEdit {
     fn byte_range(&self) -> Range<usize> {
         self.start..self.end
     }
-}
-
-fn rope() -> &'static mut Rope {
-    todo!()
-}
-
-fn replica() -> &'static mut Replica {
-    todo!()
 }
