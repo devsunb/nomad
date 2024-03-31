@@ -595,7 +595,20 @@ impl
 {
     #[inline]
     fn from(
-        _args: (
+        (
+            _bytes,
+            buf,
+            _changedtick,
+            start_row,
+            start_col,
+            start_offset,
+            _old_end_row,
+            _old_end_col,
+            old_end_len,
+            new_end_row,
+            new_end_col,
+            _new_end_len,
+        ): (
             String,
             NvimBuffer,
             u32,
@@ -610,6 +623,51 @@ impl
             usize,
         ),
     ) -> Self {
-        todo!();
+        let replacement_start_point = Point { row: start_row, col: start_col };
+
+        let replacement_end_point =
+            Point { row: new_end_row, col: new_end_col };
+
+        let replacement = nvim_buf_get_text(
+            &buf,
+            replacement_start_point..replacement_end_point,
+        )
+        .expect("buffer must exist");
+
+        let replaced_byte_range = {
+            let start = start_offset;
+            let end = start_offset + old_end_len;
+            start..end
+        };
+
+        Self {
+            start: replaced_byte_range.start,
+            end: replaced_byte_range.end,
+            replacement,
+        }
     }
+}
+
+/// TODO: docs
+#[inline]
+fn nvim_buf_get_text(
+    buf: &NvimBuffer,
+    point_range: Range<Point>,
+) -> Result<String, nvim::api::Error> {
+    let opts = opts::GetTextOpts::builder().build();
+
+    let lines = buf.get_text(
+        point_range.start.row..point_range.end.row,
+        point_range.start.col,
+        point_range.end.col,
+        &opts,
+    )?;
+
+    let mut text = String::new();
+
+    for line in lines {
+        text.push_str(&line.to_string_lossy());
+    }
+
+    Ok(text)
 }
