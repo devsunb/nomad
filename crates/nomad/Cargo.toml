@@ -12,6 +12,7 @@ neovim-0-9 = ["nvim/neovim-0-9"]
 neovim-nightly = ["nvim/neovim-nightly"]
 
 [dependencies]
+async-broadcast = "0.7"
 async-task = "4.7"
 cola = "0.4"
 concurrent-queue = "2.4"

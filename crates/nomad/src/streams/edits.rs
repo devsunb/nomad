@@ -1,11 +1,25 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
+use async_broadcast::Receiver;
 use futures::Stream;
+use pin_project_lite::pin_project;
 
-/// A [`Stream`] that yields the [`Edit`]s that are applied to a
-/// [`Buffer`](crate::editor::Buffer).
-pub struct Edits {}
+pin_project! {
+    /// A [`Stream`] that yields the [`Edit`]s that are applied to a
+    /// [`Buffer`](crate::editor::Buffer).
+    pub struct Edits {
+        #[pin]
+        inner: Receiver<AppliedEdit>,
+    }
+}
+
+impl Edits {
+    #[inline]
+    pub(crate) fn new(inner: Receiver<AppliedEdit>) -> Self {
+        Self { inner }
+    }
+}
 
 impl Stream for Edits {
     type Item = AppliedEdit;
@@ -13,9 +27,9 @@ impl Stream for Edits {
     #[inline]
     fn poll_next(
         self: Pin<&mut Self>,
-        _ctx: &mut Context<'_>,
+        ctx: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        todo!()
+        self.project().inner.poll_next(ctx)
     }
 }
 

@@ -4,12 +4,13 @@ use core::cell::RefCell;
 use core::iter;
 use core::ops::Range;
 
+use async_broadcast::{InactiveReceiver, Sender};
 use cola::{Anchor, Replica};
 use crop::{Rope, RopeBuilder};
-use flume::Sender;
 use nvim::api::{opts, Buffer as NvimBuffer};
 
 use super::{BufferId, EditorId};
+use crate::runtime::spawn;
 use crate::streams::{AppliedDeletion, AppliedEdit, AppliedInsertion, Edits};
 
 /// TODO: docs
@@ -24,10 +25,10 @@ pub struct Buffer {
     inner: Rc<RefCell<BufferInner>>,
 
     /// TODO: docs
-    receiver: flume::Receiver<AppliedEdit>,
+    receiver: InactiveReceiver<AppliedEdit>,
 
     /// TODO: docs
-    sender: flume::Sender<AppliedEdit>,
+    sender: Sender<AppliedEdit>,
 }
 
 impl Buffer {
@@ -88,19 +89,19 @@ impl Buffer {
     /// TODO: docs
     #[inline]
     pub fn edits(&self) -> Edits {
-        todo!();
+        Edits::new(self.receiver.activate_cloned())
     }
 
     /// TODO: docs
     #[inline]
     pub async fn new(id: BufferId) -> Self {
-        let (sender, receiver) = flume::unbounded();
+        let (sender, receiver) = async_broadcast::broadcast(32);
 
         let this = Self {
             applied_queue: AppliedEditQueue::new(),
             id,
             inner: Rc::new(RefCell::new(BufferInner::new(id))),
-            receiver,
+            receiver: receiver.deactivate(),
             sender,
         };
 
@@ -128,7 +129,7 @@ impl Buffer {
             // the queue.
             if caused_by_applied {
                 let applied = applied_queue.pop_front().expect("just checked");
-                let _ = sender.send(applied);
+                broadcast_edit(&sender, applied);
             }
             // The change was either caused by the user or by another plugin,
             // so we apply it to our buffer to keep it in sync.
@@ -136,14 +137,28 @@ impl Buffer {
                 let (del, ins) = buffer.apply_byte_change(change);
 
                 if let Some(deletion) = del {
-                    let _ = sender.send(AppliedEdit::Deletion(deletion));
+                    broadcast_edit(&sender, AppliedEdit::Deletion(deletion));
                 }
 
                 if let Some(insertion) = ins {
-                    let _ = sender.send(AppliedEdit::Insertion(insertion));
+                    broadcast_edit(&sender, AppliedEdit::Insertion(insertion));
                 }
             }
         }
+    }
+}
+
+/// TODO: docs
+#[inline]
+fn broadcast_edit(sender: &Sender<AppliedEdit>, edit: AppliedEdit) {
+    if sender.receiver_count() > 0 {
+        let sender = sender.clone();
+
+        spawn(async move {
+            if sender.receiver_count() > 0 {
+                let _ = sender.broadcast_direct(edit).await;
+            }
+        });
     }
 }
 
