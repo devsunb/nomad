@@ -34,7 +34,7 @@ impl Stream for Edits {
 }
 
 /// A single edit to a [`Buffer`].
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum AppliedEdit {
     /// TODO: docs
     Insertion(AppliedInsertion),
@@ -44,7 +44,7 @@ pub enum AppliedEdit {
 }
 
 /// TODO: docs
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AppliedInsertion {
     inner: cola::Insertion,
     text: String,
@@ -68,7 +68,7 @@ impl AppliedInsertion {
 }
 
 /// TODO: docs
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AppliedDeletion {
     inner: cola::Deletion,
 }
