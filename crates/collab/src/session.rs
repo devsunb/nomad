@@ -1,4 +1,4 @@
-use futures::{select as race, FutureExt, StreamExt};
+use futures::{pin_mut, select as race, FutureExt, StreamExt};
 use nomad::prelude::*;
 
 use crate::config::ConnectorError;
@@ -28,7 +28,10 @@ impl Session {
 
         let editor_id = EditorId::generate();
 
-        let mut edits = Buffer::new(buf_id).await.edits_filtered(editor_id);
+        let mut edits =
+            Buffer::new(buf_id).await.edits().filter(|_edit| async { true });
+
+        pin_mut!(edits);
 
         loop {
             race! {

@@ -25,6 +25,9 @@ pub struct Buffer {
 
     /// TODO: docs
     receiver: flume::Receiver<AppliedEdit>,
+
+    /// TODO: docs
+    sender: flume::Sender<AppliedEdit>,
 }
 
 impl Buffer {
@@ -68,35 +71,8 @@ impl Buffer {
 
     /// TODO: docs
     #[inline]
-    pub fn edits(&self) -> Edits {
-        self.edits_inner(None)
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn edits_filtered(&self, filter_out: EditorId) -> Edits {
-        self.edits_inner(Some(filter_out))
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn edits_inner(&self, filter_out: Option<EditorId>) -> Edits {
-        todo!();
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub async fn new(id: BufferId) -> Self {
-        let (tx, rx) = flume::unbounded();
-
-        let this = Self {
-            applied_queue: AppliedEditQueue::new(),
-            id,
-            inner: Rc::new(RefCell::new(BufferInner::new(id))),
-            receiver: rx,
-        };
-
-        let on_bytes = this.on_bytes(tx);
+    fn attach(&self) {
+        let on_bytes = self.on_bytes();
 
         let opts = opts::BufAttachOpts::builder()
             .on_bytes(move |args| {
@@ -105,19 +81,39 @@ impl Buffer {
             })
             .build();
 
-        let _ = NvimBuffer::from(this.id).attach(false, &opts);
+        // This can fail if the buffer has been unloaded.
+        let _ = NvimBuffer::from(self.id).attach(false, &opts);
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn edits(&self) -> Edits {
+        todo!();
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub async fn new(id: BufferId) -> Self {
+        let (sender, receiver) = flume::unbounded();
+
+        let this = Self {
+            applied_queue: AppliedEditQueue::new(),
+            id,
+            inner: Rc::new(RefCell::new(BufferInner::new(id))),
+            receiver,
+            sender,
+        };
+
+        this.attach();
 
         this
     }
 
     #[inline]
-    fn on_bytes(
-        &self,
-        sender: Sender<AppliedEdit>,
-    ) -> impl Fn(ByteChange) + 'static {
+    fn on_bytes(&self) -> impl Fn(ByteChange) + 'static {
         let applied_queue = self.applied_queue.clone();
-
         let buffer = self.inner.clone();
+        let sender = self.sender.clone();
 
         move |change| {
             let mut buffer = buffer.borrow_mut();
