@@ -37,8 +37,19 @@ pub struct AppliedInsertion {
 }
 
 impl AppliedInsertion {
+    #[inline]
+    pub(crate) fn anchor(&self) -> cola::Anchor {
+        todo!();
+    }
+
+    #[inline]
     pub(crate) fn new(inner: cola::Insertion, text: String) -> Self {
         Self { inner, text }
+    }
+
+    #[inline]
+    pub(crate) fn text(&self) -> &str {
+        &self.text
     }
 }
 
@@ -49,7 +60,18 @@ pub struct AppliedDeletion {
 }
 
 impl AppliedDeletion {
+    #[inline]
+    pub(crate) fn end(&self) -> cola::Anchor {
+        todo!();
+    }
+
+    #[inline]
     pub(crate) fn new(inner: cola::Deletion) -> Self {
         Self { inner }
+    }
+
+    #[inline]
+    pub(crate) fn start(&self) -> cola::Anchor {
+        todo!();
     }
 }

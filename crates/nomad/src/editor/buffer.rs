@@ -47,31 +47,41 @@ impl Buffer {
     fn on_bytes(
         &self,
         sender: Sender<AppliedEdit>,
-    ) -> impl Fn(ByteEdit) -> bool + 'static {
-        move |edit| {
-            let byte_range = edit.byte_range();
+    ) -> impl Fn(ByteChange) + 'static {
+        fn inner() -> &'static mut BufferInner {
+            todo!()
+        }
 
-            let text = rope();
+        move |change| {
+            let buffer = inner();
 
-            text.replace(byte_range.clone(), &edit.replacement);
+            let applied_queue = applied_queue();
 
-            let replica = replica();
+            let caused_by_applied = applied_queue.with_first(|applied| {
+                let Some(applied) = applied else { return false };
+                buffer.applied_caused_change(applied, &change)
+            });
 
-            if !byte_range.is_empty() {
-                let del = replica.deleted(byte_range.clone());
-                let del = AppliedDeletion::new(del);
-                let _ = sender.send(AppliedEdit::Deletion(del));
+            // If the change was caused by an edit we already applied we
+            // mustn't apply it again. We instead pop the applied edit from
+            // the queue.
+            if caused_by_applied {
+                let applied = applied_queue.pop_front().expect("just checked");
+                let _ = sender.send(applied);
             }
+            // The change was either caused by the user or by another plugin,
+            // so we apply it to our buffer to keep it in sync.
+            else {
+                let (del, ins) = buffer.apply_byte_change(change);
 
-            let text_len = edit.replacement.len();
+                if let Some(deletion) = del {
+                    let _ = sender.send(AppliedEdit::Deletion(deletion));
+                }
 
-            if text_len > 0 {
-                let ins = replica.inserted(byte_range.start, text_len);
-                let ins = AppliedInsertion::new(ins, edit.replacement);
-                let _ = sender.send(AppliedEdit::Insertion(ins));
+                if let Some(insertion) = ins {
+                    let _ = sender.send(AppliedEdit::Insertion(insertion));
+                }
             }
-
-            false
         }
     }
 }
@@ -89,6 +99,35 @@ struct BufferInner {
 }
 
 impl BufferInner {
+    /// TODO: docs
+    #[inline]
+    fn apply_byte_change(
+        &mut self,
+        change: ByteChange,
+    ) -> (Option<AppliedDeletion>, Option<AppliedInsertion>) {
+        let byte_range = change.byte_range();
+
+        self.text.replace(byte_range.clone(), &change.replacement);
+
+        let mut deletion = None;
+
+        let mut insertion = None;
+
+        if byte_range.is_empty() {
+            let del = self.crdt.deleted(byte_range.clone());
+            deletion = Some(AppliedDeletion::new(del));
+        }
+
+        let text_len = change.replacement.len();
+
+        if text_len > 0 {
+            let ins = self.crdt.inserted(byte_range.start, text_len);
+            insertion = Some(AppliedInsertion::new(ins, change.replacement));
+        }
+
+        (deletion, insertion)
+    }
+
     /// TODO: docs
     ///
     /// # Panics
@@ -117,22 +156,13 @@ impl BufferInner {
 
         assert!(start_offset < end_offset);
 
-        let start_point = self.point_of_offset(start_offset);
+        let delete_range = start_offset..end_offset;
 
-        let end_point = self.point_of_offset(end_offset);
+        self.nvim_delete(delete_range.clone());
 
-        self.text.delete(start_offset..end_offset);
+        self.text.delete(delete_range.clone());
 
-        let deletion = self.crdt.deleted(start_offset..end_offset);
-
-        self.nvim
-            .set_text(
-                start_point.row..end_point.row,
-                start_point.col,
-                end_point.col,
-                iter::empty::<nvim::String>(),
-            )
-            .expect("start and end points are within bounds");
+        let deletion = self.crdt.deleted(delete_range);
 
         Some(AppliedDeletion::new(deletion))
     }
@@ -153,19 +183,184 @@ impl BufferInner {
             panic_couldnt_resolve_anchor(&insert_at);
         };
 
-        let point = self.point_of_offset(byte_offset);
+        self.nvim_insert(byte_offset, &text);
 
         self.text.insert(byte_offset, &text);
 
         let insertion = self.crdt.inserted(byte_offset, text.len());
 
-        let Point { row, col } = point;
-
-        self.nvim
-            .set_text(row..row, col, col, iter::once(&*text))
-            .expect("row and col are within bounds");
-
         AppliedInsertion::new(insertion, text)
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn apply_remote_deletion(&mut self, deletion: &RemoteDeletion) {
+        let delete_ranges = self.crdt.integrate_deletion(&deletion.inner);
+
+        for range in delete_ranges.into_iter().rev() {
+            self.nvim_delete(range.clone());
+            self.text.delete(range);
+        }
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn apply_remote_insertion(&mut self, insertion: &RemoteInsertion) {
+        let Some(byte_offset) =
+            self.crdt.integrate_insertion(&insertion.inner)
+        else {
+            return;
+        };
+
+        self.nvim_insert(byte_offset, &insertion.text);
+        self.text.insert(byte_offset, &insertion.text);
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn applied_caused_change(
+        &self,
+        applied: &AppliedEdit,
+        change: &ByteChange,
+    ) -> bool {
+        let byte_range = change.byte_range();
+
+        match (byte_range.is_empty(), change.replacement.is_empty()) {
+            // Insertion
+            (true, false) => {
+                let AppliedEdit::Insertion(insertion) = &applied else {
+                    return false;
+                };
+
+                self.applied_insertion_caused_change(
+                    insertion,
+                    byte_range.start,
+                    &change.replacement,
+                )
+            },
+
+            // Deletion
+            (false, true) => {
+                let AppliedEdit::Deletion(deletion) = &applied else {
+                    return false;
+                };
+
+                self.applied_deletion_caused_change(deletion, byte_range)
+            },
+
+            // Replacement or no-op
+            _ => false,
+        }
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn applied_deletion_caused_change(
+        &self,
+        deletion: &AppliedDeletion,
+        byte_range: Range<ByteOffset>,
+    ) -> bool {
+        #[inline(never)]
+        fn unreachable_applied() -> ! {
+            unreachable!(
+                "the deletion was applied, so its start and end anchors can \
+                 be resolved"
+            );
+        }
+
+        let Some(deletion_start) = self.crdt.resolve_anchor(deletion.start())
+        else {
+            unreachable_applied();
+        };
+
+        if deletion_start != byte_range.start {
+            return false;
+        }
+
+        let Some(deletion_end) = self.crdt.resolve_anchor(deletion.end())
+        else {
+            unreachable_applied();
+        };
+
+        deletion_end == byte_range.end
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn applied_insertion_caused_change(
+        &self,
+        insertion: &AppliedInsertion,
+        byte_offset: ByteOffset,
+        text: &str,
+    ) -> bool {
+        #[inline(never)]
+        fn unreachable_applied() -> ! {
+            unreachable!(
+                "the insertion was applied, so its anchor can be resolved"
+            );
+        }
+
+        if insertion.text().len() != text.len() {
+            return false;
+        }
+
+        let Some(insertion_offset) =
+            self.crdt.resolve_anchor(insertion.anchor())
+        else {
+            unreachable_applied();
+        };
+
+        if insertion_offset != byte_offset {
+            return false;
+        }
+
+        let compare_until_threshold = 16;
+
+        // If we get here we know that both the anchor and the text length
+        // match, so it's very likely that the text is the same.
+        //
+        // Still, for texts up to a length threshold we actually perform the
+        // comparison just to be sure.
+        if text.len() < compare_until_threshold {
+            insertion.text() == text
+        }
+        // For larger texts we only compare the first `threshold` bytes because
+        // comparing the whole texts gets too expensive considering this blocks
+        // after every edit.
+        else {
+            insertion.text()[..compare_until_threshold]
+                == text[..compare_until_threshold]
+        }
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn nvim_delete(&mut self, delete_range: Range<ByteOffset>) {
+        let start_point = self.point_of_offset(delete_range.start);
+
+        let end_point = self.point_of_offset(delete_range.end);
+
+        // This can fail if the buffer has been unloaded.
+        let _ = self.nvim.set_text(
+            start_point.row..end_point.row,
+            start_point.col,
+            end_point.col,
+            iter::empty::<nvim::String>(),
+        );
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn nvim_insert(&mut self, insert_at: ByteOffset, text: &str) {
+        let point = self.point_of_offset(insert_at);
+
+        // This can fail if the buffer has been unloaded.
+        let _ = self.nvim.set_text(
+            point.row..point.row,
+            point.col,
+            point.col,
+            iter::once(text),
+        );
     }
 
     /// Transforms the 1-dimensional byte offset into a 2-dimensional
@@ -194,37 +389,23 @@ struct Point {
 }
 
 #[derive(Clone)]
-struct EditQueue {
-    inner: Rc<RefCell<VecDeque<PendingEdit>>>,
+struct AppliedEditQueue {
+    inner: Rc<RefCell<VecDeque<AppliedEdit>>>,
 }
 
-/// TODO: docs
-enum PendingEdit {
-    Local(PendingLocalEdit),
-    Remote(PendingRemoteEdit),
-}
+impl AppliedEditQueue {
+    #[inline]
+    fn with_first<F, R>(&self, _fun: F) -> R
+    where
+        F: FnOnce(Option<&AppliedEdit>) -> R,
+    {
+        todo!();
+    }
 
-/// TODO: docs
-enum PendingLocalEdit {
-    Insertion(LocalInsertion),
-    Deletion(LocalDeletion),
-}
-
-/// TODO: docs
-struct LocalInsertion {
-    insert_at: Anchor,
-    text: String,
-}
-
-/// TODO: docs
-struct LocalDeletion {
-    range: Range<Anchor>,
-}
-
-/// TODO: docs
-enum PendingRemoteEdit {
-    Insertion(RemoteInsertion),
-    Deletion(RemoteDeletion),
+    #[inline]
+    fn pop_front(&self) -> Option<AppliedEdit> {
+        self.inner.borrow_mut().pop_front()
+    }
 }
 
 /// TODO: docs
@@ -233,29 +414,39 @@ struct RemoteInsertion {
     text: String,
 }
 
+impl From<RemoteInsertion> for AppliedInsertion {
+    #[inline]
+    fn from(insertion: RemoteInsertion) -> Self {
+        AppliedInsertion::new(insertion.inner, insertion.text)
+    }
+}
+
 /// TODO: docs
 struct RemoteDeletion {
     inner: cola::Deletion,
 }
 
-fn rope() -> &'static mut Rope {
-    todo!()
+impl From<RemoteDeletion> for AppliedDeletion {
+    #[inline]
+    fn from(deletion: RemoteDeletion) -> Self {
+        AppliedDeletion::new(deletion.inner)
+    }
 }
 
-fn replica() -> &'static mut Replica {
+fn applied_queue() -> &'static AppliedEditQueue {
     todo!()
 }
 
 type ByteOffset = usize;
 
 /// TODO: docs
-struct ByteEdit {
+struct ByteChange {
     start: ByteOffset,
     end: ByteOffset,
     replacement: String,
 }
 
-impl ByteEdit {
+impl ByteChange {
     #[inline]
     fn byte_range(&self) -> Range<usize> {
         self.start..self.end
