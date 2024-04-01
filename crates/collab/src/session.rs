@@ -36,8 +36,14 @@ impl Session {
         let (sender, receiver, session) =
             config.get().connector()?.join(session_id.into()).await?;
 
+        let collab::messages::FileKind::Document(doc) =
+            session.project().root().kind()
+        else {
+            unreachable!();
+        };
+
         Ok(Self {
-            buffer: create_buffer(session).await,
+            buffer: Buffer::create(doc.text()),
             id: session_id,
             receiver,
             _sender: sender,

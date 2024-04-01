@@ -10,6 +10,13 @@ impl BufferId {
     }
 }
 
+impl From<nvim::api::Buffer> for BufferId {
+    #[inline]
+    fn from(buf: nvim::api::Buffer) -> Self {
+        (&buf).into()
+    }
+}
+
 impl From<&nvim::api::Buffer> for BufferId {
     #[inline]
     fn from(buf: &nvim::api::Buffer) -> Self {

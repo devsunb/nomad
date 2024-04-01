@@ -7,7 +7,7 @@ use core::ops::Range;
 use async_broadcast::{InactiveReceiver, Sender};
 use cola::{Anchor, Replica};
 use crop::{Rope, RopeBuilder};
-use nvim::api::{opts, Buffer as NvimBuffer};
+use nvim::api::{self, opts, Buffer as NvimBuffer};
 
 use super::{BufferId, EditorId};
 use crate::runtime::spawn;
@@ -84,6 +84,22 @@ impl Buffer {
 
         // This can fail if the buffer has been unloaded.
         let _ = NvimBuffer::from(self.id).attach(false, &opts);
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub fn create(text: &str) -> Self {
+        let Ok(mut buf) = api::create_buf(true, false) else { unreachable!() };
+
+        let Ok(()) = buf.set_lines(.., true, text.lines()) else {
+            unreachable!()
+        };
+
+        let mut win = api::Window::current();
+
+        let Ok(()) = win.set_buf(&buf) else { unreachable!() };
+
+        Self::new(buf.into())
     }
 
     /// TODO: docs
