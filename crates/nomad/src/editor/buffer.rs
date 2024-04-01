@@ -360,12 +360,9 @@ impl BufferInner {
             return false;
         }
 
-        let Some(deletion_end) = self.crdt.resolve_anchor(deletion.end())
-        else {
-            unreachable_applied();
-        };
+        // TODO: compare deletion's length to byte range's.
 
-        deletion_end == byte_range.end
+        true
     }
 
     /// TODO: docs
