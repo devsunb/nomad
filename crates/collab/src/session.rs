@@ -1,11 +1,11 @@
 use core::future::ready;
 
-use collab::messages::{FileKind, InboundMessage, OutboundMessage};
+use collab::messages::{FileKind, InboundMessage};
 use futures::{pin_mut, select as race, FutureExt, StreamExt};
 use nomad::prelude::*;
 
 use crate::config::ConnectorError;
-use crate::{Config, SessionId};
+use crate::{Config, Convert, SessionId};
 
 /// TODO: docs
 pub(crate) struct Session {
@@ -57,13 +57,13 @@ impl Session {
     async fn handle_inbound(&mut self, msg: InboundMessage) {
         match msg {
             InboundMessage::RemoteDeletion(deletion) => {
-                self.buffer.apply_remote_deletion(deletion.into());
+                self.buffer.apply_remote_deletion(deletion.convert());
             },
             InboundMessage::RemoteInsertion(insertion) => {
-                self.buffer.apply_remote_insertion(insertion.into());
+                self.buffer.apply_remote_insertion(insertion.convert());
             },
             InboundMessage::SessionRequest(request) => {
-                request.send(self.buffer.snapshot().into());
+                request.send(self.buffer.snapshot().convert());
             },
             _ => {},
         }
@@ -84,7 +84,7 @@ impl Session {
             race! {
                 maybe_edit = edits.next().fuse() => {
                     let Some(edit) = maybe_edit else { return Ok(()) };
-                    self.sender.send(edit.into())?;
+                    self.sender.send(edit.convert())?;
                 },
                 maybe_msg = self.receiver.recv().fuse() => {
                     let Ok(msg) = maybe_msg else { return Ok(()) };
