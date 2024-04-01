@@ -498,6 +498,7 @@ fn panic_couldnt_resolve_anchor(anchor: &Anchor) -> ! {
 }
 
 /// TODO: docs
+#[derive(Debug, PartialEq, Eq)]
 struct Point {
     /// TODO: docs
     row: usize,
@@ -579,22 +580,7 @@ impl ByteChange {
     }
 }
 
-impl
-    From<(
-        String,
-        NvimBuffer,
-        u32,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-        usize,
-    )> for ByteChange
-{
+impl From<opts::OnBytesArgs> for ByteChange {
     #[inline]
     fn from(
         (
@@ -610,41 +596,25 @@ impl
             new_end_row,
             new_end_col,
             _new_end_len,
-        ): (
-            String,
-            NvimBuffer,
-            u32,
-            usize,
-            usize,
-            usize,
-            usize,
-            usize,
-            usize,
-            usize,
-            usize,
-            usize,
-        ),
+        ): opts::OnBytesArgs,
     ) -> Self {
-        let replacement_start_point = Point { row: start_row, col: start_col };
+        let replacement_start = Point { row: start_row, col: start_col };
 
-        let replacement_end_point =
-            Point { row: new_end_row, col: new_end_col };
+        let replacement_end = Point {
+            row: start_row + new_end_row,
+            col: start_col * (new_end_row == 0) as usize + new_end_col,
+        };
 
-        let replacement = nvim_buf_get_text(
-            &buf,
-            replacement_start_point..replacement_end_point,
-        )
-        .expect("buffer must exist");
-
-        let replaced_byte_range = {
-            let start = start_offset;
-            let end = start_offset + old_end_len;
-            start..end
+        let replacement = if replacement_start == replacement_end {
+            String::new()
+        } else {
+            nvim_buf_get_text(&buf, replacement_start..replacement_end)
+                .expect("buffer must exist")
         };
 
         Self {
-            start: replaced_byte_range.start,
-            end: replaced_byte_range.end,
+            start: start_offset,
+            end: start_offset + old_end_len,
             replacement,
         }
     }
