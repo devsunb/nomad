@@ -1,5 +1,6 @@
 use core::future::ready;
 
+use collab::messages::{FileKind, InboundMessage, OutboundMessage};
 use futures::{pin_mut, select as race, FutureExt, StreamExt};
 use nomad::prelude::*;
 
@@ -18,7 +19,7 @@ pub(crate) struct Session {
     receiver: collab::Receiver,
 
     /// TODO: docs
-    _sender: collab::Sender,
+    sender: collab::Sender,
 }
 
 impl Session {
@@ -33,12 +34,14 @@ impl Session {
         config: Get<Config>,
         session_id: SessionId,
     ) -> Result<Self, JoinError> {
-        let (sender, receiver, session) =
-            config.get().connector()?.join(session_id.into()).await?;
+        let (sender, receiver, session) = config
+            .get()
+            .connector()?
+            .peer_id(collab::messages::PeerId::new_random())
+            .join(session_id.into())
+            .await?;
 
-        let collab::messages::FileKind::Document(doc) =
-            session.project().root().kind()
-        else {
+        let FileKind::Document(doc) = session.project().root().kind() else {
             unreachable!();
         };
 
@@ -46,12 +49,28 @@ impl Session {
             buffer: Buffer::create(doc.text()),
             id: session_id,
             receiver,
-            _sender: sender,
+            sender,
         })
     }
 
     /// TODO: docs
-    pub async fn run(&mut self) {
+    async fn handle_inbound(&mut self, msg: InboundMessage) {
+        match msg {
+            InboundMessage::RemoteDeletion(deletion) => {
+                self.buffer.apply_remote_deletion(deletion.into());
+            },
+            InboundMessage::RemoteInsertion(insertion) => {
+                self.buffer.apply_remote_insertion(insertion.into());
+            },
+            InboundMessage::SessionRequest(request) => {
+                request.send(self.buffer.snapshot().into());
+            },
+            _ => {},
+        }
+    }
+
+    /// TODO: docs
+    pub async fn run(&mut self) -> Result<(), RunError> {
         let editor_id = EditorId::generate();
 
         let edits = self
@@ -64,10 +83,12 @@ impl Session {
         loop {
             race! {
                 maybe_edit = edits.next().fuse() => {
-                    let Some(edit) = maybe_edit else { return };
-                }
+                    let Some(edit) = maybe_edit else { return Ok(()) };
+                    self.sender.send(edit.into())?;
+                },
                 maybe_msg = self.receiver.recv().fuse() => {
-                    let Ok(msg) = maybe_msg else { return };
+                    let Ok(msg) = maybe_msg else { return Ok(()) };
+                    self.handle_inbound(msg).await;
                 },
             }
         }
@@ -78,15 +99,15 @@ impl Session {
         config: Get<Config>,
         buffer: Buffer,
     ) -> Result<Self, StartError> {
-        let (sender, receiver, session_id) =
-            config.get().connector()?.start().await?;
+        let (sender, receiver, session_id) = config
+            .get()
+            .connector()?
+            .peer_id(collab::messages::PeerId::new_random())
+            .start()
+            .await?;
 
-        Ok(Self { buffer, id: session_id.into(), receiver, _sender: sender })
+        Ok(Self { buffer, id: session_id.into(), receiver, sender })
     }
-}
-
-async fn create_buffer(session: collab::messages::Session) -> Buffer {
-    todo!()
 }
 
 /// Whether there is an active collab session or not.
@@ -116,4 +137,10 @@ pub enum StartError {
 
     #[error(transparent)]
     Connector(#[from] ConnectorError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RunError {
+    #[error(transparent)]
+    Collab(#[from] collab::Error),
 }
