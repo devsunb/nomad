@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 async-net = { workspace = true }
+cola = "0.4"
 collab = { git = "ssh://git@github.com/nomad/collab.git" }
 futures = { workspace = true }
 nomad = { workspace = true }

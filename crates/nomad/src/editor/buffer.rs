@@ -88,18 +88,12 @@ impl Buffer {
 
     /// TODO: docs
     #[inline]
-    pub fn create(text: &str) -> Self {
-        let Ok(mut buf) = api::create_buf(true, false) else { unreachable!() };
-
-        let Ok(()) = buf.set_lines(.., true, text.lines()) else {
+    pub fn create(text: &str, replica: Replica) -> Self {
+        let inner = BufferInner::create(text, replica);
+        let Ok(()) = api::Window::current().set_buf(&inner.nvim) else {
             unreachable!()
         };
-
-        let mut win = api::Window::current();
-
-        let Ok(()) = win.set_buf(&buf) else { unreachable!() };
-
-        Self::new(buf.into())
+        Self::new(inner)
     }
 
     /// TODO: docs
@@ -110,13 +104,18 @@ impl Buffer {
 
     /// TODO: docs
     #[inline]
-    pub fn new(id: BufferId) -> Self {
+    pub fn from_id(id: BufferId) -> Self {
+        Self::new(BufferInner::from_id(id))
+    }
+
+    #[inline]
+    fn new(inner: BufferInner) -> Self {
         let (sender, receiver) = async_broadcast::broadcast(32);
 
         let this = Self {
             applied_queue: AppliedEditQueue::new(),
-            id,
-            inner: Rc::new(RefCell::new(BufferInner::new(id))),
+            id: (&inner.nvim).into(),
+            inner: Rc::new(RefCell::new(inner)),
             receiver: receiver.deactivate(),
             sender,
         };
@@ -436,7 +435,18 @@ impl BufferInner {
     }
 
     #[inline]
-    fn new(id: BufferId) -> Self {
+    fn create(text: &str, crdt: Replica) -> Self {
+        let Ok(mut buf) = api::create_buf(true, false) else { unreachable!() };
+
+        let Ok(()) = buf.set_lines(.., true, text.lines()) else {
+            unreachable!()
+        };
+
+        Self { crdt, nvim: buf, text: Rope::from(text) }
+    }
+
+    #[inline]
+    fn from_id(id: BufferId) -> Self {
         let nvim = id.into();
         let text = rope_from_buf(&nvim).expect("buffer must exist");
         let crdt = Replica::new(1, text.byte_len());

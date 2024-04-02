@@ -33,7 +33,7 @@ impl Action<Collab> for Start {
             return Err(StartError::ExistingSession(session_id));
         }
 
-        let buffer = Buffer::new(BufferId::current());
+        let buffer = Buffer::from_id(BufferId::current());
 
         let mut session = Session::start(self.config.clone(), buffer).await?;
 

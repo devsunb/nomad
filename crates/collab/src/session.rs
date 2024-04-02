@@ -1,5 +1,6 @@
 use core::future::ready;
 
+use cola::Replica;
 use collab::messages::{FileKind, InboundMessage};
 use futures::{pin_mut, select as race, FutureExt, StreamExt};
 use nomad::prelude::*;
@@ -34,10 +35,12 @@ impl Session {
         config: Get<Config>,
         session_id: SessionId,
     ) -> Result<Self, JoinError> {
+        let peer_id = collab::messages::PeerId::new_random();
+
         let (sender, receiver, session) = config
             .get()
             .connector()?
-            .peer_id(collab::messages::PeerId::new_random())
+            .peer_id(peer_id)
             .join(session_id.into())
             .await?;
 
@@ -45,8 +48,13 @@ impl Session {
             unreachable!();
         };
 
+        let Ok(replica) = Replica::decode(peer_id.as_u64(), doc.replica())
+        else {
+            unreachable!();
+        };
+
         Ok(Self {
-            buffer: Buffer::create(doc.text()),
+            buffer: Buffer::create(doc.text(), replica),
             id: session_id,
             receiver,
             sender,
