@@ -11,6 +11,7 @@ publish = false
 
 [workspace.dependencies]
 async-net = "2"
+clipboard = { path = "./crates/clipboard" }
 futures = "0.3"
 nomad = { path = "./crates/nomad" }
 serde = "1.0"
