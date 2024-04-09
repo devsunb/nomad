@@ -28,7 +28,7 @@ impl Action<Collab> for Start {
 
     type Return = ();
 
-    async fn execute(&self, _: ()) -> Result<(), StartError> {
+    async fn execute(&mut self, _: ()) -> Result<(), StartError> {
         if let &SessionState::Active(session_id) = self.state.get() {
             return Err(StartError::ExistingSession(session_id));
         }

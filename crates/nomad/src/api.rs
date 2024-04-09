@@ -163,7 +163,7 @@ where
         },
     };
 
-    let Ok(action) = action.try_borrow_mut() else {
+    let Ok(mut action) = action.try_borrow_mut() else {
         return ActionSyncness::Sync(Err(ExecuteActionError::Borrow));
     };
 

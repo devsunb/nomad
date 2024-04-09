@@ -27,13 +27,12 @@ impl Action<Collab> for Join {
 
     type Return = ();
 
-    async fn execute(&self, session_id: SessionId) -> Result<(), JoinError> {
-        if let &SessionState::Active(session_id) = self.state.get() {
-            return Err(JoinError::ExistingSession(session_id));
+    async fn execute(&mut self, id: SessionId) -> Result<(), JoinError> {
+        if let &SessionState::Active(active_id) = self.state.get() {
+            return Err(JoinError::ExistingSession(active_id));
         }
 
-        let mut session =
-            Session::join(self.config.clone(), session_id).await?;
+        let mut session = Session::join(self.config.clone(), id).await?;
 
         self.set_state.set(SessionState::Active(session.id()));
 

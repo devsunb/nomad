@@ -208,7 +208,7 @@ where
 {
     let args = A::Args::try_from(args).map_err(Into::into)?;
 
-    let Ok(action) = action.try_borrow_mut() else {
+    let Ok(mut action) = action.try_borrow_mut() else {
         // Should we maybe return an error to notify the user that the
         // action couldn't be executed?
         return Ok(());

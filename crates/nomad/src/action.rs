@@ -22,7 +22,7 @@ pub trait Action<M: Module>: 'static {
 
     /// TODO: docs
     fn execute(
-        &self,
+        &mut self,
         args: Self::Args,
     ) -> impl MaybeFuture<Output = impl MaybeResult<Self::Return>>;
 }
