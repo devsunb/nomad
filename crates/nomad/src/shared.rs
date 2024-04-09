@@ -23,6 +23,53 @@ impl<T> Shared<T> {
     pub fn new(value: T) -> Self {
         Self { inner: Rc::new(WithCell::new(value)) }
     }
+
+    /// Tries to call a closure with a shared reference to the value, returning
+    /// an error if the value is already exclusively borrowed.
+    #[inline]
+    pub fn try_with<R>(
+        &self,
+        fun: impl FnOnce(&T) -> R,
+    ) -> Result<R, BorrowError> {
+        self.inner.try_with(fun)
+    }
+
+    /// Tries to call a closure with an exclusive reference to the value,
+    /// returning an error if the value is already borrowed.
+    #[inline]
+    pub fn try_with_mut<R>(
+        &self,
+        fun: impl FnOnce(&mut T) -> R,
+    ) -> Result<R, BorrowError> {
+        self.inner.try_with_mut(fun)
+    }
+
+    /// Calls a closure with a shared reference to the value, panicking if the
+    /// value is already exclusively borrowed.
+    ///
+    /// Check out [`try_with`](Self::try_with) for a non-panicking alternative.
+    #[inline]
+    pub fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
+        self.inner.with(fun)
+    }
+
+    /// Calls a closure with an exclusive reference to the value, panicking if
+    /// the value is already borrowed.
+    ///
+    /// Check out [`try_with_mut`](Self::try_with_mut) for a non-panicking
+    /// alternative.
+    #[inline]
+    pub fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
+        self.inner.with_mut(fun)
+    }
+}
+
+impl<T: Copy> Shared<T> {
+    /// Returns a copy of the value.
+    #[inline]
+    pub fn get(&self) -> T {
+        self.inner.get()
+    }
 }
 
 #[derive(Default)]
