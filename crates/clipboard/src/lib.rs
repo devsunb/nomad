@@ -1,6 +1,6 @@
 //! TODO: docs
 
-use core::fmt::{self, Debug, Display};
+use core::fmt::{self, Display};
 use std::error::Error as StdError;
 
 use copypasta::{ClipboardContext, ClipboardProvider};
@@ -47,6 +47,8 @@ impl Display for ClipboardError {
     }
 }
 
+impl StdError for ClipboardError {}
+
 impl PartialEq for ClipboardError {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
@@ -56,8 +58,6 @@ impl PartialEq for ClipboardError {
 }
 
 impl Eq for ClipboardError {}
-
-impl StdError for ClipboardError {}
 
 #[derive(Debug, Eq, PartialEq)]
 enum ClipboardErrorKind {
