@@ -16,6 +16,7 @@ pub mod module;
 mod nomad;
 pub mod runtime;
 mod serde;
+pub mod shared;
 pub mod streams;
 pub mod warning;
 
@@ -36,6 +37,7 @@ pub mod prelude {
     pub use crate::maybe_result::*;
     pub use crate::module::*;
     pub use crate::runtime::*;
+    pub use crate::shared::*;
     pub use crate::streams::*;
     pub use crate::warning::*;
     pub use crate::Nomad;
