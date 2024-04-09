@@ -1,5 +1,6 @@
 //! TODO: docs
 
+use core::cell::RefCell;
 use core::convert::Infallible;
 use std::rc::Rc;
 
@@ -74,7 +75,7 @@ impl Functions {
         A::Args: DeserializeOwned,
         A::Return: Serialize,
     {
-        let action = Rc::new(action);
+        let action = Rc::new(RefCell::new(action));
 
         let action = move |args| exec_action(Rc::clone(&action), args);
 
@@ -83,28 +84,30 @@ impl Functions {
     }
 }
 
+#[allow(clippy::await_holding_refcell_ref)]
 #[inline]
-fn exec_action<M, A>(action: Rc<A>, obj: Object) -> Result<Object, Infallible>
+fn exec_action<M, A>(
+    action: Rc<RefCell<A>>,
+    obj: Object,
+) -> Result<Object, Infallible>
 where
     M: Module,
     A: Action<M>,
     A::Args: DeserializeOwned,
     A::Return: Serialize,
 {
-    enum ActionSyncness<Result> {
-        /// The action is synchronous, so the future is guaranteed to resolve
-        /// immediately.
-        Sync(Result),
-
-        /// The action is asynchronous, so the future may not resolve
-        /// immediately.
-        Async,
-    }
-
     let future = async move {
         let args = match deserialize::<A::Args>(obj, "args") {
             Ok(args) => args,
-            Err(de_err) => return ActionSyncness::Sync(Err(de_err)),
+            Err(de_err) => {
+                return ActionSyncness::Sync(Err(
+                    ExecuteActionError::Deserialize(de_err),
+                ))
+            },
+        };
+
+        let Ok(action) = action.try_borrow_mut() else {
+            return ActionSyncness::Sync(Err(ExecuteActionError::Borrow));
         };
 
         let future = match action.execute(args).into_enum() {
@@ -130,17 +133,28 @@ where
 
     let mut task = spawn(future);
 
-    let Some(res) = (&mut task).now_or_never() else {
+    let Some(syncness) = (&mut task).now_or_never() else {
         // The action is async and it's not done yet.
         task.detach();
         return Ok(Object::nil());
     };
 
-    let res = match res {
-        ActionSyncness::Sync(Ok(res)) => res
-            .and_then(|value| serialize(&value, "result").map_err(Into::into)),
+    let res = match syncness {
+        ActionSyncness::Sync(future_res) => match future_res {
+            Ok(action_res) => action_res.and_then(|action_ret| {
+                serialize(&action_ret, "result").map_err(Into::into)
+            }),
 
-        ActionSyncness::Sync(Err(de_err)) => Err(WarningMsg::from(de_err)),
+            Err(ExecuteActionError::Deserialize(de_err)) => {
+                Err(WarningMsg::from(de_err))
+            },
+
+            Err(ExecuteActionError::Borrow) => {
+                // Should we maybe return an error to notify the user that the
+                // action couldn't be executed?
+                Ok(Object::nil())
+            },
+        },
 
         // The action was async but it resolved on the first poll.
         ActionSyncness::Async => Ok(Object::nil()),
@@ -159,4 +173,23 @@ where
             Ok(Object::nil())
         },
     }
+}
+
+enum ActionSyncness<T> {
+    /// The action is synchronous, so the future is guaranteed to resolve
+    /// immediately.
+    Sync(T),
+
+    /// The action is asynchronous, so the future may not resolve
+    /// immediately.
+    Async,
+}
+
+enum ExecuteActionError {
+    /// The arguments didn't deserialize correctly.
+    Deserialize(crate::serde::DeserializeError),
+
+    /// It wasn't possible to obtain a mutable reference to the action because
+    /// it's still being used by a previous execution that hasn't yet finished.
+    Borrow,
 }
