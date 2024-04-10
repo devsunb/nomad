@@ -2,6 +2,7 @@
 //!
 //! TODO: docs
 
+mod activity;
 mod collab;
 mod config;
 mod context;
@@ -11,11 +12,12 @@ mod session_id;
 mod start;
 mod utils;
 
+use activity::Activity;
 pub use collab::Collab;
 use config::Config;
 use context::Context;
 use join::Join;
-use session::{Session, SessionState};
+use session::Session;
 use session_id::SessionId;
 use start::Start;
 use utils::*;

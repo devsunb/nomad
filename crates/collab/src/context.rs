@@ -1,17 +1,16 @@
-use nomad::prelude::{new_input, Get, Set};
+use nomad::prelude::{Get, Shared};
 
-use crate::{Config, SessionState};
+use crate::{Activity, Config};
 
 /// TODO: docs
 pub(crate) struct Context {
+    pub(crate) activity: Shared<Activity>,
     pub(crate) config: Get<Config>,
-    pub(crate) set_state: Set<SessionState>,
-    pub(crate) state: Get<SessionState>,
 }
 
 impl Context {
     pub(crate) fn new(config: Get<Config>) -> Self {
-        let (state, set_state) = new_input(SessionState::default());
-        Self { config, set_state, state }
+        let activity = Shared::new(Activity::default());
+        Self { activity, config }
     }
 }

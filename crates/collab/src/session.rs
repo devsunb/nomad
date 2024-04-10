@@ -35,7 +35,7 @@ impl Session {
 
     /// TODO: docs
     pub async fn join(
-        config: Get<Config>,
+        config: &Get<Config>,
         session_id: SessionId,
     ) -> Result<Self, JoinError> {
         let peer_id = collab::messages::PeerId::new_random();
@@ -111,7 +111,7 @@ impl Session {
     }
 
     /// TODO: docs
-    pub async fn start(config: Get<Config>) -> Result<Self, StartError> {
+    pub async fn start(config: &Get<Config>) -> Result<Self, StartError> {
         let peer_id = collab::messages::PeerId::new_random();
 
         let (sender, receiver, session_id) =
@@ -125,17 +125,6 @@ impl Session {
             session_id: session_id.into(),
         })
     }
-}
-
-/// Whether there is an active collab session or not.
-#[derive(Debug, Clone, Copy, Default)]
-pub(crate) enum SessionState {
-    /// There is an active collab session.
-    Active(SessionId),
-
-    /// There is no active collab session.
-    #[default]
-    Inactive,
 }
 
 #[derive(Debug, thiserror::Error)]

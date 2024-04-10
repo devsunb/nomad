@@ -1,22 +1,17 @@
 use nomad::prelude::*;
 
-use crate::{Collab, Config, Context, Session, SessionId, SessionState};
+use crate::{Activity, Collab, Config, Context, Session, SessionId};
 
 /// TODO: docs
 #[derive(Clone)]
 pub(crate) struct Start {
+    activity: Shared<Activity>,
     config: Get<Config>,
-    state: Get<SessionState>,
-    set_state: Set<SessionState>,
 }
 
 impl Start {
     pub(crate) fn new(ctx: &Context) -> Self {
-        Self {
-            config: ctx.config.clone(),
-            state: ctx.state.clone(),
-            set_state: ctx.set_state.clone(),
-        }
+        Self { activity: ctx.activity.clone(), config: ctx.config.clone() }
     }
 }
 
@@ -29,15 +24,31 @@ impl Action<Collab> for Start {
     type Return = ();
 
     async fn execute(&mut self, _: ()) -> Result<(), StartError> {
-        if let &SessionState::Active(session_id) = self.state.get() {
-            return Err(StartError::ExistingSession(session_id));
+        match self.activity.get() {
+            Activity::Active(id) => return Err(StartError::AlreadyActive(id)),
+            Activity::Joining => return Err(StartError::AlreadyJoining),
+            _ => (),
         }
 
-        let mut session = Session::start(self.config.clone()).await?;
+        self.activity.set(Activity::Starting);
 
-        nvim::print!("Session started with ID {}", session.id());
+        // TODO: there should be a reactor that looks at the activity and
+        // prints a message when it changes.
+        // Self::info(SessionStarting);
 
-        self.set_state.set(SessionState::Active(session.id()));
+        let mut session = Session::start(&self.config).await?;
+
+        let session_id = session.id();
+
+        self.activity.set(Activity::Active(session_id));
+
+        clipboard::set(session_id)?;
+
+        // TODO: there should be a reactor that looks at the activity and
+        // prints a message when it changes.
+        // Self::info(SessionStarted);
+
+        nvim::print!("Session ID copied to clipboard");
 
         let _ = session.run().await;
 
@@ -48,7 +59,13 @@ impl Action<Collab> for Start {
 #[derive(Debug, thiserror::Error)]
 pub enum StartError {
     #[error("there is already an active session with ID {0}")]
-    ExistingSession(SessionId),
+    AlreadyActive(SessionId),
+
+    #[error("cannot start a session while another one is being joined")]
+    AlreadyJoining,
+
+    #[error(transparent)]
+    Clipboard(#[from] clipboard::ClipboardError),
 
     #[error(transparent)]
     Start(#[from] crate::session::StartError),

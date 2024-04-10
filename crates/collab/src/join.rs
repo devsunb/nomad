@@ -1,21 +1,16 @@
 use nomad::prelude::*;
 
-use crate::{Collab, Config, Context, Session, SessionId, SessionState};
+use crate::{Activity, Collab, Config, Context, Session, SessionId};
 
 #[derive(Clone)]
 pub(crate) struct Join {
+    activity: Shared<Activity>,
     config: Get<Config>,
-    state: Get<SessionState>,
-    set_state: Set<SessionState>,
 }
 
 impl Join {
     pub(crate) fn new(ctx: &Context) -> Self {
-        Self {
-            config: ctx.config.clone(),
-            state: ctx.state.clone(),
-            set_state: ctx.set_state.clone(),
-        }
+        Self { activity: ctx.activity.clone(), config: ctx.config.clone() }
     }
 }
 
@@ -28,13 +23,17 @@ impl Action<Collab> for Join {
     type Return = ();
 
     async fn execute(&mut self, id: SessionId) -> Result<(), JoinError> {
-        if let &SessionState::Active(active_id) = self.state.get() {
-            return Err(JoinError::ExistingSession(active_id));
+        match self.activity.get() {
+            Activity::Active(id) => return Err(JoinError::AlreadyActive(id)),
+            Activity::Starting => return Err(JoinError::AlreadyStarting),
+            _ => (),
         }
 
-        let mut session = Session::join(self.config.clone(), id).await?;
+        self.activity.set(Activity::Joining);
 
-        self.set_state.set(SessionState::Active(session.id()));
+        let mut session = Session::join(&self.config, id).await?;
+
+        self.activity.set(Activity::Active(session.id()));
 
         let _ = session.run().await;
 
@@ -45,7 +44,10 @@ impl Action<Collab> for Join {
 #[derive(Debug, thiserror::Error)]
 pub enum JoinError {
     #[error("there is already an active session with ID {0}")]
-    ExistingSession(SessionId),
+    AlreadyActive(SessionId),
+
+    #[error("cannot join a session while another one is being started")]
+    AlreadyStarting,
 
     #[error(transparent)]
     Join(#[from] crate::session::JoinError),
