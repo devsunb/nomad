@@ -17,9 +17,11 @@ mod nomad;
 mod nvim_buffer;
 pub mod runtime;
 mod serde;
+mod byte_offset;
 pub mod shared;
 pub mod streams;
 pub mod warning;
+mod edit;
 
 pub use nomad::Nomad;
 
@@ -44,4 +46,7 @@ pub mod prelude {
     pub use crate::Nomad;
 }
 
-pub use nvim_buffer::NvimBuffer;
+pub use byte_offset::ByteOffset;
+pub use edit::Edit;
+pub use shared::Shared;
+pub use nvim_buffer::{NvimBuffer, NvimBufferDoesntExistError};

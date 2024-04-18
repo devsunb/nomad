@@ -1,5 +1,5 @@
 use nomad::test::{Generator, TestResult};
-use nomad::{NvimBuffer, NvimEdit, Shared};
+use nomad::{NvimBuffer, Edit, Shared};
 
 #[nomad::test]
 fn nomad_buffer_sync_fuzz_0(gen: &mut Generator) -> TestResult {
@@ -33,15 +33,12 @@ fn buffer_sync(num_edits: usize, gen: &mut Generator) -> TestResult {
 
         buffer.on_edit(move |edit| {
             let range = edit.start().into()..edit.end().into();
-            string.replace(range, edit.replacement());
+            string.with_mut(|s| s.replace(range, edit.replacement()));
         });
     }
 
     for _ in 0..num_edits {
-        let start = string.with(|s| gen.generate(s));
-        let end = string.with(|s| gen.generate(&s[start..])) + start;
-        let replacement = gen.generate::<String>(5);
-        let edit = NvimEdit::new(start, end, replacement);
+        let edit = string.with(|s| gen.generate::<Edit>((s, 3, 5))|);
         buffer.edit(edit);
     }
 
