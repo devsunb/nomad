@@ -1,6 +1,7 @@
 use core::ops::{Bound, Range, RangeBounds};
 
 use nvim::api::{self, opts};
+use smol_str::SmolStr;
 
 use crate::{ByteOffset, Edit, Point, Replacement, Shared};
 
@@ -24,11 +25,33 @@ impl core::fmt::Debug for NvimBuffer {
 }
 
 impl NvimBuffer {
+    #[inline]
+    fn attach(buf: api::Buffer) -> Result<Self, NvimBufferDoesntExistError> {
+        let on_edit_callbacks = Shared::<Vec<OnEdit>>::default();
+
+        let cbs = on_edit_callbacks.clone();
+
+        let opts = opts::BufAttachOpts::builder()
+            .on_bytes(move |args| {
+                let edit = Replacement::from(args);
+                cbs.with_mut(|cbs| cbs.iter_mut().for_each(|cb| cb(&edit)));
+                Ok(false)
+            })
+            .build();
+
+        buf.attach(false, &opts)
+            // All the arguments passed to `attach()` are valid, so if it fails
+            // it must be because the buffer doesn't exist.
+            .map_err(|_| NvimBufferDoesntExistError)?;
+
+        Ok(Self { inner: buf, on_edit_callbacks })
+    }
+
     /// Creates a new buffer.
     #[inline]
     pub fn create() -> Self {
         let Ok(buf) = api::create_buf(true, false) else { unreachable!() };
-        let Ok(buf) = Self::new(buf) else { unreachable!() };
+        let Ok(buf) = Self::attach(buf) else { unreachable!() };
         buf
     }
 
@@ -104,26 +127,8 @@ impl NvimBuffer {
     }
 
     #[inline]
-    fn new(buffer: api::Buffer) -> Result<Self, NvimBufferDoesntExistError> {
-        let on_edit_callbacks = Shared::<Vec<OnEdit>>::default();
-
-        let cbs = on_edit_callbacks.clone();
-
-        let opts = opts::BufAttachOpts::builder()
-            .on_bytes(move |args| {
-                let edit = Replacement::from(args);
-                cbs.with_mut(|cbs| cbs.iter_mut().for_each(|cb| cb(&edit)));
-                Ok(false)
-            })
-            .build();
-
-        buffer
-            .attach(false, &opts)
-            // All the arguments passed to `attach()` are valid, so if it fails
-            // it must be because the buffer doesn't exist.
-            .map_err(|_| NvimBufferDoesntExistError)?;
-
-        Ok(Self { inner: buffer, on_edit_callbacks })
+    fn new(buf: api::Buffer, on_edit_callbacks: Shared<Vec<OnEdit>>) -> Self {
+        Self { inner: buf, on_edit_callbacks }
     }
 
     /// TODO: docs
@@ -179,26 +184,27 @@ impl From<opts::OnBytesArgs> for Replacement<ByteOffset> {
             _new_end_len,
         ): opts::OnBytesArgs,
     ) -> Self {
-        todo!();
-        // let replacement_start = Point { row: start_row, col: start_col };
-        //
-        // let replacement_end = Point {
-        //     row: start_row + new_end_row,
-        //     col: start_col * (new_end_row == 0) as usize + new_end_col,
-        // };
-        //
-        // let replacement = if replacement_start == replacement_end {
-        //     String::new()
-        // } else {
-        //     nvim_buf_get_text(&buf, replacement_start..replacement_end)
-        //         .expect("buffer must exist")
-        // };
-        //
-        // Self {
-        //     start: start_offset,
-        //     end: start_offset + old_end_len,
-        //     replacement,
-        // }
+        let buf = NvimBuffer::new(buf, Shared::default());
+
+        let start = Point::new(start_row, start_col.into());
+
+        let end = Point::new(
+            start_row + new_end_row,
+            (start_col * (new_end_row == 0) as usize + new_end_col).into(),
+        );
+
+        let replacement = if start == end {
+            SmolStr::default()
+        } else {
+            buf.get(start..end)
+                .expect("buffer exists and range is valid")
+                .into()
+        };
+
+        let replaced_range =
+            start_offset.into()..(start_offset + old_end_len).into();
+
+        Self::new(replaced_range, replacement)
     }
 }
 
