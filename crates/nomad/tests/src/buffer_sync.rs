@@ -1,5 +1,5 @@
-use nomad::test::{EditCtx, Generate, Generator, MeanLen};
-use nomad::{Edit, NvimBuffer, Shared};
+use nomad::test::{Generate, Generator, MeanLen, ReplacementCtx};
+use nomad::{NvimBuffer, Replacement, Shared};
 
 #[nomad::test]
 fn nomad_buffer_sync_fuzz_0(gen: &mut Generator) {
@@ -38,12 +38,12 @@ fn buffer_sync(num_edits: usize, gen: &mut Generator) {
     }
 
     for _ in 0..num_edits {
-        let edit = string.with(|s| {
-            let ctx = EditCtx::new(s.as_ref(), MeanLen(3), MeanLen(5));
+        let replacement = string.with(|s| {
+            let ctx = ReplacementCtx::new(s.as_ref(), MeanLen(3), MeanLen(5));
             gen.generate(ctx)
         });
 
-        buffer.edit(edit);
+        buffer.edit(replacement);
     }
 
     string.with(|s| {

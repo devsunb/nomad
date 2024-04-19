@@ -7,7 +7,7 @@ use rand::Rng;
 use rand_chacha::ChaChaRng;
 use rand_distr::{Distribution, Normal};
 
-use crate::{ByteOffset, Edit};
+use crate::{ByteOffset, Replacement};
 
 /// A generator of random values.
 pub struct Generator {
@@ -103,7 +103,7 @@ impl Generate<ByteRangeCtx<'_, MeanLen>> for Range<ByteOffset> {
 }
 
 /// A context for generating edits.
-pub struct EditCtx<'a, RangeLen, TextLen> {
+pub struct ReplacementCtx<'a, RangeLen, TextLen> {
     /// The string the edit acts on.
     pub string: &'a str,
 
@@ -114,7 +114,7 @@ pub struct EditCtx<'a, RangeLen, TextLen> {
     pub text_len: TextLen,
 }
 
-impl<'a, RangeLen, TextLen> EditCtx<'a, RangeLen, TextLen> {
+impl<'a, RangeLen, TextLen> ReplacementCtx<'a, RangeLen, TextLen> {
     /// Creates a new [`EditCtx`].
     pub fn new(
         string: &'a str,
@@ -125,22 +125,23 @@ impl<'a, RangeLen, TextLen> EditCtx<'a, RangeLen, TextLen> {
     }
 }
 
-impl<'a, RangeLen, TextLen> Generate<EditCtx<'a, RangeLen, TextLen>> for Edit
+impl<'a, RangeLen, TextLen> Generate<ReplacementCtx<'a, RangeLen, TextLen>>
+    for Replacement<ByteOffset>
 where
     Range<ByteOffset>: Generate<ByteRangeCtx<'a, RangeLen>>,
     String: Generate<TextLen>,
 {
     fn generate(
         gen: &mut Generator,
-        ctx: EditCtx<'a, RangeLen, TextLen>,
+        ctx: ReplacementCtx<'a, RangeLen, TextLen>,
     ) -> Self {
-        let EditCtx { string, range_len, text_len } = ctx;
+        let ReplacementCtx { string, range_len, text_len } = ctx;
 
         let range_ctx = ByteRangeCtx { string, len: range_len };
         let range: Range<ByteOffset> = gen.generate(range_ctx);
         let replacement: String = gen.generate(text_len);
 
-        Edit::new(range.start, range.end, replacement)
+        Replacement::new(range.start, range.end, replacement)
     }
 }
 

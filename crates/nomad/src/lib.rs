@@ -48,7 +48,6 @@ pub mod prelude {
 }
 
 pub use byte_offset::ByteOffset;
-pub use edit::Edit;
+pub use edit::Replacement;
 pub use nvim_buffer::{NvimBuffer, NvimBufferDoesntExistError};
 pub use shared::Shared;
-
