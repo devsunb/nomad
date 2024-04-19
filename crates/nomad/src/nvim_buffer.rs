@@ -1,6 +1,8 @@
+use core::ops::{Bound, Range, RangeBounds};
+
 use nvim::api::{self, opts};
 
-use crate::{ByteOffset, Replacement, Shared};
+use crate::{ByteOffset, IntoCtx, Point, Replacement, Shared};
 
 type OnEdit = Box<dyn FnMut(&Replacement<ByteOffset>) + 'static>;
 
@@ -28,6 +30,63 @@ impl NvimBuffer {
         let Ok(buf) = api::create_buf(true, false) else { unreachable!() };
         let Ok(buf) = Self::new(buf) else { unreachable!() };
         buf
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn end_point(&self) -> Point<ByteOffset> {
+        todo!();
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn get<R, O>(&self, range: R) -> Result<String, api::Error>
+    where
+        R: RangeBounds<O>,
+        O: IntoCtx<Point<ByteOffset>, Self> + Copy,
+    {
+        let start = match range.start_bound() {
+            Bound::Included(&start) => start.into_ctx(self),
+            Bound::Excluded(&start) => start.into_ctx(self),
+            Bound::Unbounded => Point::default(),
+        };
+
+        let end = match range.end_bound() {
+            Bound::Included(&end) => end.into_ctx(self),
+            Bound::Excluded(&end) => end.into_ctx(self),
+            Bound::Unbounded => self.end_point(),
+        };
+
+        self.get_point_range(start..end)
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn get_point_range(
+        &self,
+        range: Range<Point<ByteOffset>>,
+    ) -> Result<String, api::Error> {
+        let mut lines = self.inner.get_text(
+            range.start.line()..range.end.line(),
+            range.start.offset().into(),
+            range.end.offset().into(),
+            &Default::default(),
+        )?;
+
+        let mut text = String::new();
+
+        let Some(first_line) = lines.next() else {
+            return Ok(text);
+        };
+
+        text.push_str(&first_line.to_string_lossy());
+
+        for line in lines {
+            text.push('\n');
+            text.push_str(&line.to_string_lossy());
+        }
+
+        Ok(text)
     }
 
     /// Registers a callback to be called every time the buffer is edited.
@@ -106,4 +165,5 @@ impl From<nvim::api::opts::OnBytesArgs> for Replacement<ByteOffset> {
 }
 
 /// An error returned whenever a..
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NvimBufferDoesntExistError;

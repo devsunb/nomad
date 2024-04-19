@@ -47,6 +47,6 @@ fn buffer_sync(num_edits: usize, gen: &mut Generator) {
     }
 
     string.with(|s| {
-        assert_eq!(buffer.get(..), s);
+        assert_eq!(&buffer.get(..).unwrap(), s);
     });
 }

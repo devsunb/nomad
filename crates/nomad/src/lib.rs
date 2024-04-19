@@ -11,12 +11,14 @@ mod command;
 mod config;
 mod edit;
 pub mod editor;
+mod from_ctx;
 pub mod log;
 pub mod maybe_future;
 pub mod maybe_result;
 pub mod module;
 mod nomad;
 mod nvim_buffer;
+mod point;
 mod replacement;
 pub mod runtime;
 mod serde;
@@ -50,6 +52,8 @@ pub mod prelude {
 
 pub use byte_offset::ByteOffset;
 pub use edit::Edit;
+pub use from_ctx::{FromCtx, IntoCtx};
 pub use nvim_buffer::{NvimBuffer, NvimBufferDoesntExistError};
+pub use point::Point;
 pub use replacement::Replacement;
 pub use shared::Shared;
