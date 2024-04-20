@@ -1,35 +1,58 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, Block, Ident, ItemFn, LitInt, Signature};
+use syn::punctuated::Punctuated;
+use syn::token::Comma;
+use syn::{
+    parse_macro_input,
+    parse_quote,
+    Block,
+    Expr,
+    FnArg,
+    Ident,
+    ItemFn,
+    LitInt,
+    Pat,
+    Signature,
+};
 
 #[inline]
 pub fn test(_attrs: TokenStream, item: TokenStream) -> TokenStream {
-    let ItemFn { sig, block, .. } = parse_macro_input!(item as syn::ItemFn);
+    let item = parse_macro_input!(item as syn::ItemFn);
 
-    let test_body = test_body(&sig, &block);
+    match test_inner(item) {
+        Ok(out) => out.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+fn test_inner(item: ItemFn) -> syn::Result<proc_macro2::TokenStream> {
+    let ItemFn { sig, block, .. } = item;
+
+    let test_body = test_body(&sig, &block)?;
 
     let test_name = sig.ident;
 
     let test_fn_name =
         Ident::new(&format!("__test_fn_{}", test_name), test_name.span());
 
-    quote! {
+    let out = quote! {
         #[::nomad::nvim::test(nvim_oxi = ::nomad::nvim, test_fn = #test_fn_name)]
         fn #test_name() {}
 
         fn #test_fn_name() {
             #test_body
         }
-    }
-    .into()
+    };
+
+    Ok(out.into())
 }
 
 fn test_body(
     test_sig: &Signature,
     test_body: &Block,
-) -> proc_macro2::TokenStream {
-    let seed = Seed::new();
+) -> syn::Result<proc_macro2::TokenStream> {
+    let seed = Seed::new(&test_sig.inputs)?;
 
     let define_seed = seed.definition();
 
@@ -52,7 +75,7 @@ fn test_body(
 
     let output = &test_sig.output;
 
-    quote! {
+    let out = quote! {
         #into_result
 
         fn #test_fn(#inputs) #output {
@@ -73,24 +96,59 @@ fn test_body(
 
         #eprintln;
         ::std::process::exit(1);
-    }
+    };
+
+    Ok(out)
 }
 
 fn unwind_body(seed: &Seed, test_fn: &Ident) -> proc_macro2::TokenStream {
-    let seed = seed.name();
+    let generator = if let Seed::None = seed {
+        None
+    } else {
+        Some(Generator { seed_name: seed.name() })
+    };
+
+    let mut args = Punctuated::<Expr, Comma>::new();
+
+    if let Some(generator) = &generator {
+        let generator = generator.name();
+        args.push(parse_quote! { &mut #generator });
+    }
+
+    let generator_definition = if let Some(generator) = generator {
+        generator.definition()
+    } else {
+        quote! {}
+    };
 
     quote! {
-        let mut generator = ::nomad::tests::Generator::new(#seed);
-        let res = #test_fn(&mut generator);
-        __IntoResult::into_result(res)
+        #generator_definition
+        __IntoResult::into_result(#test_fn(#args))
+    }
+}
+
+struct Generator {
+    seed_name: Ident,
+}
+
+impl Generator {
+    fn definition(&self) -> proc_macro2::TokenStream {
+        let seed = &self.seed_name;
+        let this = self.name();
+        quote! {
+            let mut #this = ::nomad::tests::Generator::new(#seed);
+        }
+    }
+
+    fn name(&self) -> Ident {
+        Ident::new("generator", Span::call_site())
     }
 }
 
 enum Seed {
     None,
     RandomlyGenerated,
-    Specified(LitInt),
-    FromEnv,
+    Specified(SpecifiedSeed),
 }
 
 impl Seed {
@@ -103,7 +161,53 @@ impl Seed {
                 let seed = ::nomad::tests::random_seed();
             },
 
-            Self::Specified(seed) => {
+            Self::Specified(seed) => seed.definition(),
+        }
+    }
+
+    fn name(&self) -> Ident {
+        Ident::new("seed", Span::call_site())
+    }
+
+    fn new(inputs: &Punctuated<FnArg, Comma>) -> syn::Result<Self> {
+        let Some(first) = inputs.first() else {
+            return Ok(Self::None);
+        };
+
+        let FnArg::Typed(pat) = first else {
+            return Err(syn::Error::new_spanned(
+                first,
+                "expected a typed argument",
+            ));
+        };
+
+        let Pat::Ident(pat_ident) = &*pat.pat else {
+            return Err(syn::Error::new_spanned(
+                pat,
+                "expected an identifier",
+            ));
+        };
+
+        let this = if pat_ident.ident == "gen" {
+            Self::RandomlyGenerated
+        } else {
+            Self::None
+        };
+
+        Ok(this)
+    }
+}
+
+enum SpecifiedSeed {
+    Literal(LitInt),
+    FromEnv,
+}
+
+impl SpecifiedSeed {
+    /// Returns the `let seed = ...;` definition.
+    fn definition(&self) -> proc_macro2::TokenStream {
+        match self {
+            Self::Literal(seed) => {
                 quote! {
                     let seed = #seed;
                 }
@@ -131,14 +235,6 @@ impl Seed {
                 }
             },
         }
-    }
-
-    fn name(&self) -> Ident {
-        Ident::new("seed", Span::call_site())
-    }
-
-    fn new() -> Self {
-        Self::RandomlyGenerated
     }
 }
 
