@@ -5,7 +5,7 @@ use crop::Rope;
 use crate::{FromCtx, IntoCtx, Point};
 
 /// A byte offset in a buffer.
-#[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ByteOffset(usize);
 
 impl ByteOffset {

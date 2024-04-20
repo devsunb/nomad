@@ -1,7 +1,7 @@
 //! TODO: docs
 
 mod edits;
-mod focused_buffer;
+// mod focused_buffer;
 
 pub use edits::{
     AppliedDeletion,
@@ -10,4 +10,4 @@ pub use edits::{
     AppliedInsertion,
     Edits,
 };
-pub use focused_buffer::FocusedBuffer;
+// pub use focused_buffer::FocusedBuffer;

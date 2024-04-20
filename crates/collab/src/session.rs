@@ -4,6 +4,7 @@ use cola::Replica;
 use collab::messages::{FileKind, InboundMessage};
 use futures::{pin_mut, select as race, FutureExt, StreamExt};
 use nomad::prelude::*;
+use nomad::*;
 
 use crate::config::ConnectorError;
 use crate::{Config, Convert, SessionId};
@@ -118,7 +119,7 @@ impl Session {
             config.get().connector()?.peer_id(peer_id).start().await?;
 
         Ok(Self {
-            buffer: Buffer::from_id(peer_id.as_u64(), BufferId::current()),
+            buffer: Buffer::from_id(peer_id.as_u64(), NvimBuffer::current()),
             editor_id: EditorId::generate(),
             receiver,
             sender,

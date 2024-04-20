@@ -7,13 +7,14 @@ use collab::messages::{
     Project,
     Session,
 };
-use nomad::editor::{BufferSnapshot, RemoteDeletion, RemoteInsertion};
+use nomad::editor::{RemoteDeletion, RemoteInsertion};
 use nomad::streams::{
     AppliedDeletion,
     AppliedEdit,
     AppliedEditKind,
     AppliedInsertion,
 };
+use nomad::BufferSnapshot;
 
 /// Exactly the same as the [`Into`] trait, but it lets us convert `T -> U`
 /// even when neither `T` nor `U` are defined in this crate.

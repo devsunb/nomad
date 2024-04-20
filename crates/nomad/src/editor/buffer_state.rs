@@ -5,15 +5,9 @@ use core::ops::Range;
 use cola::{Anchor, Deletion, Insertion, Replica};
 use crop::Rope;
 
-use crate::editor::{
-    ByteChange,
-    ByteOffset,
-    Point,
-    RemoteDeletion,
-    RemoteInsertion,
-};
+use crate::editor::{RemoteDeletion, RemoteInsertion};
 use crate::streams::{AppliedDeletion, AppliedInsertion};
-use crate::BufferSnapshot;
+use crate::{BufferSnapshot, ByteOffset, Edit, Point, Replacement};
 
 /// TODO: docs
 #[derive(Clone)]
@@ -26,7 +20,7 @@ impl BufferState {
     #[inline]
     pub fn edit<E>(&self, edit: E) -> E::Diff
     where
-        E: Edit,
+        E: Edit<BufferInner>,
     {
         self.with_mut(|inner| inner.edit(edit))
     }
@@ -68,6 +62,7 @@ impl BufferInner {
     /// TODO: docs
     #[inline]
     pub fn delete(&mut self, range: Range<ByteOffset>) -> Deletion {
+        let range: Range<usize> = range.start.into()..range.end.into();
         self.text.delete(range.clone());
         self.replica.deleted(range)
     }
@@ -76,7 +71,7 @@ impl BufferInner {
     #[inline]
     pub fn edit<E>(&mut self, edit: E) -> E::Diff
     where
-        E: Edit,
+        E: Edit<Self>,
     {
         edit.apply(self)
     }
@@ -84,8 +79,8 @@ impl BufferInner {
     /// TODO: docs
     #[inline]
     pub fn insert(&mut self, offset: ByteOffset, text: &str) -> Insertion {
-        self.text.insert(offset, text);
-        self.replica.inserted(offset, text.len())
+        self.text.insert(offset.into(), text);
+        self.replica.inserted(offset.into(), text.len())
     }
 
     /// TODO: docs
@@ -96,7 +91,7 @@ impl BufferInner {
     ) -> Vec<Range<ByteOffset>> {
         let byte_ranges = self.replica.integrate_deletion(deletion);
         byte_ranges.iter().rev().for_each(|r| self.text.delete(r.clone()));
-        byte_ranges
+        unsafe { core::mem::transmute(byte_ranges) }
     }
 
     /// TODO: docs
@@ -108,7 +103,7 @@ impl BufferInner {
     ) -> Option<ByteOffset> {
         let offset = self.replica.integrate_insertion(insertion)?;
         self.text.insert(offset, text);
-        Some(offset)
+        Some(ByteOffset::new(offset))
     }
 
     #[inline]
@@ -127,17 +122,20 @@ impl BufferInner {
     /// Transforms the 1-dimensional byte offset into a 2-dimensional
     /// [`Point`].
     #[inline]
-    pub fn point_of_offset(&self, byte_offset: ByteOffset) -> Point {
-        let row = self.text.line_of_byte(byte_offset);
-        let row_offset = self.text.byte_of_line(row);
+    pub fn point_of_offset(
+        &self,
+        byte_offset: ByteOffset,
+    ) -> Point<ByteOffset> {
+        let row = self.text.line_of_byte(byte_offset.into());
+        let row_offset = ByteOffset::new(self.text.byte_of_line(row));
         let col = byte_offset - row_offset;
-        Point { row, col }
+        Point::new(row, col)
     }
 
     /// TODO: docs
     #[inline]
     pub fn resolve_anchor(&self, anchor: &Anchor) -> Option<ByteOffset> {
-        self.replica.resolve_anchor(*anchor)
+        self.replica.resolve_anchor(*anchor).map(ByteOffset::new)
     }
 
     /// TODO: docs
@@ -147,16 +145,7 @@ impl BufferInner {
     }
 }
 
-/// TODO: docs
-pub(super) trait Edit {
-    /// TODO: docs
-    type Diff;
-
-    /// TODO: docs
-    fn apply(self, buf: &mut BufferInner) -> Self::Diff;
-}
-
-impl Edit for ByteChange {
+impl Edit<BufferInner> for &Replacement<ByteOffset> {
     type Diff = (Option<AppliedDeletion>, Option<AppliedInsertion>);
 
     #[inline]
@@ -164,14 +153,17 @@ impl Edit for ByteChange {
         let mut applied_del = None;
         let mut applied_ins = None;
 
-        if !self.byte_range().is_empty() {
-            let del = buf.delete(self.byte_range());
+        if !self.range().is_empty() {
+            let del = buf.delete(self.range());
             applied_del = Some(AppliedDeletion::new(del));
         }
 
-        if !self.text().is_empty() {
-            let ins = buf.insert(self.byte_range().start, self.text());
-            applied_ins = Some(AppliedInsertion::new(ins, self.into_text()));
+        if !self.replacement().is_empty() {
+            let ins = buf.insert(self.range().start, self.replacement());
+            applied_ins = Some(AppliedInsertion::new(
+                ins,
+                self.replacement().to_owned(),
+            ));
         }
 
         (applied_del, applied_ins)
@@ -190,8 +182,8 @@ impl LocalDeletion {
     }
 }
 
-impl Edit for &LocalDeletion {
-    type Diff = Option<(AppliedDeletion, Range<Point>)>;
+impl Edit<BufferInner> for &LocalDeletion {
+    type Diff = Option<(AppliedDeletion, Range<Point<ByteOffset>>)>;
 
     fn apply(self, buf: &mut BufferInner) -> Self::Diff {
         let start_anchor = &self.range.start;
@@ -233,8 +225,8 @@ impl LocalInsertion {
     }
 }
 
-impl Edit for LocalInsertion {
-    type Diff = (AppliedInsertion, Point);
+impl Edit<BufferInner> for LocalInsertion {
+    type Diff = (AppliedInsertion, Point<ByteOffset>);
 
     fn apply(self, buf: &mut BufferInner) -> Self::Diff {
         let Some(byte_offset) = buf.resolve_anchor(&self.insert_at) else {
@@ -249,8 +241,8 @@ impl Edit for LocalInsertion {
     }
 }
 
-impl Edit for &RemoteDeletion {
-    type Diff = Vec<Range<Point>>;
+impl Edit<BufferInner> for &RemoteDeletion {
+    type Diff = Vec<Range<Point<ByteOffset>>>;
 
     fn apply(self, buf: &mut BufferInner) -> Self::Diff {
         let buf_prev = buf.clone();
@@ -268,8 +260,8 @@ impl Edit for &RemoteDeletion {
     }
 }
 
-impl Edit for &RemoteInsertion {
-    type Diff = Option<Point>;
+impl Edit<BufferInner> for &RemoteInsertion {
+    type Diff = Option<Point<ByteOffset>>;
 
     fn apply(self, buf: &mut BufferInner) -> Self::Diff {
         let buf_prev = buf.clone();
