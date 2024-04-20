@@ -1,8 +1,9 @@
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
+use syn::parse::Parse;
 use syn::punctuated::Punctuated;
-use syn::token::Comma;
+use syn::token::{Comma, Dollar};
 use syn::{
     parse_macro_input,
     parse_quote,
@@ -45,7 +46,7 @@ fn test_inner(item: ItemFn) -> syn::Result<proc_macro2::TokenStream> {
         }
     };
 
-    Ok(out.into())
+    Ok(out)
 }
 
 fn test_body(
@@ -201,6 +202,28 @@ impl Seed {
 enum SpecifiedSeed {
     Literal(LitInt),
     FromEnv,
+}
+
+impl Parse for SpecifiedSeed {
+    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
+        if input.peek(LitInt) {
+            let lit = input.parse()?;
+            return Ok(Self::Literal(lit));
+        }
+
+        let _ = input.parse::<Dollar>()?;
+
+        let seed = input.parse::<Ident>()?;
+
+        if seed != "SEED" {
+            return Err(syn::Error::new_spanned(
+                seed,
+                "expected `$SEED` or an integer",
+            ));
+        }
+
+        Ok(Self::FromEnv)
+    }
 }
 
 impl SpecifiedSeed {
