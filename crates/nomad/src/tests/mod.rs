@@ -1,8 +1,10 @@
 //! Utilities for testing.
 
+mod emoji;
 mod generate;
 mod generator;
 
+pub use emoji::Emoji;
 pub use generate::*;
 pub use generator::Generator;
 
