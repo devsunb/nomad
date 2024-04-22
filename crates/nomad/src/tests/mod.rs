@@ -3,11 +3,13 @@
 mod emoji;
 mod generate;
 mod generator;
+mod letter;
 mod text;
 
 pub use emoji::Emoji;
 pub use generate::*;
 pub use generator::Generator;
+pub use letter::Letter;
 pub use text::Text;
 
 /// Result value for tests.

@@ -31,7 +31,7 @@ impl Distribution<char> for Text {
 
         let weights = [prob_newline, prob_space, prob_emoji, prob_letter];
 
-        let weighted = WeightedIndex::new(&weights).unwrap();
+        let weighted = WeightedIndex::new(weights).expect("weights are valid");
 
         match weighted.sample(rng) {
             0 => '\n',
