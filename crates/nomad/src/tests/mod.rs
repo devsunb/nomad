@@ -1,11 +1,13 @@
 //! Utilities for testing.
 
+mod build;
 mod emoji;
 mod generate;
 mod generator;
 mod letter;
 mod text;
 
+pub use build::build_script;
 pub use emoji::Emoji;
 pub use generate::*;
 pub use generator::Generator;
