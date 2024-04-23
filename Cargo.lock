@@ -1088,7 +1088,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#3d7091318b07cce63bf7a1874d69e4a5ae2baf1a"
+source = "git+https://github.com/noib3/nvim-oxi#ab86ea879b65c6faf6d6a15bace8dcd418ef3370"
 dependencies = [
  "miniserde",
  "nvim-oxi-api",
@@ -1102,7 +1102,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-api"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#3d7091318b07cce63bf7a1874d69e4a5ae2baf1a"
+source = "git+https://github.com/noib3/nvim-oxi#ab86ea879b65c6faf6d6a15bace8dcd418ef3370"
 dependencies = [
  "nvim-oxi-luajit",
  "nvim-oxi-macros",
@@ -1115,7 +1115,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-libuv"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#3d7091318b07cce63bf7a1874d69e4a5ae2baf1a"
+source = "git+https://github.com/noib3/nvim-oxi#ab86ea879b65c6faf6d6a15bace8dcd418ef3370"
 dependencies = [
  "nvim-oxi-luajit",
  "thiserror",
@@ -1124,7 +1124,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-luajit"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#3d7091318b07cce63bf7a1874d69e4a5ae2baf1a"
+source = "git+https://github.com/noib3/nvim-oxi#ab86ea879b65c6faf6d6a15bace8dcd418ef3370"
 dependencies = [
  "thiserror",
 ]
@@ -1132,7 +1132,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-macros"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#3d7091318b07cce63bf7a1874d69e4a5ae2baf1a"
+source = "git+https://github.com/noib3/nvim-oxi#ab86ea879b65c6faf6d6a15bace8dcd418ef3370"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1142,7 +1142,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-types"
 version = "0.4.2"
-source = "git+https://github.com/noib3/nvim-oxi#3d7091318b07cce63bf7a1874d69e4a5ae2baf1a"
+source = "git+https://github.com/noib3/nvim-oxi#ab86ea879b65c6faf6d6a15bace8dcd418ef3370"
 dependencies = [
  "libc",
  "nvim-oxi-luajit",

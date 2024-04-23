@@ -54,7 +54,6 @@ name = "nomad"
 crate-type = ["cdylib"]
 
 [features]
-default = ["neovim-0-9"]
 neovim-0-9 = ["nomad/neovim-0-9"]
 neovim-nightly = ["nomad/neovim-nightly"]
 

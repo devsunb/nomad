@@ -6,6 +6,10 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+neovim-0-9 = ["nomad/neovim-0-9"]
+neovim-nightly = ["nomad/neovim-nightly"]
+
 [dependencies]
 crop = "0.4"
 nomad = { path = "..", features = ["tests"] }
