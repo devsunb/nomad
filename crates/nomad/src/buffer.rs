@@ -6,11 +6,12 @@ use crop::Rope;
 use nvim::api;
 
 use crate::runtime::spawn;
-use crate::streams::{AppliedDeletion, AppliedEdit, AppliedInsertion, Edits};
+use crate::streams::{AppliedDeletion, AppliedInsertion, Edits};
 use crate::{
     Apply,
     BufferSnapshot,
     ByteOffset,
+    Edit,
     EditorId,
     IntoCtx,
     NvimBuffer,
@@ -60,15 +61,12 @@ impl Buffer {
 
     /// TODO: docs
     #[inline]
-    pub fn edit<E>(
-        &mut self,
-        edit: E,
-        _editor_id: EditorId,
-    ) -> <Self as Apply<E>>::Diff
+    pub fn edit<E>(&mut self, edit: E, editor_id: EditorId)
     where
-        Self: Apply<E>,
+        Self: Apply<E, Diff = Edit>,
     {
-        self.apply(edit)
+        let edit = self.apply(edit);
+        self.broadcaster.broadcast(edit.with_editor(editor_id));
     }
 
     /// TODO: docs
@@ -111,20 +109,11 @@ impl Buffer {
 
         move |replacement| {
             if should_broadcast.get().should_broadcast() {
-                let (del, ins) =
-                    inner.with_mut(|inner| inner.edit(replacement));
+                let edit = inner
+                    .with_mut(|inner| inner.edit(replacement))
+                    .with_editor(EditorId::unknown());
 
-                let id = EditorId::unknown();
-
-                if let Some(deletion) = del {
-                    let edit = AppliedEdit::deletion(deletion, id);
-                    broadcaster.broadcast(edit);
-                }
-
-                if let Some(insertion) = ins {
-                    let edit = AppliedEdit::insertion(insertion, id);
-                    broadcaster.broadcast(edit);
-                }
+                broadcaster.broadcast(edit);
             }
         }
     }
@@ -139,13 +128,13 @@ impl Buffer {
 /// TODO: docs
 #[derive(Clone)]
 struct EditBroadcaster {
-    receiver: InactiveReceiver<AppliedEdit>,
-    sender: Sender<AppliedEdit>,
+    receiver: InactiveReceiver<Edit>,
+    sender: Sender<Edit>,
 }
 
 impl EditBroadcaster {
     #[inline]
-    fn broadcast(&self, edit: AppliedEdit) {
+    fn broadcast(&self, edit: Edit) {
         if self.receiver.receiver_count() > 0 {
             let sender = self.sender.clone();
 
@@ -164,7 +153,7 @@ impl EditBroadcaster {
     }
 
     #[inline]
-    fn receiver(&self) -> Receiver<AppliedEdit> {
+    fn receiver(&self) -> Receiver<Edit> {
         self.receiver.activate_cloned()
     }
 }
@@ -189,29 +178,25 @@ impl BroadcastStatus {
 }
 
 impl Apply<Replacement<ByteOffset>> for Buffer {
-    type Diff = ();
+    type Diff = Edit;
 
     #[inline]
     fn apply(&mut self, repl: Replacement<ByteOffset>) -> Self::Diff {
         let point_range =
             self.inner.with(|inner| repl.range().into_ctx(inner.rope()));
 
-        self.inner.with_mut(|inner| {
-            let range = repl.range().start.into()..repl.range().end.into();
-            inner.rope_mut().replace(range.clone(), repl.text());
-            let _ = inner.replica_mut().deleted(range.clone());
-            let _ =
-                inner.replica_mut().inserted(range.start, repl.text().len());
-        });
+        let edit = self.inner.with_mut(|inner| inner.edit(&repl));
 
         self.broadcast_status.set(BroadcastStatus::DontBroadcast);
         self.nvim.edit(repl.map_range(|_| point_range));
         self.broadcast_status.set(BroadcastStatus::Broadcast);
+
+        edit
     }
 }
 
 impl Apply<Replacement<Anchor>> for Buffer {
-    type Diff = ();
+    type Diff = Edit;
 
     #[inline]
     fn apply(&mut self, repl: Replacement<Anchor>) -> Self::Diff {
@@ -224,13 +209,15 @@ impl Apply<Replacement<Anchor>> for Buffer {
         });
 
         if let (Some(start), Some(end)) = (start, end) {
-            self.apply(repl.map_range(|_| start..end));
+            self.apply(repl.map_range(|_| start..end))
+        } else {
+            Edit::default()
         }
     }
 }
 
 impl<T: AsRef<str>> Apply<(&cola::Insertion, T)> for Buffer {
-    type Diff = ();
+    type Diff = Edit;
 
     #[inline]
     fn apply(
@@ -248,11 +235,13 @@ impl<T: AsRef<str>> Apply<(&cola::Insertion, T)> for Buffer {
             self.nvim.edit(Replacement::insertion(point, text.as_ref()));
             self.broadcast_status.set(BroadcastStatus::Broadcast);
         }
+
+        todo!();
     }
 }
 
 impl Apply<&cola::Deletion> for Buffer {
-    type Diff = ();
+    type Diff = Edit;
 
     #[inline]
     fn apply(&mut self, deletion: &cola::Deletion) -> Self::Diff {
@@ -281,6 +270,8 @@ impl Apply<&cola::Deletion> for Buffer {
         for byte_range in byte_ranges.into_iter().rev() {
             self.inner.with_mut(|inner| inner.rope_mut().delete(byte_range));
         }
+
+        todo!();
     }
 }
 
@@ -368,7 +359,7 @@ impl BufferInner {
 }
 
 impl Apply<&Replacement<ByteOffset>> for BufferInner {
-    type Diff = (Option<AppliedDeletion>, Option<AppliedInsertion>);
+    type Diff = Edit;
 
     #[inline]
     fn apply(&mut self, repl: &Replacement<ByteOffset>) -> Self::Diff {
@@ -386,6 +377,6 @@ impl Apply<&Replacement<ByteOffset>> for BufferInner {
                 Some(AppliedInsertion::new(ins, repl.text().to_owned()));
         }
 
-        (applied_del, applied_ins)
+        todo!();
     }
 }

@@ -93,7 +93,7 @@ impl Session {
         let edits = self
             .buffer
             .edits()
-            .filter(|edit| ready(edit.created_by() != editor_id));
+            .filter(|edit| ready(edit.applied_by() != editor_id));
 
         pin_mut!(edits);
 
