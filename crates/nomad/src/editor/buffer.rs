@@ -15,12 +15,9 @@ use crate::{
     Apply,
     BufferSnapshot,
     ByteOffset,
-    Edit,
     EditorId,
-    FromCtx,
     IntoCtx,
     NvimBuffer,
-    Point,
     Replacement,
 };
 
@@ -75,33 +72,6 @@ impl Buffer {
 
     /// TODO: docs
     #[inline]
-    pub fn apply_remote_deletion(
-        &mut self,
-        deletion: RemoteDeletion,
-        id: EditorId,
-    ) {
-        let point_ranges = self.state.edit(&deletion);
-        self.applied_queue.push_back(AppliedEdit::deletion(deletion, id));
-        for range in point_ranges.into_iter().rev() {
-            self.nvim.delete(range).expect("");
-        }
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn apply_remote_insertion(
-        &mut self,
-        insertion: RemoteInsertion,
-        id: EditorId,
-    ) {
-        let Some(point) = self.state.edit(&insertion) else { return };
-        let text = insertion.text().to_owned();
-        self.applied_queue.push_back(AppliedEdit::insertion(insertion, id));
-        self.nvim.insert(point, &text).expect("");
-    }
-
-    /// TODO: docs
-    #[inline]
     fn attach(&self) {
         self.nvim.on_edit(self.on_edit());
     }
@@ -126,11 +96,15 @@ impl Buffer {
 
     /// TODO: docs
     #[inline]
-    pub fn edit<E>(&mut self, edit: E, editor_id: EditorId) -> E::Diff
+    pub fn edit<E>(
+        &mut self,
+        edit: E,
+        _editor_id: EditorId,
+    ) -> <Self as Apply<E>>::Diff
     where
-        E: Edit<Self>,
+        Self: Apply<E>,
     {
-        todo!();
+        self.apply(edit)
     }
 
     /// TODO: docs

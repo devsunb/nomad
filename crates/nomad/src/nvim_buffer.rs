@@ -241,7 +241,7 @@ impl Edit<NvimBuffer> for &Replacement<Point<ByteOffset>> {
 
     #[inline]
     fn apply(self, buf: &mut NvimBuffer) -> Self::Diff {
-        if let Err(err) = buf.replace(self.range(), self.replacement()) {
+        if let Err(err) = buf.replace(self.range(), self.text()) {
             panic!("couldn't apply replacement: {err}");
         }
     }

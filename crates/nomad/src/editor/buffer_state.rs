@@ -179,12 +179,10 @@ impl Edit<BufferInner> for &Replacement<ByteOffset> {
             applied_del = Some(AppliedDeletion::new(del));
         }
 
-        if !self.replacement().is_empty() {
-            let ins = buf.insert(self.range().start, self.replacement());
-            applied_ins = Some(AppliedInsertion::new(
-                ins,
-                self.replacement().to_owned(),
-            ));
+        if !self.text().is_empty() {
+            let ins = buf.insert(self.range().start, self.text());
+            applied_ins =
+                Some(AppliedInsertion::new(ins, self.text().to_owned()));
         }
 
         (applied_del, applied_ins)
