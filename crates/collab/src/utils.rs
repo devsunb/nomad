@@ -7,7 +7,6 @@ use collab::messages::{
     Project,
     Session,
 };
-use nomad::editor::{RemoteDeletion, RemoteInsertion};
 use nomad::streams::{
     AppliedDeletion,
     AppliedEdit,
@@ -58,19 +57,5 @@ impl Convert<Session> for BufferSnapshot {
         let peers = vec![PeerId::new(self.replica().id())];
 
         Session::new(project, peers)
-    }
-}
-
-impl Convert<RemoteDeletion> for CollabDeletion {
-    fn convert(self) -> RemoteDeletion {
-        // FIXME: don't clone.
-        RemoteDeletion::new(self.crdt().clone())
-    }
-}
-
-impl Convert<RemoteInsertion> for CollabInsertion {
-    fn convert(self) -> RemoteInsertion {
-        // FIXME: don't clone.
-        RemoteInsertion::new(self.crdt().clone(), self.text().to_owned())
     }
 }

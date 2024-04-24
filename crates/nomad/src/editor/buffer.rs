@@ -217,65 +217,6 @@ impl AppliedEditQueue {
     }
 }
 
-/// TODO: docs
-pub struct RemoteInsertion {
-    inner: cola::Insertion,
-    text: String,
-}
-
-impl RemoteInsertion {
-    /// TODO: docs
-    #[inline]
-    pub fn inner(&self) -> &cola::Insertion {
-        &self.inner
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn new(inner: cola::Insertion, text: String) -> Self {
-        Self { inner, text }
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-}
-
-impl From<RemoteInsertion> for AppliedInsertion {
-    #[inline]
-    fn from(insertion: RemoteInsertion) -> Self {
-        AppliedInsertion::new(insertion.inner, insertion.text)
-    }
-}
-
-/// TODO: docs
-pub struct RemoteDeletion {
-    inner: cola::Deletion,
-}
-
-impl RemoteDeletion {
-    /// TODO: docs
-    #[inline]
-    pub fn inner(&self) -> &cola::Deletion {
-        &self.inner
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn new(inner: cola::Deletion) -> Self {
-        Self { inner }
-    }
-}
-
-impl From<RemoteDeletion> for AppliedDeletion {
-    #[inline]
-    fn from(deletion: RemoteDeletion) -> Self {
-        AppliedDeletion::new(deletion.inner)
-    }
-}
-
 impl Apply<Replacement<ByteOffset>> for Buffer {
     type Diff = ();
 
