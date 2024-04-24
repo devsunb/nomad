@@ -44,6 +44,17 @@ fn workspace_target_dir() -> PathBuf {
     nvim::tests::target_dir(Path::new(&manifest))
 }
 
+/// TODO: docs
+pub fn library_path(crate_name: &str) -> PathBuf {
+    let library_name = format!(
+        "{prefix}{crate_name}{suffix}",
+        prefix = env::consts::DLL_PREFIX,
+        suffix = env::consts::DLL_SUFFIX,
+    );
+
+    build_target_dir().join("debug").join(library_name)
+}
+
 struct BuildingGuard {
     lock_file_path: PathBuf,
 }
