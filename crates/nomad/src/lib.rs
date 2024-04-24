@@ -9,6 +9,7 @@ pub use nvim;
 
 pub mod action;
 pub mod api;
+mod apply;
 mod autocmd_id;
 mod buffer_snapshot;
 mod byte_offset;
@@ -57,6 +58,7 @@ pub mod prelude {
     pub use crate::Nomad;
 }
 
+pub use apply::Apply;
 pub(crate) use autocmd_id::AutocmdId;
 pub use buffer_snapshot::BufferSnapshot;
 pub use byte_offset::ByteOffset;
