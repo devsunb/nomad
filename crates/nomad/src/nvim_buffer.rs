@@ -3,7 +3,7 @@ use core::ops::{Bound, Range, RangeBounds};
 use nvim::api::{self, opts};
 use smol_str::SmolStr;
 
-use crate::{ByteOffset, Edit, Point, Replacement, Shared};
+use crate::{Apply, ByteOffset, Point, Replacement, Shared};
 
 type OnEdit = Box<dyn FnMut(&Replacement<ByteOffset>) + 'static>;
 
@@ -63,22 +63,13 @@ impl NvimBuffer {
         buf
     }
 
-    /// TODO: docs
-    #[inline]
-    pub fn delete(
-        &mut self,
-        range: Range<Point<ByteOffset>>,
-    ) -> Result<(), api::Error> {
-        self.replace(range, "")
-    }
-
     /// Edits the buffer.
     #[inline]
-    pub fn edit<E>(&mut self, edit: E) -> E::Diff
+    pub fn edit<E>(&mut self, edit: E) -> <Self as Apply<E>>::Diff
     where
-        E: Edit<Self>,
+        Self: Apply<E>,
     {
-        edit.apply(self)
+        self.apply(edit)
     }
 
     /// Returns the [`Point`] at the end of the buffer.
@@ -148,16 +139,6 @@ impl NvimBuffer {
 
     pub(crate) fn inner_mut(&mut self) -> &mut api::Buffer {
         &mut self.inner
-    }
-
-    /// TODO: docs
-    #[inline]
-    pub fn insert(
-        &mut self,
-        insert_at: Point<ByteOffset>,
-        replacement: &str,
-    ) -> Result<(), api::Error> {
-        self.replace(insert_at..insert_at, replacement)
     }
 
     /// Registers a callback to be called every time the buffer is edited.
@@ -236,23 +217,23 @@ impl TryFrom<&NvimBuffer> for crop::Rope {
     }
 }
 
-impl Edit<NvimBuffer> for &Replacement<Point<ByteOffset>> {
+impl Apply<&Replacement<Point<ByteOffset>>> for NvimBuffer {
     type Diff = ();
 
     #[inline]
-    fn apply(self, buf: &mut NvimBuffer) -> Self::Diff {
-        if let Err(err) = buf.replace(self.range(), self.text()) {
+    fn apply(&mut self, repl: &Replacement<Point<ByteOffset>>) -> Self::Diff {
+        if let Err(err) = self.replace(repl.range(), repl.text()) {
             panic!("couldn't apply replacement: {err}");
         }
     }
 }
 
-impl Edit<NvimBuffer> for Replacement<Point<ByteOffset>> {
+impl Apply<Replacement<Point<ByteOffset>>> for NvimBuffer {
     type Diff = ();
 
     #[inline]
-    fn apply(self, buf: &mut NvimBuffer) -> Self::Diff {
-        (&self).apply(buf)
+    fn apply(&mut self, repl: Replacement<Point<ByteOffset>>) -> Self::Diff {
+        self.apply(&repl)
     }
 }
 
