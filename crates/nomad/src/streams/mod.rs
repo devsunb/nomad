@@ -1,13 +1,7 @@
 //! TODO: docs
 
 mod edits;
-// mod focused_buffer;
+mod focused_buffer;
 
-pub use edits::{
-    AppliedDeletion,
-    AppliedEdit,
-    AppliedEditKind,
-    AppliedInsertion,
-    Edits,
-};
-// pub use focused_buffer::FocusedBuffer;
+pub use edits::Edits;
+pub use focused_buffer::FocusedBuffer;

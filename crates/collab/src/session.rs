@@ -74,10 +74,12 @@ impl Session {
 
         match msg {
             InboundMessage::RemoteDeletion(deletion) => {
-                buffer.edit(deletion.crdt(), id);
+                // TODO: don't clone.
+                buffer.edit(deletion.crdt().clone(), id);
             },
             InboundMessage::RemoteInsertion(insertion) => {
-                buffer.edit((insertion.crdt(), insertion.text()), id);
+                // TODO: don't clone.
+                buffer.edit((insertion.crdt().clone(), insertion.text()), id);
             },
             InboundMessage::SessionRequest(request) => {
                 request.send(buffer.snapshot().convert());

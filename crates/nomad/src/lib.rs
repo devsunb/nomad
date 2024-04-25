@@ -12,6 +12,7 @@ pub mod api;
 mod apply;
 mod autocmd_id;
 mod buffer;
+mod buffer_id;
 mod buffer_snapshot;
 mod byte_offset;
 mod command;
@@ -62,6 +63,7 @@ pub mod prelude {
 pub use apply::Apply;
 pub(crate) use autocmd_id::AutocmdId;
 pub use buffer::Buffer;
+pub use buffer_id::BufferId;
 pub use buffer_snapshot::BufferSnapshot;
 pub use byte_offset::ByteOffset;
 pub use crdt_replacement::CrdtReplacement;
