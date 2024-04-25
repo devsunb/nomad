@@ -1,6 +1,7 @@
 use cola::{Deletion, Insertion};
 
 /// TODO: docs
+#[derive(Clone, Debug)]
 pub struct ColaReplacement {
     deletion: Option<Deletion>,
     insertion: Option<Insertion>,
@@ -39,5 +40,11 @@ impl ColaReplacement {
     #[inline]
     pub(crate) fn new_insertion(insertion: Insertion) -> Self {
         Self { deletion: None, insertion: Some(insertion) }
+    }
+
+    /// Creates a new [`ColaReplacement`] representing a no-op.
+    #[inline]
+    pub(crate) fn new_no_op() -> Self {
+        Self { deletion: None, insertion: None }
     }
 }

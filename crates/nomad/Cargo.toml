@@ -20,6 +20,7 @@ home = "0.5"
 macros = { path = "./macros" }
 nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi", features = ["libuv"] }
 pond = { git = "ssh://git@github.com/nomad/pond.git" }
+smallvec = { workspace = true }
 smol_str = { workspace = true }
 
 # Async executor

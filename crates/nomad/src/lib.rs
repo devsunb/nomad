@@ -63,6 +63,7 @@ pub(crate) use autocmd_id::AutocmdId;
 pub use buffer::Buffer;
 pub use buffer_snapshot::BufferSnapshot;
 pub use byte_offset::ByteOffset;
+pub use cola_replacement::ColaReplacement;
 pub use edit::Edit;
 pub use editor_id::EditorId;
 pub use from_ctx::{FromCtx, IntoCtx};

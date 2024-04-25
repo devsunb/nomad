@@ -211,7 +211,7 @@ impl Apply<Replacement<Anchor>> for Buffer {
         if let (Some(start), Some(end)) = (start, end) {
             self.apply(repl.map_range(|_| start..end))
         } else {
-            Edit::default()
+            Edit::no_op()
         }
     }
 }

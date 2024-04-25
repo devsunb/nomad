@@ -2,7 +2,7 @@ use core::ops::Range;
 
 use crop::Rope;
 use nomad::tests::{Generator, MeanLen, ReplacementCtx};
-use nomad::{ByteOffset, IntoCtx, NvimBuffer, Replacement, Shared};
+use nomad::{IntoCtx, NvimBuffer, Replacement, Shared};
 
 #[nomad::test]
 fn nomad_buffer_sync_fuzz_0(gen: &mut Generator) {

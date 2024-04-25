@@ -1035,6 +1035,7 @@ dependencies = [
  "rand_distr",
  "serde",
  "serde_path_to_error",
+ "smallvec",
  "smol_str",
  "strsim",
  "time",
