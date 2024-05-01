@@ -312,20 +312,15 @@ impl SpecifiedSeed {
                 quote! {
                     let seed = {
                         let Some(env) = ::std::env::var_os("SEED") else {
-                            eprintln!("$SEED not set");
-                            ::std::process::exit(1);
+                            panic!("$SEED not set");
                         };
                         let Some(str) = env.to_str() else {
-                            eprintln!("$SEED is not UTF-8");
-                            ::std::process::exit(1);
+                            panic!("$SEED is not UTF-8");
                         };
                         match str.parse::<u64>() {
                             Ok(seed) => seed,
-                            Err(err) => {
-                                eprintln!("couldn't parse $SEED: {err}");
-                                ::std::process::exit(1);
-                            }
-                        };
+                            Err(err) => panic!("couldn't parse $SEED: {err}"),
+                        }
                     };
                 }
             },
