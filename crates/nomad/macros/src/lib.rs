@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, ItemImpl, LitStr};
+use syn::{parse_macro_input, DeriveInput, ItemFn, ItemImpl, LitStr};
 
 mod action_name;
 mod async_action;
@@ -82,5 +82,10 @@ pub fn ready(input: TokenStream) -> TokenStream {
 /// TODO: docs
 #[proc_macro_attribute]
 pub fn test(attrs: TokenStream, input: TokenStream) -> TokenStream {
-    test::test(attrs, input)
+    let args = parse_macro_input!(attrs as test::Args);
+    let input = parse_macro_input!(input as ItemFn);
+    match test::test(args, input) {
+        Ok(token_stream) => token_stream.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
 }

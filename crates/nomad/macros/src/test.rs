@@ -1,115 +1,221 @@
-use proc_macro::TokenStream;
-use proc_macro2::Span;
-use quote::quote;
+use proc_macro2::{Span, TokenStream};
+use quote::{quote, ToTokens};
 use syn::parse::Parse;
 use syn::punctuated::Punctuated;
 use syn::token::{Comma, Dollar};
 use syn::{
-    parse_macro_input,
     parse_quote,
-    Block,
     Expr,
     FnArg,
     Ident,
     ItemFn,
     LitInt,
     Pat,
-    Signature,
+    Result,
+    ReturnType,
 };
 use syn_derive_args::Parse;
 
 #[inline]
-pub fn test(args: TokenStream, item: TokenStream) -> TokenStream {
-    let args = parse_macro_input!(args as Args);
-    let item = parse_macro_input!(item as syn::ItemFn);
+pub fn test(args: Args, item: ItemFn) -> Result<TokenStream> {
+    let test_attrs = item
+        .attrs
+        .iter()
+        .map(ToTokens::into_token_stream)
+        .collect::<proc_macro2::TokenStream>();
 
-    match test_inner(args, item) {
-        Ok(out) => out.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
+    let test_name = &item.sig.ident;
 
-fn test_inner(
-    args: Args,
-    item: ItemFn,
-) -> syn::Result<proc_macro2::TokenStream> {
-    let ItemFn { sig, block, .. } = item;
+    let inputs = TestInputs::new(&args, &item)?;
 
-    let test_name = &sig.ident;
-    let output = &sig.output;
-    let test_body = test_body(&args, &sig, &block)?;
+    let test = Test::new(&inputs, &item)?;
 
-    let out = quote! {
+    let maybe_terminator = test
+        .terminator()
+        .map(ToTokens::into_token_stream)
+        .unwrap_or_else(|| quote! {});
+
+    let output = test.output();
+
+    let body = test.body();
+
+    Ok(quote! {
         #[::nomad::nvim::test(
             nvim_oxi = ::nomad::nvim,
-            library_path = ::nomad::tests::library_path(env!("CARGO_CRATE_NAME"))
+            library_path = ::nomad::tests::library_path(env!("CARGO_CRATE_NAME")),
         )]
-        fn #test_name() #output {
-            #test_body
+        #test_attrs
+        fn #test_name(#maybe_terminator) #output {
+            #body
         }
-    };
-
-    Ok(out)
+    })
 }
 
-fn test_body(
-    args: &Args,
-    test_sig: &Signature,
-    test_body: &Block,
-) -> syn::Result<proc_macro2::TokenStream> {
-    let seed = Seed::new(args, &test_sig.inputs)?;
+struct TestInputs {
+    inputs: Punctuated<Expr, Comma>,
+    definitions: TokenStream,
+}
 
-    let define_seed = seed.definition();
-
-    let print_seed = if let Seed::None = seed {
-        quote! {}
-    } else {
-        let seed_name = seed.name();
-        quote! { println!("seed: {}", #seed_name); }
-    };
-
-    let test_fn = Ident::new("__test_fn", Span::call_site());
-
-    let generator = if let Seed::None = seed {
-        None
-    } else {
-        Some(Generator { seed_name: seed.name() })
-    };
-
-    let mut args = Punctuated::<Expr, Comma>::new();
-
-    if let Some(generator) = &generator {
-        let generator = generator.name();
-        args.push(parse_quote! { &mut #generator });
+impl TestInputs {
+    /// Returns the `let {input} = ..;` definition for every test input.
+    fn definitions(&self) -> &TokenStream {
+        &self.definitions
     }
 
-    let define_generator = if let Some(generator) = generator {
-        generator.definition()
-    } else {
-        quote! {}
-    };
+    /// Returns the comma-separated list of inputs to call the test function
+    /// with.
+    fn inputs(&self) -> &Punctuated<Expr, Comma> {
+        &self.inputs
+    }
 
-    let inputs = &test_sig.inputs;
-    let output = &test_sig.output;
+    fn new(args: &Args, item: &ItemFn) -> Result<Self> {
+        let seed = Seed::new(args, &item.sig.inputs)?;
 
-    let body = quote! {
-        #define_seed
-        #print_seed
+        let define_seed = seed.definition();
+        let mut print_seed = quote!();
+        let mut define_generator = quote!();
 
-        fn #test_fn(#inputs) #output {
-            #test_body
+        let mut inputs = Punctuated::<Expr, Comma>::new();
+
+        if !seed.is_none() {
+            print_seed = {
+                let seed_name = seed.name();
+                quote! { println!("seed: {}", #seed_name); }
+            };
+
+            define_generator = {
+                let seed_name = seed.name();
+                quote! {
+                    let mut generator =
+                        ::nomad::tests::Generator::new(#seed_name);
+                }
+            };
+
+            inputs.push(parse_quote! { &mut generator });
         }
 
-        #define_generator
-        #test_fn(#args)
-    };
+        let definitions = quote! {
+            #define_seed
+            #print_seed
+            #define_generator
+        };
 
-    Ok(body)
+        Ok(Self { inputs, definitions })
+    }
+}
+
+enum Test {
+    Sync(SyncTest),
+    Async(AsyncTest),
+}
+
+impl Test {
+    fn body(&self) -> &TokenStream {
+        match self {
+            Self::Sync(test) => test.body(),
+            Self::Async(test) => test.body(),
+        }
+    }
+
+    fn output(&self) -> &ReturnType {
+        match self {
+            Self::Sync(test) => test.output(),
+            Self::Async(test) => test.output(),
+        }
+    }
+
+    fn new(inputs: &TestInputs, item: &ItemFn) -> Result<Self> {
+        if item.sig.asyncness.is_some() {
+            Ok(Self::Async(AsyncTest::new(inputs, item)))
+        } else {
+            Ok(Self::Sync(SyncTest::new(inputs, item)))
+        }
+    }
+
+    /// Returns the `terminator: Terminator` argument to be used in the
+    /// signature of the test function if the test is async, or `None`
+    /// otherwise.
+    fn terminator(&self) -> Option<FnArg> {
+        match self {
+            Self::Sync(_) => None,
+            Self::Async(_) => todo!(),
+        }
+    }
+}
+
+struct SyncTest {
+    body: TokenStream,
+    output: ReturnType,
+}
+
+impl SyncTest {
+    fn body(&self) -> &TokenStream {
+        &self.body
+    }
+
+    fn output(&self) -> &ReturnType {
+        &self.output
+    }
+
+    fn new(inputs: &TestInputs, item: &ItemFn) -> Self {
+        let definitions = inputs.definitions();
+        let test_inputs = inputs.inputs();
+        let inputs = &item.sig.inputs;
+        let output = &item.sig.output;
+        let test_body = &item.block;
+
+        let body = quote! {
+            fn __test_fn(#inputs) #output {
+                #test_body
+            }
+
+            #definitions
+            __test_fn(#test_inputs)
+        };
+
+        Self { body, output: item.sig.output.clone() }
+    }
+}
+
+struct AsyncTest {
+    body: TokenStream,
+    output: ReturnType,
+}
+
+impl AsyncTest {
+    fn body(&self) -> &TokenStream {
+        &self.body
+    }
+
+    fn output(&self) -> &ReturnType {
+        &self.output
+    }
+
+    fn new(inputs: &TestInputs, item: &ItemFn) -> Self {
+        let definitions = inputs.definitions();
+        let test_inputs = inputs.inputs();
+        let inputs = &item.sig.inputs;
+        let output = &item.sig.output;
+        let test_body = &item.block;
+
+        let body = quote! {
+            async fn __test_fn(#inputs) #output {
+                #test_body
+            }
+
+            ::nomad::tests::async_body(async move {
+                #definitions
+                __test_fn(#test_inputs).await
+            })
+        };
+
+        Self { body, output: ReturnType::Default }
+    }
 }
 
 #[derive(Parse)]
 #[args(default)]
-struct Args {
+pub(super) struct Args {
     seed: SpecifiedSeed,
 }
 
@@ -131,6 +237,10 @@ impl Seed {
 
             Self::Specified(seed) => seed.definition(),
         }
+    }
+
+    fn is_none(&self) -> bool {
+        matches!(self, Self::None)
     }
 
     fn name(&self) -> Ident {
@@ -241,23 +351,5 @@ impl Parse for SpecifiedSeed {
         }
 
         Ok(Self::FromEnv)
-    }
-}
-
-struct Generator {
-    seed_name: Ident,
-}
-
-impl Generator {
-    fn definition(&self) -> proc_macro2::TokenStream {
-        let seed = &self.seed_name;
-        let this = self.name();
-        quote! {
-            let mut #this = ::nomad::tests::Generator::new(#seed);
-        }
-    }
-
-    fn name(&self) -> Ident {
-        Ident::new("generator", Span::call_site())
     }
 }
