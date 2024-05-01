@@ -1,5 +1,6 @@
 //! Utilities for testing.
 
+mod async_body;
 mod build;
 mod emoji;
 mod generate;
@@ -7,6 +8,7 @@ mod generator;
 mod letter;
 mod text;
 
+pub use async_body::async_body;
 pub use build::{build_script, library_path};
 pub use emoji::Emoji;
 pub use generate::*;

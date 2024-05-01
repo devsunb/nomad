@@ -138,7 +138,7 @@ impl Test {
     fn terminator(&self) -> Option<FnArg> {
         match self {
             Self::Sync(_) => None,
-            Self::Async(_) => todo!(),
+            Self::Async(test) => Some(test.terminator()),
         }
     }
 }
@@ -180,6 +180,7 @@ impl SyncTest {
 struct AsyncTest {
     body: TokenStream,
     output: ReturnType,
+    terminator: Ident,
 }
 
 impl AsyncTest {
@@ -197,19 +198,25 @@ impl AsyncTest {
         let inputs = &item.sig.inputs;
         let output = &item.sig.output;
         let test_body = &item.block;
+        let terminator = Ident::new("__test_terminator", Span::call_site());
 
         let body = quote! {
             async fn __test_fn(#inputs) #output {
                 #test_body
             }
 
-            ::nomad::tests::async_body(async move {
+            ::nomad::tests::async_body(#terminator, async move {
                 #definitions
                 __test_fn(#test_inputs).await
             })
         };
 
-        Self { body, output: ReturnType::Default }
+        Self { body, output: ReturnType::Default, terminator }
+    }
+
+    fn terminator(&self) -> FnArg {
+        let terminator = &self.terminator;
+        parse_quote! { #terminator: ::nomad::nvim::TestTerminator }
     }
 }
 
