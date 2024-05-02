@@ -7,8 +7,7 @@ license.workspace = true
 publish = false
 
 [features]
-default = ["neovim-0-9"]
-neovim-0-9 = ["nvim/neovim-0-9", "ui/neovim-0-9"]
+default = ["neovim-nightly"]
 neovim-nightly = ["nvim/neovim-nightly", "ui/neovim-nightly"]
 tests = ["nvim/test-terminator", "rand", "rand_chacha", "rand_distr"]
 

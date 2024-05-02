@@ -7,8 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-default = ["neovim-0-9"]
-neovim-0-9 = ["nvim/neovim-0-9"]
+default = ["neovim-nightly"]
 neovim-nightly = ["nvim/neovim-nightly"]
 
 [dependencies]
