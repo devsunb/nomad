@@ -34,15 +34,19 @@ impl<S: AsRef<str>> From<S> for Text {
 }
 
 impl IntoRender for &str {
+    type Render = Text;
+
     #[inline]
-    fn into_render(self) -> Text {
+    fn into_render(self) -> Self::Render {
         self.into()
     }
 }
 
 impl IntoRender for String {
+    type Render = Text;
+
     #[inline]
-    fn into_render(self) -> Text {
+    fn into_render(self) -> Self::Render {
         self.into()
     }
 }
