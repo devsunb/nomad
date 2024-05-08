@@ -6,7 +6,7 @@ pub trait IntoRender {
     type Render: Render;
 
     /// TODO: docs
-    fn into_render(self) -> impl Render;
+    fn into_render(self) -> Self::Render;
 }
 
 impl<T> IntoRender for T
