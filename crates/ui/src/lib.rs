@@ -1,9 +1,9 @@
 //! TODO: docs
 
+mod bound;
 mod cells;
 mod component;
 mod expand_rect;
-mod explicit_bound;
 mod popover;
 mod react;
 pub mod render;
@@ -11,10 +11,10 @@ mod requested_bound;
 mod scene_fragment;
 mod view;
 
+use bound::Bound;
 pub use cells::Cells;
 pub use component::Component;
 pub use expand_rect::ExpandRect;
-use explicit_bound::ExplicitBound;
 pub use popover::{Popover, PopoverAnchor, PopoverBuilder};
 pub use react::React;
 pub use render::{IntoRender, Render};

@@ -1,10 +1,10 @@
 /// TODO: docs
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ExpandRect<T> {
-    top: T,
-    bottom: T,
-    left: T,
-    right: T,
+    pub(crate) top: T,
+    pub(crate) bottom: T,
+    pub(crate) left: T,
+    pub(crate) right: T,
 }
 
 impl<T> ExpandRect<T> {
