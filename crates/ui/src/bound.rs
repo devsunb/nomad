@@ -12,16 +12,26 @@ pub struct Bound<T: Metric> {
 impl<T: Metric> Bound<T> {
     /// Creates a new empty `Bound`.
     #[inline]
-    pub(crate) fn empty() -> Self {
+    pub fn empty() -> Self {
         Self { height: T::zero(), width: T::zero() }
+    }
+
+    /// Creates a new empty `Bound`.
+    #[inline]
+    pub fn new<H, W>(height: H, width: W) -> Self
+    where
+        H: Into<T>,
+        W: Into<T>,
+    {
+        Self { height: height.into(), width: width.into() }
     }
 }
 
 impl<T: Metric> AddAssign<ExpandRect<T>> for Bound<T> {
     #[inline]
     fn add_assign(&mut self, expand: ExpandRect<T>) {
-        self.height = self.height + expand.top + expand.bottom;
-        self.width = self.width + expand.left + expand.right;
+        self.height += expand.top + expand.bottom;
+        self.width += expand.left + expand.right;
     }
 }
 

@@ -13,6 +13,13 @@ impl From<u32> for Cells {
     }
 }
 
+impl From<usize> for Cells {
+    #[inline]
+    fn from(value: usize) -> Self {
+        Self(value as _)
+    }
+}
+
 impl From<Cells> for u32 {
     #[inline]
     fn from(cells: Cells) -> Self {

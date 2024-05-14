@@ -1,27 +1,31 @@
 use compact_str::CompactString;
+use str_indices::chars;
 
-use crate::{Cells, IntoRender, Render, RequestedBound, SceneFragment};
+use crate::{Bound, Cells, IntoRender, Render, RequestedBound, SceneFragment};
 
 /// TODO: docs
 pub struct Text {
-    _inner: CompactString,
+    inner: CompactString,
 }
 
 impl Text {
     #[inline]
     pub(crate) fn new(inner: CompactString) -> Self {
-        Self { _inner: inner }
+        Self { inner }
     }
 }
 
 impl Render for Text {
     #[inline]
     fn layout(&self) -> RequestedBound<Cells> {
-        todo!()
+        // TODO: is it worth counting graphemes instead of characters?
+        // TODO: support soft wrapping.
+        RequestedBound::Exact(Bound::new(1u32, chars::count(&self.inner)))
     }
 
     #[inline]
     fn paint(&self, _scene_fragment: &mut SceneFragment) {
+        // TODO: support soft wrapping.
         todo!()
     }
 }
