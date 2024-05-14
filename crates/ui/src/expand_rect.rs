@@ -1,23 +1,28 @@
-use crate::{Cells, Cutout, SceneFragment};
+use crate::{Cells, Cutout, Metric, SceneFragment};
 
 /// TODO: docs
-#[derive(Debug, Default, Copy, Clone)]
-pub struct ExpandRect<T> {
+#[derive(Debug, Copy, Clone)]
+pub struct ExpandRect<T: Metric> {
     pub(crate) top: T,
     pub(crate) bottom: T,
     pub(crate) left: T,
     pub(crate) right: T,
 }
 
-impl<T> ExpandRect<T> {
+impl Default for ExpandRect<Cells> {
+    #[inline]
+    fn default() -> Self {
+        Self::new(Cells::zero(), Cells::zero(), Cells::zero(), Cells::zero())
+    }
+}
+
+impl<T: Metric> ExpandRect<T> {
     /// Creates a new [`ExpandRect`] with the given top, bottom, left, and right values.
     #[inline]
     pub fn new(top: T, bottom: T, left: T, right: T) -> Self {
         Self { top, bottom, left, right }
     }
-}
 
-impl<T: Copy> ExpandRect<T> {
     /// Sets the left and right edges of the [`ExpandRect`] to the given value.
     #[inline]
     pub fn x(mut self, expand_x_by: T) -> Self {
