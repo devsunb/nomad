@@ -47,8 +47,8 @@ impl Cutout for ExpandRect<Cells> {
     #[inline]
     fn cutout(
         self,
-        fragment: &mut SceneFragment,
-    ) -> (&mut SceneFragment, Self::Cutout<'_>) {
+        fragment: SceneFragment,
+    ) -> (SceneFragment, Self::Cutout<'_>) {
         let (top, bottom) =
             foo(self.top.into(), self.bottom.into(), fragment.height().into());
 
@@ -90,8 +90,8 @@ fn foo(lhs: u32, rhs: u32, total: u32) -> (u32, u32) {
 
 /// TODO: docs.
 pub struct ExpandRectCutout<'a> {
-    top: &'a mut SceneFragment,
-    bottom: &'a mut SceneFragment,
-    left: &'a mut SceneFragment,
-    right: &'a mut SceneFragment,
+    top: SceneFragment<'a>,
+    bottom: SceneFragment<'a>,
+    left: SceneFragment<'a>,
+    right: SceneFragment<'a>,
 }

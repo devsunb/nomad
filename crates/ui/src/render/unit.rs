@@ -7,5 +7,5 @@ impl Render for () {
     }
 
     #[inline]
-    fn paint(&self, _: &mut SceneFragment) {}
+    fn paint(&self, _: SceneFragment) {}
 }

@@ -1,15 +1,14 @@
 use crate::Cells;
 
 /// TODO: docs.
-pub struct SceneFragment {}
+pub struct SceneFragment<'a> {
+    _a: &'a (),
+}
 
-impl SceneFragment {
+impl<'a> SceneFragment<'a> {
     /// TODO: docs
     #[inline]
-    pub fn cutout<C: Cutout>(
-        &mut self,
-        cutout: C,
-    ) -> (&mut Self, C::Cutout<'_>) {
+    pub fn cutout<C: Cutout>(self, cutout: C) -> (Self, C::Cutout<'a>) {
         cutout.cutout(self)
     }
 
@@ -27,13 +26,13 @@ impl SceneFragment {
 
     /// TODO: docs
     #[inline]
-    pub fn split_x(&mut self, _split_at: Cells) -> (&mut Self, &mut Self) {
+    pub fn split_x(self, _split_at: Cells) -> (Self, Self) {
         todo!()
     }
 
     /// TODO: docs
     #[inline]
-    pub fn split_y(&mut self, _split_at: Cells) -> (&mut Self, &mut Self) {
+    pub fn split_y(self, _split_at: Cells) -> (Self, Self) {
         todo!()
     }
 
@@ -52,6 +51,6 @@ pub trait Cutout {
     /// TODO: docs.
     fn cutout(
         self,
-        fragment: &mut SceneFragment,
-    ) -> (&mut SceneFragment, Self::Cutout<'_>);
+        fragment: SceneFragment<'_>,
+    ) -> (SceneFragment<'_>, Self::Cutout<'_>);
 }

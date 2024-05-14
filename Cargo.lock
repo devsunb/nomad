@@ -1687,6 +1687,7 @@ version = "0.1.0"
 dependencies = [
  "compact_str",
  "nvim-oxi",
+ "str_indices",
 ]
 
 [[package]]

@@ -6,7 +6,7 @@ pub trait Render {
     fn layout(&self) -> RequestedBound<Cells>;
 
     /// TODO: docs
-    fn paint(&self, scene_fragment: &mut SceneFragment);
+    fn paint(&self, scene_fragment: SceneFragment);
 }
 
 impl<T: Render> Render for &T {
@@ -16,7 +16,7 @@ impl<T: Render> Render for &T {
     }
 
     #[inline]
-    fn paint(&self, scene_fragment: &mut SceneFragment) {
+    fn paint(&self, scene_fragment: SceneFragment) {
         (*self).paint(scene_fragment)
     }
 }

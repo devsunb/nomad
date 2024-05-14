@@ -20,11 +20,12 @@ impl Render for Text {
     fn layout(&self) -> RequestedBound<Cells> {
         // TODO: is it worth counting graphemes instead of characters?
         // TODO: support soft wrapping.
-        RequestedBound::Exact(Bound::new(1u32, chars::count(&self.inner)))
+        let bound = Bound::new(1u32, chars::count(&self.inner) as u32);
+        RequestedBound::Exact(bound)
     }
 
     #[inline]
-    fn paint(&self, _scene_fragment: &mut SceneFragment) {
+    fn paint(&self, _scene_fragment: SceneFragment) {
         // TODO: support soft wrapping.
         todo!()
     }
