@@ -15,16 +15,24 @@ pub(crate) struct View {
     scene: Scene,
 
     /// TODO: docs.
-    size: Bound<Cells>,
-
-    /// TODO: docs.
     window: api::Window,
 }
 
 impl View {
-    /// Creates a new `View` that isn't displayed on the screen.
     #[inline]
-    pub(crate) fn new_hidden() -> Self {
+    pub(crate) fn is_hidden(&self) -> bool {
+        self.window
+            .get_config()
+            .map(|config| config.hide.unwrap_or(false))
+            .unwrap_or(false)
+    }
+
+    /// Opens a new `View`.
+    #[inline]
+    pub(crate) fn open(
+        root: Box<dyn Render + 'static>,
+        available_size: Bound<Cells>,
+    ) -> Self {
         let buffer = api::create_buf(false, true).expect("never fails(?)");
 
         let config = WindowConfig::builder()
@@ -34,14 +42,17 @@ impl View {
             .row(0)
             .col(0)
             .hide(true)
+            .style(WindowStyle::Minimal)
             .build();
 
-        let _window = api::open_win(&buffer, false, &config)
+        let window = api::open_win(&buffer, false, &config)
             .expect("the config is valid");
 
-        // Self { buffer, window }
+        let mut this = Self { buffer, root, scene: Scene::new(), window };
 
-        todo!();
+        this.render(available_size);
+
+        this
     }
 
     /// TODO: docs.
@@ -61,13 +72,11 @@ impl View {
         self.root.paint(scene_fragment);
 
         self.scene.diff().apply(self);
-
-        self.size = size;
     }
 
     /// TODO: docs.
     #[inline]
     pub(crate) fn size(&self) -> Bound<Cells> {
-        self.size
+        self.scene.size()
     }
 }

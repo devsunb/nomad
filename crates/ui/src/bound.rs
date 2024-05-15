@@ -26,6 +26,12 @@ impl<T: Metric> Bound<T> {
         }
     }
 
+    /// TODO: docs
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.height == T::zero() || self.width == T::zero()
+    }
+
     /// Creates a new empty `Bound`.
     #[inline]
     pub fn new<H, W>(height: H, width: W) -> Self

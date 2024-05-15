@@ -20,7 +20,19 @@ impl Scene {
 
     /// TODO: docs
     #[inline]
+    pub(crate) fn new() -> Self {
+        todo!()
+    }
+
+    /// TODO: docs
+    #[inline]
     pub(crate) fn resize(&mut self, new_size: Bound<Cells>) {
+        todo!();
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub(crate) fn size(&self) -> Bound<Cells> {
         todo!();
     }
 }

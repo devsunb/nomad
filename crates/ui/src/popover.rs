@@ -15,48 +15,13 @@ impl Popover {
     /// TODO: docs
     #[inline]
     pub fn builder() -> PopoverBuilder<RootRender> {
-        PopoverBuilder { popover: Self::uninit(), _state: PhantomData }
-    }
-
-    #[inline]
-    fn uninit() -> Self {
-        Self { anchor: PopoverAnchor::Editor, view: View::new_hidden() }
+        PopoverBuilder {
+            anchor: PopoverAnchor::Editor,
+            root: Box::new(()),
+            _state: PhantomData,
+        }
     }
 }
-
-// the first time a popover is opened, we:
-//
-// - get the available size we have;
-// - ask the root render its layout. together with the total size this will
-// determine the size of the popover;
-// - set the size of the scene to that size;
-// - paint the root render into the scene;
-// - paint the entire scene into the view;
-//
-// once that's done, we'll only re-render if:
-//
-// - the anchor changes;
-// - the position of the anchor changes;
-// - the size of the terminal changes;
-//
-// or if:
-//
-// - a reactive used when rendering changes.
-//
-// If we change for one of the first 3 reasons, may be able to just reposition
-// the view without re-rendering it. to determine this:
-//
-// - get the new available size;
-// - if it's the same, we're done;
-// - if the last time we rendered the requested bound was:
-//   * Available -> we re-render from scratch;
-//   * Explicit with bound > current size -> we re-render from scratch;
-//   * Explicit with bound <= current size -> we just reposition the view;
-//
-// If we change because a reactive changed, we do re-layout and re-paint,
-// incrementally. The `Scene` will then tell us how to change the view while
-// doing the least amount of work possible. This means we shouldn't re-render
-// everything if the size or layout changes.
 
 /// TODO: docs
 pub enum PopoverAnchor {
@@ -78,8 +43,20 @@ impl PopoverAnchor {
 
 /// TODO: docs
 pub struct PopoverBuilder<State> {
-    popover: Popover,
+    anchor: PopoverAnchor,
+    root: Box<dyn Render + 'static>,
     _state: PhantomData<State>,
+}
+
+impl<State> PopoverBuilder<State> {
+    #[inline]
+    fn change_state<NewState>(self) -> PopoverBuilder<NewState> {
+        PopoverBuilder {
+            anchor: self.anchor,
+            root: self.root,
+            _state: PhantomData,
+        }
+    }
 }
 
 impl PopoverBuilder<RootRender> {
@@ -89,9 +66,8 @@ impl PopoverBuilder<RootRender> {
     where
         R: Render + 'static,
     {
-        // self.popover.root = Box::new(root);
-        // PopoverBuilder { popover: self.popover, _state: PhantomData }
-        todo!();
+        self.root = Box::new(root);
+        self.change_state()
     }
 }
 
@@ -102,8 +78,8 @@ impl PopoverBuilder<Anchor> {
     where
         A: Into<PopoverAnchor>,
     {
-        self.popover.anchor = anchor.into();
-        PopoverBuilder { popover: self.popover, _state: PhantomData }
+        self.anchor = anchor.into();
+        self.change_state()
     }
 }
 
@@ -111,7 +87,9 @@ impl PopoverBuilder<Done> {
     /// TODO: docs
     #[inline]
     pub fn open(self) -> Popover {
-        self.popover
+        let available_size = self.anchor.max_size();
+        let view = View::open(self.root, available_size);
+        Popover { anchor: self.anchor, view }
     }
 }
 
