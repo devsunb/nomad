@@ -2,8 +2,10 @@
 
 mod bound;
 mod cells;
+mod color;
 mod component;
 mod expand_rect;
+mod highlight;
 mod metric;
 mod popover;
 mod react;
@@ -16,8 +18,10 @@ mod view;
 
 use bound::Bound;
 pub use cells::Cells;
+pub use color::Color;
 pub use component::Component;
 pub use expand_rect::ExpandRect;
+pub use highlight::{Highlight, HighlightName};
 pub use metric::Metric;
 pub use popover::{Popover, PopoverAnchor, PopoverBuilder};
 pub use react::React;
