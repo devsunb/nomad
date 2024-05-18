@@ -9,9 +9,6 @@ pub(crate) struct Scene {
     lines: Vec<SceneLine>,
 
     /// TODO: docs.
-    width: Cells,
-
-    /// TODO: docs.
     diff: DiffTracker,
 }
 
@@ -64,7 +61,7 @@ impl Scene {
     /// TODO: docs
     #[inline]
     pub(crate) fn width(&self) -> Cells {
-        self.width
+        self.lines.first().map(SceneLine::width).unwrap_or_default()
     }
 }
 
@@ -92,20 +89,40 @@ impl SceneLine {
     fn truncate(&mut self, _len: Cells) {
         todo!();
     }
+
+    /// TODO: docs.
+    #[inline]
+    fn width(&self) -> Cells {
+        // FIXME: this is O(n). We could do it in O(1) by either memoizing it
+        // or by storing the runs in a Btree.
+        self.runs.iter().map(SceneRun::width).sum()
+    }
 }
 
 /// TODO: docs
 #[derive(Debug)]
-struct SceneRun {
+enum SceneRun {
     /// TODO: docs.
-    text: CompactString,
+    Empty { width: Cells },
+
+    /// TODO: docs.
+    Text { text: CompactString },
 }
 
 impl SceneRun {
     /// Creates a new empty `SceneRun` with the given width.
     #[inline]
-    fn new_empty(_width: Cells) -> Self {
-        todo!();
+    fn new_empty(width: Cells) -> Self {
+        Self::Empty { width }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn width(&self) -> Cells {
+        match self {
+            Self::Empty { width } => *width,
+            Self::Text { text } => Cells::measure(text.as_str()),
+        }
     }
 }
 
@@ -247,7 +264,6 @@ impl TruncateLinesOp {
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
         scene.lines.iter_mut().for_each(|line| line.truncate(cells));
-        scene.width = cells;
     }
 }
 
@@ -354,7 +370,6 @@ impl ExtendLinesOp {
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
         scene.lines.iter_mut().for_each(|line| line.extend(cells));
-        scene.width = cells;
     }
 }
 

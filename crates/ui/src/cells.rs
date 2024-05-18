@@ -1,10 +1,21 @@
+use core::iter::Sum;
 use core::ops::{Add, AddAssign, Sub, SubAssign};
+
+use str_indices::chars;
 
 use crate::Metric;
 
 /// TODO: docs
 #[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cells(u32);
+
+impl Cells {
+    /// TODO: docs
+    #[inline]
+    pub fn measure(text: &str) -> Self {
+        Self(chars::count(text) as u32)
+    }
+}
 
 impl From<u32> for Cells {
     #[inline]
@@ -51,6 +62,16 @@ impl SubAssign for Cells {
     #[inline]
     fn sub_assign(&mut self, rhs: Self) {
         self.0 -= rhs.0;
+    }
+}
+
+impl Sum for Cells {
+    #[inline]
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Self>,
+    {
+        iter.fold(Self::zero(), Add::add)
     }
 }
 

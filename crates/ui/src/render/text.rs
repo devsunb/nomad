@@ -1,5 +1,4 @@
 use compact_str::CompactString;
-use str_indices::chars;
 
 use crate::{Bound, Cells, IntoRender, Render, RequestedBound, SceneFragment};
 
@@ -20,7 +19,7 @@ impl Render for Text {
     fn layout(&self) -> RequestedBound<Cells> {
         // TODO: is it worth counting graphemes instead of characters?
         // TODO: support soft wrapping.
-        let bound = Bound::new(1u32, chars::count(&self.inner) as u32);
+        let bound = Bound::new(1u32, Cells::measure(&self.inner));
         RequestedBound::Explicit(bound)
     }
 
