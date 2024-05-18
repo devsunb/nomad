@@ -68,3 +68,15 @@ impl HighlightName {
         Self { str }
     }
 }
+
+/// TODO: docs
+pub struct Normal;
+
+impl Highlight for Normal {
+    const NAME: HighlightName = HighlightName::new("Normal");
+
+    #[inline]
+    fn builtin(&self) -> bool {
+        true
+    }
+}

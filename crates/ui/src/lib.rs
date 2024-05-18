@@ -31,5 +31,5 @@ pub use render::{IntoRender, Render};
 pub use requested_bound::RequestedBound;
 pub(crate) use scene::Scene;
 pub use scene_fragment::{Cutout, SceneFragment};
-pub(crate) use surface::Surface;
+pub(crate) use surface::{Point, Surface};
 use view::View;

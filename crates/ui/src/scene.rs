@@ -2,10 +2,11 @@ use alloc::borrow::Cow;
 use alloc::vec::Drain;
 use core::cmp::Ordering;
 use core::mem;
+use core::ops::Range;
 
 use compact_str::CompactString;
 
-use crate::{Bound, Cells, Metric, SceneFragment, Surface};
+use crate::{Bound, Cells, Highlight, Metric, Point, SceneFragment, Surface};
 
 /// TODO: docs
 #[derive(Debug, Default)]
@@ -527,8 +528,20 @@ struct HlHunk {}
 impl HlHunk {
     /// TODO: docs
     #[inline]
-    fn apply_to(self, _surface: &mut Surface) {
+    fn apply_to(self, surface: &mut Surface) {
+        surface.highlight_text(self.point_range(), &self.hl());
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn point_range(&self) -> Range<Point> {
         todo!();
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn hl(&self) -> impl Highlight {
+        crate::highlight::Normal
     }
 }
 
@@ -556,7 +569,19 @@ struct TextHunk<'a> {
 impl<'a> TextHunk<'a> {
     /// TODO: docs
     #[inline]
-    fn apply_to(self, _surface: &mut Surface) {
+    fn apply_to(self, surface: &mut Surface) {
+        surface.replace_text(self.point_range(), self.text());
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn point_range(&self) -> Range<Point> {
+        todo!();
+    }
+
+    /// TODO: docs
+    #[inline]
+    fn text(&self) -> &str {
         todo!();
     }
 }
