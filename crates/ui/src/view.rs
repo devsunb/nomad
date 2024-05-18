@@ -52,7 +52,7 @@ impl View {
 
         self.root.paint(self.scene.as_fragment());
 
-        self.scene.diff().apply(&mut self.surface);
+        self.scene.diff().apply_to(&mut self.surface);
     }
 
     /// TODO: docs.

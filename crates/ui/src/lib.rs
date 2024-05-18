@@ -1,5 +1,7 @@
 //! TODO: docs
 
+extern crate alloc;
+
 mod bound;
 mod cells;
 mod color;

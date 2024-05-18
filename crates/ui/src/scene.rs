@@ -472,9 +472,85 @@ pub(crate) struct SceneDiff<'a> {
 }
 
 impl<'a> SceneDiff<'a> {
+    /// TODO: docs.
+    #[inline]
+    fn hl_hunks(&self) -> HlHunks<'_> {
+        todo!();
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn text_hunks(&self) -> TextHunks<'_> {
+        todo!();
+    }
+}
+
+impl<'a> SceneDiff<'a> {
     /// TODO: docs
     #[inline]
-    pub(crate) fn apply(self, _surface: &mut Surface) {
-        todo!()
+    pub(crate) fn apply_to(self, surface: &mut Surface) {
+        for hunk in self.text_hunks() {
+            hunk.apply_to(surface);
+        }
+
+        for hunk in self.hl_hunks() {
+            hunk.apply_to(surface);
+        }
+    }
+}
+
+/// TODO: docs.
+struct HlHunks<'a> {
+    _marker: &'a (),
+}
+
+impl Iterator for HlHunks<'_> {
+    type Item = HlHunk;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!();
+    }
+}
+
+/// TODO: docs.
+#[derive(Debug)]
+struct HlHunk {}
+
+/// TODO: docs.
+impl HlHunk {
+    /// TODO: docs
+    #[inline]
+    fn apply_to(self, _surface: &mut Surface) {
+        todo!();
+    }
+}
+
+/// TODO: docs.
+struct TextHunks<'a> {
+    _marker: &'a (),
+}
+
+impl<'a> Iterator for TextHunks<'a> {
+    type Item = TextHunk<'a>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!();
+    }
+}
+
+/// TODO: docs.
+#[derive(Debug)]
+struct TextHunk<'a> {
+    _marker: &'a (),
+}
+
+/// TODO: docs.
+impl<'a> TextHunk<'a> {
+    /// TODO: docs
+    #[inline]
+    fn apply_to(self, _surface: &mut Surface) {
+        todo!();
     }
 }
