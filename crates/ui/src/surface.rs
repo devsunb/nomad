@@ -22,12 +22,8 @@ pub(crate) struct Surface {
 impl Surface {
     /// TODO: docs
     #[inline]
-    pub(crate) fn highlight_line_range<R, Hl>(
-        &mut self,
-        line: usize,
-        range: R,
-        hl: &Hl,
-    ) where
+    fn highlight_line_range<R, Hl>(&mut self, line: usize, range: R, hl: &Hl)
+    where
         R: RangeBounds<ByteOffset>,
         Hl: Highlight,
     {
@@ -110,7 +106,7 @@ impl Surface {
 
     /// TODO: docs
     #[inline]
-    fn replace_text(&mut self, range: Range<Point>, text: &str) {
+    pub(crate) fn replace_text(&mut self, range: Range<Point>, text: &str) {
         let lines = text.lines().chain(text.ends_with('\n').then_some(""));
 
         let _ = self.buffer.set_text(
@@ -123,7 +119,7 @@ impl Surface {
 
     /// TODO: docs
     #[inline]
-    fn resize_window(&mut self, new_size: Bound<Cells>) {
+    pub(crate) fn resize_window(&mut self, new_size: Bound<Cells>) {
         let config = WindowConfig::builder()
             .height(new_size.height().into())
             .width(new_size.width().into())
