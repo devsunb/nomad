@@ -121,25 +121,25 @@ impl ShrinkOp {
     }
 }
 
-/// A `DeleteLinesOp(n)` shrinks a [`Scene`] vertically by keeping the first
-/// `n` lines of a `Scene` and deletes the rest.
+/// A `DeleteLinesOp(n)` shrinks a [`Scene`] vertically by keeping its first
+/// `n` lines and deleting the rest.
 ///
 /// For example, a `DeleteLinesOp(1)` would transform the following scene:
 ///
 /// ```txt
-/// ┌────────────┐
-/// │▒▒▒▒▒▒▒▒▒▒▒▒│
-/// │▒▒▒▒3x12▒▒▒▒│
-/// │▒▒▒▒▒▒▒▒▒▒▒▒│
-/// └────────────┘
+/// ┌──────────────┐
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒3x14▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// └──────────────┘
 /// ```
 ///
 /// into:
 ///
 /// ```txt
-/// ┌────────────┐
-/// │▒▒▒▒1x12▒▒▒▒│
-/// └────────────┘
+/// ┌──────────────┐
+/// │▒▒▒▒▒1x14▒▒▒▒▒│
+/// └──────────────┘
 /// ```
 ///
 /// A `DeleteLinesOp(0)` deletes all the lines of a `Scene`.
@@ -147,16 +147,16 @@ impl ShrinkOp {
 struct DeleteLinesOp(u32);
 
 /// A `TruncateLinesOp(n)` shrinks a [`Scene`] horizontally by keeping the
-/// first `n` cells of every line of a `Scene` and deleting the rest.
+/// first `n` cells of every line and deleting the rest.
 ///
 /// For example, a `TruncateLinesOp(10)` would transform the following scene:
 ///
 /// ```txt
-/// ┌────────────────────┐
-/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
-/// │▒▒▒▒▒▒▒▒3x20▒▒▒▒▒▒▒▒│
-/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
-/// └────────────────────┘
+/// ┌──────────────┐
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒3x14▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// └──────────────┘
 /// ```
 ///
 /// into:
@@ -175,7 +175,10 @@ struct TruncateLinesOp(u32);
 
 /// An `ExpandOp` expands a `Scene` by inserting lines and/or extending lines.
 #[derive(Debug, Clone, Copy, Default)]
-struct ExpandOp {}
+struct ExpandOp {
+    extend_lines: Option<ExtendLinesOp>,
+    insert_lines: Option<InsertLinesOp>,
+}
 
 impl ExpandOp {
     #[inline]
@@ -186,6 +189,58 @@ impl ExpandOp {
         todo!();
     }
 }
+
+/// An `InsertLinesOp(n)` expands a [`Scene`] vertically by appending lines
+/// until its height reacher `n` cells.
+///
+/// For example, an `InsertLinesOp(5)` would transform the following scene:
+///
+/// ```txt
+/// ┌──────────────┐
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒3x14▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// └──────────────┘
+/// ```
+///
+/// into:
+///
+/// ```txt
+/// ┌──────────────┐
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒5x14▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// └──────────────┘
+/// ```
+#[derive(Debug, Clone, Copy)]
+struct InsertLinesOp(u32);
+
+/// An `ExtendLinesOp(n)` expands a [`Scene`] horizontally by extending every
+/// line until its width reaches `n` cells.
+///
+/// For example, an `ExtendLinesOp(18)` would transform the following scene:
+///
+/// ```txt
+/// ┌──────────────┐
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒3x14▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// └──────────────┘
+/// ```
+///
+/// into:
+///
+/// ```txt
+/// ┌──────────────────┐
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒3x18▒▒▒▒▒▒▒│
+/// │▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒│
+/// └──────────────────┘
+/// ```
+#[derive(Debug, Clone, Copy)]
+struct ExtendLinesOp(u32);
 
 /// TODO: docs
 #[derive(Debug)]
