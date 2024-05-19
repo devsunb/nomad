@@ -371,38 +371,38 @@ impl VerticalResizeHunk {
 
 #[derive(Debug)]
 struct HorizontalShrinkHunk {
-    range: Range<Point>,
+    range: Range<Point<usize>>,
 }
 
 impl HorizontalShrinkHunk {
     #[inline]
-    fn new(range: Range<Point>) -> Self {
+    fn new(range: Range<Point<usize>>) -> Self {
         Self { range }
     }
 }
 
 #[derive(Debug)]
 struct HorizontalExpandHunk {
-    at: Point,
+    at: Point<usize>,
     width: Cells,
 }
 
 impl HorizontalExpandHunk {
     #[inline]
-    fn new(at: Point, width: Cells) -> Self {
+    fn new(at: Point<usize>, width: Cells) -> Self {
         Self { at, width }
     }
 }
 
 #[derive(Debug)]
 struct ReplaceHunk {
-    range: Range<Point>,
+    range: Range<Point<usize>>,
     replaced_with: (usize, Cells), // (line_idx, run_idx)
 }
 
 impl ReplaceHunk {
     #[inline]
-    fn new(range: Range<Point>, replaced_with: (usize, Cells)) -> Self {
+    fn new(range: Range<Point<usize>>, replaced_with: (usize, Cells)) -> Self {
         Self { range, replaced_with }
     }
 }
@@ -737,6 +737,7 @@ impl Iterator for HlHunks<'_> {
 /// TODO: docs.
 #[derive(Debug)]
 struct HlHunk {
+    range: Range<Point<usize>>,
     hl_group: HighlightGroup,
 }
 
@@ -745,13 +746,13 @@ impl HlHunk {
     /// TODO: docs
     #[inline]
     fn apply_to(self, surface: &mut Surface) {
-        surface.highlight_text(self.point_range(), &self.hl_group);
+        surface.highlight_text(self.range.clone(), &self.hl_group);
     }
 
     /// TODO: docs
     #[inline]
-    fn point_range(&self) -> Range<Point> {
-        todo!();
+    fn new(range: Range<Point<usize>>, hl_group: HighlightGroup) -> Self {
+        Self { range, hl_group }
     }
 }
 
@@ -838,7 +839,7 @@ impl<'scene> Iterator for TextHunks<'_, 'scene> {
 #[derive(Debug)]
 enum TextHunk<'scene> {
     VerticalResize(VerticalResizeHunk),
-    Replace { range: Range<Point>, text: Cow<'scene, str> },
+    Replace { range: Range<Point<usize>>, text: Cow<'scene, str> },
 }
 
 /// TODO: docs.
@@ -875,8 +876,8 @@ impl From<HorizontalExpandHunk> for TextHunk<'_> {
 
 #[inline]
 fn spaces(width: Cells) -> Cow<'static, str> {
-    /// The sole purpose of this constant is to avoid allocating when the
-    /// text is empty.
+    /// The purpose of this constant is to avoid allocating when the desired
+    /// width is <= 512.
     const SPACES: &str = r#"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                "#;
 
     let len = u32::from(width) as usize;

@@ -3,7 +3,7 @@ use core::ops::{Range, RangeBounds};
 use api::types::*;
 use nvim::api;
 
-use crate::{Bound, Cells, Highlight};
+use crate::{Bound, Cells, HighlightGroup, Point};
 
 pub(crate) type ByteOffset = usize;
 
@@ -22,16 +22,19 @@ pub(crate) struct Surface {
 impl Surface {
     /// TODO: docs
     #[inline]
-    fn highlight_line_range<R, Hl>(&mut self, line: usize, range: R, hl: &Hl)
-    where
+    fn highlight_line_range<R>(
+        &mut self,
+        line: usize,
+        range: R,
+        hl: &HighlightGroup,
+    ) where
         R: RangeBounds<ByteOffset>,
-        Hl: Highlight,
     {
         hl.set(self.namespace);
 
         let _ = self.buffer.add_highlight(
             self.namespace,
-            <Hl as Highlight>::NAME.as_str(),
+            hl.name().as_str(),
             line,
             range,
         );
@@ -39,34 +42,29 @@ impl Surface {
 
     /// TODO: docs
     #[inline]
-    pub(crate) fn highlight_text<Hl: Highlight>(
+    pub(crate) fn highlight_text(
         &mut self,
-        range: Range<Point>,
-        hl: &Hl,
+        range: Range<Point<ByteOffset>>,
+        hl: &HighlightGroup,
     ) {
         let start = range.start;
 
         let end = range.end;
 
-        if start.line == end.line {
-            self.highlight_line_range(
-                start.line,
-                start.offset..end.offset,
-                hl,
-            );
-
+        if start.y() == end.y() {
+            self.highlight_line_range(start.y(), start.x()..end.x(), hl);
             return;
         }
 
-        let mut line_range = start.line..=end.line;
+        let mut line_range = start.y()..=end.y();
 
         let Some(first_line) = line_range.next() else { return };
 
-        self.highlight_line_range(first_line, start.offset.., hl);
+        self.highlight_line_range(first_line, start.x().., hl);
 
         let Some(last_line) = line_range.next_back() else { return };
 
-        self.highlight_line_range(last_line, ..end.offset, hl);
+        self.highlight_line_range(last_line, ..end.x(), hl);
 
         for line in line_range {
             self.highlight_line_range(line, .., hl);
@@ -116,13 +114,17 @@ impl Surface {
 
     /// TODO: docs
     #[inline]
-    pub(crate) fn replace_text(&mut self, range: Range<Point>, text: &str) {
+    pub(crate) fn replace_text(
+        &mut self,
+        range: Range<Point<ByteOffset>>,
+        text: &str,
+    ) {
         let lines = text.lines().chain(text.ends_with('\n').then_some(""));
 
         let _ = self.buffer.set_text(
-            range.start.line..range.end.line,
-            range.start.offset,
-            range.end.offset,
+            range.start.y()..range.end.y(),
+            range.start.x(),
+            range.end.x(),
             lines,
         );
     }
@@ -136,19 +138,5 @@ impl Surface {
             .build();
 
         let _ = self.window.set_config(&config);
-    }
-}
-
-/// TODO: docs
-#[derive(Debug, Copy, Clone)]
-pub(crate) struct Point {
-    line: ByteOffset,
-    offset: ByteOffset,
-}
-
-impl Point {
-    #[inline]
-    pub(crate) fn new(line: ByteOffset, offset: ByteOffset) -> Self {
-        Self { line, offset }
     }
 }

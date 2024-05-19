@@ -15,3 +15,10 @@ pub trait Metric:
     /// TODO: docs
     fn zero() -> Self;
 }
+
+impl Metric for usize {
+    #[inline]
+    fn zero() -> Self {
+        0
+    }
+}
