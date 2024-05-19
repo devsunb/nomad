@@ -130,6 +130,7 @@ impl Surface {
 }
 
 /// TODO: docs
+#[derive(Debug, Copy, Clone)]
 pub(crate) struct Point {
     line: ByteOffset,
     offset: ByteOffset,

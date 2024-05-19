@@ -10,6 +10,13 @@ pub struct Bound<T: Metric> {
     width: T,
 }
 
+impl<T: Metric> Default for Bound<T> {
+    #[inline]
+    fn default() -> Self {
+        Self::empty()
+    }
+}
+
 impl<T: Metric> Bound<T> {
     /// Creates a new empty `Bound`.
     #[inline]

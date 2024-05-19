@@ -1,7 +1,6 @@
 use alloc::borrow::Cow;
 use alloc::vec::Drain;
 use core::cmp::Ordering;
-use core::mem;
 use core::ops::Range;
 
 use compact_str::CompactString;
@@ -12,7 +11,7 @@ use crate::{Bound, Cells, Highlight, Metric, Point, SceneFragment, Surface};
 #[derive(Debug, Default)]
 pub(crate) struct Scene {
     /// TODO: docs.
-    lines: Vec<SceneLine>,
+    surface: SceneSurface,
 
     /// TODO: docs.
     diff: DiffTracker,
@@ -35,15 +34,19 @@ impl Scene {
     /// TODO: docs
     #[inline]
     pub(crate) fn diff(&mut self) -> SceneDiff<'_> {
-        let resize = mem::take(&mut self.diff.resize);
-        let paint = self.diff.paint.drain(..);
-        SceneDiff { lines: &self.lines, resize, paint }
+        SceneDiff {
+            surface: &self.surface,
+            deleted: self.diff.deleted.drain(..),
+            inserted: self.diff.inserted.drain(..),
+            replaced: self.diff.replaced.drain(..),
+            paint: self.diff.paint.drain(..),
+        }
     }
 
     /// TODO: docs
     #[inline]
     pub(crate) fn height(&self) -> Cells {
-        (self.lines.len() as u32).into()
+        self.surface.height()
     }
 
     /// TODO: docs
@@ -55,9 +58,7 @@ impl Scene {
     /// TODO: docs
     #[inline]
     pub(crate) fn resize(&mut self, new_size: Bound<Cells>) {
-        let op = ResizeOp::new(self.size(), new_size);
-        self.apply(op);
-        self.diff.resize = op;
+        self.apply(ResizeOp::new(self.size(), new_size));
     }
 
     /// TODO: docs
@@ -69,6 +70,37 @@ impl Scene {
     /// TODO: docs
     #[inline]
     pub(crate) fn width(&self) -> Cells {
+        self.surface.width()
+    }
+}
+
+/// TODO: docs.
+#[derive(Debug, Default)]
+struct SceneSurface {
+    /// TODO: docs.
+    lines: Vec<SceneLine>,
+}
+
+impl SceneSurface {
+    #[inline]
+    fn height(&self) -> Cells {
+        (self.lines.len() as u32).into()
+    }
+
+    #[inline]
+    fn run_at(
+        &self,
+        line_idx: usize,
+        run_offset: Cells,
+        bias: Bias,
+    ) -> &SceneRun {
+        let line = &self.lines[line_idx];
+        let (run_idx, _) = line.run_at(run_offset, bias);
+        &line.runs[run_idx]
+    }
+
+    #[inline]
+    fn width(&self) -> Cells {
         self.lines.first().map(SceneLine::width).unwrap_or_default()
     }
 }
@@ -80,6 +112,14 @@ struct SceneLine {
 }
 
 impl SceneLine {
+    /// TODO: docs.
+    #[inline]
+    fn byte_len(&self) -> usize {
+        // FIXME: this is O(n). We could do it in O(1) by either memoizing it
+        // or by storing the runs in a Btree.
+        self.runs.iter().map(SceneRun::byte_len).sum()
+    }
+
     /// TODO: docs.
     #[inline]
     fn extend(&mut self, to_width: Cells) {
@@ -97,7 +137,7 @@ impl SceneLine {
 
     /// TODO: docs.
     #[inline]
-    fn run_at_offset(&self, offset: Cells, bias: Bias) -> (usize, Cells) {
+    fn run_at(&self, offset: Cells, bias: Bias) -> (usize, Cells) {
         let mut run_offset = Cells::zero();
         let mut runs = self.runs.iter().enumerate();
 
@@ -132,7 +172,7 @@ impl SceneLine {
     /// TODO: docs.
     #[inline]
     fn truncate(&mut self, to_width: Cells) {
-        let (run_idx, run_offset) = self.run_at_offset(to_width, Bias::Right);
+        let (run_idx, run_offset) = self.run_at(to_width, Bias::Right);
 
         if run_offset < to_width {
             self.runs[run_idx].truncate(to_width - run_offset);
@@ -168,6 +208,15 @@ enum SceneRun {
 }
 
 impl SceneRun {
+    /// TODO: docs.
+    #[inline]
+    fn byte_len(&self) -> usize {
+        match self {
+            Self::Empty { width } => u32::from(*width) as usize,
+            Self::Text { text } => text.len(),
+        }
+    }
+
     /// Creates a new empty `SceneRun` with the given width.
     #[inline]
     fn new_empty(width: Cells) -> Self {
@@ -177,20 +226,8 @@ impl SceneRun {
     /// Returns the text of the `SceneRun`.
     #[inline]
     fn text(&self) -> Cow<str> {
-        /// The sole purpose of this constant is to avoid allocating when the
-        /// text is empty.
-        const SPACES: &str = r#"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                "#;
-
         match self {
-            Self::Empty { width } => {
-                let len = u32::from(*width) as usize;
-                if len > SPACES.len() {
-                    Cow::Owned(" ".repeat(len))
-                } else {
-                    Cow::Borrowed(&SPACES[..len])
-                }
-            },
-
+            Self::Empty { width } => spaces(*width),
             Self::Text { text } => Cow::Borrowed(text.as_str()),
         }
     }
@@ -224,15 +261,60 @@ impl SceneRun {
 #[derive(Debug, Default)]
 struct DiffTracker {
     /// TODO: docs.
-    resize: ResizeOp,
+    deleted: Vec<DeleteHunk>,
+
+    /// TODO: docs.
+    inserted: Vec<InsertHunk>,
+
+    /// TODO: docs
+    replaced: Vec<ReplaceHunk>,
 
     /// TODO: docs
     paint: Vec<PaintOp>,
 }
 
+#[derive(Debug)]
+struct DeleteHunk {
+    range: Range<Point>,
+}
+
+impl DeleteHunk {
+    #[inline]
+    fn new(range: Range<Point>) -> Self {
+        Self { range }
+    }
+}
+
+#[derive(Debug)]
+struct InsertHunk {
+    at: Point,
+    width: Cells,
+}
+
+impl InsertHunk {
+    #[inline]
+    fn new(at: Point, width: Cells) -> Self {
+        Self { at, width }
+    }
+}
+
+#[derive(Debug)]
+struct ReplaceHunk {
+    range: Range<Point>,
+    replaced_with: (usize, Cells), // (line_idx, run_idx)
+}
+
+impl ReplaceHunk {
+    #[inline]
+    fn new(range: Range<Point>, replaced_with: (usize, Cells)) -> Self {
+        Self { range, replaced_with }
+    }
+}
+
 /// A `ResizeOp` is a collection of operations that resize a `Scene`.
 #[derive(Debug, Copy, Clone, Default)]
 struct ResizeOp {
+    old_size: Bound<Cells>,
     shrink: ShrinkOp,
     expand: ExpandOp,
 }
@@ -253,7 +335,7 @@ impl ResizeOp {
     fn new(old_size: Bound<Cells>, new_size: Bound<Cells>) -> Self {
         let shrink = ShrinkOp::new(old_size, new_size);
         let expand = ExpandOp::new(old_size, new_size);
-        Self { shrink, expand }
+        Self { old_size, shrink, expand }
     }
 }
 
@@ -322,7 +404,19 @@ struct DeleteLinesOp(u32);
 impl DeleteLinesOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
-        scene.lines.truncate(self.0 as usize);
+        let end = {
+            let Some(last_line) = scene.surface.lines.last() else { return };
+            let height = u32::from(scene.height()) as usize;
+            Point::new(height - 1, last_line.byte_len())
+        };
+
+        let num_lines = self.0 as usize;
+
+        let start = Point::new(num_lines, 0);
+
+        scene.diff.deleted.push(DeleteHunk::new(start..end));
+
+        scene.surface.lines.truncate(num_lines);
     }
 }
 
@@ -357,7 +451,13 @@ impl TruncateLinesOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
-        scene.lines.iter_mut().for_each(|line| line.truncate(cells));
+
+        for (idx, line) in scene.surface.lines.iter_mut().enumerate() {
+            let start = Point::new(idx, line.byte_len());
+            line.truncate(cells);
+            let end = Point::new(idx, line.byte_len());
+            scene.diff.deleted.push(DeleteHunk::new(start..end));
+        }
     }
 }
 
@@ -428,9 +528,7 @@ struct InsertLinesOp(u32);
 impl InsertLinesOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
-        let len = self.0 as usize;
-        let width = scene.width();
-        scene.lines.resize_with(len, || SceneLine::new_empty(width));
+        todo!();
     }
 }
 
@@ -463,7 +561,16 @@ impl ExtendLinesOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         let cells = Cells::from(self.0);
-        scene.lines.iter_mut().for_each(|line| line.extend(cells));
+
+        let insert_hunks =
+            scene.surface.lines.iter().enumerate().map(|(idx, line)| {
+                let point = Point::new(idx, line.byte_len());
+                InsertHunk::new(point, cells)
+            });
+
+        scene.diff.inserted.extend(insert_hunks);
+
+        scene.surface.lines.iter_mut().for_each(|line| line.extend(cells));
     }
 }
 
@@ -472,30 +579,39 @@ impl ExtendLinesOp {
 struct PaintOp {}
 
 /// TODO: docs
-pub(crate) struct SceneDiff<'a> {
-    lines: &'a [SceneLine],
-    resize: ResizeOp,
-    paint: Drain<'a, PaintOp>,
+pub(crate) struct SceneDiff<'scene> {
+    surface: &'scene SceneSurface,
+    deleted: Drain<'scene, DeleteHunk>,
+    inserted: Drain<'scene, InsertHunk>,
+    replaced: Drain<'scene, ReplaceHunk>,
+    paint: Drain<'scene, PaintOp>,
 }
 
-impl<'a> SceneDiff<'a> {
+impl<'scene> SceneDiff<'scene> {
     /// TODO: docs.
     #[inline]
-    fn hl_hunks(&self) -> HlHunks<'_> {
+    fn hl_hunks(&mut self) -> HlHunks<'_> {
         todo!();
     }
 
     /// TODO: docs.
     #[inline]
-    fn text_hunks(&self) -> TextHunks<'_> {
-        todo!();
+    fn text_hunks(&mut self) -> TextHunks<'_, 'scene> {
+        TextHunks { diff: self, status: TextHunkStatus::Deleted }
     }
+}
+
+enum TextHunkStatus {
+    Deleted,
+    Inserted,
+    Replaced,
+    Done,
 }
 
 impl<'a> SceneDiff<'a> {
     /// TODO: docs
     #[inline]
-    pub(crate) fn apply_to(self, surface: &mut Surface) {
+    pub(crate) fn apply_to(mut self, surface: &mut Surface) {
         for hunk in self.text_hunks() {
             hunk.apply_to(surface);
         }
@@ -541,28 +657,65 @@ impl HlHunk {
     /// TODO: docs
     #[inline]
     fn hl(&self) -> impl Highlight {
+        todo!();
         crate::highlight::Normal
     }
 }
 
 /// TODO: docs.
-struct TextHunks<'a> {
-    _marker: &'a (),
+struct TextHunks<'a, 'scene> {
+    diff: &'a mut SceneDiff<'scene>,
+    status: TextHunkStatus,
 }
 
-impl<'a> Iterator for TextHunks<'a> {
-    type Item = TextHunk<'a>;
+impl<'scene> Iterator for TextHunks<'_, 'scene> {
+    type Item = TextHunk<'scene>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        todo!();
+        let diff = &mut self.diff;
+        loop {
+            let text_hunk = match self.status {
+                TextHunkStatus::Deleted => {
+                    let Some(delete) = diff.deleted.next() else {
+                        self.status = TextHunkStatus::Inserted;
+                        continue;
+                    };
+                    TextHunk::new_delete(delete.range)
+                },
+
+                TextHunkStatus::Inserted => {
+                    let Some(insert) = diff.inserted.next() else {
+                        self.status = TextHunkStatus::Replaced;
+                        continue;
+                    };
+                    TextHunk::new_insert(insert.at, spaces(insert.width))
+                },
+
+                TextHunkStatus::Replaced => {
+                    let Some(replace) = diff.replaced.next() else {
+                        self.status = TextHunkStatus::Done;
+                        continue;
+                    };
+                    let (line_idx, run_offset) = replace.replaced_with;
+                    let run =
+                        diff.surface.run_at(line_idx, run_offset, Bias::Right);
+                    TextHunk::new(replace.range, run.text())
+                },
+
+                TextHunkStatus::Done => return None,
+            };
+
+            return Some(text_hunk);
+        }
     }
 }
 
 /// TODO: docs.
 #[derive(Debug)]
 struct TextHunk<'a> {
-    _marker: &'a (),
+    range: Range<Point>,
+    text: Cow<'a, str>,
 }
 
 /// TODO: docs.
@@ -573,15 +726,45 @@ impl<'a> TextHunk<'a> {
         surface.replace_text(self.point_range(), self.text());
     }
 
+    #[inline]
+    fn new(range: Range<Point>, text: impl Into<Cow<'a, str>>) -> Self {
+        Self { range, text: text.into() }
+    }
+
+    #[inline]
+    fn new_delete(range: Range<Point>) -> Self {
+        Self::new(range, "")
+    }
+
+    #[inline]
+    fn new_insert(at: Point, text: impl Into<Cow<'a, str>>) -> Self {
+        Self::new(at..at, text)
+    }
+
     /// TODO: docs
     #[inline]
     fn point_range(&self) -> Range<Point> {
-        todo!();
+        self.range.clone()
     }
 
     /// TODO: docs
     #[inline]
     fn text(&self) -> &str {
-        todo!();
+        self.text.as_ref()
+    }
+}
+
+#[inline]
+fn spaces(width: Cells) -> Cow<'static, str> {
+    /// The sole purpose of this constant is to avoid allocating when the
+    /// text is empty.
+    const SPACES: &str = r#"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                "#;
+
+    let len = u32::from(width) as usize;
+
+    if len > SPACES.len() {
+        Cow::Owned(" ".repeat(len))
+    } else {
+        Cow::Borrowed(&SPACES[..len])
     }
 }
