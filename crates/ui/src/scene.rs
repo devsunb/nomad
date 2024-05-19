@@ -36,10 +36,12 @@ impl Scene {
     pub(crate) fn diff(&mut self) -> SceneDiff<'_> {
         SceneDiff {
             surface: &self.surface,
-            deleted: self.diff.deleted.drain(..),
-            inserted: self.diff.inserted.drain(..),
+            deleted: self.diff.deleted.take(),
+            inserted: self.diff.inserted.take(),
+            truncated: self.diff.truncated.drain(..),
+            extended: self.diff.extended.drain(..),
             replaced: self.diff.replaced.drain(..),
-            paint: self.diff.paint.drain(..),
+            _paint: self.diff.paint.drain(..),
         }
     }
 
@@ -261,10 +263,16 @@ impl SceneRun {
 #[derive(Debug, Default)]
 struct DiffTracker {
     /// TODO: docs.
-    deleted: Vec<DeleteHunk>,
+    deleted: Option<DeleteHunk>,
 
     /// TODO: docs.
-    inserted: Vec<InsertHunk>,
+    inserted: Option<InsertHunk>,
+
+    /// TODO: docs.
+    truncated: Vec<TruncateHunk>,
+
+    /// TODO: docs.
+    extended: Vec<ExtendHunk>,
 
     /// TODO: docs
     replaced: Vec<ReplaceHunk>,
@@ -275,10 +283,36 @@ struct DiffTracker {
 
 #[derive(Debug)]
 struct DeleteHunk {
-    range: Range<Point>,
+    delete_all_from: usize,
 }
 
 impl DeleteHunk {
+    #[inline]
+    fn new(delete_all_from: usize) -> Self {
+        Self { delete_all_from }
+    }
+}
+
+#[derive(Debug)]
+struct InsertHunk {
+    at_line: usize,
+    num_inserted: usize,
+    width: Cells,
+}
+
+impl InsertHunk {
+    #[inline]
+    fn new(at_line: usize, num_inserted: usize, width: Cells) -> Self {
+        Self { at_line, num_inserted, width }
+    }
+}
+
+#[derive(Debug)]
+struct TruncateHunk {
+    range: Range<Point>,
+}
+
+impl TruncateHunk {
     #[inline]
     fn new(range: Range<Point>) -> Self {
         Self { range }
@@ -286,12 +320,12 @@ impl DeleteHunk {
 }
 
 #[derive(Debug)]
-struct InsertHunk {
+struct ExtendHunk {
     at: Point,
     width: Cells,
 }
 
-impl InsertHunk {
+impl ExtendHunk {
     #[inline]
     fn new(at: Point, width: Cells) -> Self {
         Self { at, width }
@@ -404,18 +438,8 @@ struct DeleteLinesOp(u32);
 impl DeleteLinesOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
-        let end = {
-            let Some(last_line) = scene.surface.lines.last() else { return };
-            let height = u32::from(scene.height()) as usize;
-            Point::new(height - 1, last_line.byte_len())
-        };
-
         let num_lines = self.0 as usize;
-
-        let start = Point::new(num_lines, 0);
-
-        scene.diff.deleted.push(DeleteHunk::new(start..end));
-
+        scene.diff.deleted = Some(DeleteHunk::new(num_lines));
         scene.surface.lines.truncate(num_lines);
     }
 }
@@ -456,7 +480,7 @@ impl TruncateLinesOp {
             let start = Point::new(idx, line.byte_len());
             line.truncate(cells);
             let end = Point::new(idx, line.byte_len());
-            scene.diff.deleted.push(DeleteHunk::new(start..end));
+            scene.diff.truncated.push(TruncateHunk::new(start..end));
         }
     }
 }
@@ -528,7 +552,18 @@ struct InsertLinesOp(u32);
 impl InsertLinesOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
-        todo!();
+        let len = self.0 as usize;
+
+        let num_inserted = len - scene.surface.lines.len();
+
+        scene.diff.inserted = Some(InsertHunk::new(
+            scene.surface.lines.len(),
+            num_inserted,
+            scene.width(),
+        ));
+
+        let width = scene.width();
+        scene.surface.lines.resize_with(len, || SceneLine::new_empty(width));
     }
 }
 
@@ -565,10 +600,10 @@ impl ExtendLinesOp {
         let insert_hunks =
             scene.surface.lines.iter().enumerate().map(|(idx, line)| {
                 let point = Point::new(idx, line.byte_len());
-                InsertHunk::new(point, cells)
+                ExtendHunk::new(point, cells)
             });
 
-        scene.diff.inserted.extend(insert_hunks);
+        scene.diff.extended.extend(insert_hunks);
 
         scene.surface.lines.iter_mut().for_each(|line| line.extend(cells));
     }
@@ -581,34 +616,15 @@ struct PaintOp {}
 /// TODO: docs
 pub(crate) struct SceneDiff<'scene> {
     surface: &'scene SceneSurface,
-    deleted: Drain<'scene, DeleteHunk>,
-    inserted: Drain<'scene, InsertHunk>,
+    deleted: Option<DeleteHunk>,
+    inserted: Option<InsertHunk>,
+    truncated: Drain<'scene, TruncateHunk>,
+    extended: Drain<'scene, ExtendHunk>,
     replaced: Drain<'scene, ReplaceHunk>,
-    paint: Drain<'scene, PaintOp>,
+    _paint: Drain<'scene, PaintOp>,
 }
 
 impl<'scene> SceneDiff<'scene> {
-    /// TODO: docs.
-    #[inline]
-    fn hl_hunks(&mut self) -> HlHunks<'_> {
-        todo!();
-    }
-
-    /// TODO: docs.
-    #[inline]
-    fn text_hunks(&mut self) -> TextHunks<'_, 'scene> {
-        TextHunks { diff: self, status: TextHunkStatus::Deleted }
-    }
-}
-
-enum TextHunkStatus {
-    Deleted,
-    Inserted,
-    Replaced,
-    Done,
-}
-
-impl<'a> SceneDiff<'a> {
     /// TODO: docs
     #[inline]
     pub(crate) fn apply_to(mut self, surface: &mut Surface) {
@@ -619,6 +635,18 @@ impl<'a> SceneDiff<'a> {
         for hunk in self.hl_hunks() {
             hunk.apply_to(surface);
         }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn hl_hunks(&mut self) -> HlHunks<'_> {
+        HlHunks { _marker: &() }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn text_hunks(&mut self) -> TextHunks<'_, 'scene> {
+        TextHunks { diff: self, status: TextHunkStatus::Deleted }
     }
 }
 
@@ -632,7 +660,7 @@ impl Iterator for HlHunks<'_> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        todo!();
+        None
     }
 }
 
@@ -668,6 +696,15 @@ struct TextHunks<'a, 'scene> {
     status: TextHunkStatus,
 }
 
+enum TextHunkStatus {
+    Deleted,
+    Inserted,
+    Truncated,
+    Extended,
+    Replaced,
+    Done,
+}
+
 impl<'scene> Iterator for TextHunks<'_, 'scene> {
     type Item = TextHunk<'scene>;
 
@@ -677,19 +714,37 @@ impl<'scene> Iterator for TextHunks<'_, 'scene> {
         loop {
             let text_hunk = match self.status {
                 TextHunkStatus::Deleted => {
-                    let Some(delete) = diff.deleted.next() else {
+                    let Some(delete) = diff.deleted.take() else {
                         self.status = TextHunkStatus::Inserted;
                         continue;
                     };
-                    TextHunk::new_delete(delete.range)
+
+                    TextHunk::DeleteLines(delete)
                 },
 
                 TextHunkStatus::Inserted => {
-                    let Some(insert) = diff.inserted.next() else {
+                    let Some(insert) = diff.inserted.take() else {
+                        self.status = TextHunkStatus::Truncated;
+                        continue;
+                    };
+
+                    TextHunk::InsertLines(insert)
+                },
+
+                TextHunkStatus::Truncated => {
+                    let Some(truncate) = diff.truncated.next() else {
+                        self.status = TextHunkStatus::Extended;
+                        continue;
+                    };
+                    TextHunk::new_delete(truncate.range)
+                },
+
+                TextHunkStatus::Extended => {
+                    let Some(extend) = diff.extended.next() else {
                         self.status = TextHunkStatus::Replaced;
                         continue;
                     };
-                    TextHunk::new_insert(insert.at, spaces(insert.width))
+                    TextHunk::new_insert(extend.at, spaces(extend.width))
                 },
 
                 TextHunkStatus::Replaced => {
@@ -713,22 +768,46 @@ impl<'scene> Iterator for TextHunks<'_, 'scene> {
 
 /// TODO: docs.
 #[derive(Debug)]
-struct TextHunk<'a> {
-    range: Range<Point>,
-    text: Cow<'a, str>,
+enum TextHunk<'scene> {
+    /// TODO: docs
+    Replace { range: Range<Point>, text: Cow<'scene, str> },
+
+    /// TODO: docs
+    InsertLines(InsertHunk),
+
+    /// TODO: docs
+    DeleteLines(DeleteHunk),
 }
 
 /// TODO: docs.
-impl<'a> TextHunk<'a> {
+impl<'scene> TextHunk<'scene> {
     /// TODO: docs
     #[inline]
     fn apply_to(self, surface: &mut Surface) {
-        surface.replace_text(self.point_range(), self.text());
+        match self {
+            Self::Replace { range, text } => {
+                surface.replace_text(range, text.as_ref());
+            },
+
+            Self::InsertLines(insert) => {
+                let line_range = insert.at_line..insert.at_line;
+                let lines =
+                    (0..insert.num_inserted).map(|_| spaces(insert.width));
+                surface.replace_lines(line_range, lines);
+            },
+
+            Self::DeleteLines(delete) => {
+                surface.replace_lines(
+                    delete.delete_all_from..,
+                    core::iter::empty::<&str>(),
+                );
+            },
+        }
     }
 
     #[inline]
-    fn new(range: Range<Point>, text: impl Into<Cow<'a, str>>) -> Self {
-        Self { range, text: text.into() }
+    fn new(range: Range<Point>, text: impl Into<Cow<'scene, str>>) -> Self {
+        Self::Replace { range, text: text.into() }
     }
 
     #[inline]
@@ -737,20 +816,15 @@ impl<'a> TextHunk<'a> {
     }
 
     #[inline]
-    fn new_insert(at: Point, text: impl Into<Cow<'a, str>>) -> Self {
+    fn new_insert(at: Point, text: impl Into<Cow<'scene, str>>) -> Self {
         Self::new(at..at, text)
     }
+}
 
-    /// TODO: docs
+impl From<DeleteHunk> for TextHunk<'_> {
     #[inline]
-    fn point_range(&self) -> Range<Point> {
-        self.range.clone()
-    }
-
-    /// TODO: docs
-    #[inline]
-    fn text(&self) -> &str {
-        self.text.as_ref()
+    fn from(delete: DeleteHunk) -> Self {
+        Self::DeleteLines(delete)
     }
 }
 

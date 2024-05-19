@@ -106,6 +106,16 @@ impl Surface {
 
     /// TODO: docs
     #[inline]
+    pub(crate) fn replace_lines(
+        &mut self,
+        line_range: impl RangeBounds<usize>,
+        replacement: impl Iterator<Item = impl Into<nvim::String>>,
+    ) {
+        let _ = self.buffer.set_lines(line_range, true, replacement);
+    }
+
+    /// TODO: docs
+    #[inline]
     pub(crate) fn replace_text(&mut self, range: Range<Point>, text: &str) {
         let lines = text.lines().chain(text.ends_with('\n').then_some(""));
 
