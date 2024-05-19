@@ -70,8 +70,24 @@ impl<'scene> SceneFragment<'scene> {
 
     /// TODO: docs
     #[inline]
-    pub fn split_y(self, _split_at: Cells) -> (Self, Self) {
-        todo!()
+    pub fn split_y(mut self, split_at: Cells) -> (Self, Self) {
+        let mut right_origin = self.origin;
+        *right_origin.x_mut() += split_at;
+
+        let mut right_size = self.size;
+        *right_size.width_mut() -= split_at;
+
+        *self.size.width_mut() = split_at;
+
+        let right_fragment = Self {
+            ptr: self.ptr,
+            origin: right_origin,
+            size: right_size,
+            borrow: self.borrow.clone(),
+            _lifetime: PhantomData,
+        };
+
+        (self, right_fragment)
     }
 
     /// TODO: docs

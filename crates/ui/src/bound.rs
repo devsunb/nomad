@@ -60,6 +60,12 @@ impl<T: Metric> Bound<T> {
     pub fn width(&self) -> T {
         self.width
     }
+
+    /// Returns a mutable reference to the width of the [`Bound`].
+    #[inline]
+    pub fn width_mut(&mut self) -> &mut T {
+        &mut self.width
+    }
 }
 
 impl<T: Metric> PartialOrd for Bound<T> {
