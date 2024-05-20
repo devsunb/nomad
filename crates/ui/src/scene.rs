@@ -255,14 +255,12 @@ impl SceneLine {
 
         let end_run = &mut self.runs[end_idx];
 
-        if let Some(split) =
-            end_run.split(end_offset + end_run.width() - range.end)
-        {
+        if let Some(split) = end_run.split(range.end - end_offset) {
             let _ = mem::replace(end_run, split);
-            end_splice_idx += 1;
+            end_splice_idx -= 1;
         }
 
-        self.runs.splice(start_splice_idx..end_splice_idx, [new_run]);
+        self.runs.splice(start_splice_idx..=end_splice_idx, [new_run]);
 
         start_splice_idx
     }
