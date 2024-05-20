@@ -1,7 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::vec::Drain;
 use core::cmp::Ordering;
-use core::ops::Range;
+use core::ops::{Range, RangeBounds};
 
 use compact_str::CompactString;
 
@@ -53,6 +53,16 @@ impl Scene {
         self.surface.height()
     }
 
+    /// Returns the [`SceneLine`] at the given index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.
+    #[inline]
+    pub(crate) fn line_mut(&mut self, line_idx: usize) -> &mut SceneLine {
+        self.surface.line_mut(line_idx)
+    }
+
     /// TODO: docs
     #[inline]
     pub(crate) fn new() -> Self {
@@ -102,6 +112,11 @@ impl SceneSurface {
     }
 
     #[inline]
+    fn line_mut(&mut self, line_idx: usize) -> &mut SceneLine {
+        &mut self.lines[line_idx]
+    }
+
+    #[inline]
     fn run_at(
         &self,
         line_idx: usize,
@@ -121,7 +136,7 @@ impl SceneSurface {
 
 /// TODO: docs
 #[derive(Debug)]
-struct SceneLine {
+pub(crate) struct SceneLine {
     runs: Vec<SceneRun>,
 }
 
@@ -227,7 +242,7 @@ enum Bias {
 
 /// TODO: docs
 #[derive(Debug)]
-struct SceneRun {
+pub(crate) struct SceneRun {
     text: RunText,
 }
 

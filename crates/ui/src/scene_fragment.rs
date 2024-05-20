@@ -1,6 +1,7 @@
 use alloc::rc::Rc;
 use core::cell::Cell;
 use core::marker::PhantomData;
+use core::panic::Location;
 use core::ptr::NonNull;
 
 use crate::{Bound, Cells, Point, Scene};
@@ -26,8 +27,9 @@ pub struct SceneFragment<'scene> {
     _lifetime: PhantomData<&'scene mut Scene>,
 }
 
+#[derive(Debug, Copy, Clone)]
 enum Borrow {
-    Borrowed,
+    Borrowed(&'static Location<'static>),
     NotBorrowed,
 }
 
@@ -48,6 +50,13 @@ impl<'scene> SceneFragment<'scene> {
     #[inline]
     pub fn height(&self) -> Cells {
         self.size.height()
+    }
+
+    /// TODO: docs
+    #[track_caller]
+    #[inline]
+    pub fn lines(&mut self) -> FragmentLines<'_, 'scene> {
+        FragmentLines::new(self)
     }
 
     /// TODO: docs
@@ -110,6 +119,32 @@ impl<'scene> SceneFragment<'scene> {
     #[inline]
     pub fn width(&self) -> Cells {
         self.size.width()
+    }
+}
+
+/// TODO: docs.
+pub struct FragmentLines<'a, 'scene> {
+    fragment: &'a mut SceneFragment<'scene>,
+}
+
+impl<'a, 'scene> FragmentLines<'a, 'scene> {
+    #[track_caller]
+    #[inline]
+    fn new(fragment: &'a mut SceneFragment<'scene>) -> Self {
+        if let Borrow::Borrowed(at) = fragment.borrow.get() {
+            panic!("fragment already borrowed at {at}")
+        }
+
+        fragment.borrow.set(Borrow::Borrowed(Location::caller()));
+
+        Self { fragment }
+    }
+}
+
+impl Drop for FragmentLines<'_, '_> {
+    #[inline]
+    fn drop(&mut self) {
+        self.fragment.borrow.set(Borrow::NotBorrowed);
     }
 }
 
