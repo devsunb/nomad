@@ -816,6 +816,28 @@ pub(crate) struct SceneLineBorrow<'scene> {
 impl<'scene> SceneLineBorrow<'scene> {
     /// TODO: docs
     #[inline]
+    pub(crate) fn into_run(self) -> SceneRunBorrow<'scene> {
+        let cell_range = self.offset..self.line.width();
+
+        let byte_range = self.line.to_byte_range(cell_range.clone());
+
+        let point_range = Point::new(self.line_idx, byte_range.start)
+            ..Point::new(self.line_idx, byte_range.end);
+
+        let hunk = ReplaceHunk::new(point_range, (self.line_idx, self.offset));
+
+        self.diff_tracker.replaced.push(hunk);
+
+        let run_idx = self.line.splice(
+            cell_range,
+            [SceneRun::new_empty(self.line.width() - self.offset)],
+        );
+
+        SceneRunBorrow { run: &mut self.line.runs[run_idx] }
+    }
+
+    /// TODO: docs
+    #[inline]
     pub(crate) fn split_run(
         &mut self,
         split_at: Cells,
@@ -828,7 +850,7 @@ impl<'scene> SceneLineBorrow<'scene> {
 
         let cell_range = self.offset..self.offset + split_at;
 
-        let byte_range = self.line.to_byte_range(cell_range);
+        let byte_range = self.line.to_byte_range(cell_range.clone());
 
         let point_range = Point::new(self.line_idx, byte_range.start)
             ..Point::new(self.line_idx, byte_range.end);
@@ -837,10 +859,8 @@ impl<'scene> SceneLineBorrow<'scene> {
 
         self.diff_tracker.replaced.push(hunk);
 
-        let splice_range = self.offset..self.offset + split_at;
-
         let run_idx =
-            self.line.splice(splice_range, [SceneRun::new_empty(split_at)]);
+            self.line.splice(cell_range, [SceneRun::new_empty(split_at)]);
 
         Some(SceneRunBorrow { run: &mut self.line.runs[run_idx] })
     }

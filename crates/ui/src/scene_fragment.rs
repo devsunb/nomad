@@ -168,7 +168,7 @@ impl<'scene> FragmentLine<'scene> {
     /// TODO: docs
     #[inline]
     pub fn into_run(self) -> FragmentRun<'scene> {
-        todo!();
+        FragmentRun::new(self.inner.into_run())
     }
 
     #[inline]
