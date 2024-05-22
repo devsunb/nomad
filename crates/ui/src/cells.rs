@@ -6,8 +6,16 @@ use str_indices::chars;
 use crate::Metric;
 
 /// TODO: docs
-#[derive(Debug, Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cells(u32);
+
+// Custom impl to make sure the output is always `Cells(..)` even when
+// formatting with `{:#?}`.
+impl core::fmt::Debug for Cells {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Cells({})", self.0)
+    }
+}
 
 impl Cells {
     /// TODO: docs
