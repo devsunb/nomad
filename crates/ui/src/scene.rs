@@ -475,6 +475,9 @@ impl RunText {
 #[derive(Debug, Default)]
 struct DiffTracker {
     /// TODO: docs.
+    window_resize: Option<Bound<Cells>>,
+
+    /// TODO: docs.
     vertical_resize: Option<VerticalResizeHunk>,
 
     /// TODO: docs.
@@ -562,6 +565,7 @@ impl ReplaceHunk {
 /// A `ResizeOp` is a collection of operations that resize a `Scene`.
 #[derive(Debug, Copy, Clone, Default)]
 struct ResizeOp {
+    window: Option<Bound<Cells>>,
     vertical: Option<VerticalOp>,
     horizontal: Option<HorizontalOp>,
 }
@@ -591,6 +595,8 @@ impl HorizontalOp {
 impl ResizeOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
+        scene.diff_tracker.window_resize = self.window;
+
         match self.vertical {
             Some(VerticalOp::Shrink(v_shrink)) => {
                 v_shrink.apply_to(scene);
@@ -632,7 +638,11 @@ impl ResizeOp {
             Ordering::Equal => None,
         };
 
-        Self { vertical, horizontal }
+        Self {
+            window: (old_size != new_size).then_some(new_size),
+            vertical,
+            horizontal,
+        }
     }
 }
 
@@ -984,6 +994,7 @@ struct PaintOp {}
 /// TODO: docs
 pub(crate) struct SceneDiff<'scene> {
     surface: &'scene SceneSurface,
+    resize_window: Option<Bound<Cells>>,
     resize_vertical: Option<VerticalResizeHunk>,
     resize_horizontal: HorizontalHunks<'scene>,
     replaced: Drain<'scene, ReplaceHunk>,
@@ -1027,6 +1038,7 @@ impl<'scene> SceneDiff<'scene> {
 
         Self {
             surface: &scene.surface,
+            resize_window: tracker.window_resize.take(),
             resize_vertical: tracker.vertical_resize.take(),
             resize_horizontal,
             replaced: tracker.replaced.drain(..),
@@ -1084,6 +1096,7 @@ struct TextHunks<'a, 'scene> {
 }
 
 enum TextHunksStatus {
+    ResizeWindow,
     ResizeVertical,
     ResizeHorizontal,
     Replaced,
@@ -1093,7 +1106,7 @@ enum TextHunksStatus {
 impl<'a, 'scene> TextHunks<'a, 'scene> {
     #[inline]
     fn new(diff: &'a mut SceneDiff<'scene>) -> Self {
-        Self { diff, status: TextHunksStatus::ResizeVertical }
+        Self { diff, status: TextHunksStatus::ResizeWindow }
     }
 }
 
@@ -1106,6 +1119,15 @@ impl<'scene> Iterator for TextHunks<'_, 'scene> {
 
         loop {
             let text_hunk = match self.status {
+                TextHunksStatus::ResizeWindow => {
+                    let Some(resize) = diff.resize_window.take() else {
+                        self.status = TextHunksStatus::ResizeVertical;
+                        continue;
+                    };
+
+                    TextHunk::WindowResize(resize)
+                },
+
                 TextHunksStatus::ResizeVertical => {
                     let Some(resize) = diff.resize_vertical.take() else {
                         self.status = TextHunksStatus::ResizeHorizontal;
@@ -1159,6 +1181,7 @@ impl<'scene> Iterator for TextHunks<'_, 'scene> {
 /// TODO: docs.
 #[derive(Debug)]
 enum TextHunk<'scene> {
+    WindowResize(Bound<Cells>),
     VerticalResize(VerticalResizeHunk),
     Replace { range: Range<Point<usize>>, text: Cow<'scene, str> },
 }
@@ -1169,6 +1192,10 @@ impl<'scene> TextHunk<'scene> {
     #[inline]
     fn apply_to(self, surface: &mut Surface) {
         match self {
+            Self::WindowResize(new_size) => {
+                surface.resize_window(new_size);
+            },
+
             Self::Replace { range, text } => {
                 surface.replace_text(range, text.as_ref());
             },
