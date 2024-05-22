@@ -522,13 +522,14 @@ impl VerticalResizeHunk {
 
 #[derive(Debug)]
 struct HorizontalShrinkHunk {
-    range: Range<Point<usize>>,
+    line: usize,
+    range: Range<usize>,
 }
 
 impl HorizontalShrinkHunk {
     #[inline]
-    fn new(range: Range<Point<usize>>) -> Self {
-        Self { range }
+    fn new(line: usize, range: Range<usize>) -> Self {
+        Self { line, range }
     }
 }
 
@@ -547,14 +548,19 @@ impl HorizontalExpandHunk {
 
 #[derive(Debug)]
 struct ReplaceHunk {
-    range: Range<Point<usize>>,
-    replaced_with: (usize, Cells), // (line_idx, run_offset)
+    line_idx: usize,
+    byte_range: Range<usize>,
+    replaced_with_run_at: Cells,
 }
 
 impl ReplaceHunk {
     #[inline]
-    fn new(range: Range<Point<usize>>, replaced_with: (usize, Cells)) -> Self {
-        Self { range, replaced_with }
+    fn new(
+        line_idx: usize,
+        byte_range: Range<usize>,
+        replaced_with_run_at: Cells,
+    ) -> Self {
+        Self { line_idx, byte_range, replaced_with_run_at }
     }
 }
 
@@ -710,13 +716,13 @@ impl HorizontalShrinkOp {
         let cells = Cells::from(self.0);
 
         for (idx, line) in scene.surface.lines_mut().enumerate() {
-            let start = Point::new(idx, line.byte_len());
+            let start = line.byte_len();
             line.truncate(cells);
-            let end = Point::new(idx, line.byte_len());
+            let end = line.byte_len();
             scene
                 .diff_tracker
                 .horizontal_shrink
-                .push(HorizontalShrinkHunk::new(start..end));
+                .push(HorizontalShrinkHunk::new(idx, start..end));
         }
     }
 }
@@ -924,16 +930,10 @@ impl<'scene> SceneRunBorrow<'scene> {
             HasSetText::No => {
                 let cell_range = self.offset..self.offset + self.width();
 
-                let point_range = {
-                    let byte_range =
-                        self.line_mut().to_byte_range(cell_range.clone());
-                    Point::new(byte_range.start, self.line_idx)
-                        ..Point::new(byte_range.end, self.line_idx)
-                };
-
                 let hunk = ReplaceHunk::new(
-                    point_range,
-                    (self.line_idx, self.offset),
+                    self.line_idx,
+                    self.line_mut().to_byte_range(cell_range.clone()),
+                    self.offset,
                 );
 
                 self.diff_tracker_mut().replaced.push(hunk);
@@ -1175,14 +1175,19 @@ impl<'scene> Iterator for TextHunks<'_, 'scene> {
                         continue;
                     };
 
-                    let (line_idx, run_offset) = replace.replaced_with;
+                    let text = diff
+                        .surface
+                        .run_at(
+                            replace.line_idx,
+                            replace.replaced_with_run_at,
+                            Bias::Right,
+                        )
+                        .text();
 
                     TextHunk::Replace {
-                        range: replace.range,
-                        text: diff
-                            .surface
-                            .run_at(line_idx, run_offset, Bias::Right)
-                            .text(),
+                        line: replace.line_idx,
+                        range: replace.byte_range,
+                        text,
                     }
                 },
 
@@ -1199,7 +1204,7 @@ impl<'scene> Iterator for TextHunks<'_, 'scene> {
 enum TextHunk<'scene> {
     WindowResize(Bound<Cells>),
     VerticalResize(VerticalResizeHunk),
-    Replace { range: Range<Point<usize>>, text: Cow<'scene, str> },
+    Replace { line: usize, range: Range<usize>, text: Cow<'scene, str> },
 }
 
 /// TODO: docs.
@@ -1212,8 +1217,8 @@ impl<'scene> TextHunk<'scene> {
                 surface.resize_window(new_size);
             },
 
-            Self::Replace { range, text } => {
-                surface.replace_text(range, text.as_ref());
+            Self::Replace { line, range, text } => {
+                surface.replace_text(line, range, text.as_ref());
             },
 
             Self::VerticalResize(resize) => resize.apply_to(surface),
@@ -1224,7 +1229,11 @@ impl<'scene> TextHunk<'scene> {
 impl From<HorizontalShrinkHunk> for TextHunk<'_> {
     #[inline]
     fn from(shrink: HorizontalShrinkHunk) -> Self {
-        Self::Replace { range: shrink.range, text: Cow::Borrowed("") }
+        Self::Replace {
+            line: shrink.line,
+            range: shrink.range,
+            text: Cow::Borrowed(""),
+        }
     }
 }
 
@@ -1232,7 +1241,8 @@ impl From<HorizontalExpandHunk> for TextHunk<'_> {
     #[inline]
     fn from(expand: HorizontalExpandHunk) -> Self {
         Self::Replace {
-            range: expand.at..expand.at,
+            line: expand.at.y(),
+            range: expand.at.x()..expand.at.x(),
             text: spaces(expand.width),
         }
     }

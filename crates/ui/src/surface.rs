@@ -170,12 +170,11 @@ impl Surface {
         line_offset: usize,
         mut lines: impl Iterator<Item = impl Into<nvim::String>>,
     ) {
-        // If the buffer is empty, the first replacement line is used to
-        // replace the empty line.
+        // If the buffer is empty, the first line is used to replace the empty
+        // line.
         if line_offset == 0 && self.is_empty() {
             let Some(first_line) = lines.next() else { return };
-            let zero = Point::new(0, 0);
-            self.replace_text(zero..zero, first_line.into());
+            self.replace_text(0, 0..0, first_line.into());
             self.insert_lines(line_offset + 1, lines);
             return;
         }
@@ -187,13 +186,14 @@ impl Surface {
     #[inline]
     pub(crate) fn replace_text(
         &mut self,
-        range: Range<Point<ByteOffset>>,
+        line_idx: usize,
+        byte_range: Range<ByteOffset>,
         text: impl Into<nvim::String>,
     ) {
         let _ = self.buffer.set_text(
-            range.start.y()..range.end.y(),
-            range.start.x(),
-            range.end.x(),
+            line_idx..line_idx,
+            byte_range.start,
+            byte_range.end,
             [text],
         );
     }
