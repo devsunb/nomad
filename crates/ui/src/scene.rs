@@ -535,7 +535,9 @@ impl HorizontalShrinkHunk {
 
 #[derive(Debug)]
 struct HorizontalExpandHunk {
+    /// The point at which we should expand the line.
     at: Point<usize>,
+    /// The width to expand the line to.
     width: Cells,
 }
 
@@ -806,7 +808,7 @@ impl HorizontalExpandOp {
 
         let insert_hunks =
             scene.surface.lines().enumerate().map(|(idx, line)| {
-                let point = Point::new(idx, line.byte_len());
+                let point = Point::new(line.byte_len(), idx);
                 HorizontalExpandHunk::new(point, cells)
             });
 
