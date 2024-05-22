@@ -1001,9 +1001,33 @@ pub(crate) struct SceneDiff<'scene> {
     _paint: Drain<'scene, PaintOp>,
 }
 
+impl core::fmt::Debug for SceneDiff<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SceneDiff")
+            .field("resize_window", &self.resize_window)
+            .field("resize_vertical", &self.resize_vertical)
+            .field("resize_horizontal", &self.resize_horizontal)
+            .field("replaced", &self.replaced.as_slice())
+            .finish()
+    }
+}
+
 enum HorizontalHunks<'scene> {
     Shrink(Drain<'scene, HorizontalShrinkHunk>),
     Expand(Drain<'scene, HorizontalExpandHunk>),
+}
+
+impl core::fmt::Debug for HorizontalHunks<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Shrink(hunks) => {
+                f.debug_tuple("Shrink").field(&hunks.as_slice()).finish()
+            },
+            Self::Expand(hunks) => {
+                f.debug_tuple("Expand").field(&hunks.as_slice()).finish()
+            },
+        }
+    }
 }
 
 impl<'scene> SceneDiff<'scene> {
