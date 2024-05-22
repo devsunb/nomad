@@ -20,6 +20,17 @@ pub(crate) struct Surface {
 }
 
 impl Surface {
+    /// A helper function that panics with a message indicating that the buffer
+    /// was removed.
+    ///
+    /// This can be used when a method on the [`Surface`]'s buffer fails if the
+    /// caller can guarantee that all the arguments passed where valid, in
+    /// which case the method must've failed because the buffer was removed by
+    /// the user.
+    fn buf_was_removed(&self) -> ! {
+        panic!("{:?} was removed", self.buffer)
+    }
+
     /// TODO: docs
     #[inline]
     pub(crate) fn hide(&mut self) {
@@ -78,12 +89,42 @@ impl Surface {
         }
     }
 
+    /// Returns the numbef of lines in the buffer.
+    ///
+    /// Note that Neovim considers an empty buffer to have one line, so the
+    /// return value is always greater than or equal to `1`.
+    #[inline]
+    fn line_count(&self) -> usize {
+        self.buffer.line_count().unwrap_or_else(|_| self.buf_was_removed())
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.line_count() == 1
+            && self.lines_inner().next().expect("len always >= 1").is_empty()
+    }
+
     #[inline]
     pub(crate) fn is_hidden(&self) -> bool {
         self.window
             .get_config()
             .map(|config| config.hide.unwrap_or(false))
             .unwrap_or(false)
+    }
+
+    /// TODO: docs
+    #[inline]
+    pub(crate) fn lines(&self) -> impl ExactSizeIterator<Item = String> {
+        self.lines_inner()
+            .take((!self.is_empty() as usize) * self.line_count())
+    }
+
+    #[inline]
+    fn lines_inner(&self) -> impl ExactSizeIterator<Item = String> {
+        self.buffer
+            .get_lines(.., true)
+            .unwrap_or_else(|_| self.buf_was_removed())
+            .map(|nvim_string| nvim_string.to_string_lossy().into_owned())
     }
 
     /// TODO: docs
