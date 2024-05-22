@@ -106,8 +106,6 @@ impl CommandArgsWrongNumError {
 impl From<CommandArgsWrongNumError> for WarningMsg {
     #[inline]
     fn from(err: CommandArgsWrongNumError) -> WarningMsg {
-        assert!(!err.got.is_empty());
-
         let mut msg = WarningMsg::new();
 
         msg.add(format!(
@@ -117,6 +115,11 @@ impl From<CommandArgsWrongNumError> for WarningMsg {
         ));
 
         let num_args = err.got.len();
+
+        if num_args == 0 {
+            msg.add("none");
+            return msg;
+        }
 
         for (idx, arg) in err.got.into_iter().enumerate() {
             msg.add(arg.highlight());
