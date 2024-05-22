@@ -576,6 +576,16 @@ enum VerticalOp {
     Expand(VerticalExpandOp),
 }
 
+impl VerticalOp {
+    #[inline]
+    fn apply_to(self, scene: &mut Scene) {
+        match self {
+            Self::Shrink(shrink) => shrink.apply_to(scene),
+            Self::Expand(expand) => expand.apply_to(scene),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 enum HorizontalOp {
     Shrink(HorizontalShrinkOp),
@@ -596,22 +606,8 @@ impl ResizeOp {
     #[inline]
     fn apply_to(self, scene: &mut Scene) {
         scene.diff_tracker.window_resize = self.window;
-
-        match self.vertical {
-            Some(VerticalOp::Shrink(v_shrink)) => {
-                v_shrink.apply_to(scene);
-                self.horizontal.inspect(|op| op.apply_to(scene));
-            },
-
-            Some(VerticalOp::Expand(v_expand)) => {
-                self.horizontal.inspect(|op| op.apply_to(scene));
-                v_expand.apply_to(scene);
-            },
-
-            None => {
-                self.horizontal.inspect(|op| op.apply_to(scene));
-            },
-        }
+        self.vertical.inspect(|op| op.apply_to(scene));
+        self.horizontal.inspect(|op| op.apply_to(scene));
     }
 
     #[inline]
