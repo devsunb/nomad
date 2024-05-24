@@ -1,3 +1,40 @@
+[workspace]
+resolver = "2"
+members = ["nvimx-*"]
+default-members = ["nvimx-*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2021"
+authors = ["Nomad <hello@nomad.foo>"]
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
+thiserror = "1.0"
+
+[workspace.lints.clippy]
+bool_to_int_with_if = "deny"
+cognitive_complexity = "deny"
+module_inception = "allow"
+multiple_crate_versions = "deny"
+needless_collect = "deny"
+same_name_method = "deny"
+too_many_arguments = "deny"
+too_many_lines = "deny"
+unwrap_used = "deny"
+
+[workspace.lints.rust]
+future_incompatible = { level = "deny", priority = -1 }
+missing_docs = "deny"
+nonstandard_style = { level = "deny", priority = -1 }
+refining_impl_trait = { level = "allow", priority = -1 }
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+private_intra_doc_links = "deny"
+
 [package]
 name = "nvimx"
 version = "0.0.0"
@@ -7,15 +44,12 @@ license.workspace = true
 
 [features]
 default = ["executor", "neovim-nightly"]
-executor = ["dep:async-task", "dep:concurrent-queue"]
+executor = ["dep:nvimx-executor"]
 neovim-nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
-nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
-
-# Executor
-async-task = { version = "4.7", optional = true }
-concurrent-queue = { version = "2.4", optional = true }
+nvimx-executor = { path = "./nvimx-executor", optional = true }
+nvim-oxi = { workspace = true }
 
 [lints]
 workspace = true

@@ -1034,6 +1034,8 @@ dependencies = [
 name = "nvimx"
 version = "0.0.0"
 dependencies = [
+ "async-task",
+ "concurrent-queue",
  "nvim-oxi",
 ]
 
