@@ -1,3 +1,4 @@
+use alloc::rc::Rc;
 use core::cell::OnceCell;
 use core::future::Future;
 use core::marker::PhantomData;
@@ -13,7 +14,7 @@ use crate::task::Task;
 /// See the [crate-level](crate) documentation for more information.
 pub struct Executor<'a> {
     /// The executor state.
-    state: OnceCell<ExecutorState>,
+    state: Rc<ExecutorState>,
 
     /// A handle to the callback that ticks the executor.
     callback_handle: libuv::AsyncHandle,
@@ -29,6 +30,36 @@ struct ExecutorState {
 }
 
 impl<'a> Executor<'a> {
+    /// TODO: docs.
+    ///
+    /// # Panics
+    ///
+    /// Panics if called from a non-main thread.
+    #[inline]
+    pub fn new() -> Self {
+        // TODO: assert that it's the main thread.
+
+        let state = Rc::new(ExecutorState::new());
+
+        let callback_handle = {
+            let state = Rc::clone(&state);
+
+            libuv::AsyncHandle::new(move || {
+                let state = Rc::clone(&state);
+                // We schedule the poll to avoid `textlock` and other
+                // synchronization issues.
+                nvim_oxi::schedule(move |_| {
+                    state.poll_all_woken();
+                    Ok(())
+                });
+                Ok::<_, core::convert::Infallible>(())
+            })
+            .expect("never fails(?)")
+        };
+
+        Self { state, callback_handle, _lifetime: PhantomData }
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn spawn<F>(&self, _fut: F) -> Task<F::Output>
