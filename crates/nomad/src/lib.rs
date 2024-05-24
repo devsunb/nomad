@@ -46,7 +46,6 @@ pub mod prelude {
     pub use macros::*;
     #[doc(hidden)]
     pub use nvim;
-    pub use ui::*;
 
     pub use crate::action::*;
     pub use crate::api::*;
