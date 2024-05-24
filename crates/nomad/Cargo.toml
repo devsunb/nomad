@@ -8,7 +8,7 @@ publish = false
 
 [features]
 default = ["neovim-nightly"]
-neovim-nightly = ["nvim/neovim-nightly", "ui/neovim-nightly"]
+neovim-nightly = ["nvim/neovim-nightly"]
 tests = ["nvim/test-terminator", "rand", "rand_chacha", "rand_distr"]
 
 [dependencies]

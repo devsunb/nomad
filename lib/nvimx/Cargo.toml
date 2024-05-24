@@ -46,7 +46,12 @@ license.workspace = true
 default = ["neovim-nightly"]
 executor = ["dep:nvimx-executor"]
 ui = ["dep:nvimx-ui"]
-neovim-nightly = ["nvim-oxi/neovim-nightly"]
+
+neovim-nightly = [
+  "nvim-oxi/neovim-nightly",
+  "nvimx-executor/neovim-nightly",
+  "nvimx-ui/neovim-nightly",
+]
 
 [dependencies]
 nvim-oxi = { workspace = true }
