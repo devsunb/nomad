@@ -1,5 +1,4 @@
 use alloc::rc::Rc;
-use core::cell::OnceCell;
 use core::future::Future;
 use core::marker::PhantomData;
 
@@ -7,7 +6,7 @@ use async_task::{Builder, Runnable};
 use concurrent_queue::ConcurrentQueue;
 use nvim_oxi::libuv;
 
-use crate::task::Task;
+use crate::Task;
 
 /// A single-threaded executor integrated with the Neovim event loop.
 ///
@@ -36,7 +35,7 @@ impl<'a> Executor<'a> {
     ///
     /// Panics if called from a non-main thread.
     #[inline]
-    pub fn new() -> Self {
+    pub fn register() -> Self {
         // TODO: assert that it's the main thread.
 
         let state = Rc::new(ExecutorState::new());
@@ -62,11 +61,32 @@ impl<'a> Executor<'a> {
 
     /// TODO: docs.
     #[inline]
-    pub fn spawn<F>(&self, _fut: F) -> Task<F::Output>
+    pub fn spawn<F>(&self, future: F) -> Task<F::Output>
     where
         F: Future<Output = ()> + 'a,
     {
-        todo!();
+        let builder = Builder::new();
+
+        let schedule = {
+            let callback_handle = self.callback_handle.clone();
+            let state = Rc::clone(&self.state);
+            move |runnable| {
+                state.woken_queue.push(runnable).expect("unbounded queue");
+                callback_handle.send().expect("never fails(?)");
+            }
+        };
+
+        // SAFETY:
+        // - future outlives the executor;
+        // - runnables are dropped when `ExecutorState::poll_all_woken` is
+        //   called, and `Self::register` made sure that happens on the main
+        //   thread.
+        let (runnable, task) =
+            unsafe { builder.spawn_unchecked(|_| future, schedule) };
+
+        runnable.schedule();
+
+        Task::new(task)
     }
 }
 
