@@ -23,7 +23,7 @@ pub(crate) fn test(args: Args, item: ItemFn) -> syn::Result<TokenStream> {
         #test_attrs
         #[#nvimx::oxi::test(
             nvim_oxi = #nvimx::oxi,
-            library_path = #nvimx::tests::library_path(env!("CARGO_CRATE_NAME")),
+            library_path = #nvimx::tests::test_macro::library_path(env!("CARGO_CRATE_NAME")),
         )]
         fn #test_name(#maybe_terminator) #test_output {
             #test_body
@@ -48,7 +48,7 @@ impl<'a> Test<'a> {
         let nvimx = &self.nvimx_path.path();
 
         parse_quote! {
-            #nvimx::tests::async_body(#terminator, async move {
+            #nvimx::tests::test_macro::async_body(#terminator, async move {
                 #orig_body.await
             })
         }
