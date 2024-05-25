@@ -50,7 +50,7 @@ license.workspace = true
 [features]
 default = ["neovim-nightly"]
 executor = ["dep:nvimx-executor"]
-macros = ["dep:nvimx-macros", "nvimx-tests/test_macro"]
+macros = ["dep:nvimx-macros"]
 project = ["dep:nvimx-project"]
 tests = ["dep:nvimx-tests"]
 ui = ["dep:nvimx-ui"]

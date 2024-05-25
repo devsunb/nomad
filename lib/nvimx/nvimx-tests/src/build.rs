@@ -52,7 +52,6 @@ pub(crate) enum BuildProfile {
 }
 
 impl BuildProfile {
-    #[cfg(feature = "test_macro")]
     pub(crate) fn as_str(&self) -> &'static str {
         match self {
             Self::Debug => "debug",
