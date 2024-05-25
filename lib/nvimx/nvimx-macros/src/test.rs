@@ -74,11 +74,6 @@ impl<'a> Test<'a> {
     }
 
     #[inline]
-    fn is_async(&self) -> bool {
-        self.terminator_name.is_some()
-    }
-
-    #[inline]
     fn terminator(&self) -> Option<FnArg> {
         self.terminator_name.as_ref().map(|terminator| {
             let nvimx = &self.nvimx_path.path();
