@@ -11,6 +11,10 @@ pub use nvimx_executor as executor;
 #[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
 #[doc(inline)]
 pub use nvimx_macros as macros;
+#[cfg(feature = "macros")]
+#[cfg_attr(docsrs, doc(cfg(feature = "macros")))]
+#[doc(inline)]
+pub use nvimx_macros::test;
 #[cfg(feature = "project")]
 #[cfg_attr(docsrs, doc(cfg(feature = "project")))]
 #[doc(inline)]
