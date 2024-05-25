@@ -14,8 +14,8 @@ where
 }
 
 /// TODO: docs
-pub fn library_path(_crate_name: &str) -> PathBuf {
-    todo!();
+pub fn library_path(crate_name: &str) -> PathBuf {
+    library_path::path(crate_name)
 }
 
 mod async_body {
@@ -97,5 +97,24 @@ mod async_body {
             let inner = Arc::new(Mutex::new(terminator));
             Self { inner }
         }
+    }
+}
+
+mod library_path {
+    use std::env::consts;
+
+    use super::*;
+    use crate::build;
+
+    pub(super) fn path(crate_name: &str) -> PathBuf {
+        let library_name = format!(
+            "{prefix}{crate_name}{suffix}",
+            prefix = consts::DLL_PREFIX,
+            suffix = consts::DLL_SUFFIX,
+        );
+
+        build::target_dir()
+            .join(build::BuildProfile::from_env().as_str())
+            .join(library_name)
     }
 }
