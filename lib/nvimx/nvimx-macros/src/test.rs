@@ -49,7 +49,7 @@ impl<'a> Test<'a> {
 
         parse_quote! {{
             #nvimx::tests::test_macro::run_async_test(#terminator, async move {
-                (async {#orig_body}).await
+                (async #orig_body).await
             })
         }}
     }
