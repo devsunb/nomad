@@ -3,7 +3,7 @@ use core::ops::RangeBounds;
 use core::str::FromStr;
 
 use api::opts::{BufAttachOpts, OptionOpts};
-use nvim_oxi::api::{self, Buffer};
+use nvim_oxi::api;
 use nvimx_common::{
     Apply,
     ByteLen,
@@ -54,7 +54,7 @@ impl TextBuffer {
     /// TODO: docs.
     #[inline]
     pub fn current() -> Result<Self, NotTextBufferError> {
-        let buffer = Buffer::current();
+        let buffer = BufferInner::current();
 
         match buffer.buftype() {
             Buftype::Text => Ok(Self::new(buffer)),
@@ -83,12 +83,9 @@ impl TextBuffer {
     ///
     /// Panics if the buffer's type is not [`Buftype::Text`].
     #[inline]
-    fn new(inner: Buffer) -> Self {
+    fn new(inner: BufferInner) -> Self {
         debug_assert!(inner.buftype().is_text());
-        Self {
-            attach_status: AttachStatus::NotAttached,
-            inner: BufferInner::new(inner),
-        }
+        Self { attach_status: AttachStatus::NotAttached, inner }
     }
 }
 
@@ -108,6 +105,21 @@ impl BufferInner {
             .build();
 
         self.0.attach(false, &opts).expect("todo");
+    }
+
+    #[inline]
+    fn buftype(&self) -> Buftype {
+        let opts = OptionOpts::builder().buffer(self.0.clone()).build();
+
+        api::get_option_value::<String>("buftype", &opts)
+            .expect("always set")
+            .parse()
+            .unwrap_or_else(|other| panic!("unknown buftype: {other}"))
+    }
+
+    #[inline]
+    fn current() -> Self {
+        Self(api::Buffer::current())
     }
 
     #[inline]
@@ -226,12 +238,11 @@ impl From<OnBytesArgs> for Replacement<ByteOffset> {
 
         let end = Point2::new(
             args.start_row + args.new_end_row,
-            (args.start_col * (args.new_end_row.is_zero() as usize)
-                + args.new_end_col)
-                .into(),
+            args.start_col * (args.new_end_row.is_zero() as usize)
+                + args.new_end_col,
         );
 
-        let replacing_text = (start == end)
+        let replacing_text = (start != end)
             .then(|| args.buffer.get(start..end).expect("always valid"));
 
         let replaced_range =
@@ -241,22 +252,6 @@ impl From<OnBytesArgs> for Replacement<ByteOffset> {
             replaced_range,
             replacing_text.as_deref().unwrap_or_default(),
         )
-    }
-}
-
-trait BufferExt {
-    fn buftype(&self) -> Buftype;
-}
-
-impl BufferExt for Buffer {
-    #[inline]
-    fn buftype(&self) -> Buftype {
-        let opts = OptionOpts::builder().buffer(self.clone()).build();
-
-        api::get_option_value::<String>("buftype", &opts)
-            .expect("always set")
-            .parse()
-            .unwrap_or_else(|other| panic!("unknown buftype: {other}"))
     }
 }
 
