@@ -1,5 +1,7 @@
 use core::ops::{Add, AddAssign, Sub, SubAssign};
 
+use crate::ByteLen;
+
 /// A byte offset in a buffer.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ByteOffset(usize);
@@ -18,35 +20,35 @@ impl ByteOffset {
     }
 }
 
-impl Add<Self> for ByteOffset {
+impl Add<ByteLen> for ByteOffset {
     type Output = Self;
 
     #[inline]
-    fn add(self, rhs: Self) -> Self {
-        Self(self.0 + rhs.0)
+    fn add(self, len: ByteLen) -> Self {
+        Self(self.as_usize() + len.as_usize())
     }
 }
 
-impl AddAssign<Self> for ByteOffset {
+impl AddAssign<ByteLen> for ByteOffset {
     #[inline]
-    fn add_assign(&mut self, rhs: Self) {
-        self.0 += rhs.0;
+    fn add_assign(&mut self, len: ByteLen) {
+        self.0 += len.as_usize();
     }
 }
 
-impl Sub<Self> for ByteOffset {
+impl Sub<ByteLen> for ByteOffset {
     type Output = Self;
 
     #[inline]
-    fn sub(self, rhs: Self) -> Self {
-        Self(self.0 - rhs.0)
+    fn sub(self, len: ByteLen) -> Self {
+        Self(self.as_usize() - len.as_usize())
     }
 }
 
-impl SubAssign<Self> for ByteOffset {
+impl SubAssign<ByteLen> for ByteOffset {
     #[inline]
-    fn sub_assign(&mut self, rhs: Self) {
-        self.0 -= rhs.0;
+    fn sub_assign(&mut self, len: ByteLen) {
+        self.0 -= len.as_usize();
     }
 }
 
