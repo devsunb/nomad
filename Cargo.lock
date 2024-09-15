@@ -1044,6 +1044,7 @@ name = "root-finder"
 version = "0.1.0"
 dependencies = [
  "collab-fs",
+ "futures-util",
 ]
 
 [[package]]
