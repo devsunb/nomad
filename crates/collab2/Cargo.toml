@@ -11,6 +11,7 @@ collab-messaging = { git = "ssh://git@github.com/nomad/collab.git" }
 collab-project = { git = "ssh://git@github.com/nomad/collab.git" }
 nomad-server = { git = "ssh://git@github.com/nomad/collab.git" }
 nomad2 = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true
