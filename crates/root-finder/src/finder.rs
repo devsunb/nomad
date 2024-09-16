@@ -19,11 +19,11 @@ impl Finder {
         let mut dir = match start_from.parent() {
             Some(dir) => dir.to_owned(),
             None => {
-                let dir = AbsUtf8PathBuf::root();
-                debug_assert_eq!(start_from, &*dir);
-                return contains_marker(&dir, marker, fs)
+                let root = AbsUtf8PathBuf::root();
+                debug_assert_eq!(start_from, &*root);
+                return contains_marker(&root, marker, fs)
                     .await
-                    .map(|contains| contains.then_some(dir));
+                    .map(|contains| contains.then_some(root));
             },
         };
 
@@ -46,15 +46,15 @@ async fn contains_marker(
     let entries = fs.read_dir(dir).await?;
     pin_mut!(entries);
 
-    let mut dir = dir.to_owned();
+    let mut path = dir.to_owned();
     while let Some(entry) = entries.next().await {
         let file_name = fs.file_name(&entry).await?;
-        dir.push(file_name.as_str());
+        path.push(file_name.as_str());
         let metadata = fs.metadata(&entry).await?;
-        if marker.matches(&dir, &metadata, fs).await? {
+        if marker.matches(&path, &metadata, fs).await? {
             return Ok(true);
         }
-        dir.pop();
+        path.pop();
     }
 
     Ok(false)
