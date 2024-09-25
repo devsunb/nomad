@@ -911,6 +911,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+ "syn-derive-args",
 ]
 
 [[package]]

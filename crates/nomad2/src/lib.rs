@@ -7,6 +7,7 @@ mod emitter;
 mod event;
 mod module;
 mod module_name;
+mod neovim;
 mod subscription;
 
 pub use api::Api;
@@ -16,5 +17,6 @@ pub use emitter::Emitter;
 pub use event::Event;
 pub use module::Module;
 pub use module_name::ModuleName;
+pub use neovim::Neovim;
 pub use nomad_macros::module_name;
 pub use subscription::Subscription;
