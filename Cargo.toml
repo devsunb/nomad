@@ -17,18 +17,20 @@ collab-fs = { git = "ssh://git@github.com/nomad/collab.git", package = "collab-f
 crop = "0.4"
 futures = "0.3"
 futures-util = "0.3"
+nohash = "0.2"
+nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi" }
 quickcheck = "1"
 quickcheck_macros = "1"
-nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi" }
 serde = "1.0"
 smallvec = "1.13"
-smol_str = "0.2"
+smol_str = "0.3"
 thiserror = "1.0"
 tracing = "0.1"
 
 clipboard = { path = "./crates/clipboard" }
 nomad = { path = "./crates/nomad" }
 nomad2 = { path = "./crates/nomad2" }
+root-finder = { path = "./crates/root-finder" }
 
 [workspace.lints.clippy]
 bool_to_int_with_if = "deny"

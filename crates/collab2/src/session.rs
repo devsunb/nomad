@@ -31,7 +31,7 @@ pub(crate) struct Session<E: Editor> {
     /// TODO: docs.
     project: Project,
 
-    /// The session's ID.
+    /// The path to the root of the project.
     project_root: AbsUtf8PathBuf,
 
     /// A receiver for receiving messages from the server.
@@ -258,8 +258,8 @@ pub(crate) enum StartSessionError {
     /// The session was started in a non-file buffer.
     NotInFile,
 
-    /// It was not possible to find the root of the project containing the file
-    /// at the given path.
+    /// It was not possible to find the root of the project containing the
+    /// file at the given path.
     CouldntFindRoot(AbsUtf8PathBuf),
 
     /// We asked the user for confirmation to start the session, but they

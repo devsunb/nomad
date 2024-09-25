@@ -3,21 +3,6 @@
 version = 3
 
 [[package]]
-name = "addr2line"
-version = "0.24.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5fb1d8e4442bd405fdfd1dacb42792696b0cf9cb15882e5d097b742a676d375"
-dependencies = [
- "gimli",
-]
-
-[[package]]
-name = "adler2"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
-
-[[package]]
 name = "async-broadcast"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -39,19 +24,6 @@ dependencies = [
  "event-listener-strategy",
  "futures-core",
  "pin-project-lite",
-]
-
-[[package]]
-name = "async-compat"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bab94bde396a3f7b4962e396fdad640e241ed797d4d8d77fc8c237d14c58fc0"
-dependencies = [
- "futures-core",
- "futures-io",
- "once_cell",
- "pin-project-lite",
- "tokio",
 ]
 
 [[package]]
@@ -147,21 +119,6 @@ name = "autocfg"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
-
-[[package]]
-name = "backtrace"
-version = "0.3.74"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d82cb332cdfaed17ae235a638438ac4d4839913cc2af585c3c6746e8f8bee1a"
-dependencies = [
- "addr2line",
- "cfg-if",
- "libc",
- "miniz_oxide",
- "object",
- "rustc-demangle",
- "windows-targets 0.52.6",
-]
 
 [[package]]
 name = "bincode"
@@ -335,20 +292,20 @@ dependencies = [
 [[package]]
 name = "collab-fs"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#862d9e6b669db1d7b248b7952e9f16c78d7b79a6"
+source = "git+ssh://git@github.com/nomad/collab.git#f0d47907aafada35fee110cd1637c42afdf22e95"
 dependencies = [
  "async-fs",
  "camino",
  "futures-util",
  "serde",
- "smol_str 0.3.1",
+ "smol_str",
  "time",
 ]
 
 [[package]]
 name = "collab-messaging"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#862d9e6b669db1d7b248b7952e9f16c78d7b79a6"
+source = "git+ssh://git@github.com/nomad/collab.git#f0d47907aafada35fee110cd1637c42afdf22e95"
 dependencies = [
  "bincode",
  "bytes",
@@ -364,7 +321,7 @@ dependencies = [
 [[package]]
 name = "collab-project"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#862d9e6b669db1d7b248b7952e9f16c78d7b79a6"
+source = "git+ssh://git@github.com/nomad/collab.git#f0d47907aafada35fee110cd1637c42afdf22e95"
 dependencies = [
  "async-recursion",
  "cola",
@@ -374,13 +331,13 @@ dependencies = [
  "nohash",
  "serde",
  "smallvec",
- "smol_str 0.3.1",
+ "smol_str",
 ]
 
 [[package]]
 name = "collab-server"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#862d9e6b669db1d7b248b7952e9f16c78d7b79a6"
+source = "git+ssh://git@github.com/nomad/collab.git#f0d47907aafada35fee110cd1637c42afdf22e95"
 dependencies = [
  "async-channel",
  "collab-messaging",
@@ -394,10 +351,16 @@ dependencies = [
 name = "collab2"
 version = "0.1.0"
 dependencies = [
+ "collab-fs",
  "collab-messaging",
  "collab-project",
+ "collab-server",
+ "futures-util",
+ "nohash",
  "nomad-server",
  "nomad2",
+ "root-finder",
+ "serde",
 ]
 
 [[package]]
@@ -720,18 +683,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gimli"
-version = "0.31.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32085ea23f3234fc7846555e85283ba4de91e21016dc0455a16286d87a292d64"
-
-[[package]]
-name = "hermit-abi"
-version = "0.3.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
-
-[[package]]
 name = "hermit-abi"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -805,7 +756,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
@@ -909,27 +860,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "miniz_oxide"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2d80299ef12ff69b16a84bb182e3b9df68b5a91574d3d4fa6e41b65deec4df1"
-dependencies = [
- "adler2",
-]
-
-[[package]]
-name = "mio"
-version = "1.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "80e04d1dcff3aae0704555fe5fee3bcfaf3d1fdf8a7e521d5b9d2b42acb52cec"
-dependencies = [
- "hermit-abi 0.3.9",
- "libc",
- "wasi",
- "windows-sys 0.52.0",
-]
-
-[[package]]
 name = "nanorand"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -966,12 +896,21 @@ dependencies = [
  "serde",
  "serde_path_to_error",
  "smallvec",
- "smol_str 0.2.2",
+ "smol_str",
  "strsim",
  "time",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "nomad-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -985,9 +924,9 @@ dependencies = [
 [[package]]
 name = "nomad-server"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#862d9e6b669db1d7b248b7952e9f16c78d7b79a6"
+source = "git+ssh://git@github.com/nomad/collab.git#f0d47907aafada35fee110cd1637c42afdf22e95"
 dependencies = [
- "async-compat",
+ "async-net",
  "collab-messaging",
  "collab-project",
  "collab-server",
@@ -998,9 +937,6 @@ dependencies = [
  "rand",
  "rand_chacha",
  "serde",
- "tokio",
- "tracing",
- "tracing-subscriber",
  "webpki-roots",
 ]
 
@@ -1016,6 +952,7 @@ dependencies = [
 name = "nomad2"
 version = "0.1.0"
 dependencies = [
+ "nomad-macros",
  "serde",
 ]
 
@@ -1140,15 +1077,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "object"
-version = "0.36.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "084f1a5821ac4c651660a94a7153d27ac9d8a53736203f58b31945ded098070a"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "once_cell"
 version = "1.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1235,7 +1163,7 @@ checksum = "cc2790cd301dec6cd3b7a025e4815cf825724a51c98dccfe6a3e55f05ffb6511"
 dependencies = [
  "cfg-if",
  "concurrent-queue",
- "hermit-abi 0.4.0",
+ "hermit-abi",
  "pin-project-lite",
  "rustix",
  "tracing",
@@ -1346,12 +1274,6 @@ dependencies = [
  "collab-fs",
  "futures-util",
 ]
-
-[[package]]
-name = "rustc-demangle"
-version = "0.1.24"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "719b953e2095829ee67db738b3bfa9fa368c94900df327b3f07fe6e794d2fe1f"
 
 [[package]]
 name = "rustc_version"
@@ -1563,31 +1485,12 @@ dependencies = [
 
 [[package]]
 name = "smol_str"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd538fb6910ac1099850255cf94a94df6551fbdd602454387d0adb2d1ca6dead"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "smol_str"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66eaf762c5af19db3108300515c8aa7a50efc90ff745f4c62288052ebf9fdd25"
 dependencies = [
  "borsh",
  "serde",
-]
-
-[[package]]
-name = "socket2"
-version = "0.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce305eb0b4296696835b71df73eb912e0f1ffd2556a501fcede6e0c50349191c"
-dependencies = [
- "libc",
- "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1713,20 +1616,6 @@ name = "tinyvec_macros"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
-
-[[package]]
-name = "tokio"
-version = "1.40.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2b070231665d27ad9ec9b8df639893f46727666c6767db40317fbe920a5d998"
-dependencies = [
- "backtrace",
- "libc",
- "mio",
- "pin-project-lite",
- "socket2",
- "windows-sys 0.52.0",
-]
 
 [[package]]
 name = "tracing"
