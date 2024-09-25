@@ -5,7 +5,7 @@ use serde::de::DeserializeOwned;
 use crate::{Api, Context, Editor, ModuleName};
 
 /// TODO: docs.
-pub trait Module: Sized {
+pub trait Module<E: Editor>: Sized {
     /// TODO: docs.
     const NAME: ModuleName;
 
@@ -13,9 +13,8 @@ pub trait Module: Sized {
     type Config: Default + DeserializeOwned;
 
     /// TODO: docs.
-    fn init<E: Editor>(ctx: &Context<E>) -> Api<Self>;
+    fn init(ctx: &Context<E>) -> Api<Self, E>;
 
     /// TODO: docs.
-    fn run<E: Editor>(&mut self, ctx: &Context<E>)
-        -> impl Future<Output = ()>;
+    fn run(&mut self, ctx: &Context<E>) -> impl Future<Output = ()>;
 }

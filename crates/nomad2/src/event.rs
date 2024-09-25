@@ -1,5 +1,6 @@
 use crate::{Context, Editor};
 
+/// TODO: docs.
 pub trait Event<E: Editor>: 'static + Ord {
     /// TODO: docs.
     type Args;

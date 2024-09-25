@@ -1,2 +1,2 @@
 /// TODO: docs.
-pub trait Editor {}
+pub trait Editor: 'static {}
