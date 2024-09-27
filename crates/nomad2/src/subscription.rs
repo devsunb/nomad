@@ -16,10 +16,16 @@ pub struct Subscription<T: Event<E>, E: Editor> {
     rx: Receiver<T::Payload>,
 
     /// TODO: docs.
-    ctx: crate::Context<E>,
+    ctx: Context<E>,
 }
 
 impl<T: Event<E>, E: Editor> Subscription<T, E> {
+    /// TODO: docs.
+    #[inline]
+    pub async fn recv(&mut self) -> &T::Payload {
+        self.rx.recv().await
+    }
+
     pub(crate) fn new(
         event: AnyEvent,
         rx: Receiver<T::Payload>,
@@ -29,13 +35,16 @@ impl<T: Event<E>, E: Editor> Subscription<T, E> {
     }
 }
 
-impl<T: Event<E>, E: Editor> Stream for Subscription<T, E> {
+impl<T: Event<E>, E: Editor> Stream for Subscription<T, E>
+where
+    T::Payload: Clone,
+{
     type Item = T::Payload;
 
     #[inline]
     fn poll_next(
         self: Pin<&mut Self>,
-        _ctx: &mut core::task::Context<'_>,
+        _ctx: &mut core::task::Context,
     ) -> Poll<Option<Self::Item>> {
         todo!();
     }
@@ -77,12 +86,17 @@ impl<T> Emitter<T> {
     }
 }
 
+/// TODO: docs.
 pub(crate) struct Receiver<T> {
     inner: T,
 }
 
 impl<T> Receiver<T> {
     pub(crate) fn deactivate(self) -> InactiveReceiver<T> {
+        todo!();
+    }
+
+    async fn recv(&mut self) -> &T {
         todo!();
     }
 }
