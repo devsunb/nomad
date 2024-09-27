@@ -6,16 +6,16 @@ pub trait Spawner {
     type JoinHandle<T>: JoinHandle<T>;
 
     /// TODO: docs.
-    fn spawn<F: Future<Output = ()> + 'static>(
-        &self,
-        fut: F,
-    ) -> Self::JoinHandle<()>;
+    fn spawn<F>(&self, fut: F) -> Self::JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static;
 
     /// TODO: docs.
-    fn spawn_background<F: Future<Output = ()> + 'static + Send>(
-        &self,
-        fut: F,
-    ) -> Self::JoinHandle<()>;
+    fn spawn_background<F>(&self, fut: F) -> Self::JoinHandle<F::Output>
+    where
+        F: Future + 'static + Send,
+        F::Output: 'static + Send;
 }
 
 /// TODO: docs.

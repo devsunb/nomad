@@ -1,2 +1,29 @@
+use core::future::Future;
+
+use super::{executor, NeovimJoinHandle};
+use crate::Spawner;
+
 /// TODO: docs.
 pub struct NeovimSpawner;
+
+impl Spawner for NeovimSpawner {
+    type JoinHandle<T> = NeovimJoinHandle<T>;
+
+    #[inline]
+    fn spawn<F>(&self, fut: F) -> Self::JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        executor::spawn(fut)
+    }
+
+    #[inline]
+    fn spawn_background<F>(&self, fut: F) -> Self::JoinHandle<F::Output>
+    where
+        F: Future + 'static + Send,
+        F::Output: 'static + Send,
+    {
+        self.spawn(fut)
+    }
+}
