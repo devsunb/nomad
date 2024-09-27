@@ -20,7 +20,13 @@ pub trait Event<E: Editor>: 'static + Ord {
     ) -> Self::SubscribeCtx;
 
     /// TODO: docs.
-    fn unsubscribe(&self, subscribe_ctx: Self::SubscribeCtx, ctx: &Context<E>);
+    #[allow(unused_variables)]
+    fn unsubscribe(
+        &self,
+        subscribe_ctx: Self::SubscribeCtx,
+        ctx: &Context<E>,
+    ) {
+    }
 }
 
 #[derive(Clone)]
