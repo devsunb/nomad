@@ -5,10 +5,10 @@ use crate::{Module, Spawner};
 /// TODO: docs.
 pub trait Editor: 'static {
     /// TODO: docs.
-    type ModuleApi<M: Module<Self>>;
+    type Fs: Fs;
 
     /// TODO: docs.
-    type Fs: Fs;
+    type ModuleApi<M: Module<Self>>;
 
     /// TODO: docs.
     type Spawner: Spawner;

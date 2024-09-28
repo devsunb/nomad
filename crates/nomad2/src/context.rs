@@ -26,7 +26,7 @@ impl<E: Editor> Context<E> {
 
     /// TODO: docs.
     #[inline]
-    pub fn subscribe<T>(&self, event: T) -> Subscription<T, E>
+    pub fn subscribe<T>(&self, mut event: T) -> Subscription<T, E>
     where
         T: Event<E>,
     {

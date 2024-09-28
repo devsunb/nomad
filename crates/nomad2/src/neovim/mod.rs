@@ -1,11 +1,13 @@
 //! TODO: docs.
 
 mod executor;
+mod function;
 mod join_handle;
 mod module_api;
 mod neovim;
 mod spawner;
 
+pub use function::NeovimFunction;
 pub use join_handle::NeovimJoinHandle;
 pub use module_api::NeovimModuleApi;
 pub use neovim::Neovim;

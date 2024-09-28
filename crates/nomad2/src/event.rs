@@ -14,7 +14,7 @@ pub trait Event<E: Editor>: 'static + Ord {
 
     /// TODO: docs.
     fn subscribe(
-        &self,
+        &mut self,
         emitter: Emitter<Self::Payload>,
         ctx: &Context<E>,
     ) -> Self::SubscribeCtx;
@@ -22,7 +22,7 @@ pub trait Event<E: Editor>: 'static + Ord {
     /// TODO: docs.
     #[allow(unused_variables)]
     fn unsubscribe(
-        &self,
+        &mut self,
         subscribe_ctx: Self::SubscribeCtx,
         ctx: &Context<E>,
     ) {
@@ -35,6 +35,17 @@ pub(crate) struct AnyEvent {
 }
 
 impl AnyEvent {
+    #[inline]
+    pub(crate) fn downcast_mut<T: Event<E>, E: Editor>(&mut self) -> &mut T {
+        let Some(inner) = Rc::get_mut(&mut self.inner) else {
+            panic!("failed to call AnyEvent::downcast_mut");
+        };
+        match inner.downcast_mut() {
+            Some(event) => event,
+            None => panic!("downcasting AnyEvent to the wrong event type"),
+        }
+    }
+
     #[inline]
     pub(crate) fn downcast_ref<T: Event<E>, E: Editor>(&self) -> &T {
         match self.inner.downcast_ref() {

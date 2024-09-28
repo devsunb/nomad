@@ -3,6 +3,7 @@ use core::task::Poll;
 
 use futures_util::Stream;
 
+use crate::context::SubscriptionState;
 use crate::event::AnyEvent;
 use crate::{Context, Editor, Event};
 
@@ -56,15 +57,16 @@ impl<T: Event<E>, E: Editor> Drop for Subscription<T, E> {
         // The `Context` owns another instance of the event, so if the ref
         // count reaches 2, it means this is the last subscription.
         if self.event.ref_count() == 2 {
-            let event = self.event.downcast_ref::<T, E>();
-            let sub_ctx = self
+            let SubscriptionState { sub_ctx, .. } = self
                 .ctx
-                .remove_subscription(event)
-                .expect("ref count is 2")
-                .sub_ctx
+                .remove_subscription(self.event.downcast_ref::<T, E>())
+                .expect("ref count is 2");
+
+            let sub_ctx = sub_ctx
                 .downcast::<T::SubscribeCtx>()
                 .expect("sub_ctx contains the correct type");
-            event.unsubscribe(*sub_ctx, &self.ctx);
+
+            self.event.downcast_mut::<T, E>().unsubscribe(*sub_ctx, &self.ctx);
         }
     }
 }
