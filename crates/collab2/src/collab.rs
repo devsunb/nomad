@@ -19,10 +19,10 @@ use crate::{Config, Session};
 
 /// TODO: docs.
 pub struct Collab<E: Editor> {
-    ctx: Context<E>,
-    config: Config,
-    join_sub: Subscription<JoinSession, E>,
-    start_sub: Subscription<StartSession, E>,
+    pub(crate) ctx: Context<E>,
+    pub(crate) config: Config,
+    pub(crate) join_sub: Subscription<JoinSession, E>,
+    pub(crate) start_sub: Subscription<StartSession, E>,
 }
 
 impl<E: Editor> Collab<E>
@@ -113,14 +113,14 @@ impl Module<Neovim> for Collab<Neovim> {
             .args::<()>()
             .build::<Self>(ctx);
 
-        let collab = Collab {
+        let this = Self(Collab {
             ctx: ctx.clone(),
             config: Config::default(),
             join_sub: join_fn_sub,
             start_sub: start_fn_sub,
-        };
+        });
 
-        NeovimModuleApi::new(collab)
+        NeovimModuleApi::new(this)
             .with_function(join_fn)
             .with_function(start_fn)
     }

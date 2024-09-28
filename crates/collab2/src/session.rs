@@ -237,11 +237,13 @@ impl<E: Editor> Drop for Session<E> {
             return;
         }
 
+        let fs = self.ctx.fs();
+        let project_root = self.project_root.clone();
+
         self.ctx
             .spawner()
-            .spawn(async {
-                let fs = self.ctx.fs();
-                if let Err(err) = fs.remove_dir(&self.project_root).await {
+            .spawn(async move {
+                if let Err(err) = fs.remove_dir(&project_root).await {
                     println!("failed to remove project directory: {err}");
                 }
             })
