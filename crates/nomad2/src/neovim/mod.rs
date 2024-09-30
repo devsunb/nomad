@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+mod api;
 mod executor;
 mod function;
 mod join_handle;
