@@ -56,6 +56,11 @@ impl<E: Editor> Context<E> {
         self.with_inner(|inner| f(&mut inner.editor))
     }
 
+    #[inline]
+    pub(crate) fn new(editor: E) -> Self {
+        Self { inner: Arc::new(Mutex::new(ContextInner::new(editor))) }
+    }
+
     /// TODO: docs.
     pub(crate) fn remove_subscription<T: Event<E>>(
         &self,
@@ -134,6 +139,11 @@ impl<E: Editor> ContextInner<E> {
         };
 
         vec.insert(idx, state);
+    }
+
+    #[inline]
+    fn new(editor: E) -> Self {
+        Self { editor, subscriptions: HashMap::new() }
     }
 }
 
