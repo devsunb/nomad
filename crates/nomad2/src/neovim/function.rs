@@ -1,7 +1,7 @@
 use core::cmp::Ordering;
 use core::marker::PhantomData;
 
-use nvim_oxi::serde::Deserializer;
+use nvim_oxi::serde::Deserializer as NvimDeserializer;
 use nvim_oxi::{Function as NvimFunction, Object as NvimObject};
 use serde::de::{Deserialize, DeserializeOwned};
 
@@ -40,8 +40,8 @@ pub trait Function: 'static {
 
 /// TODO: docs.
 pub struct FunctionHandle {
-    name: &'static str,
-    inner: NvimFunction<NvimObject, ()>,
+    pub(super) name: &'static str,
+    pub(super) inner: NvimFunction<NvimObject, ()>,
 }
 
 /// TODO: docs.
@@ -59,7 +59,7 @@ impl<T: Function> Event<Neovim> for FunctionEvent<T> {
     #[inline]
     fn subscribe(&mut self, emitter: Emitter<T::Args>, _: &Context<Neovim>) {
         let nvim_fun = NvimFunction::<NvimObject, ()>::from_fn(move |obj| {
-            match T::Args::deserialize(Deserializer::new(obj)) {
+            match T::Args::deserialize(NvimDeserializer::new(obj)) {
                 Ok(payload) => emitter.send(payload),
                 Err(_err) => {
                     todo!();

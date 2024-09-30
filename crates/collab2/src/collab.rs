@@ -1,6 +1,6 @@
 use collab_server::SessionId;
 use futures_util::{select, FutureExt};
-use nomad2::neovim::{self, Neovim, NeovimModuleApi};
+use nomad2::neovim::{function, ModuleApi, Neovim};
 use nomad2::{
     module_name,
     Api,
@@ -89,7 +89,7 @@ impl Module<Neovim> for Collab<Neovim> {
 
     type Config = Config;
 
-    fn api(ctx: &Context<Neovim>) -> NeovimModuleApi<Self> {
+    fn api(ctx: &Context<Neovim>) -> ModuleApi<Self> {
         // let (join_fn, join_fn_sub) = NeovimFunction::builder()
         //     .name(JoinSession::NAME)
         //     .args::<SessionId>()
@@ -100,11 +100,11 @@ impl Module<Neovim> for Collab<Neovim> {
         //     .args::<()>()
         //     .build::<Self>(ctx);
 
-        let (join_cmd, join_cmd_sub) = NeovimCommand::new(JoinSession, ctx);
-        let (start_cmd, start_cmd_sub) = NeovimCommand::new(StartSession, ctx);
+        // let (join_cmd, join_cmd_sub) = NeovimCommand::new(JoinSession, ctx);
+        // let (start_cmd, start_cmd_sub) = NeovimCommand::new(StartSession, ctx);
 
-        let (join_fn, join_fn_sub) = neovim::function::<JoinSession>(ctx);
-        let (start_fn, start_fn_sub) = neovim::function::<StartSession>(ctx);
+        let (join_fn, join_fn_sub) = function::<JoinSession>(ctx);
+        let (start_fn, start_fn_sub) = function::<StartSession>(ctx);
 
         let this = Self(Collab {
             ctx: ctx.clone(),
@@ -113,10 +113,10 @@ impl Module<Neovim> for Collab<Neovim> {
             start_sub: start_cmd_sub.zip(start_fn_sub),
         });
 
-        NeovimModuleApi::new(this)
+        ModuleApi::new(this)
             // .with_default_command(Auth)
-            .with_command(join_cmd)
-            .with_command(start_cmd)
+            // .with_command(join_cmd)
+            // .with_command(start_cmd)
             .with_function(join_fn)
             .with_function(start_fn)
     }

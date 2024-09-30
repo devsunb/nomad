@@ -9,6 +9,6 @@ mod spawner;
 
 pub use function::{function, Function, FunctionEvent, FunctionHandle};
 pub use join_handle::NeovimJoinHandle;
-pub use module_api::NeovimModuleApi;
+pub use module_api::ModuleApi;
 pub use neovim::Neovim;
 pub use spawner::NeovimSpawner;
