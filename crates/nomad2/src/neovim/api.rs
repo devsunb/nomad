@@ -9,7 +9,7 @@ use nvim_oxi::{
 };
 
 use super::{ModuleApi, Neovim};
-use crate::Module;
+use crate::Nomad;
 
 const SETUP_FN_NAME: &str = "setup";
 
@@ -52,3 +52,13 @@ impl lua::Pushable for Api {
 }
 
 fn setup(_obj: NvimObject) {}
+
+impl lua::Pushable for Nomad<Neovim> {
+    unsafe fn push(
+        mut self,
+        state: NonNull<lua::State>,
+    ) -> Result<i32, lua::Error> {
+        self.start_modules();
+        self.into_api().push(state)
+    }
+}

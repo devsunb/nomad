@@ -29,7 +29,7 @@ impl<E: Editor> Nomad<E> {
 
     /// TODO: docs.
     #[inline]
-    pub fn start(&mut self) {
+    pub fn start_modules(&mut self) {
         for fut in self.run.drain(..) {
             self.ctx.spawner().spawn(fut).detach();
         }
