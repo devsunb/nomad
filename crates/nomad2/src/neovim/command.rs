@@ -13,7 +13,7 @@ pub fn command<T: Command>(
 ) -> (CommandHandle, Subscription<CommandEvent<T>, Neovim>) {
     let buf = Shared::new(None);
     let event = CommandEvent {
-        module_name: T::Module::NAME,
+        module_name: T::Module::NAME.as_str(),
         command_name: T::NAME,
         on_execute_buf: buf.clone(),
         ty: PhantomData,
@@ -34,9 +34,7 @@ pub trait Command: 'static {
     const NAME: &'static str;
 
     /// TODO: docs.
-    type Args: TryFrom<CommandArgs>
-    where
-        <Self::Args as TryFrom<CommandArgs>>::Error: Into<CommandArgsError>;
+    type Args: TryFrom<CommandArgs, Error: Into<CommandArgsError>>;
 
     /// TODO: docs.
     type Module: Module<Neovim>;
@@ -65,11 +63,10 @@ impl<T: Command> Event<Neovim> for CommandEvent<T> {
 
     #[inline]
     fn subscribe(&mut self, emitter: Emitter<T::Args>, _: &Context<Neovim>) {
-        let on_execute = OnExecute::new(move |args| {
-            match T::Args::try_from(args) {
+        let on_execute = Box::new(move |args| {
+            match T::Args::try_from(args).map_err(Into::into) {
                 Ok(payload) => emitter.send(payload),
                 Err(err) => {
-                    let _err = CommandArgsError::from(err);
                     todo!();
                 },
             };
@@ -101,6 +98,7 @@ impl<T> PartialOrd for CommandEvent<T> {
 }
 
 impl<T> Ord for CommandEvent<T> {
+    #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         match self.module_name.cmp(other.module_name) {
             Ordering::Equal => self.command_name.cmp(other.command_name),

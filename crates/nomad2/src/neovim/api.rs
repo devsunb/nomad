@@ -13,6 +13,7 @@ use crate::Nomad;
 
 const SETUP_FN_NAME: &str = "setup";
 
+/// TODO: docs.
 #[derive(Default, Debug)]
 pub struct Api {
     dict: NvimDictionary,
