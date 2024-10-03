@@ -1,14 +1,21 @@
+//! Contains things related to the configuration of modules.
+
 use core::cmp::Ordering;
 use core::marker::PhantomData;
 use std::collections::HashMap;
 
-use nvim_oxi::Object as NvimObject;
+use nvim_oxi::{
+    Object as NvimObject,
+    ObjectKind as NvimObjectKind,
+    String as NvimString,
+};
 use serde::de::DeserializeOwned;
 
 use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared};
 
-pub(super) type OnConfigChange = Box<dyn Fn(NvimObject)>;
+pub(super) type OnConfigChange =
+    Box<dyn Fn(NvimObject) -> Result<(), DeserializeConfigError>>;
 
 /// TODO: docs.
 pub struct ConfigEvent<T> {
@@ -55,13 +62,11 @@ impl<T: Module<Neovim>> Event<Neovim> for ConfigEvent<T> {
         emitter: Emitter<Self::Payload>,
         ctx: &Context<Neovim>,
     ) {
-        let on_config_change =
-            Box::new(move |obj| match obj_to_config::<T::Config>(obj) {
-                Ok(config) => emitter.send(config),
-                Err(err) => {
-                    todo!();
-                },
-            });
+        let on_config_change = Box::new(move |obj| {
+            let config = obj_to_config::<T::Config>(obj)?;
+            emitter.send(config);
+            Ok(())
+        });
 
         self.buf.with_mut(|buf| {
             *buf = Some(on_config_change);
@@ -101,7 +106,39 @@ impl Setup {
         &self,
         obj: NvimObject,
     ) -> Result<(), DeserializeConfigError> {
-        todo!();
+        let dict = match obj.kind() {
+            NvimObjectKind::Dictionary => {
+                // SAFETY: the object's kind is a dictionary.
+                unsafe { obj.into_dict_unchecked() }
+            },
+            other => {
+                return Err(DeserializeConfigError::object_not_dict(other))
+            },
+        };
+
+        let handle = |module_name: NvimString, module_config: NvimObject| {
+            let module_name = module_name.as_str().ok_or_else(|| {
+                DeserializeConfigError::non_unicode_module_name(module_name)
+            })?;
+
+            let on_config_change =
+                self.on_config_change.get(&module_name).ok_or_else(|| {
+                    DeserializeConfigError::unknown_module(
+                        module_name,
+                        self.module_names,
+                    )
+                })?;
+
+            on_config_change(module_config)
+        };
+
+        for (module_name, module_config) in dict {
+            if let Err(err) = handle(module_name, module_config) {
+                todo!();
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -111,4 +148,23 @@ fn obj_to_config<T: DeserializeOwned>(
     todo!();
 }
 
+/// Error returned when a subset of the Lua object given to the `setup()`
+/// function cannot be deserialized into the expected type.
 struct DeserializeConfigError {}
+
+impl DeserializeConfigError {
+    fn non_unicode_module_name(module_name: NvimString) -> Self {
+        todo!();
+    }
+
+    fn object_not_dict(kind: NvimObjectKind) -> Self {
+        todo!();
+    }
+
+    fn unknown_module(
+        module_name: &str,
+        valid_module_names: &'static [&'static str],
+    ) -> Self {
+        todo!();
+    }
+}
