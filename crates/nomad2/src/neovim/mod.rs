@@ -16,7 +16,6 @@ pub use command::{
     command,
     Command,
     CommandArgs,
-    CommandArgsError,
     CommandEvent,
     CommandHandle,
 };

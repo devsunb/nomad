@@ -13,7 +13,7 @@ use super::Neovim;
 use crate::{Context, Emitter, Event, Module, Shared, Subscription};
 
 pub(super) type OnExecute =
-    Box<dyn Fn(CommandArgs) -> Result<(), CommandArgsError> + 'static>;
+    Box<dyn Fn(CommandArgs) -> Result<(), DiagnosticMessage> + 'static>;
 
 /// TODO: docs.
 pub fn command<T: Command>(
@@ -43,7 +43,7 @@ pub trait Command: 'static {
     const NAME: &'static str;
 
     /// TODO: docs.
-    type Args: TryFrom<CommandArgs, Error: Into<CommandArgsError>>;
+    type Args: TryFrom<CommandArgs, Error: Into<DiagnosticMessage>>;
 
     /// TODO: docs.
     type Module: Module<Neovim>;
@@ -145,23 +145,12 @@ impl<T> Ord for CommandEvent<T> {
 }
 
 /// TODO: docs.
-pub struct CommandArgsError {
+pub(super) struct CommandArgsError {
     source: DiagnosticSource,
     msg: DiagnosticMessage,
 }
 
 impl CommandArgsError {
-    /// TODO: docs.
-    pub fn new(
-        module_name: &str,
-        command_name: &str,
-        msg: DiagnosticMessage,
-    ) -> Self {
-        let mut source = DiagnosticSource::new();
-        source.push_segment(module_name).push_segment(command_name);
-        Self { source, msg }
-    }
-
     #[inline]
     pub(super) fn emit(self) {
         self.msg.emit(Level::Error, self.source);
@@ -196,6 +185,13 @@ impl CommandArgsError {
             );
 
         Self { source: DiagnosticSource::new(), msg }
+    }
+
+    pub(super) fn new(
+        source: DiagnosticSource,
+        msg: DiagnosticMessage,
+    ) -> Self {
+        Self { source, msg }
     }
 
     #[inline]
@@ -241,13 +237,18 @@ impl CommandArgsError {
 }
 
 impl TryFrom<CommandArgs> for () {
-    type Error = CommandArgsError;
+    type Error = DiagnosticMessage;
 
     fn try_from(args: CommandArgs) -> Result<Self, Self::Error> {
         if args.is_empty() {
             Ok(())
         } else {
-            todo!();
+            let mut msg = DiagnosticMessage::new();
+            msg.push_str("unexpected arguments: ").push_comma_separated(
+                args.as_slice(),
+                HighlightGroup::special(),
+            );
+            Err(msg)
         }
     }
 }

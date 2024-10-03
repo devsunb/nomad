@@ -9,9 +9,11 @@ use nvim_oxi::{
     Function as NvimFunction,
 };
 
+use super::command::{CommandArgs, CommandArgsError};
 use super::config::{OnConfigChange, Setup};
+use super::diagnostic::DiagnosticSource;
 use super::module_api::ModuleCommands;
-use super::{CommandArgs, CommandArgsError, ModuleApi, Neovim};
+use super::{ModuleApi, Neovim};
 use crate::Nomad;
 
 /// TODO: docs.
@@ -93,7 +95,11 @@ impl Commands {
 
         let Some(command_name) = args.pop_front() else {
             return if let Some(default) = module_commands.default_command() {
-                default(args)
+                default(args).map_err(|msg| {
+                    let mut source = DiagnosticSource::new();
+                    source.push_segment(&module_name);
+                    CommandArgsError::new(source, msg)
+                })
             } else {
                 Err(CommandArgsError::missing_command(module_commands))
             };
@@ -109,7 +115,11 @@ impl Commands {
                 )
             })?;
 
-        command(args)
+        command(args).map_err(|msg| {
+            let mut source = DiagnosticSource::new();
+            source.push_segment(&module_name).push_segment(&command_name);
+            CommandArgsError::new(source, msg)
+        })
     }
 }
 
