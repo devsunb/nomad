@@ -11,6 +11,7 @@ collab-fs = { workspace = true }
 futures-util = { workspace = true }
 nomad-macros = { path = "./macros" }
 serde = { workspace = true }
+smol_str = { workspace = true }
 
 # Neovim-specific dependencies.
 async-task = "4.7"

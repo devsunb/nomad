@@ -3,6 +3,7 @@
 mod api;
 mod command;
 mod config;
+mod diagnostic;
 mod executor;
 mod function;
 mod join_handle;

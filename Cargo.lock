@@ -961,6 +961,7 @@ dependencies = [
  "nvim-oxi",
  "pin-project-lite",
  "serde",
+ "smol_str",
 ]
 
 [[package]]
@@ -992,7 +993,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#d56ae4d6a02fb55371c6d9e3451aa731a5fec666"
+source = "git+https://github.com/noib3/nvim-oxi#b566d7cec817583c8f220e9d3384f2ab2b04caa2"
 dependencies = [
  "miniserde",
  "nvim-oxi-api",
@@ -1006,7 +1007,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-api"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#d56ae4d6a02fb55371c6d9e3451aa731a5fec666"
+source = "git+https://github.com/noib3/nvim-oxi#b566d7cec817583c8f220e9d3384f2ab2b04caa2"
 dependencies = [
  "nvim-oxi-luajit",
  "nvim-oxi-macros",
@@ -1019,7 +1020,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-libuv"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#d56ae4d6a02fb55371c6d9e3451aa731a5fec666"
+source = "git+https://github.com/noib3/nvim-oxi#b566d7cec817583c8f220e9d3384f2ab2b04caa2"
 dependencies = [
  "nvim-oxi-luajit",
  "thiserror",
@@ -1028,7 +1029,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-luajit"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#d56ae4d6a02fb55371c6d9e3451aa731a5fec666"
+source = "git+https://github.com/noib3/nvim-oxi#b566d7cec817583c8f220e9d3384f2ab2b04caa2"
 dependencies = [
  "thiserror",
 ]
@@ -1036,7 +1037,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-macros"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#d56ae4d6a02fb55371c6d9e3451aa731a5fec666"
+source = "git+https://github.com/noib3/nvim-oxi#b566d7cec817583c8f220e9d3384f2ab2b04caa2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1046,7 +1047,7 @@ dependencies = [
 [[package]]
 name = "nvim-oxi-types"
 version = "0.5.1"
-source = "git+https://github.com/noib3/nvim-oxi#d56ae4d6a02fb55371c6d9e3451aa731a5fec666"
+source = "git+https://github.com/noib3/nvim-oxi#b566d7cec817583c8f220e9d3384f2ab2b04caa2"
 dependencies = [
  "libc",
  "nvim-oxi-luajit",

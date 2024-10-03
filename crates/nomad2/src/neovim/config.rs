@@ -117,8 +117,8 @@ impl Setup {
         };
 
         let handle = |module_name: NvimString, module_config: NvimObject| {
-            let module_name = module_name.as_str().ok_or_else(|| {
-                DeserializeConfigError::non_unicode_module_name(module_name)
+            let module_name = module_name.to_str().map_err(|_| {
+                DeserializeConfigError::non_unicode_module_name(&module_name)
             })?;
 
             let on_config_change =
@@ -150,10 +150,10 @@ fn obj_to_config<T: DeserializeOwned>(
 
 /// Error returned when a subset of the Lua object given to the `setup()`
 /// function cannot be deserialized into the expected type.
-struct DeserializeConfigError {}
+pub(super) struct DeserializeConfigError {}
 
 impl DeserializeConfigError {
-    fn non_unicode_module_name(module_name: NvimString) -> Self {
+    fn non_unicode_module_name(module_name: &NvimString) -> Self {
         todo!();
     }
 
