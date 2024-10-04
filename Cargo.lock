@@ -982,6 +982,7 @@ dependencies = [
  "concurrent-queue",
  "futures-util",
  "home",
+ "nohash",
  "nomad-macros",
  "nvim-oxi",
  "pin-project-lite",

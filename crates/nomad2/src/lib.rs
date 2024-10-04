@@ -19,6 +19,7 @@ mod spawner;
 mod subscription;
 mod text;
 
+pub use actor_id::ActorId;
 pub use buffer::Buffer;
 pub use byte_offset::ByteOffset;
 pub use context::Context;

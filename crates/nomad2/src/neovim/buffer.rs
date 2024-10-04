@@ -1,6 +1,7 @@
 use alloc::borrow::Cow;
 use core::cmp::Ordering;
 use core::fmt;
+use core::hash::{Hash, Hasher};
 use core::ops::{Bound, Range, RangeBounds};
 
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf};
@@ -8,6 +9,7 @@ use nvim_oxi::api::{self, Buffer as NvimBuffer};
 
 use super::Neovim;
 use crate::{
+    ActorId,
     ByteOffset,
     Context,
     Edit,
@@ -22,18 +24,21 @@ use crate::{
 /// TODO: docs.
 pub struct Buffer {
     id: BufferId,
+
+    /// TODO: docs.
+    next_edit_made_by: Shared<Option<ActorId>>,
 }
 
 /// TODO: docs.
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct BufferId {
     inner: NvimBuffer,
 }
 
 /// TODO: docs.
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct EditEvent {
     id: BufferId,
+    next_edit_made_by: Shared<Option<ActorId>>,
 }
 
 /// The 2D equivalent of a `ByteOffset`.
@@ -47,8 +52,11 @@ struct Point {
 }
 
 impl Buffer {
-    pub(super) fn new(id: BufferId) -> Self {
-        Self { id }
+    pub(super) fn new(
+        id: BufferId,
+        next_edit_made_by: Shared<Option<ActorId>>,
+    ) -> Self {
+        Self { id, next_edit_made_by }
     }
 }
 
@@ -57,7 +65,10 @@ impl crate::Buffer<Neovim> for Buffer {
     type Id = BufferId;
 
     fn edit_stream(&mut self, ctx: &Context<Neovim>) -> Self::EditStream {
-        ctx.subscribe(EditEvent { id: self.id.clone() })
+        ctx.subscribe(EditEvent {
+            id: self.id.clone(),
+            next_edit_made_by: self.next_edit_made_by.clone(),
+        })
     }
 
     fn get_text<R>(&self, byte_range: R) -> Text
@@ -77,13 +88,18 @@ impl crate::Buffer<Neovim> for Buffer {
         self.id.is_of_text_buffer().then(|| Cow::Owned(self.id.path()))
     }
 
-    fn set_text<R, T>(&mut self, replaced_range: R, new_text: T)
-    where
+    fn set_text<R, T>(
+        &mut self,
+        replaced_range: R,
+        new_text: T,
+        actor_id: ActorId,
+    ) where
         R: RangeBounds<ByteOffset>,
         T: AsRef<str>,
     {
         let point_range = self.id.point_range_of_byte_range(replaced_range);
         self.id.replace_text_in_point_range(point_range, new_text.as_ref());
+        self.next_edit_made_by.set(Some(actor_id));
     }
 }
 
@@ -284,6 +300,35 @@ impl Ord for BufferId {
     }
 }
 
+impl Hash for BufferId {
+    #[inline]
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        hasher.write_i32(self.inner.handle());
+    }
+}
+
+impl nohash::IsEnabled for BufferId {}
+
+impl PartialEq for EditEvent {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other) == Ordering::Equal
+    }
+}
+
+impl Eq for EditEvent {}
+
+impl PartialOrd for EditEvent {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for EditEvent {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.id.cmp(&other.id)
+    }
+}
+
 impl Event<Neovim> for EditEvent {
     type Payload = Edit;
     type SubscribeCtx = Shared<bool>;
@@ -297,9 +342,13 @@ impl Event<Neovim> for EditEvent {
 
         let opts = api::opts::BufAttachOpts::builder()
             .on_bytes({
+                let next_edit_made_by = self.next_edit_made_by.clone();
                 let should_detach = should_detach.clone();
                 move |args| {
-                    let edit = Edit::new([Hunk::from(args)]);
+                    let actor_id = next_edit_made_by
+                        .with_mut(Option::take)
+                        .unwrap_or(ActorId::unknown());
+                    let edit = Edit::new(actor_id, [Hunk::from(args)]);
                     emitter.send(edit);
                     should_detach.get()
                 }

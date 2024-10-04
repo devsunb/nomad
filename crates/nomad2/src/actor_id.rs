@@ -51,7 +51,7 @@ impl PartialOrd for ActorId {
 
 impl Hash for ActorId {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+    fn hash<H: Hasher>(&self, hasher: &mut H) {
+        hasher.write_u64(self.0);
     }
 }

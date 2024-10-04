@@ -5,7 +5,7 @@ use core::ops::RangeBounds;
 use collab_fs::AbsUtf8Path;
 use futures_util::Stream;
 
-use crate::{ByteOffset, Context, Edit, Editor, Text};
+use crate::{ActorId, ByteOffset, Context, Edit, Editor, Text};
 
 /// TODO: docs.
 pub trait Buffer<E: Editor> {
@@ -30,8 +30,12 @@ pub trait Buffer<E: Editor> {
     fn path(&self) -> Option<Cow<'_, AbsUtf8Path>>;
 
     /// TODO: docs.
-    fn set_text<R, T>(&mut self, replaced_range: R, new_text: T)
-    where
+    fn set_text<R, T>(
+        &mut self,
+        replaced_range: R,
+        new_text: T,
+        actor_id: ActorId,
+    ) where
         R: RangeBounds<ByteOffset>,
         T: AsRef<str>;
 }

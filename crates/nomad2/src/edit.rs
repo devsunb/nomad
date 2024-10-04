@@ -3,21 +3,22 @@ use core::ops::Range;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
-use crate::ByteOffset;
+use crate::{ActorId, ByteOffset};
 
 /// TODO: docs.
 #[derive(Debug, Clone)]
 pub struct Edit {
+    actor_id: ActorId,
     hunks: SmallVec<[Hunk; 1]>,
 }
 
 impl Edit {
     /// TODO: docs.
-    pub fn new<I>(hunks: I) -> Self
+    pub fn new<I>(actor_id: ActorId, hunks: I) -> Self
     where
         I: IntoIterator<Item = Hunk>,
     {
-        Self { hunks: hunks.into_iter().collect() }
+        Self { actor_id, hunks: hunks.into_iter().collect() }
     }
 }
 

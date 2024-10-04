@@ -1,11 +1,15 @@
 use collab_fs::{AbsUtf8PathBuf, OsFs};
+use nohash::IntMap as NoHashMap;
 
 use super::{Api, Buffer, BufferId, ModuleApi, NeovimSpawner};
-use crate::Editor;
+use crate::{ActorId, Editor, Shared};
 
 /// TODO: docs.
 #[derive(Default)]
-pub struct Neovim {}
+pub struct Neovim {
+    /// TODO: docs.
+    actor_ids: NoHashMap<BufferId, Shared<Option<ActorId>>>,
+}
 
 impl Editor for Neovim {
     type Api = Api;
@@ -18,8 +22,12 @@ impl Editor for Neovim {
         self.get_buffer(BufferId::new(nvim_oxi::api::Buffer::current()))
     }
 
-    fn get_buffer(&mut self, id: BufferId) -> Option<Self::Buffer<'_>> {
-        id.is_of_text_buffer().then_some(Buffer::new(id))
+    fn get_buffer(&mut self, buffer_id: BufferId) -> Option<Self::Buffer<'_>> {
+        if !buffer_id.is_of_text_buffer() {
+            return None;
+        }
+        let actor_id = self.actor_ids.entry(buffer_id.clone()).or_default();
+        Some(Buffer::new(buffer_id, actor_id.clone()))
     }
 
     fn fs(&self) -> Self::Fs {
