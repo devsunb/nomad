@@ -38,6 +38,10 @@ impl Buffer {
         &self.id.inner
     }
 
+    fn as_nvim_mut(&mut self) -> &mut NvimBuffer {
+        &mut self.id.inner
+    }
+
     #[track_caller]
     fn byte_offset_of_point(&self, point: Point) -> ByteOffset {
         todo!()
@@ -104,13 +108,30 @@ impl Buffer {
         start..end
     }
 
+    /// # Panics.
+    ///
+    /// Panics if the point range is out of bounds or if the buffer has been
+    /// deleted or unloaded.
     #[track_caller]
     fn replace_text_in_point_range(
-        &self,
+        &mut self,
         point_range: Range<Point>,
         replacement: &str,
     ) {
-        todo!()
+        // If the text has a trailing newline, Neovim expects an additional
+        // empty line to be included.
+        let lines = replacement
+            .lines()
+            .chain(replacement.ends_with('\n').then_some(""));
+
+        if let Err(err) = self.as_nvim_mut().set_text(
+            point_range.start.line_idx..point_range.end.line_idx,
+            point_range.start.byte_offset.into(),
+            point_range.end.byte_offset.into(),
+            lines,
+        ) {
+            panic!("{err}");
+        }
     }
 }
 
