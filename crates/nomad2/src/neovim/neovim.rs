@@ -1,6 +1,6 @@
 use collab_fs::{AbsUtf8PathBuf, OsFs};
 
-use super::{Api, ModuleApi, NeovimSpawner};
+use super::{Api, Buffer, BufferId, ModuleApi, NeovimSpawner};
 use crate::Editor;
 
 /// TODO: docs.
@@ -8,10 +8,16 @@ use crate::Editor;
 pub struct Neovim {}
 
 impl Editor for Neovim {
-    type Fs = OsFs;
     type Api = Api;
+    type Buffer<'ed> = Buffer;
+    type Fs = OsFs;
     type ModuleApi = ModuleApi;
     type Spawner = NeovimSpawner;
+
+    fn current_buffer(&self) -> Option<Self::Buffer<'_>> {
+        let id = BufferId::new(nvim_oxi::api::Buffer::current());
+        id.is_of_text_buffer().then_some(Buffer::new(id))
+    }
 
     fn fs(&self) -> Self::Fs {
         OsFs::new()

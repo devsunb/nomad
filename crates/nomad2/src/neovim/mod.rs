@@ -1,6 +1,7 @@
 //! TODO: docs.
 
 mod api;
+mod buffer;
 mod command;
 mod config;
 mod diagnostic;
@@ -13,6 +14,7 @@ mod serde;
 mod spawner;
 
 pub use api::Api;
+pub use buffer::{Buffer, BufferId};
 pub use command::{
     command,
     Command,
