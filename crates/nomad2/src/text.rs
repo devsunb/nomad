@@ -1,9 +1,9 @@
-use smol_str::SmolStr;
+use compact_str::CompactString;
 
 /// TODO: docs.
 #[derive(Default)]
 pub struct Text {
-    inner: SmolStr,
+    inner: CompactString,
 }
 
 impl Text {
@@ -14,11 +14,11 @@ impl Text {
 
     /// TODO: docs.
     pub fn push(&mut self, ch: char) {
-        todo!();
+        self.inner.push(ch);
     }
 
     /// TODO: docs.
     pub fn push_str(&mut self, s: &str) {
-        todo!();
+        self.inner.push_str(s);
     }
 }

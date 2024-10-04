@@ -12,6 +12,7 @@ neovim = []
 
 [dependencies]
 collab-fs = { workspace = true }
+compact_str = { workspace = true }
 futures-util = { workspace = true }
 nomad-macros = { path = "./macros" }
 serde = { workspace = true }

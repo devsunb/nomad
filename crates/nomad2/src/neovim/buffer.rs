@@ -5,7 +5,6 @@ use core::ops::{Bound, Range, RangeBounds};
 
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf};
 use nvim_oxi::api::{self, Buffer as NvimBuffer};
-use nvim_oxi::Array as NvimArray;
 
 use super::Neovim;
 use crate::{ByteOffset, Text};
