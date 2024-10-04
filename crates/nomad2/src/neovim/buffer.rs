@@ -47,9 +47,36 @@ impl Buffer {
         todo!()
     }
 
+    /// # Panics
+    ///
+    /// Panics if the point range is out of bounds or if the buffer has been
+    /// deleted or unloaded.
     #[track_caller]
     fn get_text_in_point_range(&self, point_range: Range<Point>) -> Text {
-        todo!()
+        let lines = match self.as_nvim().get_text(
+            point_range.start.line_idx..point_range.end.line_idx,
+            point_range.start.byte_offset.into(),
+            point_range.end.byte_offset.into(),
+            &Default::default(),
+        ) {
+            Ok(lines) => lines,
+            Err(err) => panic!("{err}"),
+        };
+
+        let mut text = Text::new();
+
+        let num_lines = lines.len();
+
+        for (idx, line) in lines.enumerate() {
+            let line = line.to_str().expect("line is not UTF-8");
+            text.push_str(line);
+            let is_last = idx + 1 == num_lines;
+            if !is_last {
+                text.push('\n');
+            }
+        }
+
+        text
     }
 
     #[track_caller]
