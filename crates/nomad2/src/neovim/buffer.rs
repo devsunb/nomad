@@ -5,6 +5,7 @@ use core::ops::{Bound, Range, RangeBounds};
 
 use collab_fs::AbsUtf8Path;
 use nvim_oxi::api::{self, Buffer as NvimBuffer};
+use nvim_oxi::Array as NvimArray;
 
 use super::Neovim;
 use crate::{ByteOffset, Text};
@@ -44,7 +45,8 @@ impl Buffer {
 
     #[track_caller]
     fn byte_offset_of_point(&self, point: Point) -> ByteOffset {
-        todo!()
+        point.byte_offset
+            + self.as_nvim().get_offset(point.line_idx).expect("todo")
     }
 
     /// # Panics
@@ -81,7 +83,18 @@ impl Buffer {
 
     #[track_caller]
     fn point_of_byte_offset(&self, byte_offset: ByteOffset) -> Point {
-        todo!()
+        let buf = self.as_nvim();
+
+        let line_idx = buf
+            .call(move |_| {
+                api::call_function::<_, usize>("byte2line", (byte_offset,))
+                    .expect("args are valid")
+            })
+            .expect("todo");
+
+        let line_byte_offset = buf.get_offset(line_idx).expect("todo");
+
+        Point { line_idx, byte_offset: byte_offset - line_byte_offset }
     }
 
     fn point_of_eof(&self) -> Point {

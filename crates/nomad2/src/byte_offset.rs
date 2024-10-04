@@ -52,6 +52,15 @@ impl SubAssign<Self> for ByteOffset {
     }
 }
 
+impl Sub<usize> for ByteOffset {
+    type Output = Self;
+
+    #[inline]
+    fn sub(self, rhs: usize) -> Self {
+        Self(self.0 - rhs)
+    }
+}
+
 impl From<usize> for ByteOffset {
     #[inline]
     fn from(offset: usize) -> Self {
@@ -63,5 +72,13 @@ impl From<ByteOffset> for usize {
     #[inline]
     fn from(offset: ByteOffset) -> usize {
         offset.0
+    }
+}
+
+#[cfg(feature = "neovim")]
+impl From<ByteOffset> for nvim_oxi::Object {
+    #[inline]
+    fn from(offset: ByteOffset) -> Self {
+        (offset.0 as nvim_oxi::Integer).into()
     }
 }
