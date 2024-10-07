@@ -6,6 +6,7 @@ mod command;
 mod config;
 mod cursor;
 mod diagnostic;
+pub mod events;
 mod executor;
 mod function;
 mod join_handle;
