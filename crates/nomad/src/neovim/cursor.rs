@@ -1,5 +1,7 @@
 use core::cmp::Ordering;
 
+use nvim_oxi::api;
+
 use super::{BufferId, Neovim};
 use crate::{ActorId, Context, Emitter, Event, Shared};
 
@@ -35,7 +37,32 @@ impl Ord for CursorEvent {
 
 impl Event<Neovim> for CursorEvent {
     type Payload = Cursor;
-    type SubscribeCtx = ();
+    type SubscribeCtx = u32;
 
-    fn subscribe(&mut self, _: Emitter<Self::Payload>, _: &Context<Neovim>) {}
+    fn subscribe(
+        &mut self,
+        emitter: Emitter<Self::Payload>,
+        _: &Context<Neovim>,
+    ) -> Self::SubscribeCtx {
+        let opts = api::opts::CreateAutocmdOpts::builder()
+            .buffer(self.id.as_nvim().clone())
+            .callback(move |_| {
+                let cursor = Cursor {};
+                emitter.send(cursor);
+                false
+            })
+            .build();
+
+        api::create_autocmd(["CursorMoved", "CursorMovedI"], &opts)
+            .expect("all arguments are valid")
+    }
+
+    fn unsubscribe(
+        &mut self,
+        autocmd_id: Self::SubscribeCtx,
+        _: &Context<Neovim>,
+    ) {
+        // Will fail if someone else has already deleted the autocmd.
+        let _ = api::del_autocmd(autocmd_id);
+    }
 }

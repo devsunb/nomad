@@ -119,6 +119,10 @@ impl fmt::Debug for Buffer {
 }
 
 impl BufferId {
+    pub(super) fn as_nvim(&self) -> &NvimBuffer {
+        &self.inner
+    }
+
     pub(super) fn is_of_text_buffer(&self) -> bool {
         let opts = api::opts::OptionOpts::builder()
             .buffer(self.inner.clone())
