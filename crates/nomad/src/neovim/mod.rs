@@ -4,6 +4,7 @@ mod api;
 mod buffer;
 mod command;
 mod config;
+mod cursor;
 mod diagnostic;
 mod executor;
 mod function;
@@ -23,6 +24,7 @@ pub use command::{
     CommandHandle,
 };
 pub use config::ConfigEvent;
+pub use cursor::{Cursor, CursorEvent};
 pub use diagnostic::{DiagnosticMessage, HighlightGroup};
 pub use function::{function, Function, FunctionEvent, FunctionHandle};
 pub use join_handle::NeovimJoinHandle;

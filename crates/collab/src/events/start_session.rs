@@ -1,4 +1,4 @@
-use nomad::neovim::{self, Neovim};
+use nomad::neovim;
 
 use crate::NeovimCollab;
 

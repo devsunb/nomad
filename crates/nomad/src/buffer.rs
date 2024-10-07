@@ -10,10 +10,19 @@ use crate::{ActorId, ByteOffset, Context, Edit, Editor, Text};
 /// TODO: docs.
 pub trait Buffer<E: Editor> {
     /// TODO: docs.
+    type Cursor;
+
+    /// TODO: docs.
+    type CursorStream: Stream<Item = Self::Cursor>;
+
+    /// TODO: docs.
     type EditStream: Stream<Item = Edit>;
 
     /// TODO: docs.
     type Id: Clone + PartialEq + Hash + Ord;
+
+    /// TODO: docs.
+    fn cursor_stream(&mut self, ctx: &Context<E>) -> Self::CursorStream;
 
     /// TODO: docs.
     fn edit_stream(&mut self, ctx: &Context<E>) -> Self::EditStream;

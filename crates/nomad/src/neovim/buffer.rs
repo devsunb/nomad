@@ -7,7 +7,7 @@ use core::ops::{Bound, Range, RangeBounds};
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf};
 use nvim_oxi::api::{self, Buffer as NvimBuffer};
 
-use super::Neovim;
+use super::{Cursor, CursorEvent, Neovim};
 use crate::{
     ActorId,
     ByteOffset,
@@ -61,8 +61,17 @@ impl Buffer {
 }
 
 impl crate::Buffer<Neovim> for Buffer {
+    type Cursor = Cursor;
+    type CursorStream = Subscription<CursorEvent, Neovim>;
     type EditStream = Subscription<EditEvent, Neovim>;
     type Id = BufferId;
+
+    fn cursor_stream(&mut self, ctx: &Context<Neovim>) -> Self::CursorStream {
+        ctx.subscribe(CursorEvent {
+            id: self.id.clone(),
+            next_cursor_moved_by: self.next_edit_made_by.clone(),
+        })
+    }
 
     fn edit_stream(&mut self, ctx: &Context<Neovim>) -> Self::EditStream {
         ctx.subscribe(EditEvent {
