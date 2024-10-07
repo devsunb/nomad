@@ -8,7 +8,10 @@ use crate::{ActorId, Editor, Shared};
 #[derive(Default)]
 pub struct Neovim {
     /// TODO: docs.
-    actor_ids: NoHashMap<BufferId, Shared<Option<ActorId>>>,
+    next_cursor_ids: NoHashMap<BufferId, Shared<Option<ActorId>>>,
+
+    /// TODO: docs.
+    next_edit_ids: NoHashMap<BufferId, Shared<Option<ActorId>>>,
 }
 
 impl Editor for Neovim {
@@ -26,8 +29,11 @@ impl Editor for Neovim {
         if !buffer_id.is_of_text_buffer() {
             return None;
         }
-        let actor_id = self.actor_ids.entry(buffer_id.clone()).or_default();
-        Some(Buffer::new(buffer_id, actor_id.clone()))
+        let next_cursor_id =
+            self.next_cursor_ids.entry(buffer_id.clone()).or_default().clone();
+        let next_edit_id =
+            self.next_edit_ids.entry(buffer_id.clone()).or_default().clone();
+        Some(Buffer::new(buffer_id, next_cursor_id, next_edit_id))
     }
 
     fn fs(&self) -> Self::Fs {

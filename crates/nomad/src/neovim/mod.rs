@@ -11,6 +11,7 @@ mod function;
 mod join_handle;
 mod module_api;
 mod neovim;
+mod point;
 mod serde;
 mod spawner;
 

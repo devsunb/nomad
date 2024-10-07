@@ -2,12 +2,29 @@ use core::cmp::Ordering;
 
 use nvim_oxi::api;
 
+use super::point::Point;
 use super::{BufferId, Neovim};
 use crate::{ActorId, Context, Emitter, Event, Shared};
 
 /// TODO: docs.
 #[derive(Clone)]
-pub struct Cursor {}
+pub struct Cursor {
+    action: CursorAction,
+    moved_by: ActorId,
+}
+
+/// TODO: docs.
+#[derive(Clone, Copy)]
+pub enum CursorAction {
+    /// The cursor has been moved away from the buffer.
+    Removed,
+
+    /// The cursor has been moved into the buffer at the given point.
+    Created(Point),
+
+    /// The cursor has been moved to the given point.
+    Moved(Point),
+}
 
 /// TODO: docs.
 pub struct CursorEvent {
@@ -46,10 +63,18 @@ impl Event<Neovim> for CursorEvent {
     ) -> Self::SubscribeCtx {
         let opts = api::opts::CreateAutocmdOpts::builder()
             .buffer(self.id.as_nvim().clone())
-            .callback(move |_| {
-                let cursor = Cursor {};
-                emitter.send(cursor);
-                false
+            .callback({
+                let next_cursor_moved_by = self.next_cursor_moved_by.clone();
+                move |_| {
+                    let action = CursorAction::Moved(Point::zero());
+
+                    let moved_by = next_cursor_moved_by
+                        .with_mut(Option::take)
+                        .unwrap_or(ActorId::unknown());
+
+                    emitter.send(Cursor { action, moved_by });
+                    false
+                }
             })
             .build();
 

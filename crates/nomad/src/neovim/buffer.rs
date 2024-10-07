@@ -7,6 +7,7 @@ use core::ops::{Bound, Range, RangeBounds};
 use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf};
 use nvim_oxi::api::{self, Buffer as NvimBuffer};
 
+use super::point::Point;
 use super::{Cursor, CursorEvent, Neovim};
 use crate::{
     ActorId,
@@ -26,6 +27,9 @@ pub struct Buffer {
     id: BufferId,
 
     /// TODO: docs.
+    next_cursor_moved_by: Shared<Option<ActorId>>,
+
+    /// TODO: docs.
     next_edit_made_by: Shared<Option<ActorId>>,
 }
 
@@ -41,22 +45,13 @@ pub struct EditEvent {
     next_edit_made_by: Shared<Option<ActorId>>,
 }
 
-/// The 2D equivalent of a `ByteOffset`.
-#[derive(PartialEq)]
-struct Point {
-    /// The index of the line in the buffer.
-    line_idx: usize,
-
-    /// The byte offset in the line.
-    byte_offset: ByteOffset,
-}
-
 impl Buffer {
     pub(super) fn new(
         id: BufferId,
+        next_cursor_moved_by: Shared<Option<ActorId>>,
         next_edit_made_by: Shared<Option<ActorId>>,
     ) -> Self {
-        Self { id, next_edit_made_by }
+        Self { id, next_cursor_moved_by, next_edit_made_by }
     }
 }
 
@@ -69,7 +64,7 @@ impl crate::Buffer<Neovim> for Buffer {
     fn cursor_stream(&mut self, ctx: &Context<Neovim>) -> Self::CursorStream {
         ctx.subscribe(CursorEvent {
             id: self.id.clone(),
-            next_cursor_moved_by: self.next_edit_made_by.clone(),
+            next_cursor_moved_by: self.next_cursor_moved_by.clone(),
         })
     }
 
@@ -381,12 +376,6 @@ impl Event<Neovim> for EditEvent {
         _: &Context<Neovim>,
     ) {
         should_detach.set(true);
-    }
-}
-
-impl Point {
-    fn zero() -> Self {
-        Self { line_idx: 0, byte_offset: ByteOffset::new(0) }
     }
 }
 
