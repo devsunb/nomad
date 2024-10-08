@@ -18,7 +18,8 @@ use root_finder::Finder;
 use tracing::error;
 
 use crate::events::cursor::{Cursor, CursorAction};
-use crate::events::{Edit, Edits, Selection, SelectionEvent};
+use crate::events::edit::Edit;
+use crate::events::selection::Selection;
 use crate::{CollabEditor, Config, SessionId};
 
 pub(crate) struct Session<E: CollabEditor> {
@@ -235,11 +236,11 @@ impl<E: CollabEditor> Session<E> {
     }
 
     fn is_ignored(&mut self, id: &E::FileId) -> bool {
-        !self.editor.is_text_file(&id)
+        !self.editor.is_text_file(id)
     }
 
     fn is_in_project_tree(&mut self, id: &E::FileId) -> bool {
-        let mut path = self.editor.path(&id).into_owned();
+        let mut path = self.editor.path(id).into_owned();
 
         loop {
             if path == self.project_root {
@@ -432,7 +433,7 @@ impl<E: CollabEditor> Session<E> {
 
     async fn sync_selection_changed(
         &mut self,
-        selection: Selection,
+        selection: Selection<E>,
     ) -> Result<(), RunSessionError> {
         todo!();
     }

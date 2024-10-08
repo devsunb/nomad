@@ -1,21 +1,13 @@
 use std::borrow::Cow;
 
 use collab_fs::AbsUtf8Path;
-use futures_util::stream::{select, Pending, Select};
+use futures_util::stream::{select, Select};
 use nomad::neovim::events::{CommandEvent, ConfigEvent, FunctionEvent};
 use nomad::neovim::{self, command, function, module_api, ModuleApi, Neovim};
-use nomad::{
-    module_name,
-    Buffer,
-    Context,
-    Editor,
-    Module,
-    ModuleName,
-    Subscription,
-};
+use nomad::{module_name, Buffer, Context, Module, ModuleName, Subscription};
 
 use crate::collab_editor::CollabEditor;
-use crate::events::{self, JoinSession, Selection, StartSession};
+use crate::events::{self, JoinSession, StartSession};
 use crate::{Collab, Config};
 
 /// TODO: docs.
@@ -58,11 +50,13 @@ impl Module<Neovim> for NeovimCollab {
 }
 
 impl CollabEditor for Neovim {
-    type FileId = neovim::BufferId;
     type CursorId = ();
-    type Cursors = events::cursor::Cursors;
-    type Edits = events::edit::Edits;
-    type Selections = Pending<Selection>;
+    type FileId = neovim::BufferId;
+    type SelectionId = ();
+
+    type Cursors = events::cursor::NeovimCursors;
+    type Edits = events::edit::NeovimEdits;
+    type Selections = events::selection::NeovimSelections;
 
     fn cursors(&mut self, _file_id: &Self::FileId) -> Self::Cursors {
         todo!();

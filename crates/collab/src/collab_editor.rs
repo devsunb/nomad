@@ -6,15 +6,19 @@ use collab_fs::AbsUtf8Path;
 use futures_util::Stream;
 
 use crate::events::cursor::Cursor;
-use crate::events::{Edit, Selection};
+use crate::events::edit::Edit;
+use crate::events::selection::Selection;
 use crate::{Config, SessionId};
 
 pub(crate) trait CollabEditor: Sized {
     /// TODO: docs.
+    type CursorId: Clone + Eq + Hash + Debug;
+
+    /// TODO: docs.
     type FileId: Clone + Eq + Hash;
 
     /// TODO: docs.
-    type CursorId: Clone + Eq + Hash + Debug;
+    type SelectionId: Clone + Eq + Hash + Debug;
 
     /// TODO: docs.
     type Cursors: Stream<Item = Cursor<Self>> + Unpin;
@@ -23,7 +27,7 @@ pub(crate) trait CollabEditor: Sized {
     type Edits: Stream<Item = Edit<Self>> + Unpin;
 
     /// TODO: docs.
-    type Selections: Stream<Item = Selection> + Unpin;
+    type Selections: Stream<Item = Selection<Self>> + Unpin;
 
     /// TODO: docs.
     fn cursors(&mut self, file_id: &Self::FileId) -> Self::Cursors;

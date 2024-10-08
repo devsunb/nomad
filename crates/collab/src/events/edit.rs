@@ -6,7 +6,7 @@ use smol_str::SmolStr;
 
 use crate::CollabEditor;
 
-pub(crate) type Edits = neovim::Edits;
+pub(crate) type NeovimEdits = neovim::Edits;
 
 pub(crate) struct Edit<E: CollabEditor> {
     pub(crate) file_id: E::FileId,

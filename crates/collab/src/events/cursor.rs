@@ -2,7 +2,7 @@ use nomad::ByteOffset;
 
 use crate::CollabEditor;
 
-pub(crate) type Cursors = neovim::Cursors;
+pub(crate) type NeovimCursors = neovim::Cursors;
 
 pub(crate) struct Cursor<E: CollabEditor> {
     pub(crate) action: CursorAction,
