@@ -1,28 +1,58 @@
 use core::cmp::Ordering;
+use core::marker::PhantomData;
+use core::ops::Range;
 
 use nvim_oxi::api;
 
-use crate::neovim::{BufferId, Neovim, Point};
-use crate::{
-    ActorId,
-    ByteOffset,
-    Context,
-    Edit,
-    Emitter,
-    Event,
-    Hunk,
-    Shared,
-    Text,
-};
+use crate::neovim::{BufferId, Neovim, Offset, Point};
+use crate::{ActorId, ByteOffset, Context, Emitter, Event, Shared, Text};
 
 /// TODO: docs.
-pub struct EditEvent {
-    pub(in crate::neovim) id: BufferId,
-    pub(in crate::neovim) next_edit_made_by: Shared<Option<ActorId>>,
+pub struct Edit<T> {
+    actor_id: ActorId,
+    hunk: Hunk<T>,
 }
 
-impl Event<Neovim> for EditEvent {
-    type Payload = Edit;
+/// TODO: docs.
+pub struct EditEvent<T> {
+    id: BufferId,
+    next_edit_made_by: Shared<Option<ActorId>>,
+    ty: PhantomData<T>,
+}
+
+struct Hunk<T> {
+    deleted_range: Range<T>,
+    inserted_text: Text,
+}
+
+impl<T> Edit<T> {
+    /// TODO: docs.
+    pub fn actor_id(&self) -> ActorId {
+        self.actor_id
+    }
+
+    /// TODO: docs.
+    pub fn deleted_range(&self) -> &Range<T> {
+        &self.hunk.deleted_range
+    }
+
+    /// TODO: docs.
+    pub fn inserted_text(&self) -> &Text {
+        &self.hunk.inserted_text
+    }
+}
+
+impl<T> EditEvent<T> {
+    pub(crate) fn new(
+        id: BufferId,
+        next_edit_made_by: Shared<Option<ActorId>>,
+    ) -> Self {
+        Self { id, next_edit_made_by, ty: PhantomData }
+    }
+}
+
+impl<T: Offset> Event<Neovim> for EditEvent<T> {
+    type Payload = Edit<T>;
     type SubscribeCtx = Shared<bool>;
 
     fn subscribe(
@@ -40,7 +70,7 @@ impl Event<Neovim> for EditEvent {
                     let actor_id = next_edit_made_by
                         .with_mut(Option::take)
                         .unwrap_or(ActorId::unknown());
-                    let edit = Edit::new(actor_id, [Hunk::from(args)]);
+                    let edit = Edit { actor_id, hunk: Hunk::from(args) };
                     emitter.send(edit);
                     should_detach.get()
                 }
@@ -63,25 +93,25 @@ impl Event<Neovim> for EditEvent {
     }
 }
 
-impl From<api::opts::OnBytesArgs> for Hunk {
+impl<T: Offset> From<api::opts::OnBytesArgs> for Hunk<T> {
     #[inline]
-    fn from(
-        (
-            _bytes,
-            buf,
+    fn from(args: nvim_oxi::api::opts::OnBytesArgs) -> Self {
+        let &(
+            ref _bytes,
+            ref buf,
             _changedtick,
             start_row,
             start_col,
             start_offset,
             _old_end_row,
             _old_end_col,
-            old_end_len,
+            _old_end_len,
             new_end_row,
             new_end_col,
             _new_end_len,
-        ): nvim_oxi::api::opts::OnBytesArgs,
-    ) -> Self {
-        let buf = BufferId::new(buf);
+        ) = &args;
+
+        let buf = BufferId::new(buf.clone());
 
         let start = Point {
             line_idx: start_row,
@@ -95,34 +125,33 @@ impl From<api::opts::OnBytesArgs> for Hunk {
                 .into(),
         };
 
-        let replacement = if start == end {
+        let inserted_text = if start == end {
             Text::new()
         } else {
             buf.get_text_in_point_range(start..end)
         };
 
-        let deleted_range =
-            start_offset.into()..(start_offset + old_end_len).into();
+        let deleted_range = T::deleted_range(&args);
 
-        Hunk::new(deleted_range, replacement.as_str())
+        Hunk { deleted_range, inserted_text }
     }
 }
 
-impl PartialEq for EditEvent {
+impl<T> PartialEq for EditEvent<T> {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
     }
 }
 
-impl Eq for EditEvent {}
+impl<T> Eq for EditEvent<T> {}
 
-impl PartialOrd for EditEvent {
+impl<T> PartialOrd for EditEvent<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for EditEvent {
+impl<T> Ord for EditEvent<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.id.cmp(&other.id)
     }

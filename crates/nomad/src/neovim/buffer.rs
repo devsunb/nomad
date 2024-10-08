@@ -8,7 +8,7 @@ use collab_fs::{AbsUtf8Path, AbsUtf8PathBuf};
 use nvim_oxi::api::{self, Buffer as NvimBuffer};
 
 use super::events::{CursorEvent, EditEvent};
-use super::{Neovim, Point};
+use super::{Neovim, Offset, Point};
 use crate::{ActorId, ByteOffset, Context, Shared, Subscription, Text};
 
 /// TODO: docs.
@@ -41,14 +41,14 @@ impl Buffer {
     }
 
     /// TODO: docs.
-    pub fn edit_stream(
+    pub fn edit_stream<T: Offset>(
         &mut self,
         ctx: &Context<Neovim>,
-    ) -> Subscription<EditEvent, Neovim> {
-        ctx.subscribe(EditEvent {
-            id: self.id.clone(),
-            next_edit_made_by: self.next_edit_made_by.clone(),
-        })
+    ) -> Subscription<EditEvent<T>, Neovim> {
+        ctx.subscribe(EditEvent::new(
+            self.id.clone(),
+            self.next_edit_made_by.clone(),
+        ))
     }
 
     pub(super) fn new(
