@@ -16,14 +16,8 @@ use nomad_server::{Io, Message};
 use root_finder::markers::Git;
 use root_finder::Finder;
 
-use crate::events::{
-    Cursor,
-    CursorEvent,
-    Edit,
-    EditEvent,
-    Selection,
-    SelectionEvent,
-};
+use crate::events::cursor::Cursor;
+use crate::events::{Edit, EditEvent, Selection, SelectionEvent};
 use crate::{CollabEditor, Config, SessionId};
 
 pub(crate) struct Session<E: CollabEditor> {
@@ -59,7 +53,7 @@ pub(crate) struct Session<E: CollabEditor> {
     subs_edits: HashMap<FileId, E::EditStream>,
 
     /// TODO: docs.
-    subs_cursors: HashMap<FileId, E::CursorStream>,
+    subs_cursors: HashMap<FileId, E::Cursors>,
 
     /// TODO: docs.
     subs_selections: HashMap<FileId, E::SelectionStream>,
@@ -219,7 +213,7 @@ impl<E: CollabEditor> Session<E> {
     #[inline]
     async fn sync_cursor_moved(
         &mut self,
-        cursor: Cursor,
+        cursor: Cursor<E>,
     ) -> Result<(), RunSessionError> {
         todo!();
     }
