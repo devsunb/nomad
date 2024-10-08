@@ -242,7 +242,9 @@ impl<E: CollabEditor> Session<E> {
             CursorAction::Moved(pos) => {
                 self.sync_moved_cursor(file_id, cursor_id, pos).await
             },
-            _ => todo!(),
+            CursorAction::Removed => {
+                self.sync_removed_cursor(file_id, cursor_id).await
+            },
         }
     }
 
@@ -306,6 +308,31 @@ impl<E: CollabEditor> Session<E> {
 
         let outbound = Outbound {
             message: Message::Project(ProjectMessage::MovedCursor(msg)),
+            recipients: Recipients::except([]),
+            should_compress: false,
+        };
+
+        self.sender.send(outbound).await.map_err(Into::into)
+    }
+
+    async fn sync_removed_cursor(
+        &mut self,
+        file_id: E::FileId,
+        cursor_id: E::CursorId,
+    ) -> Result<(), RunSessionError> {
+        let file_id = self.to_file_id(file_id);
+
+        let cursor = self
+            .cursors
+            .remove_local(cursor_id)
+            .expect("cursor has not been removed yet");
+
+        let action = actions::remove_cursor::RemovedCursor { cursor };
+
+        let msg = self.project.synchronize(action);
+
+        let outbound = Outbound {
+            message: Message::Project(ProjectMessage::RemovedCursor(msg)),
             recipients: Recipients::except([]),
             should_compress: false,
         };
