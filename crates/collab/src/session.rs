@@ -487,6 +487,23 @@ impl<E: CollabEditor> Session<E> {
             .await
     }
 
+    async fn sync_removed_selection(
+        &mut self,
+        selection_id: E::SelectionId,
+    ) -> Result<(), RunSessionError> {
+        let selection = self
+            .selections
+            .remove_local(selection_id)
+            .expect("selection has not been removed yet");
+
+        let action = actions::remove_selection::RemovedSelection { selection };
+
+        let msg = self.project.synchronize(action);
+
+        self.broadcast(Message::Project(ProjectMessage::RemovedSelection(msg)))
+            .await
+    }
+
     async fn sync_removed_cursor(
         &mut self,
         cursor_id: E::CursorId,
@@ -528,8 +545,7 @@ impl<E: CollabEditor> Session<E> {
                 .await
             },
             SelectionAction::Removed => {
-                todo!();
-                // self.sync_removed_selection(selection.selection_id).await
+                self.sync_removed_selection(selection.selection_id).await
             },
         }
     }
