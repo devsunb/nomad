@@ -4,13 +4,7 @@ use nomad::neovim::{self, command, function, module_api, ModuleApi, Neovim};
 use nomad::{module_name, Context, Module, ModuleName, Subscription};
 
 use crate::collab_editor::CollabEditor;
-use crate::events::{
-    self,
-    EditEvent,
-    JoinSession,
-    SelectionEvent,
-    StartSession,
-};
+use crate::events::{self, JoinSession, SelectionEvent, StartSession};
 use crate::{Collab, Config};
 
 /// TODO: docs.
@@ -56,6 +50,7 @@ impl CollabEditor for Neovim {
     type FileId = neovim::BufferId;
     type CursorId = ();
     type Cursors = events::cursor::Cursors;
+    type Edits = events::edit::Edits;
 
     fn cursors(_ed: &Context<Self>, _file_id: Self::FileId) -> Self::Cursors {
         todo!();
@@ -70,6 +65,5 @@ impl CollabEditor for Neovim {
         Subscription<CommandEvent<StartSession>, Neovim>,
         Subscription<FunctionEvent<StartSession>, Neovim>,
     >;
-    type EditStream = Subscription<EditEvent, Neovim>;
     type SelectionStream = Subscription<SelectionEvent, Neovim>;
 }

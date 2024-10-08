@@ -1,21 +1,66 @@
-use nomad::neovim::Neovim;
-use nomad::{Context, Emitter, Event};
+use nomad::ByteOffset;
+use smallvec::SmallVec;
+use smol_str::SmolStr;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct EditEvent {}
+use crate::CollabEditor;
 
-impl Event<Neovim> for EditEvent {
-    type Payload = Edit;
-    type SubscribeCtx = ();
+pub(crate) type Edits = neovim::Edits;
 
-    fn subscribe(
-        &mut self,
-        emitter: Emitter<Self::Payload>,
-        _ctx: &Context<Neovim>,
-    ) {
-        todo!();
-    }
+pub(crate) struct Edit<E: CollabEditor> {
+    pub(crate) file_id: E::FileId,
+    pub(crate) hunks: SmallVec<[Hunk; 1]>,
 }
 
 #[derive(Clone)]
-pub(crate) struct Edit {}
+pub(crate) struct Hunk {
+    pub(crate) start: ByteOffset,
+    pub(crate) end: ByteOffset,
+    pub(crate) text: SmolStr,
+}
+
+mod neovim {
+    use core::pin::Pin;
+    use core::task::{Context, Poll};
+
+    use futures_util::Stream;
+    use nomad::neovim::{self, Neovim};
+    use nomad::Subscription;
+
+    use super::*;
+
+    pin_project_lite::pin_project! {
+        /// TODO: docs.
+        pub(crate) struct Edits {
+            buffer_id: neovim::BufferId,
+            #[pin]
+            inner: Subscription<neovim::events::EditEvent<ByteOffset>, Neovim>,
+        }
+    }
+
+    impl Stream for Edits {
+        type Item = super::Edit<Neovim>;
+
+        fn poll_next(
+            self: Pin<&mut Self>,
+            ctx: &mut Context,
+        ) -> Poll<Option<Self::Item>> {
+            let this = self.project();
+            this.inner.poll_next(ctx).map(|maybe_edit| {
+                maybe_edit.map(|edit| Edit {
+                    file_id: this.buffer_id.clone(),
+                    hunks: smallvec::smallvec![edit.into()],
+                })
+            })
+        }
+    }
+
+    impl From<neovim::events::Edit<ByteOffset>> for super::Hunk {
+        fn from(edit: neovim::events::Edit<ByteOffset>) -> Self {
+            Self {
+                start: edit.deleted_range().start,
+                end: edit.deleted_range().end,
+                text: edit.inserted_text().as_str().into(),
+            }
+        }
+    }
+}

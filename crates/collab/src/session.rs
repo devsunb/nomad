@@ -26,7 +26,7 @@ use root_finder::Finder;
 use tracing::error;
 
 use crate::events::cursor::{Cursor, CursorAction};
-use crate::events::{Edit, EditEvent, Selection, SelectionEvent};
+use crate::events::{Edit, Edits, Selection, SelectionEvent};
 use crate::{CollabEditor, Config, SessionId};
 
 pub(crate) struct Session<E: CollabEditor> {
@@ -59,7 +59,7 @@ pub(crate) struct Session<E: CollabEditor> {
     sender: Sender,
 
     /// TODO: docs.
-    subs_edits: HashMap<FileId, E::EditStream>,
+    subs_edits: HashMap<FileId, E::Edits>,
 
     /// TODO: docs.
     subs_cursors: HashMap<FileId, E::Cursors>,
@@ -343,15 +343,13 @@ impl<E: CollabEditor> Session<E> {
             .await
     }
 
-    #[inline]
     async fn sync_local_edit(
         &mut self,
-        edit: Edit,
+        edit: Edit<E>,
     ) -> Result<(), RunSessionError> {
         todo!();
     }
 
-    #[inline]
     async fn sync_selection_changed(
         &mut self,
         selection: Selection,
@@ -359,7 +357,6 @@ impl<E: CollabEditor> Session<E> {
         todo!();
     }
 
-    #[inline]
     fn to_file_id(&self, file_id: E::FileId) -> FileId {
         todo!();
     }

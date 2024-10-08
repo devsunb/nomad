@@ -1,7 +1,7 @@
 use compact_str::CompactString;
 
 /// TODO: docs.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Text {
     inner: CompactString,
 }

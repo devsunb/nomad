@@ -8,6 +8,7 @@ use crate::neovim::{BufferId, Neovim, Offset, Point};
 use crate::{ActorId, ByteOffset, Context, Emitter, Event, Shared, Text};
 
 /// TODO: docs.
+#[derive(Clone)]
 pub struct Edit<T> {
     actor_id: ActorId,
     hunk: Hunk<T>,
@@ -20,6 +21,7 @@ pub struct EditEvent<T> {
     ty: PhantomData<T>,
 }
 
+#[derive(Clone)]
 struct Hunk<T> {
     deleted_range: Range<T>,
     inserted_text: Text,

@@ -19,11 +19,13 @@ pub(crate) trait CollabEditor: Editor {
     type Cursors: Stream<Item = Cursor<Self>> + Unpin;
 
     /// TODO: docs.
+    type Edits: Stream<Item = Edit<Self>> + Unpin;
+
+    /// TODO: docs.
     fn cursors(ctx: &Context<Self>, file_id: Self::FileId) -> Self::Cursors;
 
     type ConfigStream: Stream<Item = Config> + Unpin;
     type JoinStream: Stream<Item = SessionId> + Unpin;
     type StartStream: Stream<Item = ()> + Unpin;
-    type EditStream: Stream<Item = Edit> + Unpin;
     type SelectionStream: Stream<Item = Selection> + Unpin;
 }
