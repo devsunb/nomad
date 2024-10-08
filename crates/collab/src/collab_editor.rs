@@ -21,6 +21,12 @@ pub(crate) trait CollabEditor: Sized {
     type SelectionId: Clone + Eq + Hash + Debug;
 
     /// TODO: docs.
+    type OpenFiles: Stream<Item = Self::FileId> + Unpin;
+
+    /// TODO: docs.
+    type CloseFiles: Stream<Item = Self::FileId> + Unpin;
+
+    /// TODO: docs.
     type Cursors: Stream<Item = Cursor<Self>> + Unpin;
 
     /// TODO: docs.
@@ -28,6 +34,12 @@ pub(crate) trait CollabEditor: Sized {
 
     /// TODO: docs.
     type Selections: Stream<Item = Selection<Self>> + Unpin;
+
+    /// TODO: docs.
+    fn open_files(&mut self) -> Self::OpenFiles;
+
+    /// TODO: docs.
+    fn close_files(&mut self) -> Self::CloseFiles;
 
     /// TODO: docs.
     fn cursors(&mut self, file_id: &Self::FileId) -> Self::Cursors;

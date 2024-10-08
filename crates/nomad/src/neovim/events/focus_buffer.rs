@@ -6,6 +6,7 @@ use crate::neovim::{BufferId, Neovim};
 use crate::{ActorId, Context, Emitter, Event, Shared};
 
 /// TODO: docs.
+#[derive(Clone)]
 pub struct FocusBuffer {
     focused_by: ActorId,
     id: BufferId,

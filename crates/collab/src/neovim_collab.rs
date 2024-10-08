@@ -54,15 +54,29 @@ impl CollabEditor for Neovim {
     type FileId = neovim::BufferId;
     type SelectionId = ();
 
+    type OpenFiles = events::open_file::NeovimOpenFiles;
+    type CloseFiles = events::close_file::NeovimCloseFiles;
     type Cursors = events::cursor::NeovimCursors;
     type Edits = events::edit::NeovimEdits;
     type Selections = events::selection::NeovimSelections;
+
+    fn open_files(&mut self) -> Self::OpenFiles {
+        todo!();
+    }
+
+    fn close_files(&mut self) -> Self::CloseFiles {
+        todo!();
+    }
 
     fn cursors(&mut self, _file_id: &Self::FileId) -> Self::Cursors {
         todo!();
     }
 
     fn edits(&mut self, _file_id: &Self::FileId) -> Self::Edits {
+        todo!();
+    }
+
+    fn selections(&mut self, _file_id: &Self::FileId) -> Self::Selections {
         todo!();
     }
 
@@ -78,10 +92,6 @@ impl CollabEditor for Neovim {
                 .expect("already checked")
                 .into_owned(),
         )
-    }
-
-    fn selections(&mut self, _file_id: &Self::FileId) -> Self::Selections {
-        todo!();
     }
 
     type ConfigStream = Subscription<ConfigEvent<NeovimCollab>, Neovim>;
