@@ -53,7 +53,7 @@ impl<E: CollabEditor> Collab<E> {
             }
         };
 
-        self.ctx.spawner().spawn(fut).detach();
+        // self.ctx.spawner().spawn(fut).detach();
     }
 
     fn start_session(&self) {
@@ -74,6 +74,6 @@ impl<E: CollabEditor> Collab<E> {
             }
         };
 
-        self.ctx.spawner().spawn(fut).detach();
+        // self.ctx.spawner().spawn(fut).detach();
     }
 }

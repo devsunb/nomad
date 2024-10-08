@@ -2,15 +2,14 @@ use core::fmt::Debug;
 use core::hash::Hash;
 
 use futures_util::Stream;
-use nomad::{Context, Editor};
 
 use crate::events::cursor::Cursor;
 use crate::events::{Edit, Selection};
 use crate::{Config, SessionId};
 
-pub(crate) trait CollabEditor: Editor {
+pub(crate) trait CollabEditor: Sized {
     /// TODO: docs.
-    type FileId: Hash + Clone;
+    type FileId: Clone + Eq + Hash;
 
     /// TODO: docs.
     type CursorId: Clone + Eq + Hash + Debug;
@@ -22,10 +21,18 @@ pub(crate) trait CollabEditor: Editor {
     type Edits: Stream<Item = Edit<Self>> + Unpin;
 
     /// TODO: docs.
-    fn cursors(ctx: &Context<Self>, file_id: Self::FileId) -> Self::Cursors;
+    type Selections: Stream<Item = Selection> + Unpin;
+
+    /// TODO: docs.
+    fn edits(&mut self, file_id: &Self::FileId) -> Self::Edits;
+
+    /// TODO: docs.
+    fn cursors(&mut self, file_id: &Self::FileId) -> Self::Cursors;
+
+    /// TODO: docs.
+    fn selections(&mut self, file_id: &Self::FileId) -> Self::Selections;
 
     type ConfigStream: Stream<Item = Config> + Unpin;
     type JoinStream: Stream<Item = SessionId> + Unpin;
     type StartStream: Stream<Item = ()> + Unpin;
-    type SelectionStream: Stream<Item = Selection> + Unpin;
 }

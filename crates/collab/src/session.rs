@@ -10,15 +10,7 @@ use collab_server::JoinRequest;
 use futures_util::stream::select_all;
 use futures_util::{select, FutureExt, SinkExt, StreamExt};
 use nohash::{IntMap as NoHashMap, IntSet as NoHashSet};
-use nomad::{
-    ByteOffset,
-    Context,
-    Editor,
-    Event,
-    JoinHandle,
-    Spawner,
-    Subscription,
-};
+use nomad::{ByteOffset, Context, JoinHandle, Spawner, Subscription};
 use nomad_server::client::{Joined, Receiver, Sender};
 use nomad_server::{Io, Message, ProjectMessage};
 use root_finder::markers::Git;
@@ -34,7 +26,7 @@ pub(crate) struct Session<E: CollabEditor> {
     config: Config,
 
     /// TODO: docs.
-    ctx: Context<E>,
+    editor: E,
 
     /// The session's ID.
     id: SessionId,
@@ -59,13 +51,13 @@ pub(crate) struct Session<E: CollabEditor> {
     sender: Sender,
 
     /// TODO: docs.
-    subs_edits: HashMap<FileId, E::Edits>,
+    subs_edits: HashMap<E::FileId, E::Edits>,
 
     /// TODO: docs.
-    subs_cursors: HashMap<FileId, E::Cursors>,
+    subs_cursors: HashMap<E::FileId, E::Cursors>,
 
     /// TODO: docs.
-    subs_selections: HashMap<FileId, E::SelectionStream>,
+    subs_selections: HashMap<E::FileId, E::Selections>,
 
     /// TODO: docs.
     cursors: Cursors<E>,
@@ -157,45 +149,26 @@ impl<E: CollabEditor> Session<E> {
         project_root: AbsUtf8PathBuf,
     ) -> Self {
         let Joined { sender, receiver, join_response, peers } = joined;
-        Self {
-            config,
-            cursors: Default::default(),
-            ctx,
-            id: SessionId(join_response.session_id),
-            peers,
-            project,
-            project_root,
-            receiver,
-            sender,
-            server_id: join_response.server_id,
-            subs_cursors: HashMap::new(),
-            subs_edits: HashMap::new(),
-            subs_selections: HashMap::new(),
-        }
+        todo!();
+        // Self {
+        //     config,
+        //     cursors: Default::default(),
+        //     // ctx,
+        //     id: SessionId(join_response.session_id),
+        //     peers,
+        //     project,
+        //     project_root,
+        //     receiver,
+        //     sender,
+        //     server_id: join_response.server_id,
+        //     subs_cursors: HashMap::new(),
+        //     subs_edits: HashMap::new(),
+        //     subs_selections: HashMap::new(),
+        // }
     }
 }
 
 impl<E: CollabEditor> Session<E> {
-    async fn broadcast(
-        &mut self,
-        message: impl Into<Message>,
-    ) -> Result<(), RunSessionError> {
-        let outbound = Outbound {
-            message: message.into(),
-            recipients: Recipients::except([self.server_id]),
-            should_compress: false,
-        };
-
-        self.sender.send(outbound).await.map_err(Into::into)
-    }
-
-    async fn integrate_message(
-        &mut self,
-        message: Message,
-    ) -> Result<(), RunSessionError> {
-        todo!();
-    }
-
     pub(crate) async fn run(mut self) -> Result<(), RunSessionError> {
         loop {
             let mut cursors = select_all(self.subs_cursors.values_mut());
@@ -241,7 +214,47 @@ impl<E: CollabEditor> Session<E> {
         }
     }
 
-    #[inline]
+    async fn broadcast(
+        &mut self,
+        message: impl Into<Message>,
+    ) -> Result<(), RunSessionError> {
+        let outbound = Outbound {
+            message: message.into(),
+            recipients: Recipients::except([self.server_id]),
+            should_compress: false,
+        };
+
+        self.sender.send(outbound).await.map_err(Into::into)
+    }
+
+    async fn integrate_message(
+        &mut self,
+        message: Message,
+    ) -> Result<(), RunSessionError> {
+        todo!();
+    }
+
+    fn is_opened(&self, file_id: &E::FileId) -> bool {
+        self.subs_edits.contains_key(file_id)
+    }
+
+    fn on_closed_file(&mut self, file_id: E::FileId) {
+        assert!(self.is_opened(&file_id), "file not opened");
+        self.subs_edits.remove(&file_id);
+        self.subs_cursors.remove(&file_id);
+        self.subs_selections.remove(&file_id);
+    }
+
+    fn on_opened_file(&mut self, file_id: E::FileId) {
+        assert!(!self.is_opened(&file_id), "file already opened");
+        let edits = self.editor.edits(&file_id);
+        let cursors = self.editor.cursors(&file_id);
+        let selections = self.editor.selections(&file_id);
+        self.subs_edits.insert(file_id.clone(), edits);
+        self.subs_cursors.insert(file_id.clone(), cursors);
+        self.subs_selections.insert(file_id.clone(), selections);
+    }
+
     async fn sync_cursor(
         &mut self,
         cursor: Cursor<E>,
@@ -499,17 +512,17 @@ impl<E: CollabEditor> Drop for Session<E> {
             return;
         }
 
-        let fs = self.ctx.fs();
-        let project_root = self.project_root.clone();
-
-        self.ctx
-            .spawner()
-            .spawn(async move {
-                if let Err(err) = fs.remove_dir(&project_root).await {
-                    println!("failed to remove project directory: {err}");
-                }
-            })
-            .detach();
+        // let fs = self.ctx.fs();
+        // let project_root = self.project_root.clone();
+        //
+        // self.ctx
+        //     .spawner()
+        //     .spawn(async move {
+        //         if let Err(err) = fs.remove_dir(&project_root).await {
+        //             println!("failed to remove project directory: {err}");
+        //         }
+        //     })
+        //     .detach();
     }
 }
 

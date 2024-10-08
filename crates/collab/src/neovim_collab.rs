@@ -1,10 +1,10 @@
-use futures_util::stream::{select, Select};
+use futures_util::stream::{select, Pending, Select};
 use nomad::neovim::events::{CommandEvent, ConfigEvent, FunctionEvent};
 use nomad::neovim::{self, command, function, module_api, ModuleApi, Neovim};
 use nomad::{module_name, Context, Module, ModuleName, Subscription};
 
 use crate::collab_editor::CollabEditor;
-use crate::events::{self, JoinSession, SelectionEvent, StartSession};
+use crate::events::{self, JoinSession, Selection, StartSession};
 use crate::{Collab, Config};
 
 /// TODO: docs.
@@ -51,8 +51,17 @@ impl CollabEditor for Neovim {
     type CursorId = ();
     type Cursors = events::cursor::Cursors;
     type Edits = events::edit::Edits;
+    type Selections = Pending<Selection>;
 
-    fn cursors(_ed: &Context<Self>, _file_id: Self::FileId) -> Self::Cursors {
+    fn cursors(&mut self, _file_id: &Self::FileId) -> Self::Cursors {
+        todo!();
+    }
+
+    fn edits(&mut self, _file_id: &Self::FileId) -> Self::Edits {
+        todo!();
+    }
+
+    fn selections(&mut self, _file_id: &Self::FileId) -> Self::Selections {
         todo!();
     }
 
@@ -65,5 +74,4 @@ impl CollabEditor for Neovim {
         Subscription<CommandEvent<StartSession>, Neovim>,
         Subscription<FunctionEvent<StartSession>, Neovim>,
     >;
-    type SelectionStream = Subscription<SelectionEvent, Neovim>;
 }
