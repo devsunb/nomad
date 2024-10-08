@@ -265,6 +265,7 @@ dependencies = [
  "pin-project-lite",
  "root-finder",
  "serde",
+ "tracing",
 ]
 
 [[package]]

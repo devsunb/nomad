@@ -18,6 +18,7 @@ nomad-server = { git = "ssh://git@github.com/nomad/collab.git", default-features
 pin-project-lite = { workspace = true }
 root-finder = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
 
 [lints]
 workspace = true
