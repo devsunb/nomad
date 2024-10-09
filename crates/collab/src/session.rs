@@ -413,7 +413,8 @@ impl<E: CollabEditor> Session<E> {
                 self.integrate_moved_selection(msg).await
             },
             ProjectMessage::RemovedCursor(msg) => {
-                self.integrate_removed_cursor(msg).await
+                self.integrate_removed_cursor(msg);
+                Ok(())
             },
             ProjectMessage::RemovedDirectory(msg) => {
                 self.integrate_removed_directory(msg).await
@@ -427,11 +428,26 @@ impl<E: CollabEditor> Session<E> {
         }
     }
 
-    async fn integrate_removed_cursor(
+    fn integrate_removed_cursor(
         &mut self,
-        _msg: actions::remove_cursor::RemovedCursorRemote,
-    ) -> Result<(), RunSessionError> {
-        Ok(())
+        msg: actions::remove_cursor::RemovedCursorRemote,
+    ) {
+        let Some(remove_cursor) = self.project.integrate(msg) else {
+            return;
+        };
+
+        let cursor = self
+            .cursors
+            .remove_remote(remove_cursor.id())
+            .expect("already received cursor creation");
+
+        if let Some(tooltip) = self.cursor_tooltips.remove(&cursor.id()) {
+            self.editor.remove_tooltip(tooltip.inner);
+        }
+
+        cursor
+            .remove(remove_cursor)
+            .expect("remove op was applied to the right cursor");
     }
 
     async fn integrate_removed_directory(
@@ -814,6 +830,13 @@ impl<E: CollabEditor> Cursors<E> {
 
     fn remove_local(&mut self, id: E::CursorId) -> Option<cursor::Cursor> {
         self.local.remove(&id)
+    }
+
+    fn remove_remote(
+        &mut self,
+        id: cursor::CursorId,
+    ) -> Option<cursor::Cursor> {
+        self.remote.remove(&id)
     }
 }
 
