@@ -397,12 +397,12 @@ impl<E: CollabEditor> Session<E> {
         Ok(())
     }
 
-    async fn integrate_moved_selection(
+    fn integrate_moved_selection(
         &mut self,
         msg: actions::move_selection::MovedSelectionRemote,
-    ) -> Result<(), RunSessionError> {
+    ) {
         let Some(move_selection) = self.project.integrate(msg) else {
-            return Ok(());
+            return;
         };
 
         let selection = self
@@ -432,8 +432,6 @@ impl<E: CollabEditor> Session<E> {
                 self.editor.move_highlight(&mut highlight.inner, byte_range);
             }
         }
-
-        Ok(())
     }
 
     async fn integrate_project_message(
@@ -486,7 +484,8 @@ impl<E: CollabEditor> Session<E> {
                 self.integrate_removed_file(msg).await
             },
             ProjectMessage::RemovedSelection(msg) => {
-                self.integrate_removed_selection(msg).await
+                self.integrate_removed_selection(msg);
+                Ok(())
             },
         }
     }
@@ -527,11 +526,28 @@ impl<E: CollabEditor> Session<E> {
         Ok(())
     }
 
-    async fn integrate_removed_selection(
+    fn integrate_removed_selection(
         &mut self,
-        _msg: actions::remove_selection::RemovedSelectionRemote,
-    ) -> Result<(), RunSessionError> {
-        Ok(())
+        msg: actions::remove_selection::RemovedSelectionRemote,
+    ) {
+        let Some(remove_selection) = self.project.integrate(msg) else {
+            return;
+        };
+
+        let selection = self
+            .selections
+            .remove_remote(remove_selection.id())
+            .expect("already received selection creation");
+
+        if let Some(highlight) =
+            self.selection_highlights.remove(&selection.id())
+        {
+            self.editor.remove_highlight(highlight.inner);
+        }
+
+        selection
+            .remove(remove_selection)
+            .expect("remove op was applied to the right selection");
     }
 
     fn is_ignored(&mut self, id: &E::FileId) -> bool {
