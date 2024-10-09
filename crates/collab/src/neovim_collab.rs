@@ -1,10 +1,20 @@
+use core::fmt::Display;
+use core::ops::Range;
 use std::borrow::Cow;
 
 use collab_fs::AbsUtf8Path;
 use futures_util::stream::{select, Select};
 use nomad::neovim::events::{CommandEvent, ConfigEvent, FunctionEvent};
 use nomad::neovim::{self, command, function, module_api, ModuleApi, Neovim};
-use nomad::{module_name, Buffer, Context, Module, ModuleName, Subscription};
+use nomad::{
+    module_name,
+    Buffer,
+    ByteOffset,
+    Context,
+    Module,
+    ModuleName,
+    Subscription,
+};
 
 use crate::collab_editor::CollabEditor;
 use crate::events::{self, JoinSession, StartSession};
@@ -93,6 +103,32 @@ impl CollabEditor for Neovim {
                 .into_owned(),
         )
     }
+
+    type Tooltip = ();
+
+    fn create_tooltip<T>(&mut self, _: &Self::FileId, _: ByteOffset, _: T)
+    where
+        T: Display,
+    {
+    }
+
+    fn move_tooltip(&mut self, _: &mut (), _: ByteOffset) {}
+
+    fn remove_tooltip(&mut self, _: ()) {}
+
+    type Highlight = ();
+
+    fn create_highlight(
+        &mut self,
+        _: &Self::FileId,
+        _: Range<ByteOffset>,
+        _: (u8, u8, u8),
+    ) {
+    }
+
+    fn move_highlight(&mut self, _: &mut (), _: Range<ByteOffset>) {}
+
+    fn remove_highlight(&mut self, _: ()) {}
 
     type ConfigStream = Subscription<ConfigEvent<NeovimCollab>, Neovim>;
     type JoinStream = Select<

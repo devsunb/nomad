@@ -1,9 +1,11 @@
-use core::fmt::Debug;
+use core::fmt::{Debug, Display};
 use core::hash::Hash;
+use core::ops::Range;
 use std::borrow::Cow;
 
 use collab_fs::AbsUtf8Path;
 use futures_util::Stream;
+use nomad::ByteOffset;
 
 use crate::events::cursor::Cursor;
 use crate::events::edit::Edit;
@@ -58,6 +60,50 @@ pub(crate) trait CollabEditor: Sized {
 
     /// TODO: docs.
     fn selections(&mut self, file_id: &Self::FileId) -> Self::Selections;
+
+    /// TODO: docs.
+    type Tooltip;
+
+    /// TODO: docs.
+    fn create_tooltip<T>(
+        &mut self,
+        file_id: &Self::FileId,
+        create_at: ByteOffset,
+        label: T,
+    ) -> Self::Tooltip
+    where
+        T: Display;
+
+    /// TODO: docs.
+    fn move_tooltip(
+        &mut self,
+        tooltip: &mut Self::Tooltip,
+        move_to: ByteOffset,
+    );
+
+    /// TODO: docs.
+    fn remove_tooltip(&mut self, tooltip: Self::Tooltip);
+
+    /// TODO: docs.
+    type Highlight;
+
+    /// TODO: docs.
+    fn create_highlight(
+        &mut self,
+        file_id: &Self::FileId,
+        range: Range<ByteOffset>,
+        color: (u8, u8, u8),
+    ) -> Self::Highlight;
+
+    /// TODO: docs.
+    fn move_highlight(
+        &mut self,
+        highlight: &mut Self::Highlight,
+        range: Range<ByteOffset>,
+    );
+
+    /// TODO: docs.
+    fn remove_highlight(&mut self, highlight: Self::Highlight);
 
     type ConfigStream: Stream<Item = Config> + Unpin;
     type JoinStream: Stream<Item = SessionId> + Unpin;
