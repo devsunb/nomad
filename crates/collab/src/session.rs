@@ -516,6 +516,16 @@ impl<E: CollabEditor> InnerSession<E> {
                 self.on_peer_disconnected(peer_id);
                 Ok(())
             },
+            Message::PeerJoined(peer_id) => {
+                let peer_id = PeerId::new(peer_id.into());
+                self.on_peer_joined(peer_id);
+                Ok(())
+            },
+            Message::PeerLeft(peer_id) => {
+                let peer_id = PeerId::new(peer_id.into());
+                self.on_peer_disconnected(peer_id);
+                Ok(())
+            },
             Message::Project(project_msg) => {
                 self.integrate_project_message(project_msg).await
             },
@@ -749,6 +759,10 @@ impl<E: CollabEditor> InnerSession<E> {
 
             self.editor.remove_highlight(highlight.inner);
         }
+    }
+
+    fn on_peer_joined(&mut self, peer_id: PeerId) {
+        self.peers.insert(peer_id, peer_id);
     }
 
     fn sync_cursor(&mut self, cursor: Cursor<E>) -> Option<ProjectMessage> {
