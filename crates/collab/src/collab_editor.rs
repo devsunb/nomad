@@ -1,4 +1,5 @@
 use core::fmt::{Debug, Display};
+use core::future::Future;
 use core::hash::Hash;
 use core::ops::Range;
 use std::borrow::Cow;
@@ -57,6 +58,15 @@ pub(crate) trait CollabEditor: Sized {
 
     /// TODO: docs.
     fn is_text_file(&self, file_id: &Self::FileId) -> bool;
+
+    /// TODO: docs.
+    fn ask_user<T: Display>(
+        &self,
+        _message: T,
+    ) -> impl Future<Output = Option<bool>>;
+
+    /// TODO: docs.
+    fn current_file(&self) -> Option<Self::FileId>;
 
     /// TODO: docs.
     fn file_id_at_path(&self, path: &AbsUtf8Path) -> Option<Self::FileId>;

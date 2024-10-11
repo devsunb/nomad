@@ -113,6 +113,10 @@ impl CollabEditor for Neovim {
         Cow::Owned(file_id.path().expect(""))
     }
 
+    fn current_file(&self) -> Option<BufferId> {
+        todo!();
+    }
+
     fn file_id_at_path(&self, path: &AbsUtf8Path) -> Option<BufferId> {
         BufferId::from_path(path)
             .and_then(|id| self.is_text_file(&id).then_some(id))

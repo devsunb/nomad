@@ -145,39 +145,42 @@ impl<E: CollabEditor> Session<E> {
 
     pub(crate) async fn start(
         config: Config,
-        ctx: Context<E>,
+        editor: E,
     ) -> Result<Self, StartSessionError> {
+        let Some(file_id) = editor.current_file() else {
+            return Err(StartSessionError::NotInFile);
+        };
+
+        let file_path = editor.path(&file_id);
+
+        let Some(root_candidate) =
+            Finder::find_root(file_path.as_ref(), &Git, &editor.fs()).await?
+        else {
+            return Err(StartSessionError::CouldntFindRoot(
+                file_path.into_owned(),
+            ));
+        };
+
+        let project_root =
+            match editor.ask_user(ConfirmStart(&root_candidate)).await {
+                Some(true) => root_candidate,
+                Some(false) => return Err(StartSessionError::UserCancelled),
+                None => todo!(),
+            };
+
+        let joined = Io::connect()
+            .await?
+            .authenticate(())
+            .await?
+            .join(JoinRequest::StartNewSession)
+            .await?;
+
+        let peer_id = PeerId::new(joined.join_response.client_id.into_u64());
+
+        let project = Project::from_fs(peer_id, &editor.fs()).await?;
+
         todo!();
-        // let Some(file) = ctx.buffer().file() else {
-        //     return Err(StartSessionError::NotInFile);
-        // };
-        //
-        // let Some(root_candidate) =
-        //     Finder::find_root(file.path(), &Git, ctx.fs()).await?
-        // else {
-        //     return Err(StartSessionError::CouldntFindRoot(
-        //         file.path().to_owned(),
-        //     ));
-        // };
-        //
-        // let project_root =
-        //     match ctx.ask_user(ConfirmStart(&root_candidate)).await {
-        //         Ok(true) => root_candidate,
-        //         Ok(false) => return Err(StartSessionError::UserCancelled),
-        //         Err(err) => return Err(err.into()),
-        //     };
-        //
-        // let joined = Io::connect()
-        //     .await?
-        //     .authenticate(())
-        //     .await?
-        //     .join(JoinRequest::StartNewSession)
-        //     .await?;
-        //
-        // let peer_id = joined.join_response.client_id;
-        //
-        // let project = Project::from_fs(peer_id, ctx.fs()).await?;
-        //
+
         // Ok(Self::new(config, ctx, joined, project, project_root))
     }
 
@@ -1243,6 +1246,28 @@ pub(crate) enum StartSessionError {
     /// We asked the user for confirmation to start the session, but they
     /// cancelled.
     UserCancelled,
+
+    /// Authentication failed.
+    Auth(collab_server::client::AuthError<nomad_server::Auth>),
+
+    /// Joining the session failed.
+    Join(nomad_server::client::JoinError),
+}
+
+impl From<collab_server::client::AuthError<nomad_server::Auth>>
+    for StartSessionError
+{
+    fn from(
+        err: collab_server::client::AuthError<nomad_server::Auth>,
+    ) -> Self {
+        Self::Auth(err)
+    }
+}
+
+impl From<nomad_server::client::JoinError> for StartSessionError {
+    fn from(err: nomad_server::client::JoinError) -> Self {
+        Self::Join(err)
+    }
 }
 
 impl From<io::Error> for StartSessionError {
