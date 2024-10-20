@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+mod action;
 mod actor_id;
 mod buffer;
 mod byte_offset;
@@ -9,6 +10,7 @@ mod context;
 mod editor;
 mod event;
 mod log;
+mod maybe_result;
 mod module;
 mod module_name;
 pub mod neovim;
@@ -18,6 +20,7 @@ mod spawner;
 mod subscription;
 mod text;
 
+pub use action::Action;
 pub use actor_id::ActorId;
 pub use buffer::Buffer;
 pub use byte_offset::ByteOffset;
