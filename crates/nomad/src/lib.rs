@@ -4,6 +4,7 @@ extern crate alloc;
 
 mod action;
 mod actor_id;
+pub mod autocmds;
 mod buffer;
 mod byte_offset;
 mod context;

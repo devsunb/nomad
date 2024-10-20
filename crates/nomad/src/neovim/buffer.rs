@@ -320,3 +320,9 @@ impl Hash for BufferId {
 }
 
 impl nohash::IsEnabled for BufferId {}
+
+impl From<api::types::AutocmdCallbackArgs> for BufferId {
+    fn from(args: api::types::AutocmdCallbackArgs) -> Self {
+        Self::new(args.buffer)
+    }
+}
