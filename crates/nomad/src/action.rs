@@ -4,7 +4,7 @@ use crate::maybe_result::MaybeResult;
 use crate::Module;
 
 /// TODO: docs
-pub trait Action<M: Module>: 'static {
+pub trait Action: 'static {
     /// TODO: docs
     const NAME: ActionName;
 
@@ -13,6 +13,9 @@ pub trait Action<M: Module>: 'static {
 
     /// TODO: docs
     type Docs;
+
+    /// TODO: docs
+    type Module: Module;
 
     /// TODO: docs
     //

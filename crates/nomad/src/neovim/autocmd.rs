@@ -1,25 +1,22 @@
 use core::fmt;
 
-use nvim_oxi::api::{self, opts};
+use nvim_oxi::api::{self, opts, types};
 
 use crate::action::{Action, ActionName};
 use crate::maybe_result::MaybeResult;
 use crate::module::Module;
-use crate::neovim::diagnostic::{DiagnosticMessage, DiagnosticSource, Level};
+use crate::neovim::diagnostic::{DiagnosticSource, Level};
 use crate::ModuleName;
 
 /// TODO: docs.
 pub trait Autocmd<M: Module>: Sized {
     /// TODO: docs.
     type Action: Action<
-        M,
-        Args = Self::Args,
+        Module = M,
+        Args: From<types::AutocmdCallbackArgs>,
         Docs: fmt::Display,
         Return: Into<ShouldDetach>,
     >;
-
-    /// TODO: docs.
-    type Args: From<api::types::AutocmdCallbackArgs>;
 
     /// TODO: docs.
     fn into_action(self) -> Self::Action;
@@ -30,7 +27,7 @@ pub trait Autocmd<M: Module>: Sized {
     /// TODO: docs.
     fn register(self) -> AutocmdId {
         let module_name = M::NAME;
-        let action_name = <Self::Action as Action<_>>::NAME;
+        let action_name = Self::Action::NAME;
 
         let augroup_name =
             AugroupName { module_name, action_name }.to_string();
@@ -50,7 +47,7 @@ pub trait Autocmd<M: Module>: Sized {
             .group(augroup_id)
             .desc(action.docs().to_string())
             .callback(nvim_oxi::Function::from_fn_mut(
-                move |args: api::types::AutocmdCallbackArgs| match action
+                move |args: types::AutocmdCallbackArgs| match action
                     .execute(args.into())
                     .into_result()
                     .map(Into::into)
@@ -58,13 +55,12 @@ pub trait Autocmd<M: Module>: Sized {
                 {
                     Ok(ShouldDetach::Yes) => true,
                     Ok(ShouldDetach::No) => false,
-                    Err(err) => {
+                    Err(diagnostic_msg) => {
                         let mut source = DiagnosticSource::new();
                         source
                             .push_segment(module_name.as_str())
                             .push_segment(action_name.as_str());
-                        DiagnosticMessage::from(err)
-                            .emit(Level::Error, source);
+                        diagnostic_msg.emit(Level::Error, source);
                         false
                     },
                 },
@@ -85,6 +81,7 @@ pub enum ShouldDetach {
     No,
 }
 
+/// TODO: docs.
 #[derive(Debug, Clone, Copy)]
 pub struct AutocmdId(u32);
 

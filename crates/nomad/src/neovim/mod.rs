@@ -18,6 +18,7 @@ mod serde;
 mod spawner;
 
 pub use api::Api;
+pub use autocmd::{Autocmd, AutocmdId, ShouldDetach};
 pub use buffer::{Buffer, BufferId};
 pub use command::{command, Command, CommandArgs, CommandHandle};
 pub use diagnostic::{DiagnosticMessage, HighlightGroup};
