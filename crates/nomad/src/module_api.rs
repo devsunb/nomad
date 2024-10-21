@@ -8,8 +8,8 @@ use crate::{Command, Function, Module};
 
 /// TODO: docs.
 pub struct ModuleApi<M: Module> {
-    dictionary: NvimDictionary,
-    commands: ModuleCommands,
+    pub(crate) dictionary: NvimDictionary,
+    pub(crate) commands: ModuleCommands,
     ty: PhantomData<M>,
 }
 

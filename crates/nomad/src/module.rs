@@ -4,7 +4,7 @@ use serde::de::DeserializeOwned;
 
 use crate::config::ConfigReceiver;
 use crate::maybe_result::MaybeResult;
-use crate::neovim::ModuleApi;
+use crate::module_api::ModuleApi;
 use crate::ModuleName;
 
 /// TODO: docs.
@@ -16,7 +16,7 @@ pub trait Module: 'static + From<ConfigReceiver<Self>> {
     type Config: Default + Clone + DeserializeOwned;
 
     /// TODO: docs.
-    fn init(&self) -> ModuleApi;
+    fn init(&self) -> ModuleApi<Self>;
 
     /// TODO: docs.
     fn run(self) -> impl Future<Output = impl MaybeResult<()>>;

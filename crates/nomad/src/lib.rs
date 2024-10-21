@@ -24,6 +24,7 @@ mod module_commands;
 mod module_name;
 pub mod neovim;
 mod nomad;
+mod nomad_command;
 mod serde;
 mod shared;
 mod spawner;

@@ -122,20 +122,3 @@ impl Commands {
         })
     }
 }
-
-impl lua::Pushable for Api {
-    unsafe fn push(mut self, state: *mut LuaState) -> Result<i32, lua::Error> {
-        self.commands.create_mad_command();
-        let setup = Setup::new(self.on_config_change);
-        self.dict.insert(Setup::NAME, NvimFunction::from_fn(setup.into_fn()));
-        self.dict.push(state)
-    }
-}
-
-impl lua::Pushable for Nomad {
-    unsafe fn push(mut self, state: *mut LuaState) -> Result<i32, lua::Error> {
-        crate::log::init(&self.log_dir());
-        self.start_modules();
-        self.into_api().push(state)
-    }
-}

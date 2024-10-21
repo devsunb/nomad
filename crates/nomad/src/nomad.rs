@@ -1,42 +1,33 @@
 use core::future::Future;
 use core::pin::Pin;
 
+use nvim_oxi::{lua, Dictionary as NvimDictionary, Function as NvimFunction};
+
 use crate::config::Setup;
 use crate::diagnostics::{DiagnosticSource, Level};
 use crate::maybe_result::MaybeResult;
-use crate::neovim::{Api, Neovim};
+use crate::neovim::Neovim;
+use crate::nomad_command::NomadCommand;
 use crate::{Context, JoinHandle, Module, Spawner};
 
 /// TODO: docs.
 pub struct Nomad {
-    api: Api,
+    api: NvimDictionary,
+    command: NomadCommand,
     ctx: Context<Neovim>,
     run: Vec<Pin<Box<dyn Future<Output = ()>>>>,
     setup: Setup,
 }
 
 impl Nomad {
-    pub(crate) const COMMAND_NAME: &'static str = "Mad";
-
-    /// TODO: docs.
-    pub fn into_api(self) -> Api {
-        self.api
-    }
-
     /// TODO: docs.
     pub fn new(neovim: Neovim) -> Self {
         Self {
-            api: Api::default(),
+            api: NvimDictionary::default(),
+            command: NomadCommand::default(),
             ctx: Context::new(neovim),
             run: Vec::default(),
             setup: Setup::default(),
-        }
-    }
-
-    /// TODO: docs.
-    pub fn start_modules(&mut self) {
-        for fut in self.run.drain(..) {
-            self.ctx.spawner().spawn(fut).detach();
         }
     }
 
@@ -46,7 +37,8 @@ impl Nomad {
         let config_rx = self.setup.add_module::<M>();
         let module = M::from(config_rx);
         let module_api = module.init();
-        self.api += module_api;
+        self.api.insert(M::NAME.as_str(), module_api.dictionary);
+        self.command.add_module(module_api.commands);
         self.run.push({
             Box::pin(async move {
                 if let Err(err) = module.run().await.into_result() {
@@ -61,5 +53,25 @@ impl Nomad {
 
     pub(crate) fn log_dir(&self) -> collab_fs::AbsUtf8PathBuf {
         todo!();
+    }
+}
+
+impl lua::Pushable for Nomad {
+    unsafe fn push(
+        mut self,
+        state: *mut lua::ffi::State,
+    ) -> Result<i32, lua::Error> {
+        crate::log::init(&self.log_dir());
+
+        // Start each module's event loop.
+        for fut in self.run.drain(..) {
+            self.ctx.spawner().spawn(fut).detach();
+        }
+
+        self.command.create();
+
+        let setup = NvimFunction::from_fn(self.setup.into_fn());
+        self.api.insert(Setup::NAME, setup);
+        self.api.push(state)
     }
 }
