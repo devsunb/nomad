@@ -8,13 +8,12 @@ use crate::diagnostics::{DiagnosticSource, Level};
 use crate::maybe_result::MaybeResult;
 use crate::neovim::Neovim;
 use crate::nomad_command::NomadCommand;
-use crate::{Context, JoinHandle, Module, Spawner};
+use crate::Module;
 
 /// TODO: docs.
 pub struct Nomad {
     api: NvimDictionary,
     command: NomadCommand,
-    ctx: Context<Neovim>,
     run: Vec<Pin<Box<dyn Future<Output = ()>>>>,
     setup: Setup,
 }
@@ -25,7 +24,6 @@ impl Nomad {
         Self {
             api: NvimDictionary::default(),
             command: NomadCommand::default(),
-            ctx: Context::new(neovim),
             run: Vec::default(),
             setup: Setup::default(),
         }
@@ -65,7 +63,7 @@ impl lua::Pushable for Nomad {
 
         // Start each module's event loop.
         for fut in self.run.drain(..) {
-            self.ctx.spawner().spawn(fut).detach();
+            crate::executor::spawn(fut).detach();
         }
 
         self.command.create();

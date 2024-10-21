@@ -6,14 +6,14 @@ use async_task::{Builder, Runnable};
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
 use nvim_oxi::{libuv, schedule};
 
-use super::NeovimJoinHandle;
+use crate::join_handle::JoinHandle;
 
 thread_local! {
     static LOCAL_EXECUTOR: LocalExecutor = const { LocalExecutor::new() };
 }
 
 /// TODO: doc
-pub(super) fn spawn<F>(future: F) -> NeovimJoinHandle<F::Output>
+pub(super) fn spawn<F>(future: F) -> JoinHandle<F::Output>
 where
     F: Future + 'static,
     F::Output: 'static,
@@ -39,7 +39,7 @@ impl LocalExecutor {
     }
 
     /// TODO: docs
-    fn spawn<F>(&self, future: F) -> NeovimJoinHandle<F::Output>
+    fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
@@ -93,7 +93,7 @@ impl LocalExecutorInner {
     }
 
     /// TODO: docs
-    fn spawn<F>(&self, future: F) -> NeovimJoinHandle<F::Output>
+    fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,
@@ -110,7 +110,7 @@ impl LocalExecutorInner {
         // Poll the future once immediately.
         Task::new(runnable).poll();
 
-        NeovimJoinHandle::new(task)
+        JoinHandle::new(task)
     }
 }
 
