@@ -6,7 +6,6 @@ use nvim_oxi::{lua, Dictionary as NvimDictionary, Function as NvimFunction};
 use crate::config::Setup;
 use crate::diagnostics::{DiagnosticSource, Level};
 use crate::maybe_result::MaybeResult;
-use crate::neovim::Neovim;
 use crate::nomad_command::NomadCommand;
 use crate::Module;
 
@@ -20,7 +19,7 @@ pub struct Nomad {
 
 impl Nomad {
     /// TODO: docs.
-    pub fn new(neovim: Neovim) -> Self {
+    pub fn new() -> Self {
         Self {
             api: NvimDictionary::default(),
             command: NomadCommand::default(),
