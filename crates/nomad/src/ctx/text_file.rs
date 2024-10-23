@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use nvim_oxi::api::types;
 
 use crate::ctx::{BufferCtx, FileCtx, TextBufferCtx};
@@ -6,17 +8,28 @@ use crate::neovim::BufferId;
 /// TODO: docs.
 #[derive(Clone)]
 pub struct TextFileCtx<'ctx> {
-    ctx: BufferCtx<'ctx>,
+    file_ctx: FileCtx<'ctx>,
 }
 
 impl<'ctx> TextFileCtx<'ctx> {
+    pub fn as_file(&self) -> &FileCtx<'ctx> {
+        &self.file_ctx
+    }
+
+    pub fn as_text_buffer(&self) -> &TextBufferCtx<'ctx> {
+        TextBufferCtx::new_ref(&*self.file_ctx)
+    }
+
     pub(crate) fn from_file(file_ctx: FileCtx<'ctx>) -> Option<Self> {
-        todo!();
+        TextBufferCtx::from_buffer((&*file_ctx).clone())
+            .is_some()
+            .then_some(Self { file_ctx })
     }
 
     pub(crate) fn from_text_buffer(
         text_buffer_ctx: TextBufferCtx<'ctx>,
     ) -> Option<Self> {
-        todo!();
+        FileCtx::from_buffer(text_buffer_ctx.into_buffer())
+            .map(|file_ctx| Self { file_ctx })
     }
 }

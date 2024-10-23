@@ -1,10 +1,6 @@
-use alloc::borrow::Cow;
-use core::cmp::Ordering;
-use core::fmt;
-use core::hash::{Hash, Hasher};
 use core::ops::{Bound, Deref, Range, RangeBounds};
 
-use nvim_oxi::api::{self, types};
+use nvim_oxi::api::{self, opts};
 
 use crate::ctx::{BufferCtx, TextFileCtx};
 use crate::neovim::BufferId;
@@ -12,6 +8,7 @@ use crate::{ByteOffset, Text};
 
 /// TODO: docs.
 #[derive(Clone)]
+#[repr(transparent)]
 pub struct TextBufferCtx<'ctx> {
     buffer_ctx: BufferCtx<'ctx>,
 }
@@ -40,17 +37,22 @@ impl<'ctx> TextBufferCtx<'ctx> {
         self.get_text_in_point_range(point_range)
     }
 
+    /// Consumes `self`, returning the underlying [`BufferCtx`].
+    pub fn into_buffer(self) -> BufferCtx<'ctx> {
+        self.buffer_ctx
+    }
+
     /// Consumes `self`, returning a [`TextFileCtx`] if the buffer is saved on
     /// disk, or `None` otherwise.
     pub fn into_text_file(self) -> Option<TextFileCtx<'ctx>> {
         TextFileCtx::from_text_buffer(self)
     }
 
-    pub(crate) fn new(ctx: BufferCtx<'ctx>) -> Option<Self> {
+    pub(crate) fn from_buffer(ctx: BufferCtx<'ctx>) -> Option<Self> {
         let nvim_buf = ctx.buffer_id().as_nvim();
 
         let opts =
-            api::opts::OptionOpts::builder().buffer(nvim_buf.clone()).build();
+            opts::OptionOpts::builder().buffer(nvim_buf.clone()).build();
 
         let is_text_file = nvim_buf.is_loaded()
             // Checks that the buftype is empty. This filters out help and
@@ -70,6 +72,13 @@ impl<'ctx> TextBufferCtx<'ctx> {
                     .unwrap_or(false);
 
         is_text_file.then_some(Self { buffer_ctx: ctx })
+    }
+
+    pub(super) fn new_ref<'a>(ctx: &'a BufferCtx<'ctx>) -> &'a Self {
+        debug_assert!(Self::from_buffer(ctx.clone()).is_some());
+        // SAFETY: `TextBufferCtx` is a `repr(transparent)` newtype over
+        // `BufferCtx`.
+        unsafe { &*(ctx as *const BufferCtx<'ctx> as *const Self) }
     }
 
     /// Returns the text in the given point range.

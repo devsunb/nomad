@@ -17,13 +17,13 @@ impl<'ctx> BufferCtx<'ctx> {
     /// Consumes `self`, returning a [`FileCtx`] if the buffer is saved on
     /// disk, or `None` otherwise.
     pub fn into_file(self) -> Option<FileCtx<'ctx>> {
-        FileCtx::new(self)
+        FileCtx::from_buffer(self)
     }
 
     /// Consumes `self`, returning a [`TextBufferCtx`] if the buffer's content
     /// is text, or `None` otherwise.
     pub fn into_text_buffer(self) -> Option<TextBufferCtx<'ctx>> {
-        TextBufferCtx::new(self)
+        TextBufferCtx::from_buffer(self)
     }
 
     pub fn name(&self) -> String {
