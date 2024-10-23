@@ -6,11 +6,12 @@ use core::ops::{Bound, Deref, Range, RangeBounds};
 
 use nvim_oxi::api::{self, types};
 
-use crate::ctx::BufferCtx;
+use crate::ctx::{BufferCtx, TextFileCtx};
 use crate::neovim::BufferId;
 use crate::{ByteOffset, Text};
 
 /// TODO: docs.
+#[derive(Clone)]
 pub struct TextBufferCtx<'ctx> {
     ctx: BufferCtx<'ctx>,
 }
@@ -39,6 +40,12 @@ impl<'ctx> TextBufferCtx<'ctx> {
         self.get_text_in_point_range(point_range)
     }
 
+    /// Consumes `self`, returning a [`TextFileCtx`] if the buffer is saved on
+    /// disk, or `None` otherwise.
+    pub fn into_text_file(self) -> Option<TextFileCtx<'ctx>> {
+        TextFileCtx::from_text_buffer(self)
+    }
+
     pub(crate) fn new(ctx: BufferCtx<'ctx>) -> Option<Self> {
         let nvim_buf = ctx.buffer_id().as_nvim();
 
@@ -46,21 +53,21 @@ impl<'ctx> TextBufferCtx<'ctx> {
             api::opts::OptionOpts::builder().buffer(nvim_buf.clone()).build();
 
         let is_text_file = nvim_buf.is_loaded()
-        // Checks that the buftype is empty. This filters out help and terminal
-        // buffers, the quickfix list, etc.
-        && api::get_option_value::<String>("buftype", &opts)
-                .ok()
-                .map(|buftype| buftype.is_empty())
-                .unwrap_or(false)
-        // Checks that the buffer contents are UTF-8 encoded, which filters
-        // out buffers containing binary data.
-        && api::get_option_value::<String>("fileencoding", &opts)
-                .ok()
-                .map(|mut encoding| {
-                    encoding.make_ascii_lowercase();
-                    encoding == "utf-8"
-                })
-                .unwrap_or(false);
+            // Checks that the buftype is empty. This filters out help and
+            // terminal buffers, the quickfix list, etc.
+            && api::get_option_value::<String>("buftype", &opts)
+                    .ok()
+                    .map(|buftype| buftype.is_empty())
+                    .unwrap_or(false)
+            // Checks that the buffer contents are UTF-8 encoded, which filters
+            // out buffers containing binary data.
+            && api::get_option_value::<String>("fileencoding", &opts)
+                    .ok()
+                    .map(|mut encoding| {
+                        encoding.make_ascii_lowercase();
+                        encoding == "utf-8"
+                    })
+                    .unwrap_or(false);
 
         is_text_file.then_some(Self { ctx })
     }

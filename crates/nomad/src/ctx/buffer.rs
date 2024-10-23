@@ -2,6 +2,7 @@ use crate::ctx::NeovimCtx;
 use crate::neovim::BufferId;
 
 /// TODO: docs.
+#[derive(Clone)]
 pub struct BufferCtx<'ctx> {
     buffer_id: BufferId,
     neovim_ctx: NeovimCtx<'ctx>,
