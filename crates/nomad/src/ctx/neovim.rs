@@ -53,9 +53,11 @@ impl Ctx {
 impl Default for CtxInner {
     fn default() -> Self {
         let opts = api::opts::CreateAugroupOpts::builder().clear(true).build();
-        let augroup_id = api::create_augroup(crate::Nomad::NAME, &opts)
-            .expect("all the arguments are valid")
-            .into();
-        Self { actor_map: ActorMap::default(), augroup_id }
+        Self {
+            actor_map: ActorMap::default(),
+            augroup_id: api::create_augroup(crate::Nomad::AUGROUP_NAME, &opts)
+                .expect("all the arguments are valid")
+                .into(),
+        }
     }
 }

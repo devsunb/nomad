@@ -1,6 +1,7 @@
 use core::future::Future;
 use core::pin::Pin;
 
+use collab_fs::AbsUtf8PathBuf;
 use nvim_oxi::{lua, Dictionary as NvimDictionary, Function as NvimFunction};
 
 use crate::config::Setup;
@@ -19,13 +20,13 @@ pub struct Nomad {
 
 impl Nomad {
     /// TODO: docs.
+    pub(crate) const AUGROUP_NAME: &'static str = "nomad";
+
+    /// TODO: docs.
     pub(crate) const COMMAND_NAME: &'static str = "Mad";
 
     /// TODO: docs.
     pub(crate) const DIAGNOSTICS_SEGMENT_NAME: &'static str = "nomad";
-
-    /// TODO: docs.
-    pub(crate) const NAME: &'static str = "nomad";
 
     /// TODO: docs.
     pub fn new() -> Self {
@@ -57,8 +58,27 @@ impl Nomad {
         self
     }
 
-    pub(crate) fn log_dir(&self) -> collab_fs::AbsUtf8PathBuf {
-        todo!();
+    pub(crate) fn log_dir(&self) -> AbsUtf8PathBuf {
+        #[cfg(target_family = "unix")]
+        {
+            let mut home = match home::home_dir() {
+                Some(home) if !home.as_os_str().is_empty() => {
+                    AbsUtf8PathBuf::from_path_buf(home)
+                        .expect("home is absolute")
+                },
+                _ => panic!("failed to get the home directory"),
+            };
+            home.push(".local");
+            home.push("share");
+            home.push("nvim");
+            home.push("nomad");
+            home.push("logs");
+            home
+        }
+        #[cfg(not(target_family = "unix"))]
+        {
+            unimplemented!()
+        }
     }
 }
 
