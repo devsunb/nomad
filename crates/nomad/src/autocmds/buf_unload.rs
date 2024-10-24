@@ -19,6 +19,12 @@ pub struct BufUnloadArgs {
 }
 
 impl<A> BufUnload<A> {
+    /// TODO: docs.
+    pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
+        self.buffer_id = Some(buffer_id);
+        self
+    }
+
     /// Creates a new [`BufUnload`] with the given action.
     pub fn new(action: A) -> Self {
         Self { action, buffer_id: None }

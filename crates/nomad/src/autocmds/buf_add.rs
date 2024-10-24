@@ -19,14 +19,15 @@ pub struct BufAddArgs {
 }
 
 impl<A> BufAdd<A> {
+    /// TODO: docs.
+    pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
+        self.buffer_id = Some(buffer_id);
+        self
+    }
+
     /// Creates a new [`BufAdd`] with the given action.
     pub fn new(action: A) -> Self {
         Self { action, buffer_id: None }
-    }
-
-    pub fn buffer(mut self, buffer_id: BufferId) -> Self {
-        self.buffer_id = Some(buffer_id);
-        self
     }
 }
 

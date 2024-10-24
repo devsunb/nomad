@@ -21,6 +21,7 @@ pub mod ctx;
 pub mod diagnostics;
 mod editor;
 mod event;
+pub mod events;
 mod executor;
 mod function;
 mod join_handle;
