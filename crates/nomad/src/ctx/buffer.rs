@@ -13,7 +13,7 @@ pub struct BufferCtx<'ctx> {
 impl<'ctx> BufferCtx<'ctx> {
     /// Returns the [`BufferId`].
     pub fn buffer_id(&self) -> BufferId {
-        self.buffer_id.clone()
+        self.buffer_id
     }
 
     /// Consumes `self`, returning a [`FileCtx`] if the buffer is saved on
@@ -28,6 +28,7 @@ impl<'ctx> BufferCtx<'ctx> {
         TextBufferCtx::from_buffer(self)
     }
 
+    /// TODO: docs.
     pub fn name(&self) -> String {
         self.buffer_id()
             .as_nvim()
@@ -38,6 +39,7 @@ impl<'ctx> BufferCtx<'ctx> {
             .to_string()
     }
 
+    /// TODO: docs.
     pub fn reborrow(&self) -> BufferCtx<'_> {
         BufferCtx {
             buffer_id: self.buffer_id,

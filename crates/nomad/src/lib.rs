@@ -3,6 +3,7 @@
 extern crate alloc;
 
 mod action;
+mod action_name;
 mod actor_id;
 mod actor_map;
 mod api;
@@ -42,7 +43,8 @@ mod spawner;
 mod subscription;
 mod text;
 
-pub use action::{Action, ActionName, FnAction};
+pub use action::{Action, FnAction};
+pub use action_name::ActionName;
 pub use actor_id::ActorId;
 pub use autocmd::{AutoCommand, ShouldDetach};
 pub use boo::Boo;

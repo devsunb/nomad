@@ -9,6 +9,7 @@ use crate::{Action, ActorId, Module};
 
 /// TODO: docs.
 pub trait AutoCommand: Sized {
+    /// TODO: docs.
     type Action: Action<
         Args: for<'a> From<(ActorId, &'a AutoCommandCtx<'a>)>,
         Return: Into<ShouldDetach>,
@@ -131,7 +132,7 @@ fn register_autocmd<A: AutoCommand>(
                     break;
                 };
                 if callback(actor_id, &autocmd_ctx).into() {
-                    callbacks.remove(idx);
+                    let _ = callbacks.remove(idx);
                 } else {
                     idx += 1;
                 }

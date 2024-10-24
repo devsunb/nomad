@@ -14,7 +14,8 @@ pub trait Command:
     Return = (),
 >
 {
-    fn into_function(self) -> Box<dyn Fn(CommandArgs)>;
+    /// TODO: docs.
+    fn into_callback(self) -> impl FnMut(CommandArgs) + 'static;
 }
 
 impl<T> Command for T
@@ -28,20 +29,24 @@ where
         Return = (),
     >,
 {
-    fn into_function(self) -> Box<dyn Fn(CommandArgs)> {
+    fn into_callback(mut self) -> impl FnMut(CommandArgs) + 'static {
         Box::new(move |mut args| {
             let args = match T::Args::try_from(&mut args) {
                 Ok(args) => args,
                 Err(err) => {
                     let mut source = DiagnosticSource::new();
-                    source.push_segment(T::Module::NAME).push_segment(T::NAME);
+                    source
+                        .push_segment(T::Module::NAME.as_str())
+                        .push_segment(T::NAME.as_str());
                     err.into().emit(Level::Error, source);
                     return;
                 },
             };
             if let Err(err) = self.execute(args).into_result() {
                 let mut source = DiagnosticSource::new();
-                source.push_segment(T::Module::NAME).push_segment(T::NAME);
+                source
+                    .push_segment(T::Module::NAME.as_str())
+                    .push_segment(T::NAME.as_str());
                 err.into().emit(Level::Error, source);
             }
         })

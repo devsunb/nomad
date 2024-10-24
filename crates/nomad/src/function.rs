@@ -1,4 +1,4 @@
-use nvim_oxi::{Function as NvimFunction, Object as NvimObject};
+use nvim_oxi::Object as NvimObject;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
@@ -8,15 +8,16 @@ use crate::{Action, Module};
 
 /// TODO: docs.
 pub trait Function: Action<Args: DeserializeOwned, Return: Serialize> {
-    fn into_function(self) -> NvimFunction<NvimObject, NvimObject>;
+    /// TODO: docs.
+    fn into_callback(self) -> impl FnMut(NvimObject) -> NvimObject;
 }
 
 impl<T> Function for T
 where
     T: Action<Args: DeserializeOwned, Return: Serialize>,
 {
-    fn into_function(self) -> NvimFunction<NvimObject, NvimObject> {
-        NvimFunction::from_fn(move |args| {
+    fn into_callback(mut self) -> impl FnMut(NvimObject) -> NvimObject {
+        move |args| {
             let args = match crate::serde::deserialize(args) {
                 Ok(args) => args,
                 Err(err) => {
@@ -40,6 +41,6 @@ where
                 },
             };
             crate::serde::serialize(&ret)
-        })
+        }
     }
 }

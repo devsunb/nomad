@@ -9,7 +9,8 @@ pub enum Boo<'a, T> {
     Owned(T),
 }
 
-impl<'a, T> Boo<'a, T> {
+impl<T> Boo<'_, T> {
+    /// TODO: docs.
     pub fn as_ref(&self) -> Boo<'_, T> {
         match self {
             Boo::Borrowed(inner) => Boo::Borrowed(inner),

@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use nvim_oxi::Dictionary as NvimDictionary;
+use nvim_oxi::{Dictionary as NvimDictionary, Function as NvimFunction};
 
 use crate::ctx::NeovimCtx;
 use crate::module_commands::ModuleCommands;
@@ -15,6 +15,7 @@ pub struct ModuleApi<M: Module> {
 }
 
 impl<M: Module> ModuleApi<M> {
+    /// TODO: docs.
     pub fn command<T>(mut self, command: T) -> Self
     where
         T: Command<Module = M>,
@@ -23,6 +24,7 @@ impl<M: Module> ModuleApi<M> {
         self
     }
 
+    /// TODO: docs.
     pub fn event<T>(self, event: T) -> Self
     where
         T: for<'a> Event<Ctx<'a> = NeovimCtx<'a>>,
@@ -31,6 +33,7 @@ impl<M: Module> ModuleApi<M> {
         self
     }
 
+    /// TODO: docs.
     pub fn function<T>(mut self, function: T) -> Self
     where
         T: Function<Module = M>,
@@ -43,10 +46,14 @@ impl<M: Module> ModuleApi<M> {
                 M::NAME,
             );
         }
-        self.dictionary.insert(T::NAME.as_str(), function.into_function());
+        self.dictionary.insert(
+            T::NAME.as_str(),
+            NvimFunction::from_fn_mut(function.into_callback()),
+        );
         self
     }
 
+    /// Creates a new [`ModuleApi`].
     pub fn new(neovim_ctx: NeovimCtx<'static>) -> Self {
         Self {
             dictionary: NvimDictionary::default(),

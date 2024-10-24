@@ -1,6 +1,6 @@
 use fxhash::FxHashMap;
 
-use crate::action::ActionNameStr;
+use crate::action_name::ActionNameStr;
 use crate::{Command, CommandArgs, Module, ModuleName};
 
 pub(super) struct ModuleCommands {
@@ -8,10 +8,10 @@ pub(super) struct ModuleCommands {
     pub(super) module_name: ModuleName,
 
     /// The command to run when no command is specified.
-    pub(super) default_command: Option<Box<dyn Fn(CommandArgs)>>,
+    pub(super) default_command: Option<Box<dyn FnMut(CommandArgs)>>,
 
     /// Map from command name to the corresponding [`Command`].
-    pub(super) commands: FxHashMap<ActionNameStr, Box<dyn Fn(CommandArgs)>>,
+    pub(super) commands: FxHashMap<ActionNameStr, Box<dyn FnMut(CommandArgs)>>,
 }
 
 impl ModuleCommands {
@@ -33,7 +33,8 @@ impl ModuleCommands {
                 self.module_name
             );
         }
-        self.commands.insert(T::NAME.as_str(), command.into_function());
+        self.commands
+            .insert(T::NAME.as_str(), Box::new(command.into_callback()));
     }
 
     #[track_caller]
@@ -54,18 +55,20 @@ impl ModuleCommands {
             );
         }
 
-        self.default_command = Some(command.into_function());
+        self.default_command = Some(Box::new(command.into_callback()));
     }
 
-    pub(crate) fn default_command(&self) -> Option<&impl Fn(CommandArgs)> {
-        self.default_command.as_ref()
+    pub(crate) fn default_command(
+        &mut self,
+    ) -> Option<&mut impl FnMut(CommandArgs)> {
+        self.default_command.as_mut()
     }
 
-    pub(crate) fn command(
-        &self,
-        command_name: &str,
-    ) -> Option<&impl Fn(CommandArgs)> {
-        self.commands.get(&command_name)
+    pub(crate) fn command<'a>(
+        &'a mut self,
+        command_name: &'a str,
+    ) -> Option<&'a mut impl FnMut(CommandArgs)> {
+        self.commands.get_mut(command_name)
     }
 
     pub(crate) fn command_names(

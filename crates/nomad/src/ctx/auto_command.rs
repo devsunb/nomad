@@ -39,7 +39,7 @@ impl<'ctx> AutoCommandCtx<'ctx> {
 
     /// Calls the given clousure with an exlusive reference to the
     /// [`ActorMap`].
-    pub fn with_actor_map<F, R>(&self, fun: F) -> R
+    pub(crate) fn with_actor_map<F, R>(&self, fun: F) -> R
     where
         F: FnOnce(&mut ActorMap) -> R,
     {

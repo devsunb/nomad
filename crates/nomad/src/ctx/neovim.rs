@@ -30,10 +30,12 @@ struct CtxInner {
 struct NomadAugroupId(AugroupId);
 
 impl<'ctx> NeovimCtx<'ctx> {
+    /// TODO: docs.
     pub fn into_buffer(self, buffer_id: BufferId) -> Option<BufferCtx<'ctx>> {
         BufferCtx::from_neovim(buffer_id, self)
     }
 
+    /// TODO: docs.
     pub fn reborrow(&self) -> NeovimCtx<'_> {
         NeovimCtx { ctx: self.ctx.as_ref() }
     }

@@ -1,10 +1,16 @@
 use fxhash::FxHashMap;
 use nvim_oxi::api;
 
-use crate::action::ActionNameStr;
+use crate::action_name::ActionNameStr;
 use crate::command_args::CommandArgs;
+use crate::diagnostics::{
+    DiagnosticMessage,
+    DiagnosticSource,
+    HighlightGroup,
+    Level,
+};
 use crate::module_commands::ModuleCommands;
-use crate::module_name::ModuleNameStr;
+use crate::module_name::{ModuleName, ModuleNameStr};
 
 #[derive(Default)]
 pub(crate) struct NomadCommand {
@@ -25,7 +31,7 @@ impl NomadCommand {
         self.commands.insert(module_name, module_commands);
     }
 
-    pub(crate) fn create(self) {
+    pub(crate) fn create(mut self) {
         let opts = api::opts::CreateCommandOpts::builder()
             .nargs(api::types::CommandNArgs::Any)
             .build();
@@ -43,14 +49,18 @@ impl NomadCommand {
         .expect("all the arguments are valid");
     }
 
-    fn call(&self, mut args: CommandArgs) -> Result<(), NomadCommandError> {
+    fn call(
+        &mut self,
+        mut args: CommandArgs,
+    ) -> Result<(), NomadCommandError> {
         let Some(module_name) = args.pop_front() else {
             return Err(NomadCommandError::MissingModule {
                 valid: self.commands.keys().copied().collect(),
             });
         };
 
-        let Some(module_commands) = self.commands.get(&module_name.as_str())
+        let Some(module_commands) =
+            self.commands.get_mut(module_name.as_str())
         else {
             return Err(NomadCommandError::UnknownModule {
                 module_name,
@@ -64,17 +74,19 @@ impl NomadCommand {
                 Ok(())
             } else {
                 Err(NomadCommandError::MissingCommand {
+                    module_name: module_commands.module_name,
                     valid: module_commands.command_names().collect(),
                 })
             };
         };
 
-        match module_commands.command(&command_name.as_str()) {
+        match module_commands.command(command_name.as_str()) {
             Some(command) => {
                 command(args);
                 Ok(())
             },
             None => Err(NomadCommandError::UnknownCommand {
+                module_name: module_commands.module_name,
                 command_name,
                 valid: module_commands.command_names().collect(),
             }),
@@ -86,18 +98,74 @@ impl NomadCommand {
 /// [`NomadCommand`].
 enum NomadCommandError {
     /// TODO: docs.
-    MissingCommand { valid: Vec<ActionNameStr> },
+    MissingCommand { module_name: ModuleName, valid: Vec<ActionNameStr> },
 
     /// TODO: docs.
     MissingModule { valid: Vec<ModuleNameStr> },
 
     /// TODO: docs.
-    UnknownCommand { command_name: String, valid: Vec<ActionNameStr> },
+    UnknownCommand {
+        module_name: ModuleName,
+        command_name: String,
+        valid: Vec<ActionNameStr>,
+    },
 
     /// TODO: docs.
     UnknownModule { module_name: String, valid: Vec<ModuleNameStr> },
 }
 
 impl NomadCommandError {
-    fn emit(self) {}
+    fn emit(self) {
+        self.message().emit(Level::Warning, self.source());
+    }
+
+    fn message(&self) -> DiagnosticMessage {
+        let mut message = DiagnosticMessage::new();
+        match self {
+            Self::MissingCommand { valid, .. } => {
+                message
+                    .push_str("missing command, the valid commands are: ")
+                    .push_comma_separated(valid, HighlightGroup::special());
+            },
+            Self::MissingModule { valid } => {
+                message
+                    .push_str("missing module, the valid modules are: ")
+                    .push_comma_separated(valid, HighlightGroup::special());
+            },
+
+            Self::UnknownCommand { command_name, valid, .. } => {
+                message
+                    .push_str("unknown command '")
+                    .push_str_highlighted(
+                        command_name,
+                        HighlightGroup::warning(),
+                    )
+                    .push_str("', the valid commands are: ")
+                    .push_comma_separated(valid, HighlightGroup::special());
+            },
+            Self::UnknownModule { module_name, valid } => {
+                message
+                    .push_str("unknown module '")
+                    .push_str_highlighted(
+                        module_name,
+                        HighlightGroup::warning(),
+                    )
+                    .push_str("', the valid modules are: ")
+                    .push_comma_separated(valid, HighlightGroup::special());
+            },
+        }
+        message
+    }
+
+    fn source(&self) -> DiagnosticSource {
+        let mut source = DiagnosticSource::new();
+        match self {
+            Self::UnknownCommand { module_name, .. }
+            | Self::MissingCommand { module_name, .. } => {
+                source.push_segment(module_name.as_str());
+            },
+            _ => (),
+        }
+        source
+    }
 }

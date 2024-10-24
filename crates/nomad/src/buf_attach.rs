@@ -53,7 +53,7 @@ where
 
     fn register(self, ctx: Self::Ctx<'_>) {
         ctx.with_buf_attach_map(|m| {
-            let neovim_ctx = (&**ctx).to_static();
+            let neovim_ctx = ctx.to_static();
             m.attach(ctx.buffer_id(), self.action, neovim_ctx);
         });
     }
@@ -87,11 +87,10 @@ impl BufAttachMap {
 
         let mut has_attached_to_buffer = true;
 
-        let callbacks =
-            self.inner.entry(buffer_id.clone()).or_insert_with(|| {
-                has_attached_to_buffer = false;
-                Vec::new()
-            });
+        let callbacks = self.inner.entry(buffer_id).or_insert_with(|| {
+            has_attached_to_buffer = false;
+            Vec::new()
+        });
 
         callbacks.push(Box::new(callback));
 
@@ -103,11 +102,10 @@ impl BufAttachMap {
 
 fn attach_to(buffer_id: BufferId, ctx: NeovimCtx<'static>) {
     let callback = {
-        let buffer_id = buffer_id.clone();
         move |args: opts::OnBytesArgs| {
             let text_buffer_ctx = ctx
                 .reborrow()
-                .into_buffer(buffer_id.clone())
+                .into_buffer(buffer_id)
                 .clone()
                 .expect(
                     "`on_bytes` is being called, so the buffer ID must still \
@@ -122,7 +120,7 @@ fn attach_to(buffer_id: BufferId, ctx: NeovimCtx<'static>) {
             let buf_attach_args = BufAttachArgs {
                 actor_id: ctx
                     .with_actor_map(|m| m.take_edited_buffer(&buffer_id)),
-                buffer_id: buffer_id.clone(),
+                buffer_id,
                 replacement: Replacement::from_on_bytes_args(
                     args,
                     text_buffer_ctx,
@@ -142,7 +140,7 @@ fn attach_to(buffer_id: BufferId, ctx: NeovimCtx<'static>) {
                         break;
                     };
                     if callback(buf_attach_args.clone()).into() {
-                        callbacks.remove(idx);
+                        let _ = callbacks.remove(idx);
                     } else {
                         idx += 1;
                     }

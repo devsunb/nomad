@@ -198,13 +198,13 @@ impl SetupError {
     fn emit(self) {
         let mut source = DiagnosticSource::new();
         source.push_segment(Setup::NAME);
-        self.message().emit(Level::Error, source);
+        self.message().emit(Level::Warning, source);
     }
 
     fn message(self) -> DiagnosticMessage {
         let mut message = DiagnosticMessage::new();
         match self {
-            SetupError::ConfigNotDict(kind) => {
+            Self::ConfigNotDict(kind) => {
                 message
                     .push_str("expected a dictionary, got a ")
                     .push_str_highlighted(
@@ -213,7 +213,7 @@ impl SetupError {
                     )
                     .push_str(" instead");
             },
-            SetupError::NonUnicodeKey(key) => {
+            Self::NonUnicodeKey(key) => {
                 message
                     .push_str("module name '")
                     .push_str_highlighted(
@@ -222,7 +222,7 @@ impl SetupError {
                     )
                     .push_str("' is not a valid Unicode string");
             },
-            SetupError::UnknownModule { name, mut valid } => {
+            Self::UnknownModule { name, mut valid } => {
                 valid.sort_unstable();
                 message
                     .push_str("unknown module '")
