@@ -63,6 +63,7 @@ pub trait AutoCommand: Sized {
 pub enum AutoCommandEvent {
     BufAdd,
     BufEnter,
+    BufLeave,
     BufUnload,
 }
 
@@ -153,12 +154,14 @@ fn register_autocmd<A: AutoCommand>(
 impl AutoCommandEvent {
     const BUF_ADD: &'static str = "BufAdd";
     const BUF_ENTER: &'static str = "BufEnter";
+    const BUF_LEAVE: &'static str = "BufLeave";
     const BUF_UNLOAD: &'static str = "BufUnload";
 
     fn as_str(&self) -> &'static str {
         match self {
             Self::BufAdd => Self::BUF_ADD,
             Self::BufEnter => Self::BUF_ENTER,
+            Self::BufLeave => Self::BUF_LEAVE,
             Self::BufUnload => Self::BUF_UNLOAD,
         }
     }
