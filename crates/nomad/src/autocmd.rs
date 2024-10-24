@@ -65,6 +65,8 @@ pub enum AutoCommandEvent {
     BufEnter,
     BufLeave,
     BufUnload,
+    CursorMoved,
+    CursorMovedI,
 }
 
 /// TODO: docs.
@@ -156,6 +158,8 @@ impl AutoCommandEvent {
     const BUF_ENTER: &'static str = "BufEnter";
     const BUF_LEAVE: &'static str = "BufLeave";
     const BUF_UNLOAD: &'static str = "BufUnload";
+    const CURSOR_MOVED: &'static str = "CursorMoved";
+    const CURSOR_MOVED_I: &'static str = "CursorMovedI";
 
     fn as_str(&self) -> &'static str {
         match self {
@@ -163,6 +167,8 @@ impl AutoCommandEvent {
             Self::BufEnter => Self::BUF_ENTER,
             Self::BufLeave => Self::BUF_LEAVE,
             Self::BufUnload => Self::BUF_UNLOAD,
+            Self::CursorMoved => Self::CURSOR_MOVED,
+            Self::CursorMovedI => Self::CURSOR_MOVED_I,
         }
     }
 }

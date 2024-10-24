@@ -1,42 +1,42 @@
+use nvim_oxi::api;
+
 use crate::autocmd::{AutoCommand, AutoCommandEvent, ShouldDetach};
 use crate::buffer_id::BufferId;
 use crate::ctx::AutoCommandCtx;
-use crate::{Action, ActorId};
+use crate::point::Point;
+use crate::{Action, ActorId, ByteOffset};
 
 /// TODO: docs.
-pub struct BufEnter<A> {
+pub struct CursorMoved<A> {
     action: A,
     buffer_id: Option<BufferId>,
 }
 
 /// TODO: docs.
-pub struct BufEnterArgs {
-    /// The [`ActorId`] that focused the buffer.
+pub struct CursorMovedArgs {
+    /// The [`ActorId`] that moved the cursor.
     pub actor_id: ActorId,
 
-    /// The [`BufferId`] of the old buffer.
-    pub old_buffer_id: BufferId,
-
-    /// The [`BufferId`] of the newly focused buffer.
-    pub new_buffer_id: BufferId,
+    /// The [`Point`] the cursor was moved to.
+    pub moved_to: Point,
 }
 
-impl<A> BufEnter<A> {
+impl<A> CursorMoved<A> {
     /// TODO: docs.
     pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
         self.buffer_id = Some(buffer_id);
         self
     }
 
-    /// Creates a new [`BufEnter`] with the given action.
+    /// Creates a new [`CursorMoved`] with the given action.
     pub fn new(action: A) -> Self {
         Self { action, buffer_id: None }
     }
 }
 
-impl<A> AutoCommand for BufEnter<A>
+impl<A> AutoCommand for CursorMoved<A>
 where
-    A: Action<Args = BufEnterArgs>,
+    A: Action<Args = CursorMovedArgs>,
     A::Return: Into<ShouldDetach>,
 {
     type Action = A;
@@ -46,7 +46,7 @@ where
     }
 
     fn on_event(&self) -> AutoCommandEvent {
-        AutoCommandEvent::BufEnter
+        AutoCommandEvent::CursorMoved
     }
 
     fn on_buffer(&self) -> Option<BufferId> {
@@ -55,16 +55,21 @@ where
 
     fn take_actor_id(ctx: &AutoCommandCtx<'_>) -> ActorId {
         let buffer_id = BufferId::new(ctx.args().buffer.clone());
-        ctx.with_actor_map(|m| m.take_focused_buffer(&buffer_id))
+        ctx.with_actor_map(|m| m.take_moved_cursor(&buffer_id))
     }
 }
 
-impl From<(ActorId, &AutoCommandCtx<'_>)> for BufEnterArgs {
-    fn from((actor_id, ctx): (ActorId, &AutoCommandCtx<'_>)) -> Self {
+impl From<(ActorId, &AutoCommandCtx<'_>)> for CursorMovedArgs {
+    fn from((actor_id, _): (ActorId, &AutoCommandCtx<'_>)) -> Self {
+        let (row, col) =
+            api::Window::current().get_cursor().expect("never fails(?)");
+
         Self {
             actor_id,
-            old_buffer_id: BufferId::new(ctx.args().buffer.clone()),
-            new_buffer_id: BufferId::current(),
+            moved_to: Point {
+                line_idx: row - 1,
+                byte_offset: ByteOffset::new(col),
+            },
         }
     }
 }

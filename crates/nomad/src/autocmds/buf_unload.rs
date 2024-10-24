@@ -11,7 +11,7 @@ pub struct BufUnload<A> {
 
 /// TODO: docs.
 pub struct BufUnloadArgs {
-    /// The [`ActorId`] of the actor that unloaded the buffer.
+    /// The [`ActorId`] that unloaded the buffer.
     pub actor_id: ActorId,
 
     /// The [`BufferId`] of the buffer that was unloaded.

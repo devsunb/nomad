@@ -46,6 +46,16 @@ impl ActorMap {
         self.buffer_focus.insert(buffer_id, actor_id);
     }
 
+    /// Registers the given [`ActorId`] as the last one to move the cursor in
+    /// the given buffer.
+    pub(crate) fn moved_cursor(
+        &mut self,
+        buffer_id: BufferId,
+        actor_id: ActorId,
+    ) {
+        self.buffer_focus.insert(buffer_id, actor_id);
+    }
+
     /// Removes the [`ActorId`] that last added the given buffer.
     pub(crate) fn take_added_buffer(
         &mut self,
@@ -64,6 +74,14 @@ impl ActorMap {
 
     /// Removes the [`ActorId`] that last focused the given buffer.
     pub(crate) fn take_focused_buffer(
+        &mut self,
+        buffer_id: &BufferId,
+    ) -> ActorId {
+        self.buffer_focus.remove(buffer_id).unwrap_or(ActorId::unknown())
+    }
+
+    /// Removes the [`ActorId`] that last moved the cursor in the given buffer.
+    pub(crate) fn take_moved_cursor(
         &mut self,
         buffer_id: &BufferId,
     ) -> ActorId {

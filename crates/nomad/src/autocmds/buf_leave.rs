@@ -12,7 +12,7 @@ pub struct BufLeave<A> {
 /// TODO: docs.
 #[derive(Debug, Copy, Clone)]
 pub struct BufLeaveArgs {
-    /// The [`ActorId`] of the actor that focused the buffer.
+    /// The [`ActorId`] that focused the buffer.
     pub actor_id: ActorId,
 
     /// The [`BufferId`] of the buffer that was left.
