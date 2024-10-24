@@ -38,6 +38,13 @@ impl<'ctx> BufferCtx<'ctx> {
             .to_string()
     }
 
+    pub fn reborrow(&self) -> BufferCtx<'_> {
+        BufferCtx {
+            buffer_id: self.buffer_id,
+            neovim_ctx: self.neovim_ctx.reborrow(),
+        }
+    }
+
     pub(crate) fn from_neovim(
         buffer_id: BufferId,
         neovim_ctx: NeovimCtx<'ctx>,

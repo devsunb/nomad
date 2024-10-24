@@ -3,11 +3,11 @@ use core::ops::{Bound, Deref, Range, RangeBounds};
 use nvim_oxi::api::{self, opts};
 
 use crate::autocmd::ShouldDetach;
-use crate::buf_attach::BufAttachArgs;
+use crate::buf_attach::{BufAttach, BufAttachArgs};
 use crate::buffer_id::BufferId;
 use crate::ctx::{BufferCtx, TextFileCtx};
 use crate::point::Point;
-use crate::{Action, ActorId, ByteOffset, Text};
+use crate::{Action, ActorId, ByteOffset, Event, Text};
 
 /// TODO: docs.
 #[derive(Clone)]
@@ -24,10 +24,7 @@ impl<'ctx> TextBufferCtx<'ctx> {
         A::Args: From<BufAttachArgs>,
         A::Return: Into<ShouldDetach>,
     {
-        self.with_buf_attach_map(|map| {
-            let neovim_ctx = (&*self.buffer_ctx).to_static();
-            map.attach(self.buffer_id(), action, neovim_ctx);
-        });
+        BufAttach::new(action).register(self.reborrow());
     }
 
     /// Returns the text in the given byte range.
@@ -41,6 +38,22 @@ impl<'ctx> TextBufferCtx<'ctx> {
     {
         let point_range = self.point_range_of_byte_range(byte_range);
         self.get_text_in_point_range(point_range)
+    }
+
+    /// Consumes `self`, returning the underlying [`BufferCtx`].
+    pub fn into_buffer(self) -> BufferCtx<'ctx> {
+        self.buffer_ctx
+    }
+
+    /// Consumes `self`, returning a [`TextFileCtx`] if the buffer is saved on
+    /// disk, or `None` otherwise.
+    pub fn into_text_file(self) -> Option<TextFileCtx<'ctx>> {
+        TextFileCtx::from_text_buffer(self)
+    }
+
+    /// TODO: docs.
+    pub fn reborrow(&self) -> TextBufferCtx<'_> {
+        TextBufferCtx { buffer_ctx: self.buffer_ctx.reborrow() }
     }
 
     /// Replaces the text in the given byte range with the given text.
@@ -61,17 +74,6 @@ impl<'ctx> TextBufferCtx<'ctx> {
         self.with_actor_map(|map| {
             map.edited_buffer(self.buffer_id(), actor_id);
         });
-    }
-
-    /// Consumes `self`, returning the underlying [`BufferCtx`].
-    pub fn into_buffer(self) -> BufferCtx<'ctx> {
-        self.buffer_ctx
-    }
-
-    /// Consumes `self`, returning a [`TextFileCtx`] if the buffer is saved on
-    /// disk, or `None` otherwise.
-    pub fn into_text_file(self) -> Option<TextFileCtx<'ctx>> {
-        TextFileCtx::from_text_buffer(self)
     }
 
     pub(crate) fn from_buffer(ctx: BufferCtx<'ctx>) -> Option<Self> {

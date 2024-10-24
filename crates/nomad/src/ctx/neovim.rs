@@ -34,12 +34,12 @@ impl<'ctx> NeovimCtx<'ctx> {
         BufferCtx::from_neovim(buffer_id, self)
     }
 
-    pub(crate) fn augroup_id(&self) -> AugroupId {
-        self.ctx.with_inner(|inner| inner.augroup_id.into())
+    pub fn reborrow(&self) -> NeovimCtx<'_> {
+        NeovimCtx { ctx: self.ctx.as_ref() }
     }
 
-    pub(crate) fn as_ref(&self) -> NeovimCtx<'_> {
-        NeovimCtx { ctx: self.ctx.as_ref() }
+    pub(crate) fn augroup_id(&self) -> AugroupId {
+        self.ctx.with_inner(|inner| inner.augroup_id.into())
     }
 
     pub(crate) fn to_static(&self) -> NeovimCtx<'static> {

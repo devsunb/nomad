@@ -3,10 +3,14 @@ use nvim_oxi::api::opts;
 
 use crate::autocmd::ShouldDetach;
 use crate::buffer_id::BufferId;
-use crate::ctx::NeovimCtx;
+use crate::ctx::{NeovimCtx, TextBufferCtx};
 use crate::diagnostics::{DiagnosticSource, Level};
 use crate::maybe_result::MaybeResult;
-use crate::{Action, ActorId, Module, Replacement};
+use crate::{Action, ActorId, Event, Module, Replacement};
+
+pub struct BufAttach<A> {
+    action: A,
+}
 
 /// TODO: docs.
 #[derive(Clone)]
@@ -28,8 +32,35 @@ pub(crate) struct BufAttachMap {
 
 type BufAttachCallback = Box<dyn FnMut(BufAttachArgs) -> ShouldDetach>;
 
+impl<A> BufAttach<A>
+where
+    A: Action,
+    A::Args: From<BufAttachArgs>,
+    A::Return: Into<ShouldDetach>,
+{
+    pub(crate) fn new(action: A) -> Self {
+        Self { action }
+    }
+}
+
+impl<A> Event for BufAttach<A>
+where
+    A: Action,
+    A::Args: From<BufAttachArgs>,
+    A::Return: Into<ShouldDetach>,
+{
+    type Ctx<'a> = TextBufferCtx<'a>;
+
+    fn register(self, ctx: Self::Ctx<'_>) {
+        ctx.with_buf_attach_map(|m| {
+            let neovim_ctx = (&**ctx).to_static();
+            m.attach(ctx.buffer_id(), self.action, neovim_ctx);
+        });
+    }
+}
+
 impl BufAttachMap {
-    pub(crate) fn attach<A>(
+    fn attach<A>(
         &mut self,
         buffer_id: BufferId,
         mut action: A,
