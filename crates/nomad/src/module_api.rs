@@ -4,7 +4,7 @@ use nvim_oxi::Dictionary as NvimDictionary;
 
 use crate::ctx::NeovimCtx;
 use crate::module_commands::ModuleCommands;
-use crate::{Action, AutoCommand, Command, Event, Function, Module};
+use crate::{Command, Event, Function, Module};
 
 /// TODO: docs.
 pub struct ModuleApi<M: Module> {
@@ -15,19 +15,19 @@ pub struct ModuleApi<M: Module> {
 }
 
 impl<M: Module> ModuleApi<M> {
-    pub fn autocmd<T>(self, autocmd: T) -> Self
-    where
-        T: AutoCommand<Action: Action<Module = M>>,
-    {
-        autocmd.register(self.neovim_ctx.reborrow());
-        self
-    }
-
     pub fn command<T>(mut self, command: T) -> Self
     where
         T: Command<Module = M>,
     {
         self.commands.add_command(command);
+        self
+    }
+
+    pub fn event<T>(self, event: T) -> Self
+    where
+        T: for<'a> Event<Ctx<'a> = NeovimCtx<'a>>,
+    {
+        event.register(self.neovim_ctx.reborrow());
         self
     }
 
