@@ -35,8 +35,8 @@ pub(super) struct SessionCtx {
     /// it's in a buffer that's not in the project.
     pub(super) local_cursor_id: Option<CursorId>,
 
-    /// Map from [`PeerId`] to the [`PeerTooltip`] displayed in the editor for
-    /// that peer.
+    /// Map from the [`PeerId`] of a remote peer to the corresponding
+    /// [`PeerTooltip`] displayed in the editor, if any.
     pub(super) remote_tooltips: FxHashMap<CursorId, PeerTooltip>,
 
     /// An instance of the [`NeovimCtx`].
@@ -51,6 +51,19 @@ pub(super) struct SessionCtx {
 }
 
 impl SessionCtx {
+    /// Returns the [`BufferCtx`] of the buffer displaying the file with the
+    /// given [`FileId`], if any.
+    pub(super) fn buffer_of_file_id(
+        &self,
+        file_id: FileId,
+    ) -> Option<BufferCtx<'_>> {
+        let file = self.replica.file(file_id)?;
+        let file_path_in_project = file.path();
+        let file_path = (&*self.project_root).concat(&file_path_in_project);
+        let buffer_id = BufferId::of_name(&*file_path)?;
+        self.neovim_ctx.reborrow().into_buffer(buffer_id)
+    }
+
     /// Returns the [`FileRefMut`] corresponding to the file that's currently
     /// being edited in the buffer with the given [`BufferId`], if any.
     pub(super) fn file_of_buffer_id(
@@ -109,16 +122,6 @@ impl SessionCtx {
 
     pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {
         self.local_cursor_id.and_then(|id| self.replica.cursor_mut(id))
-    }
-
-    /// Returns the [`BufferCtx`] of the buffer displaying the file with the
-    /// given [`FileId`], if any.
-    fn buffer_of_file_id(&self, file_id: FileId) -> Option<BufferCtx<'_>> {
-        let file = self.replica.file(file_id)?;
-        let file_path_in_project = file.path();
-        let file_path = (&*self.project_root).concat(&file_path_in_project);
-        let buffer_id = BufferId::of_name(&*file_path)?;
-        self.neovim_ctx.reborrow().into_buffer(buffer_id)
     }
 }
 

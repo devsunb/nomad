@@ -13,9 +13,10 @@ use nomad::{
     ShouldDetach,
 };
 use nomad_server::Message;
+use smallvec::SmallVec;
 use tracing::error;
 
-use super::{SessionCtx, SyncCursor, SyncReplacement};
+use super::{PeerTooltip, SessionCtx, SyncCursor, SyncReplacement};
 use crate::Collab;
 
 pub(super) struct RegisterBufferActions {
@@ -77,7 +78,25 @@ impl RegisterBufferActions {
             })
             .register((&**text_buffer_ctx).reborrow());
 
-            todo!("display tooltips for cursors in this buffer");
+            let new_tooltips = session_ctx
+                .replica
+                .cursors()
+                .filter_map(|cursor| {
+                    let file_id = cursor.file().id();
+                    let buffer = session_ctx.buffer_of_file_id(file_id)?;
+                    let peer = String::from("TODO: get peer");
+                    let peer_tooltip = PeerTooltip::create(
+                        peer,
+                        cursor.byte_offset().into(),
+                        buffer,
+                    );
+                    Some((cursor.id(), peer_tooltip))
+                })
+                .collect::<SmallVec<[_; 4]>>();
+
+            for (cursor_id, tooltip) in new_tooltips {
+                session_ctx.remote_tooltips.insert(cursor_id, tooltip);
+            }
         });
     }
 }
