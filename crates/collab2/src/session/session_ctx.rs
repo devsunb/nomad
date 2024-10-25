@@ -1,10 +1,17 @@
 use core::ops::Deref;
 
 use e31e::fs::AbsPathBuf;
-use e31e::{Edit, FileId, FileRef};
+use e31e::{CursorCreation, CursorId, CursorRefMut, Edit, FileId, FileRef};
 use nohash::IntMap as NoHashMap;
 use nomad::ctx::NeovimCtx;
-use nomad::{ActorId, BufferId, Replacement, Shared, ShouldDetach};
+use nomad::{
+    ActorId,
+    BufferId,
+    ByteOffset,
+    Replacement,
+    Shared,
+    ShouldDetach,
+};
 
 #[derive(Clone)]
 pub(super) struct SessionCtx {
@@ -13,6 +20,10 @@ pub(super) struct SessionCtx {
 
     /// Map from [`BufferId`]
     pub(super) buffer_actions: NoHashMap<BufferId, Shared<ShouldDetach>>,
+
+    /// The [`CursorId`] of the cursor owned by the local peer, or `None` if
+    /// it's in a buffer that's not in the project.
+    pub(super) local_cursor_id: Option<CursorId>,
 
     /// An instance of the [`NeovimCtx`].
     pub(super) neovim_ctx: NeovimCtx<'static>,
@@ -61,6 +72,10 @@ impl SessionCtx {
             None => None,
         }
     }
+
+    pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {
+        self.local_cursor_id.and_then(|id| self.replica.cursor_mut(id))
+    }
 }
 
 pub(super) struct FileRefMut<'ctx> {
@@ -70,6 +85,21 @@ pub(super) struct FileRefMut<'ctx> {
 }
 
 impl FileRefMut<'_> {
+    pub(super) fn sync_created_cursor(
+        &mut self,
+        byte_offset: ByteOffset,
+    ) -> CursorCreation {
+        assert!(
+            self.session_ctx.local_cursor_id.is_none(),
+            "creating a new cursor when another already exists, but Neovim \
+             only supports a single cursor"
+        );
+        let (cursor_id, cursor_creation) =
+            self.as_inner_mut().sync_created_cursor(byte_offset.into_u64());
+        self.session_ctx.local_cursor_id = Some(cursor_id);
+        cursor_creation
+    }
+
     pub(super) fn sync_edited_text(
         &mut self,
         replacement: Replacement,
