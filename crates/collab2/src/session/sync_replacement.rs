@@ -1,5 +1,7 @@
+use core::any::type_name;
+
 use nomad::buf_attach::BufAttachArgs;
-use nomad::{action_name, Action, ActionName, Shared, ShouldDetach};
+use nomad::{action_name, Action, ActionName, BufferId, Shared, ShouldDetach};
 use nomad_server::Message;
 
 use super::SessionCtx;
@@ -24,13 +26,21 @@ impl Action for SyncReplacement {
                 return None;
             }
 
-            // 1: get the `FileId` associated with the `BufferId`;
-            // 2: get the corresponding `FileRefMut`;
-            // 3: synchronize the replacement -> get the `Message`;
-            // 4: for all windows displaying the buffer, update tooltips of all
-            //    remote cursors and selections on the buffer;
-            // 5: return `Message`
-            todo!();
+            let Some(mut file) =
+                session_ctx.file_mut_of_buffer_id(args.buffer_id)
+            else {
+                unreachable!(
+                    "couldn't convert BufferId to file in {}",
+                    type_name::<Self>()
+                );
+            };
+
+            let edit = file.sync_edited_text([args.replacement.into()]);
+
+            todo!(
+                "for all windows displaying the buffer, update tooltips of \
+                 all remote cursors and selections on the buffer"
+            );
         });
 
         if let Some(message) = message {
