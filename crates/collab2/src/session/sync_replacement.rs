@@ -35,12 +35,9 @@ impl Action for SyncReplacement {
                 );
             };
 
-            let edit = file.sync_edited_text([args.replacement.into()]);
+            let edit = file.sync_edited_text(args.replacement);
 
-            todo!(
-                "for all windows displaying the buffer, update tooltips of \
-                 all remote cursors and selections on the buffer"
-            );
+            todo!();
         });
 
         if let Some(message) = message {

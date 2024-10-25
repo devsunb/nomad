@@ -1,8 +1,10 @@
+use core::ops::Deref;
+
 use e31e::fs::AbsPathBuf;
-use e31e::FileRefMut;
+use e31e::{Edit, FileId, FileRef};
 use nohash::IntMap as NoHashMap;
 use nomad::ctx::NeovimCtx;
-use nomad::{ActorId, BufferId, Shared, ShouldDetach};
+use nomad::{ActorId, BufferId, Replacement, Shared, ShouldDetach};
 
 #[derive(Clone)]
 pub(super) struct SessionCtx {
@@ -26,10 +28,10 @@ pub(super) struct SessionCtx {
 impl SessionCtx {
     /// Returns the [`FileRefMut`] corresponding to the file that's currently
     /// being edited in the buffer with the given [`BufferId`], if any.
-    pub(super) fn file_mut_of_buffer_id(
+    pub(super) fn file_of_buffer_id(
         &mut self,
         buffer_id: BufferId,
-    ) -> Option<FileRefMut<'_>> {
+    ) -> Option<FileRef<'_>> {
         let file_ctx = self
             .neovim_ctx
             .reborrow()
@@ -38,9 +40,50 @@ impl SessionCtx {
 
         let file_path = file_ctx.path().strip_prefix(&self.project_root)?;
 
-        match self.replica.file_mut_at_path(file_path) {
+        match self.replica.file_at_path(file_path) {
             Ok(Some(file)) => Some(file),
             _ => None,
         }
+    }
+
+    /// Same as [`file_of_buffer_id`](Self::file_of_buffer_id), but returns a
+    /// [`FileRefMut`].
+    pub(super) fn file_mut_of_buffer_id(
+        &mut self,
+        buffer_id: BufferId,
+    ) -> Option<FileRefMut<'_>> {
+        match self.file_of_buffer_id(buffer_id) {
+            Some(file) => Some(FileRefMut {
+                file_id: file.id(),
+                buffer_id,
+                session_ctx: self,
+            }),
+            None => None,
+        }
+    }
+}
+
+pub(super) struct FileRefMut<'ctx> {
+    file_id: FileId,
+    buffer_id: BufferId,
+    session_ctx: &'ctx mut SessionCtx,
+}
+
+impl FileRefMut<'_> {
+    pub(super) fn sync_edited_text(
+        &mut self,
+        replacement: Replacement,
+    ) -> Edit {
+        let edit = self.as_inner_mut().sync_edited_text([replacement.into()]);
+        // TODO: for all windows displaying the buffer, update tooltips of all
+        // remote cursors and selections on the buffer.
+        edit
+    }
+
+    fn as_inner_mut(&mut self) -> e31e::FileRefMut<'_> {
+        self.session_ctx
+            .replica
+            .file_mut(self.file_id)
+            .expect("we have a FileRefMut")
     }
 }
