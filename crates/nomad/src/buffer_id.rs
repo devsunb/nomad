@@ -1,7 +1,7 @@
 use core::fmt;
 use core::hash::{Hash, Hasher};
 
-use nvim_oxi::api::Buffer as NvimBuffer;
+use nvim_oxi::api::{self, Buffer as NvimBuffer};
 
 type BufHandle = i32;
 
@@ -12,9 +12,15 @@ pub struct BufferId {
 }
 
 impl BufferId {
-    /// TODO: docs.
+    /// Returns the [`BufferId`] of the currently focused buffer.
     pub fn current() -> Self {
         Self::new(NvimBuffer::current())
+    }
+
+    /// Returns an iterator of the [`BufferId`]s of all the currently opened
+    /// buffers.
+    pub fn opened() -> impl ExactSizeIterator<Item = Self> {
+        api::list_bufs().map(Self::new)
     }
 
     pub(crate) fn as_nvim(&self) -> NvimBuffer {
