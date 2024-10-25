@@ -19,9 +19,9 @@ impl Action for Start {
     type Module = Collab;
     type Return = ();
 
-    fn docs(&self) -> Self::Docs {}
-
     fn execute(&mut self, _args: Self::Args) {
         todo!()
     }
+
+    fn docs(&self) -> Self::Docs {}
 }
