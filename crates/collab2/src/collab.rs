@@ -2,6 +2,8 @@ use nomad::config::ConfigReceiver;
 use nomad::ctx::NeovimCtx;
 use nomad::{module_name, Module, ModuleApi, ModuleName};
 
+use crate::actions::{Join, Start};
+
 /// TODO: docs.
 pub struct Collab {
     config_rx: ConfigReceiver<Self>,
@@ -13,7 +15,14 @@ impl Module for Collab {
     type Config = ();
 
     fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self> {
-        todo!()
+        let join = Join::new();
+        let start = Start::new();
+
+        ModuleApi::new(ctx.to_static())
+            .command(join.clone())
+            .command(start.clone())
+            .function(join)
+            .function(start)
     }
 
     async fn run(self, ctx: NeovimCtx<'static>) {
