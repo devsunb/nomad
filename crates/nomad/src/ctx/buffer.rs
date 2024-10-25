@@ -20,6 +20,19 @@ impl<'ctx> BufferCtx<'ctx> {
         self.buffer_id
     }
 
+    /// Converts the given [`Point`] to the corresponding [`ByteOffset`] in the
+    /// buffer.
+    #[track_caller]
+    pub fn byte_offset_of_point(&self, point: Point) -> ByteOffset {
+        let line_offset: ByteOffset = self
+            .buffer_id()
+            .as_nvim()
+            .get_offset(point.line_idx)
+            .expect("couldn't get line offset")
+            .into();
+        line_offset + point.byte_offset
+    }
+
     /// Consumes `self`, returning a [`FileCtx`] if the buffer is saved on
     /// disk, or `None` otherwise.
     pub fn into_file(self) -> Option<FileCtx<'ctx>> {

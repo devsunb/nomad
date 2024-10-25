@@ -10,23 +10,36 @@ use crate::autocmds::{
 use crate::ctx::BufferCtx;
 use crate::maybe_result::MaybeResult;
 use crate::point::Point;
-use crate::{Action, ActorId, Event, FnAction, Shared, ShouldDetach};
+use crate::{
+    Action,
+    ActorId,
+    BufferId,
+    ByteOffset,
+    Event,
+    FnAction,
+    Shared,
+    ShouldDetach,
+};
 
 /// TODO: docs.
 #[derive(Clone)]
 pub struct Cursor {
-    action: CursorAction,
-    moved_by: ActorId,
+    /// TODO: docs.
+    pub action: CursorAction,
+    /// TODO: docs.
+    pub buffer_id: BufferId,
+    /// TODO: docs.
+    pub moved_by: ActorId,
 }
 
 /// TODO: docs.
 #[derive(Clone, Copy)]
 pub enum CursorAction {
-    /// The cursor has been moved into the buffer at the given point.
-    Created(Point),
+    /// The cursor has been moved into the buffer at the given offset.
+    Created(ByteOffset),
 
-    /// The cursor has been moved to the given point.
-    Moved(Point),
+    /// The cursor has been moved to the given offset.
+    Moved(ByteOffset),
 
     /// The cursor has been moved away from the buffer.
     Removed,
@@ -35,18 +48,6 @@ pub enum CursorAction {
 /// TODO: docs.
 pub struct CursorEvent<A> {
     action: A,
-}
-
-impl Cursor {
-    /// TODO: docs.
-    pub fn action(&self) -> CursorAction {
-        self.action
-    }
-
-    /// TODO: docs.
-    pub fn moved_by(&self) -> ActorId {
-        self.moved_by
-    }
 }
 
 impl<A> CursorEvent<A> {
@@ -65,6 +66,7 @@ where
 
     fn register(self, ctx: Self::Ctx<'_>) {
         let mut action = self.action;
+        let buffer_id = ctx.buffer_id();
         let should_detach = Shared::new(ShouldDetach::No);
         let has_just_entered_buf = Shared::new(false);
 
@@ -82,6 +84,7 @@ where
                     action
                         .execute(Cursor {
                             action: cursor_action,
+                            buffer_id,
                             moved_by: args.actor_id,
                         })
                         .into_result()
@@ -94,11 +97,11 @@ where
             });
 
         CursorMoved::new(cursor_moved_action.clone())
-            .buffer_id(ctx.buffer_id())
+            .buffer_id(buffer_id)
             .register((&*ctx).reborrow());
 
         CursorMovedI::new(cursor_moved_action)
-            .buffer_id(ctx.buffer_id())
+            .buffer_id(buffer_id)
             .register((&*ctx).reborrow());
 
         BufEnter::new(FnAction::<_, A::Module, _, _>::new({
@@ -108,7 +111,7 @@ where
                 should_detach.get()
             }
         }))
-        .buffer_id(ctx.buffer_id())
+        .buffer_id(buffer_id)
         .register((&*ctx).reborrow());
 
         BufLeave::new(FnAction::<_, A::Module, _, ShouldDetach>::new(
@@ -116,6 +119,7 @@ where
                 action
                     .execute(Cursor {
                         action: CursorAction::Removed,
+                        buffer_id,
                         moved_by: args.actor_id,
                     })
                     .into_result()
@@ -126,7 +130,7 @@ where
                     .map_err(Into::into)
             },
         ))
-        .buffer_id(ctx.buffer_id())
+        .buffer_id(buffer_id)
         .register((&*ctx).reborrow());
     }
 }

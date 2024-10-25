@@ -17,8 +17,8 @@ pub struct CursorMovedArgs {
     /// The [`ActorId`] that moved the cursor.
     pub actor_id: ActorId,
 
-    /// The [`Point`] the cursor was moved to.
-    pub moved_to: Point,
+    /// The [`ByteOffset`] the cursor was moved to.
+    pub moved_to: ByteOffset,
 }
 
 impl<A> CursorMoved<A> {
@@ -60,16 +60,21 @@ where
 }
 
 impl From<(ActorId, &AutoCommandCtx<'_>)> for CursorMovedArgs {
-    fn from((actor_id, _): (ActorId, &AutoCommandCtx<'_>)) -> Self {
+    fn from((actor_id, ctx): (ActorId, &AutoCommandCtx<'_>)) -> Self {
         let (row, col) =
             api::Window::current().get_cursor().expect("never fails(?)");
 
-        Self {
-            actor_id,
-            moved_to: Point {
-                line_idx: row - 1,
-                byte_offset: ByteOffset::new(col),
-            },
-        }
+        let point =
+            Point { line_idx: row - 1, byte_offset: ByteOffset::new(col) };
+
+        let buffer_id = BufferId::new(ctx.args().buffer.clone());
+
+        let buffer_ctx =
+            ctx.as_neovim().reborrow().into_buffer(buffer_id).expect(
+                "the CursorMoved event just triggered on the buffer, so it \
+                 must exist",
+            );
+
+        Self { actor_id, moved_to: buffer_ctx.byte_offset_of_point(point) }
     }
 }
