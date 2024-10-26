@@ -5,6 +5,7 @@ use e31e::{
     CursorCreation,
     CursorId,
     CursorRefMut,
+    CursorRelocation,
     Edit,
     FileId,
     FileRef,
@@ -118,6 +119,21 @@ impl SessionCtx {
         let peer = String::from("TODO: get peer");
         let peer_tooltip = PeerTooltip::create(peer, cursor_offset, buffer);
         self.remote_tooltips.insert(cursor_id, peer_tooltip);
+    }
+
+    pub(super) fn integrate_cursor_relocation(
+        &mut self,
+        cursor_relocation: CursorRelocation,
+    ) {
+        let Some(cursor) =
+            self.replica.integrate_cursor_relocation(cursor_relocation)
+        else {
+            return;
+        };
+        let Some(tooltip) = self.remote_tooltips.get_mut(&cursor.id()) else {
+            return;
+        };
+        tooltip.relocate(cursor.byte_offset().into());
     }
 
     pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {

@@ -29,34 +29,14 @@ impl PeerTooltip {
         &self.peer
     }
 
-    /// # Panics
-    ///
-    /// Panics if the [`PeerTooltip`] was created in a different buffer.
-    pub(super) fn relocate(
-        &mut self,
-        new_offset: ByteOffset,
-        ctx: BufferCtx<'_>,
-    ) {
-        assert_eq!(
-            self.in_buffer,
-            ctx.buffer_id(),
-            "relocating tooltip in wrong buffer"
-        );
+    pub(super) fn relocate(&mut self, new_offset: ByteOffset) {
         if self.at_offset == new_offset {
             return;
         }
         todo!();
     }
 
-    /// # Panics
-    ///
-    /// Panics if the [`PeerTooltip`] was created in a different buffer.
-    pub(super) fn remove(self, ctx: BufferCtx<'_>) {
-        assert_eq!(
-            self.in_buffer,
-            ctx.buffer_id(),
-            "removing tooltip from wrong buffer"
-        );
+    pub(super) fn remove(self) {
         todo!();
     }
 }
