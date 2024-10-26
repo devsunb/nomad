@@ -35,8 +35,4 @@ impl PeerTooltip {
         }
         todo!();
     }
-
-    pub(super) fn remove(self) {
-        todo!();
-    }
 }

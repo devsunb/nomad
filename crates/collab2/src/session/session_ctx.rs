@@ -6,6 +6,7 @@ use e31e::{
     CursorId,
     CursorRefMut,
     CursorRelocation,
+    CursorRemoval,
     Edit,
     FileId,
     FileRef,
@@ -134,6 +135,18 @@ impl SessionCtx {
             return;
         };
         tooltip.relocate(cursor.byte_offset().into());
+    }
+
+    pub(super) fn integrate_cursor_removal(
+        &mut self,
+        cursor_removal: CursorRemoval,
+    ) {
+        let Some(cursor_id) =
+            self.replica.integrate_cursor_removal(cursor_removal)
+        else {
+            return;
+        };
+        let _ = self.remote_tooltips.remove(&cursor_id);
     }
 
     pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {
