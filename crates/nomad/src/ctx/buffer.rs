@@ -99,7 +99,7 @@ impl<'ctx> BufferCtx<'ctx> {
     /// Converts the given byte range into the corresponding point range in the
     /// buffer.
     #[track_caller]
-    pub fn point_range_of_byte_range<R>(&self, byte_range: R) -> Range<Point>
+    pub fn point_range_of_byte_range<R>(&self, byte_range: &R) -> Range<Point>
     where
         R: RangeBounds<ByteOffset>,
     {

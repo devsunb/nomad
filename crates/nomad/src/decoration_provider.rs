@@ -86,7 +86,7 @@ impl DecorationProvider {
                     return true;
                 }
                 let point_range =
-                    buffer_ctx.point_range_of_byte_range(infos.range.clone());
+                    buffer_ctx.point_range_of_byte_range(&infos.range);
                 let opts = opts::SetExtmarkOpts::builder()
                     .id(infos.extmark_id.into_u32())
                     .end_row(point_range.end.line_idx)

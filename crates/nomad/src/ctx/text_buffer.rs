@@ -35,7 +35,7 @@ impl<'ctx> TextBufferCtx<'ctx> {
     where
         R: RangeBounds<ByteOffset>,
     {
-        let point_range = self.point_range_of_byte_range(byte_range);
+        let point_range = self.point_range_of_byte_range(&byte_range);
         self.get_text_in_point_range(point_range)
     }
 
@@ -68,7 +68,7 @@ impl<'ctx> TextBufferCtx<'ctx> {
     ) where
         R: RangeBounds<ByteOffset>,
     {
-        let point_range = self.point_range_of_byte_range(delete_range);
+        let point_range = self.point_range_of_byte_range(&delete_range);
         self.replace_text_in_point_range(point_range, insert_text.as_str());
         self.with_actor_map(|map| {
             map.edited_buffer(self.buffer_id(), actor_id);
