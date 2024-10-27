@@ -10,6 +10,7 @@ use e31e::{
     Edit,
     FileId,
     FileRef,
+    Hunks,
     PeerId,
 };
 use fxhash::FxHashMap;
@@ -147,6 +148,41 @@ impl SessionCtx {
             return;
         };
         let _ = self.remote_tooltips.remove(&cursor_id);
+    }
+
+    /// Tries to integrate the given [`Edit`] into corresponding buffer.
+    ///
+    /// If there's no open buffer for the file being edited, its absolute path
+    /// is returned together with the [`Replacements`](Hunks) that need to be
+    /// applied to it.
+    pub(super) fn integrate_edit(
+        &mut self,
+        edit: Edit,
+    ) -> Option<(AbsPathBuf, Hunks)> {
+        let (file, hunks) = self.replica.integrate_edit(edit)?;
+        let file_id = file.id();
+        let Some(buffer) = self.buffer_of_file_id(file_id) else {
+            let file_path_in_project = self
+                .replica
+                .file(file_id)
+                .expect("we just had a FileRef")
+                .path();
+            let file_path = (&*self.project_root)
+                .concat(&file_path_in_project)
+                .into_owned();
+            return Some((file_path, hunks));
+        };
+        let text_buffer = buffer
+            .into_text_buffer()
+            .expect("the file is in the Replica, so it must contain text");
+        for replacement in hunks.map(Replacement::from) {
+            text_buffer.replace_text(
+                replacement.deleted_range(),
+                replacement.inserted_text(),
+                self.actor_id,
+            );
+        }
+        None
     }
 
     pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {

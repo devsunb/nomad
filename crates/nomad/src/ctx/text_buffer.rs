@@ -63,7 +63,7 @@ impl<'ctx> TextBufferCtx<'ctx> {
     pub fn replace_text<R>(
         &self,
         delete_range: R,
-        insert_text: Text,
+        insert_text: &Text,
         actor_id: ActorId,
     ) where
         R: RangeBounds<ByteOffset>,
