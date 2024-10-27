@@ -32,7 +32,7 @@ use nomad::{
 
 use super::{PeerSelection, PeerTooltip};
 
-pub(super) struct SessionCtx {
+pub(super) struct Project {
     /// The [`ActorId`] of the [`Session`].
     pub(super) actor_id: ActorId,
 
@@ -62,7 +62,7 @@ pub(super) struct SessionCtx {
     pub(super) replica: e31e::Replica,
 }
 
-impl SessionCtx {
+impl Project {
     /// Returns the [`BufferCtx`] of the buffer displaying the file with the
     /// given [`FileId`], if any.
     pub(super) fn buffer_of_file_id(

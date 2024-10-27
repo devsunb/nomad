@@ -2,25 +2,24 @@ use nomad::autocmds::BufUnloadArgs;
 use nomad::{action_name, Action, ActionName, BufferId, Shared, ShouldDetach};
 use nomad_server::Message;
 
-use super::SessionCtx;
+use super::Project;
 use crate::Collab;
 
 pub(super) struct DetachBufferActions {
     pub(super) message_tx: flume::Sender<Message>,
-    pub(super) session_ctx: Shared<SessionCtx>,
+    pub(super) project: Shared<Project>,
 }
 
 impl DetachBufferActions {
     fn detach_actions(&mut self, buffer_id: BufferId) {
-        self.session_ctx.with_mut(|session_ctx| {
-            if let Some(should_detach) =
-                session_ctx.buffer_actions.get(&buffer_id)
+        self.project.with_mut(|project| {
+            if let Some(should_detach) = project.buffer_actions.get(&buffer_id)
             {
                 should_detach.set(ShouldDetach::Yes);
-                session_ctx
+                project
                     .remote_tooltips
                     .retain(|_, tooltip| tooltip.buffer_id() != buffer_id);
-                session_ctx
+                project
                     .remote_selections
                     .retain(|_, selection| selection.buffer_id() != buffer_id);
             }

@@ -4,13 +4,13 @@ use nomad::events::{Cursor, CursorAction};
 use nomad::{action_name, Action, ActionName, Shared, ShouldDetach};
 use nomad_server::Message;
 
-use super::SessionCtx;
+use super::Project;
 use crate::Collab;
 
 #[derive(Clone)]
 pub(super) struct SyncCursor {
     pub(super) message_tx: flume::Sender<Message>,
-    pub(super) session_ctx: Shared<SessionCtx>,
+    pub(super) project: Shared<Project>,
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
@@ -22,13 +22,13 @@ impl Action for SyncCursor {
     type Return = ShouldDetach;
 
     fn execute(&mut self, cursor: Self::Args) -> Self::Return {
-        let message = self.session_ctx.with_mut(|session_ctx| {
-            if cursor.moved_by == session_ctx.actor_id {
+        let message = self.project.with_mut(|project| {
+            if cursor.moved_by == project.actor_id {
                 return None;
             }
 
             let Some(mut file) =
-                session_ctx.file_mut_of_buffer_id(cursor.buffer_id)
+                project.file_mut_of_buffer_id(cursor.buffer_id)
             else {
                 unreachable!(
                     "couldn't convert BufferId to file in {}",
@@ -41,22 +41,22 @@ impl Action for SyncCursor {
                     let (cursor_id, cursor_creation) =
                         file.sync_created_cursor(byte_offset.into_u64());
                     assert!(
-                        session_ctx.local_cursor_id.is_none(),
+                        project.local_cursor_id.is_none(),
                         "creating a new cursor when another already exists, \
                          but Neovim only supports a single cursor"
                     );
-                    session_ctx.local_cursor_id = Some(cursor_id);
+                    project.local_cursor_id = Some(cursor_id);
                     todo!();
                 },
                 CursorAction::Moved(byte_offset) => {
-                    session_ctx
+                    project
                         .local_cursor_mut()
                         .expect("cursor is being moved, so it must exist")
                         .sync_relocated(byte_offset.into_u64());
                     todo!();
                 },
                 CursorAction::Removed => {
-                    session_ctx
+                    project
                         .local_cursor_mut()
                         .expect("cursor is being removed, so it must exist")
                         .sync_removed();

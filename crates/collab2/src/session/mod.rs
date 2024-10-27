@@ -1,8 +1,8 @@
 mod detach_buffer_actions;
 mod peer_selection;
 mod peer_tooltip;
+mod project;
 mod register_buffer_actions;
-mod session_ctx;
 mod sync_cursor;
 mod sync_replacement;
 
@@ -22,15 +22,15 @@ use nomad::{Action, BufferId, Event, Shared};
 use nomad_server::Message;
 use peer_selection::PeerSelection;
 use peer_tooltip::PeerTooltip;
+use project::Project;
 use register_buffer_actions::RegisterBufferActions;
-use session_ctx::SessionCtx;
 use sync_cursor::SyncCursor;
 use sync_replacement::SyncReplacement;
 
 /// TODO: docs.
 pub(crate) struct Session {
     neovim_ctx: NeovimCtx<'static>,
-    session_ctx: Shared<SessionCtx>,
+    project: Shared<Project>,
 }
 
 impl Session {
@@ -47,12 +47,12 @@ impl Session {
 
         let mut register_buffer_actions = RegisterBufferActions {
             message_tx: local_tx.clone(),
-            session_ctx: self.session_ctx.clone(),
+            project: self.project.clone(),
         };
 
         let detach_buffer_actions = DetachBufferActions {
             message_tx: local_tx,
-            session_ctx: self.session_ctx.clone(),
+            project: self.project.clone(),
         };
 
         for buffer_id in BufferId::opened() {

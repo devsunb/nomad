@@ -4,12 +4,12 @@ use nomad::buf_attach::BufAttachArgs;
 use nomad::{action_name, Action, ActionName, BufferId, Shared, ShouldDetach};
 use nomad_server::Message;
 
-use super::SessionCtx;
+use super::Project;
 use crate::Collab;
 
 pub(super) struct SyncReplacement {
     pub(super) message_tx: flume::Sender<Message>,
-    pub(super) session_ctx: Shared<SessionCtx>,
+    pub(super) project: Shared<Project>,
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
@@ -21,13 +21,12 @@ impl Action for SyncReplacement {
     type Return = ShouldDetach;
 
     fn execute(&mut self, args: Self::Args) -> Self::Return {
-        let message = self.session_ctx.with_mut(|session_ctx| {
-            if args.actor_id == session_ctx.actor_id {
+        let message = self.project.with_mut(|project| {
+            if args.actor_id == project.actor_id {
                 return None;
             }
 
-            let Some(mut file) =
-                session_ctx.file_mut_of_buffer_id(args.buffer_id)
+            let Some(mut file) = project.file_mut_of_buffer_id(args.buffer_id)
             else {
                 unreachable!(
                     "couldn't convert BufferId to file in {}",
@@ -38,8 +37,8 @@ impl Action for SyncReplacement {
             let edit = file.sync_edited_text([args.replacement.into()]);
 
             let file_id = file.id();
-            session_ctx.refresh_cursors(file_id);
-            session_ctx.refresh_selections(file_id);
+            project.refresh_cursors(file_id);
+            project.refresh_selections(file_id);
 
             todo!();
         });
