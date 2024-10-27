@@ -14,6 +14,7 @@ use e31e::{
     PeerId,
     SelectionCreation,
     SelectionId,
+    SelectionRelocation,
 };
 use fxhash::FxHashMap;
 use nohash::IntMap as NoHashMap;
@@ -240,6 +241,27 @@ impl SessionCtx {
         };
         let peer_selection = PeerSelection::create(selection_range, buffer);
         self.remote_selections.insert(selection_id, peer_selection);
+    }
+
+    pub(super) fn integrate_selection_relocation(
+        &mut self,
+        selection_relocation: SelectionRelocation,
+    ) {
+        let Some(selection) =
+            self.replica.integrate_selection_relocation(selection_relocation)
+        else {
+            return;
+        };
+        let Some(peer_selection) =
+            self.remote_selections.get_mut(&selection.id())
+        else {
+            return;
+        };
+        let new_range = {
+            let r = selection.byte_range();
+            r.start.into()..r.end.into()
+        };
+        peer_selection.relocate(new_range);
     }
 
     pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {
