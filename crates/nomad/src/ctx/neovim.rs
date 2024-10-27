@@ -24,10 +24,14 @@ struct CtxInner {
     augroup_id: NomadAugroupId,
     autocmd_map: AutoCommandMap,
     buf_attach_map: BufAttachMap,
+    namespace_id: NomadNamespaceId,
 }
 
 #[derive(Copy, Clone)]
 struct NomadAugroupId(AugroupId);
+
+#[derive(Copy, Clone)]
+struct NomadNamespaceId(u32);
 
 impl<'ctx> NeovimCtx<'ctx> {
     /// TODO: docs.
@@ -88,6 +92,12 @@ impl Default for NomadAugroupId {
                 .expect("all the arguments are valid")
                 .into();
         Self(augroup_id)
+    }
+}
+
+impl Default for NomadNamespaceId {
+    fn default() -> Self {
+        Self(api::create_namespace(crate::Nomad::NAMESPACE_NAME))
     }
 }
 
