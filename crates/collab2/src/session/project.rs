@@ -196,6 +196,14 @@ impl Project {
         None
     }
 
+    pub(super) fn integrate_peer_joined(&mut self, peer: Peer) {
+        todo!();
+    }
+
+    pub(super) fn integrate_peer_left(&mut self, peer_id: PeerId) {
+        todo!();
+    }
+
     pub(super) fn integrate_selection_creation(
         &mut self,
         selection_creation: SelectionCreation,
