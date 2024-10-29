@@ -1,3 +1,5 @@
+use core::future::Future;
+
 use nvim_oxi::api;
 
 use crate::actor_map::ActorMap;
@@ -6,7 +8,7 @@ use crate::buf_attach::BufAttachMap;
 use crate::buffer_id::BufferId;
 use crate::ctx::BufferCtx;
 use crate::decoration_provider::{DecorationProvider, NamespaceId};
-use crate::{Boo, Shared};
+use crate::{Boo, JoinHandle, Shared};
 
 /// TODO: docs.
 #[derive(Default, Clone)]
@@ -44,6 +46,15 @@ impl<'ctx> NeovimCtx<'ctx> {
     /// TODO: docs.
     pub fn reborrow(&self) -> NeovimCtx<'_> {
         NeovimCtx { ctx: self.ctx.as_ref() }
+    }
+
+    /// TODO: docs.
+    pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        crate::executor::spawn(future)
     }
 
     /// TODO: docs.
