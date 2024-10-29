@@ -89,15 +89,13 @@ impl RegisterBufferActions {
                 .replica
                 .cursors()
                 .filter_map(|cursor| {
-                    if cursor.owner() == project.replica.id() {
-                        return None;
-                    }
+                    let peer =
+                        project.remote_peers.get(&cursor.owner()).cloned()?;
                     let file_id = cursor.file().id();
                     let buffer_ctx = project.buffer_of_file_id(file_id)?;
                     if buffer_ctx.buffer_id() != buffer_id {
                         return None;
                     }
-                    let peer = String::from("TODO: get peer");
                     let peer_tooltip = PeerTooltip::create(
                         peer,
                         cursor.byte_offset().into(),
@@ -115,7 +113,7 @@ impl RegisterBufferActions {
                 .replica
                 .selections()
                 .filter_map(|selection| {
-                    if selection.owner() == project.replica.id() {
+                    if !project.remote_peers.contains_key(&selection.owner()) {
                         return None;
                     }
                     let file_id = selection.file().id();

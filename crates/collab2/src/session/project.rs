@@ -121,13 +121,16 @@ impl Project {
         else {
             return;
         };
+        let Some(peer) = self.remote_peers.get(&cursor.owner()).cloned()
+        else {
+            return;
+        };
         let cursor_id = cursor.id();
         let cursor_offset = cursor.byte_offset().into();
         let file_id = cursor.file().id();
         let Some(buffer) = self.buffer_of_file_id(file_id) else {
             return;
         };
-        let peer = String::from("TODO: get peer");
         let peer_tooltip = PeerTooltip::create(peer, cursor_offset, buffer);
         self.remote_tooltips.insert(cursor_id, peer_tooltip);
     }
@@ -197,10 +200,14 @@ impl Project {
     }
 
     pub(super) fn integrate_peer_joined(&mut self, peer: Peer) {
-        todo!();
+        assert_ne!(peer.id(), self.replica.id());
+        assert!(self.remote_peers.insert(peer.id(), peer).is_none());
+        // TODO: display backlogged cursors and selections.
     }
 
     pub(super) fn integrate_peer_left(&mut self, peer_id: PeerId) {
+        // TODO: allow the Replica to remove all cursors and selections owned by
+        // the peer.
         todo!();
     }
 
@@ -213,6 +220,9 @@ impl Project {
         else {
             return;
         };
+        if !self.remote_peers.contains_key(&selection.owner()) {
+            return;
+        }
         let selection_id = selection.id();
         let selection_range = {
             let r = selection.byte_range();

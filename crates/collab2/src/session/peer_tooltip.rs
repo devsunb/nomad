@@ -1,8 +1,7 @@
+use collab_server::message::Peer;
 use nomad::ctx::BufferCtx;
 use nomad::diagnostics::HighlightGroup;
 use nomad::{BufferId, ByteOffset, Selection};
-
-type Peer = String;
 
 /// TODO: docs.
 pub(super) struct PeerTooltip {
