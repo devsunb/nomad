@@ -6,8 +6,19 @@ mod register_buffer_actions;
 mod sync_cursor;
 mod sync_replacement;
 
-use collab_server::message::Message;
+use core::future::Future;
+use std::io;
+
+use collab_server::message::{
+    Message,
+    Peer,
+    Peers,
+    ProjectRequest,
+    ProjectResponse,
+    ProjectTree,
+};
 use detach_buffer_actions::DetachBufferActions;
+use e31e::fs::AbsPath;
 use futures_util::{
     pin_mut,
     select,
@@ -19,7 +30,13 @@ use futures_util::{
 };
 use nomad::autocmds::{BufAdd, BufUnload};
 use nomad::ctx::NeovimCtx;
-use nomad::{BufferId, Event, Shared};
+use nomad::diagnostics::{
+    DiagnosticMessage,
+    DiagnosticSource,
+    HighlightGroup,
+    Level,
+};
+use nomad::{BufferId, Event, Module, Shared};
 use peer_selection::PeerSelection;
 use peer_tooltip::PeerTooltip;
 use project::Project;
@@ -28,7 +45,10 @@ use sync_cursor::SyncCursor;
 use sync_replacement::SyncReplacement;
 use tracing::error;
 
+use crate::Collab;
+
 /// TODO: docs.
+#[derive(Clone)]
 pub(crate) struct Session {
     neovim_ctx: NeovimCtx<'static>,
     project: Shared<Project>,
@@ -52,7 +72,7 @@ impl Session {
         };
 
         let detach_buffer_actions = DetachBufferActions {
-            message_tx: local_tx,
+            message_tx: local_tx.clone(),
             project: self.project.clone(),
         };
 
@@ -73,7 +93,7 @@ impl Session {
             select! {
                 remote_message = remote_rx.next().fuse() => {
                     if let Some(remote_message) = remote_message {
-                        self.integrate_message(remote_message);
+                        self.integrate_message(remote_message, &local_tx);
                     }
                 },
                 local_message = local_rx.recv_async().fuse() => {
@@ -88,7 +108,11 @@ impl Session {
         }
     }
 
-    fn integrate_message(&self, message: Message) {
+    fn integrate_message(
+        &self,
+        message: Message,
+        message_tx: &flume::Sender<Message>,
+    ) {
         use Message::*;
         match message {
             CreatedCursor(msg) => self.integrate_created_cursor(msg),
@@ -103,11 +127,13 @@ impl Session {
             PeerDisconnected(msg) => self.integrate_peer_disconnected(msg),
             PeerJoined(msg) => self.integrate_peer_joined(msg),
             PeerLeft(msg) => self.integrate_peer_left(msg),
-            ProjectRequest(msg) => self.integrate_project_request(msg),
             RemovedCursor(msg) => self.integrate_removed_cursor(msg),
             RemovedSelection(msg) => self.integrate_removed_selection(msg),
             RemovedFile(msg) => self.integrate_removed_file(msg),
             RemovedDirectory(msg) => self.integrate_removed_directory(msg),
+            ProjectRequest(msg) => {
+                self.handle_project_request(msg, message_tx.clone())
+            },
             ProjectResponse(msg) => {
                 error!("received unexpected ProjectResponse: {:?}", msg)
             },
@@ -212,19 +238,12 @@ impl Session {
         self.project.with_mut(|p| p.integrate_peer_left(peer_id));
     }
 
-    fn integrate_peer_joined(&self, peer: collab_server::message::Peer) {
+    fn integrate_peer_joined(&self, peer: Peer) {
         self.project.with_mut(|p| p.integrate_peer_joined(peer));
     }
 
     fn integrate_peer_left(&self, peer_id: e31e::PeerId) {
         self.project.with_mut(|p| p.integrate_peer_left(peer_id));
-    }
-
-    fn integrate_project_request(
-        &self,
-        project_request: collab_server::message::ProjectRequest,
-    ) {
-        todo!();
     }
 
     fn integrate_removed_cursor(&self, cursor_removal: e31e::CursorRemoval) {
@@ -257,5 +276,90 @@ impl Session {
         }) {
             todo!();
         }
+    }
+
+    fn handle_project_request(
+        &self,
+        project_request: ProjectRequest,
+        message_tx: flume::Sender<Message>,
+    ) {
+        self.neovim_ctx.spawn({
+            let this = self.clone();
+            let respond_to = project_request.request_from;
+            async move {
+                match this.read_project().await {
+                    Ok(project) => {
+                        let _ = message_tx.send(Message::ProjectResponse(
+                            Box::new(ProjectResponse {
+                                respond_to: respond_to.id(),
+                                project,
+                            }),
+                        ));
+                    },
+                    Err(err) => {
+                        ReadProjectError { err, respond_to }.emit();
+                    },
+                };
+            }
+        });
+    }
+
+    async fn read_project(
+        &self,
+    ) -> io::Result<collab_server::message::Project> {
+        let (peers, replica) = self.project.with(|p| {
+            (
+                p.remote_peers
+                    .values()
+                    .cloned()
+                    .chain([p.local_peer.clone()])
+                    .collect::<Peers>(),
+                p.replica.clone(),
+            )
+        });
+
+        match ProjectTree::new(replica, |file_path| self.read_file(file_path))
+            .await
+        {
+            Ok(tree) => Ok(collab_server::message::Project { peers, tree }),
+            Err((err, _)) => Err(err),
+        }
+    }
+
+    fn read_file<'a>(
+        &'a self,
+        _file_path: &AbsPath,
+    ) -> impl Future<Output = std::io::Result<Box<str>>> + 'a {
+        async move { Ok("".into()) }
+    }
+}
+
+struct ReadProjectError {
+    err: io::Error,
+    respond_to: Peer,
+}
+
+impl ReadProjectError {
+    fn emit(&self) {
+        self.message().emit(Level::Error, self.source());
+    }
+
+    fn message(&self) -> DiagnosticMessage {
+        let mut message = DiagnosticMessage::new();
+        message
+            .push_str("couldn't send project to ")
+            .push_str_highlighted(
+                self.respond_to.github_handle().to_string(),
+                HighlightGroup::special(),
+            )
+            .push_str(": ")
+            .push_str(self.err.to_string());
+        message
+    }
+
+    fn source(&self) -> DiagnosticSource {
+        let mut source = DiagnosticSource::new();
+        source.push_segment(<Collab as Module>::NAME.as_str());
+        source
     }
 }

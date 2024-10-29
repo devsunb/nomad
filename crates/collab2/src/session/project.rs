@@ -35,6 +35,9 @@ pub(super) struct Project {
     /// it's in a buffer that's not in the project.
     pub(super) local_cursor_id: Option<CursorId>,
 
+    /// The local [`Peer`].
+    pub(super) local_peer: Peer,
+
     /// An instance of the [`NeovimCtx`].
     pub(super) neovim_ctx: NeovimCtx<'static>,
 
