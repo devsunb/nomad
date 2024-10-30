@@ -27,6 +27,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-fs"
+version = "2.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebcd09b382f40fcd159c2d695175b2ae620ffa5f3bd6f664131efff4e8b9e04a"
+dependencies = [
+ "async-lock",
+ "blocking",
+ "futures-lite",
+]
+
+[[package]]
 name = "async-io"
 version = "2.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -65,6 +76,17 @@ dependencies = [
  "async-io",
  "blocking",
  "futures-lite",
+]
+
+[[package]]
+name = "async-recursion"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b43422f69d8ff38f95f1b2bb76517c91589a924d1559a0e935d7c8ce0274c11"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -244,6 +266,8 @@ dependencies = [
 name = "collab"
 version = "0.1.0"
 dependencies = [
+ "async-fs",
+ "async-recursion",
  "e31e",
  "flume",
  "futures-util",
@@ -431,7 +455,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "e31e"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/e31e.git#8d4655a864998269db9d5073fc32ce6d2e783b48"
+source = "git+ssh://git@github.com/nomad/e31e.git#8a72d577f375fe91c18a41c80fe100951432769a"
 dependencies = [
  "cola",
  "compact_str",
@@ -710,7 +734,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4979f22fdb869068da03c9f7528f8297c6fd2606bc3a4affe42e6a823fdb8da4"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]

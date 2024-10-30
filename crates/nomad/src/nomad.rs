@@ -1,7 +1,7 @@
 use core::future::Future;
 use core::pin::Pin;
 
-use e31e::fs::AbsPathBuf;
+use e31e::fs::{AbsPathBuf, FsNodeName};
 use nvim_oxi::{lua, Dictionary as NvimDictionary, Function as NvimFunction};
 
 use crate::config::Setup;
@@ -75,11 +75,11 @@ impl Nomad {
                 },
                 _ => panic!("failed to get the home directory"),
             };
-            home.push(".local".try_into().expect("it's valid"))
-                .push("share".try_into().expect("it's valid"))
-                .push("nvim".try_into().expect("it's valid"))
-                .push("nomad".try_into().expect("it's valid"))
-                .push("logs".try_into().expect("it's valid"));
+            home.push(<&FsNodeName>::try_from(".local").expect("it's valid"))
+                .push(<&FsNodeName>::try_from("share").expect("it's valid"))
+                .push(<&FsNodeName>::try_from("nvim").expect("it's valid"))
+                .push(<&FsNodeName>::try_from("nomad").expect("it's valid"))
+                .push(<&FsNodeName>::try_from("logs").expect("it's valid"));
             home
         }
         #[cfg(not(target_family = "unix"))]
