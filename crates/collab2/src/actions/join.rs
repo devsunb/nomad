@@ -1,10 +1,10 @@
 use collab_server::message::Message;
 use futures_util::StreamExt;
 use nomad::ctx::NeovimCtx;
-use nomad::diagnostics::DiagnosticMessage;
 use nomad::{action_name, ActionName, AsyncAction, Shared};
 
-use crate::session::{Project, Session};
+use super::UserBusyError;
+use crate::session::Session;
 use crate::session_id::SessionId;
 use crate::session_status::SessionStatus;
 use crate::Collab;
@@ -30,21 +30,10 @@ impl AsyncAction for Join {
         &mut self,
         session_id: Self::Args,
         ctx: NeovimCtx<'_>,
-    ) -> Result<(), JoinError> {
-        let maybe_err = self.session_status.with_mut(|status| match status {
-            SessionStatus::NotInSession => {
-                *status = SessionStatus::Joining(session_id);
-                None
-            },
-            SessionStatus::Starting => Some(JoinError::Starting),
-            SessionStatus::Joining(_) => Some(JoinError::Joining),
-            SessionStatus::InSession(project) => {
-                Some(JoinError::InSession(project.clone()))
-            },
-        });
-
-        if let Some(err) = maybe_err {
-            return Err(err);
+    ) -> Result<(), UserBusyError> {
+        match self.session_status.with(|s| UserBusyError::try_from(s)).ok() {
+            Some(err) => return Err(err),
+            _ => self.session_status.set(SessionStatus::Joining(session_id)),
         }
 
         let mut session = Session::join().await;
@@ -54,7 +43,7 @@ impl AsyncAction for Join {
             let tx = tx.into_sink::<'static>();
             let rx = rx
                 .into_stream::<'static>()
-                .map(|msg| Ok::<_, core::convert::Infallible>(msg));
+                .map(Ok::<_, core::convert::Infallible>);
             let _err = session.run(tx, rx).await;
         });
 
@@ -62,21 +51,4 @@ impl AsyncAction for Join {
     }
 
     fn docs(&self) {}
-}
-
-pub(crate) enum JoinError {
-    /// Couldn't join because another session is being started.
-    Starting,
-
-    /// Couldn't join because another session is being joined starting.
-    Joining,
-
-    /// Couldn't join because the user is already in a session.
-    InSession(Shared<Project>),
-}
-
-impl From<JoinError> for DiagnosticMessage {
-    fn from(_err: JoinError) -> Self {
-        todo!();
-    }
 }
