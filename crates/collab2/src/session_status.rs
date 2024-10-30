@@ -1,7 +1,7 @@
-use collab_server::SessionId;
 use nomad::Shared;
 
 use crate::session::Project;
+use crate::session_id::SessionId;
 
 #[derive(Default)]
 pub(crate) enum SessionStatus {

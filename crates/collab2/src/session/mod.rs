@@ -60,14 +60,22 @@ impl Session {
         todo!();
     }
 
+    pub(crate) fn project(&self) -> Shared<Project> {
+        self.project.clone()
+    }
+
     pub(crate) async fn start() -> Self {
         todo!();
     }
 
-    pub(crate) async fn run<Tx, Rx>(&mut self, remote_tx: Tx, remote_rx: Rx)
+    pub(crate) async fn run<Tx, Rx, RxError>(
+        &mut self,
+        remote_tx: Tx,
+        remote_rx: Rx,
+    ) -> Result<(), RunSessionError<Tx::Error, RxError>>
     where
-        Tx: Sink<Message, Error = core::convert::Infallible>,
-        Rx: Stream<Item = Message>,
+        Tx: Sink<Message>,
+        Rx: Stream<Item = Result<Message, RxError>>,
     {
         let (local_tx, local_rx) = flume::unbounded();
 
@@ -96,17 +104,17 @@ impl Session {
 
         loop {
             select! {
-                remote_message = remote_rx.next().fuse() => {
-                    if let Some(remote_message) = remote_message {
-                        self.integrate_message(remote_message, &local_tx);
-                    }
+                msg = remote_rx.next().fuse() => {
+                    let Some(msg_res) = msg else { continue };
+                    let remote_message = msg_res.map_err(RunSessionError::Receive)?;
+                    self.integrate_message(remote_message, &local_tx);
                 },
-                local_message = local_rx.recv_async().fuse() => {
-                    if let Ok(local_message) = local_message {
+                msg = local_rx.recv_async().fuse() => {
+                    if let Ok(local_message) = msg {
                         remote_tx
                             .send(local_message)
                             .await
-                            .expect("Infallible");
+                            .map_err(RunSessionError::Send)?;
                     }
                 },
             }
@@ -328,6 +336,11 @@ impl Session {
     ) -> impl Future<Output = std::io::Result<Box<str>>> + 'a {
         async move { Ok("".into()) }
     }
+}
+
+pub(crate) enum RunSessionError<TxErr, RxErr> {
+    Send(TxErr),
+    Receive(RxErr),
 }
 
 struct ReadProjectError {

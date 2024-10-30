@@ -1,5 +1,5 @@
 use collab_server::message::Peer;
-use e31e::fs::AbsPathBuf;
+use e31e::fs::{AbsPath, AbsPathBuf};
 use e31e::{
     CursorCreation,
     CursorId,
@@ -77,6 +77,11 @@ impl Project {
     /// it be, use [`all_peers`](Self::all_peers) instead.
     pub(crate) fn remote_peers(&self) -> impl Iterator<Item = &Peer> {
         self.remote_peers.values()
+    }
+
+    /// Returns the absolute path to the root of the project.
+    pub(crate) fn root(&self) -> &AbsPath {
+        &self.project_root
     }
 
     /// Returns the [`BufferCtx`] of the buffer displaying the file with the
