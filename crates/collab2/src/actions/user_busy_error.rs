@@ -1,4 +1,4 @@
-use nomad::diagnostics::DiagnosticMessage;
+use nomad::diagnostics::{DiagnosticMessage, HighlightGroup};
 use nomad::Shared;
 
 use crate::session::Project;
@@ -38,7 +38,27 @@ impl<const WAS_STARTING: bool> TryFrom<&SessionStatus>
 impl<const WAS_STARTING: bool> From<UserBusyError<WAS_STARTING>>
     for DiagnosticMessage
 {
-    fn from(_err: UserBusyError<WAS_STARTING>) -> Self {
-        todo!();
+    fn from(err: UserBusyError<WAS_STARTING>) -> Self {
+        let mut msg = DiagnosticMessage::new();
+        let action = if WAS_STARTING { "start" } else { "join" };
+        match err {
+            UserBusyError::Starting => msg
+                .push_str("can't start a new session while another is being ")
+                .push_str(action)
+                .push_str("ed"),
+            UserBusyError::Joining => msg
+                .push_str("can't join a new session while another is being ")
+                .push_str(action)
+                .push_str("ed"),
+            UserBusyError::InSession(project) => msg
+                .push_str("can't ")
+                .push_str(action)
+                .push_str(" a new session, another is already in progress at ")
+                .push_str_highlighted(
+                    project.with(|p| p.root().to_string()),
+                    HighlightGroup::special(),
+                ),
+        };
+        msg
     }
 }
