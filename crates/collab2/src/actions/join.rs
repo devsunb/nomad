@@ -30,7 +30,7 @@ impl AsyncAction for Join {
         &mut self,
         session_id: Self::Args,
         ctx: NeovimCtx<'_>,
-    ) -> Result<(), UserBusyError> {
+    ) -> Result<(), UserBusyError<false>> {
         match self.session_status.with(|s| UserBusyError::try_from(s)).ok() {
             Some(err) => return Err(err),
             _ => self.session_status.set(SessionStatus::Joining(session_id)),

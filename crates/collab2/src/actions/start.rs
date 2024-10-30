@@ -29,7 +29,7 @@ impl AsyncAction for Start {
         &mut self,
         _: Self::Args,
         ctx: NeovimCtx<'_>,
-    ) -> Result<(), UserBusyError> {
+    ) -> Result<(), UserBusyError<true>> {
         match self.session_status.with(|s| UserBusyError::try_from(s)).ok() {
             Some(err) => return Err(err),
             _ => self.session_status.set(SessionStatus::Starting),

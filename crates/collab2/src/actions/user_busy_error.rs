@@ -4,9 +4,12 @@ use nomad::Shared;
 use crate::session::Project;
 use crate::session_status::SessionStatus;
 
-/// The type of error returned when a "busy" user tries to join/start a new
+/// The type of error returned when a "busy" user tries to start/join a new
 /// session.
-pub(crate) enum UserBusyError {
+///
+/// The generic parameter represents whether the user was trying to start or
+/// join a session when the error occurred.
+pub(crate) enum UserBusyError<const WAS_STARTING: bool> {
     /// Another session is being started.
     Starting,
 
@@ -17,7 +20,9 @@ pub(crate) enum UserBusyError {
     InSession(Shared<Project>),
 }
 
-impl TryFrom<&SessionStatus> for UserBusyError {
+impl<const WAS_STARTING: bool> TryFrom<&SessionStatus>
+    for UserBusyError<WAS_STARTING>
+{
     type Error = ();
 
     fn try_from(status: &SessionStatus) -> Result<Self, Self::Error> {
@@ -30,8 +35,10 @@ impl TryFrom<&SessionStatus> for UserBusyError {
     }
 }
 
-impl From<UserBusyError> for DiagnosticMessage {
-    fn from(_err: UserBusyError) -> Self {
+impl<const WAS_STARTING: bool> From<UserBusyError<WAS_STARTING>>
+    for DiagnosticMessage
+{
+    fn from(_err: UserBusyError<WAS_STARTING>) -> Self {
         todo!();
     }
 }
