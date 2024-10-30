@@ -2,6 +2,7 @@
 
 mod actions;
 mod collab;
+mod config;
 mod session;
 mod session_id;
 mod session_status;

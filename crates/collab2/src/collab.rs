@@ -3,10 +3,12 @@ use nomad::ctx::NeovimCtx;
 use nomad::{module_name, Module, ModuleApi, ModuleName, Shared};
 
 use crate::actions::{Join, Start};
+use crate::config::Config;
 use crate::session_status::SessionStatus;
 
 /// TODO: docs.
 pub struct Collab {
+    config: Config,
     config_rx: ConfigReceiver<Self>,
     session_status: Shared<SessionStatus>,
 }
@@ -14,7 +16,7 @@ pub struct Collab {
 impl Module for Collab {
     const NAME: ModuleName = module_name!("collab");
 
-    type Config = ();
+    type Config = Config;
 
     fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self> {
         let join = Join::new(self.session_status.clone());
@@ -27,13 +29,19 @@ impl Module for Collab {
             .function(start)
     }
 
-    async fn run(self, ctx: NeovimCtx<'static>) {
-        todo!()
+    async fn run(mut self, _: NeovimCtx<'static>) {
+        loop {
+            self.config = self.config_rx.recv().await;
+        }
     }
 }
 
 impl From<ConfigReceiver<Self>> for Collab {
     fn from(config_rx: ConfigReceiver<Self>) -> Self {
-        Self { config_rx, session_status: Shared::default() }
+        Self {
+            config: Config::default(),
+            config_rx,
+            session_status: Shared::default(),
+        }
     }
 }
