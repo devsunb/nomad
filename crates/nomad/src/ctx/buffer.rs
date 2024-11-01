@@ -55,6 +55,11 @@ impl<'ctx> BufferCtx<'ctx> {
         })
     }
 
+    /// Returns the [`BufferCtx`] of the current buffer.
+    pub fn current(neovim_ctx: NeovimCtx<'ctx>) -> Self {
+        Self { buffer_id: BufferId::current(), neovim_ctx }
+    }
+
     /// Consumes `self`, returning a [`FileCtx`] if the buffer is saved on
     /// disk, or `None` otherwise.
     pub fn into_file(self) -> Option<FileCtx<'ctx>> {

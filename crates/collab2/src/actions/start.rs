@@ -1,7 +1,7 @@
 use collab_server::message::{GitHubHandle, Message};
 use collab_server::AuthInfos;
 use futures_util::StreamExt;
-use nomad::ctx::NeovimCtx;
+use nomad::ctx::{BufferCtx, NeovimCtx};
 use nomad::diagnostics::DiagnosticMessage;
 use nomad::{action_name, ActionName, AsyncAction, Shared};
 
@@ -98,8 +98,10 @@ pub(crate) enum StartError {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("failed to find project root")]
-pub(crate) struct FindProjectRootError;
+pub(crate) enum FindProjectRootError {
+    #[error("current buffer is not a file")]
+    NotInFile,
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
@@ -142,6 +144,10 @@ impl Starter<FindProjectRoot> {
     async fn find_project_root(
         self,
     ) -> Result<Starter<ConfirmStart>, FindProjectRootError> {
+        let _file_ctx = BufferCtx::current(self.state.ctx.reborrow())
+            .into_file()
+            .ok_or(FindProjectRootError::NotInFile)?;
+
         todo!();
     }
 }
