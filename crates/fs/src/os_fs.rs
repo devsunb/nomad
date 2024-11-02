@@ -3,11 +3,19 @@
 use alloc::borrow::Cow;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use std::ffi::OsString;
 use std::io;
 
 use futures_util::Stream;
 
-use crate::{AbsPath, DirEntry, Fs, FsNodeKind, FsNodeName};
+use crate::{
+    AbsPath,
+    DirEntry,
+    Fs,
+    FsNodeKind,
+    FsNodeName,
+    InvalidFsNodeNameError,
+};
 
 /// TODO: docs.
 pub struct OsFs {}
@@ -16,7 +24,21 @@ pub struct OsFs {}
 pub struct OsReadDir {}
 
 /// TODO: docs.
-pub struct OsDirEntry {}
+pub struct OsDirEntry {
+    inner: async_fs::DirEntry,
+}
+
+/// TODO: docs.
+#[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
+pub enum OsNameError {
+    /// TODO: docs.
+    #[error("file name {:?} is not valid UTF-8", .0)]
+    NotUtf8(OsString),
+
+    /// TODO: docs.
+    #[error(transparent)]
+    Invalid(#[from] InvalidFsNodeNameError),
+}
 
 impl Fs for OsFs {
     type DirEntry = OsDirEntry;
@@ -44,11 +66,16 @@ impl Stream for OsReadDir {
 }
 
 impl DirEntry for OsDirEntry {
-    type NameError = io::Error;
+    type NameError = OsNameError;
     type NodeKindError = io::Error;
 
     async fn name(&self) -> Result<Cow<'_, FsNodeName>, Self::NameError> {
-        todo!();
+        let os_name = self.inner.file_name();
+        let fs_name: &FsNodeName = os_name
+            .to_str()
+            .ok_or_else(|| OsNameError::NotUtf8(os_name.clone()))?
+            .try_into()?;
+        Ok(Cow::Owned(fs_name.to_owned()))
     }
 
     async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {

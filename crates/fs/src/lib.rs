@@ -8,6 +8,12 @@ mod fs_node_kind;
 pub mod os_fs;
 
 pub use dir_entry::DirEntry;
-pub use e31e::fs::{AbsPath, AbsPathBuf, FsNodeName, FsNodeNameBuf};
+pub use e31e::fs::{
+    AbsPath,
+    AbsPathBuf,
+    FsNodeName,
+    FsNodeNameBuf,
+    InvalidFsNodeNameError,
+};
 pub use fs::Fs;
 pub use fs_node_kind::FsNodeKind;
