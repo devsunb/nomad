@@ -288,7 +288,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#e07ca3aaa933cdb2fffae6dc54a68690a887a9bd"
+source = "git+ssh://git@github.com/nomad/collab.git#e29a016a14f704a7a6b823d67627c260e988e6cf"
 dependencies = [
  "e31e",
  "futures-util",
@@ -317,7 +317,7 @@ dependencies = [
 [[package]]
 name = "collab-protocol"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#e07ca3aaa933cdb2fffae6dc54a68690a887a9bd"
+source = "git+ssh://git@github.com/nomad/collab.git#e29a016a14f704a7a6b823d67627c260e988e6cf"
 dependencies = [
  "bincode",
  "bytes",
@@ -333,7 +333,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#e07ca3aaa933cdb2fffae6dc54a68690a887a9bd"
+source = "git+ssh://git@github.com/nomad/collab.git#e29a016a14f704a7a6b823d67627c260e988e6cf"
 dependencies = [
  "async-channel",
  "collab-protocol",
@@ -848,7 +848,7 @@ dependencies = [
 [[package]]
 name = "nomad-server"
 version = "0.0.8"
-source = "git+ssh://git@github.com/nomad/collab.git#e07ca3aaa933cdb2fffae6dc54a68690a887a9bd"
+source = "git+ssh://git@github.com/nomad/collab.git#e29a016a14f704a7a6b823d67627c260e988e6cf"
 dependencies = [
  "async-net",
  "collab-message",

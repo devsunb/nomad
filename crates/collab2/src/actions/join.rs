@@ -210,8 +210,19 @@ pub(crate) enum RequestProjectError {
 pub(crate) struct FindProjectRootError;
 
 #[derive(Debug, thiserror::Error)]
-#[error("")]
-pub(crate) struct FlushProjectError;
+pub(crate) enum FlushProjectError {
+    #[error("")]
+    CleanProjectRoot { project_root: AbsPathBuf, err: io::Error },
+
+    #[error("")]
+    CreateProjectRoot { project_root: AbsPathBuf, err: io::Error },
+
+    #[error("")]
+    CreateDir { dir_path: AbsPathBuf, err: io::Error },
+
+    #[error("")]
+    CreateFile { file_path: AbsPathBuf, err: io::Error },
+}
 
 #[derive(Debug, thiserror::Error)]
 #[error("")]
@@ -351,7 +362,47 @@ impl FindProjectRoot {
 
 impl FlushProject {
     async fn flush_project(self) -> Result<JumpToHost, FlushProjectError> {
-        todo!();
+        if async_fs::metadata(&self.project_root).await.is_ok() {
+            // Clean project root.
+            async_fs::remove_dir_all(&self.project_root).await.map_err(
+                |err| FlushProjectError::CleanProjectRoot {
+                    project_root: self.project_root.clone(),
+                    err,
+                },
+            )?;
+        }
+
+        // Create all missing directories to project root.
+        async_fs::create_dir_all(&self.project_root).await.map_err(|err| {
+            FlushProjectError::CreateProjectRoot {
+                project_root: self.project_root.clone(),
+                err,
+            }
+        })?;
+
+        let (err_tx, err_rx) = flume::unbounded();
+        recurse(
+            self.project.tree.root(),
+            self.project_root.clone(),
+            ErrTx { inner: err_tx },
+            self.joiner.ctx.reborrow(),
+        );
+
+        if let Ok(err) = err_rx.recv_async().await {
+            return Err(err);
+        }
+
+        let local_peer_id = self.local_peer.id();
+
+        Ok(JumpToHost {
+            buffered: self.buffered,
+            joined: self.joined,
+            local_peer: self.local_peer,
+            project_root: self.project_root,
+            remote_peers: self.project.peers,
+            replica: self.project.tree.into_replica(local_peer_id),
+            joiner: self.joiner,
+        })
     }
 }
 
@@ -400,6 +451,25 @@ impl RemoveProjectRoot {
     async fn remove_project_root(self) {
         let _ = async_fs::remove_dir(self.project_root).await;
     }
+}
+
+struct ErrTx {
+    inner: flume::Sender<FlushProjectError>,
+}
+
+impl ErrTx {
+    fn send(&self, err: FlushProjectError) {
+        self.inner.send(err).expect("receiver hasn't been dropped");
+    }
+}
+
+fn recurse(
+    dir: collab_server::message::DirectoryRef<'_>,
+    dir_path: AbsPathBuf,
+    err_tx: ErrTx,
+    ctx: NeovimCtx<'_>,
+) {
+    todo!();
 }
 
 impl From<JoinError> for DiagnosticMessage {
