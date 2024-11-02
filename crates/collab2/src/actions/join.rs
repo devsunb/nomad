@@ -12,7 +12,7 @@ use collab_server::message::{
     ProjectTree,
 };
 use collab_server::AuthInfos;
-use e31e::fs::{AbsPath, AbsPathBuf};
+use e31e::fs::AbsPathBuf;
 use e31e::{DirectoryId, Replica};
 use futures_util::{future, stream, AsyncWriteExt, SinkExt, StreamExt};
 use nomad::ctx::NeovimCtx;
@@ -439,8 +439,8 @@ impl JumpToHost {
 impl RunSession {
     async fn run_session(self) -> Result<RemoveProjectRoot, RunSessionError> {
         let collab_server::client::Joined {
-            sender,
-            receiver,
+            sender: tx,
+            receiver: rx,
             session_id,
             peers: _,
         } = self.joined;
@@ -457,7 +457,9 @@ impl RunSession {
 
         let status = SessionStatus::InSession(session.project());
         self.joiner.session_status.set(status);
-        session.run(sender, receiver).await.map_err(|_err| todo!())?;
+
+        let rx = stream::iter(self.buffered.into_iter().map(Ok)).chain(rx);
+        session.run(tx, rx).await.map_err(|_err| todo!())?;
 
         Ok(RemoveProjectRoot { project_root: self.project_root })
     }
