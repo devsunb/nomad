@@ -10,6 +10,16 @@ pub trait Marker {
     ) -> bool;
 }
 
+impl<M: Marker> Marker for &M {
+    fn matches(
+        &self,
+        fs_node_name: &FsNodeName,
+        fs_node_kind: FsNodeKind,
+    ) -> bool {
+        (*self).matches(fs_node_name, fs_node_kind)
+    }
+}
+
 impl<M1, M2> Marker for (M1, M2)
 where
     M1: Marker,
