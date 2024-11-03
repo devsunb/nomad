@@ -2,7 +2,7 @@ use nomad::config::ConfigReceiver;
 use nomad::ctx::NeovimCtx;
 use nomad::{module_name, Module, ModuleApi, ModuleName, Shared};
 
-use crate::actions::{Join, Start};
+use crate::actions::{Join, Start, Yank};
 use crate::config::Config;
 use crate::session_status::SessionStatus;
 
@@ -21,12 +21,15 @@ impl Module for Collab {
     fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self> {
         let join = Join::new(self.session_status.clone());
         let start = Start::new(self.session_status.clone());
+        let yank = Yank::new(self.session_status.clone());
 
         ModuleApi::new(ctx.to_static())
             .command(join.clone())
             .command(start.clone())
+            .command(yank.clone())
             .function(join)
             .function(start)
+            .function(yank)
     }
 
     async fn run(mut self, _: NeovimCtx<'static>) {
