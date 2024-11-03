@@ -31,7 +31,7 @@ thiserror = "1.0"
 tracing = "0.1"
 
 clipboard = { path = "./crates/clipboard" }
-collab = { path = "./crates/collab2" }
+collab = { path = "./crates/collab" }
 fs = { path = "./crates/fs" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }

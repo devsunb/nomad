@@ -300,22 +300,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "collab-old"
-version = "0.1.0"
-dependencies = [
- "futures-util",
- "nohash",
- "nomad",
- "nomad-server",
- "pin-project-lite",
- "root-finder",
- "serde",
- "smallvec",
- "smol_str",
- "tracing",
-]
-
-[[package]]
 name = "collab-protocol"
 version = "0.0.8"
 source = "git+ssh://git@github.com/nomad/collab.git#20f6d89645b0388bbdecb6caec5673c249531ffc"
