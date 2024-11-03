@@ -103,6 +103,7 @@ impl Session {
             remote_selections: Default::default(),
             remote_tooltips: Default::default(),
             replica: args.replica,
+            session_id: args.session_id,
         };
         Self { neovim_ctx: args.neovim_ctx, project: Shared::new(project) }
     }
@@ -127,10 +128,8 @@ impl Session {
             project: self.project.clone(),
         };
 
-        let detach_buffer_actions = DetachBufferActions {
-            message_tx: local_tx.clone(),
-            project: self.project.clone(),
-        };
+        let detach_buffer_actions =
+            DetachBufferActions { project: self.project.clone() };
 
         for buffer_id in BufferId::opened() {
             register_buffer_actions.register_actions(buffer_id);

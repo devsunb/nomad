@@ -33,11 +33,6 @@ impl PeerTooltip {
         }
     }
 
-    /// The [`Peer`] this tooltip is for.
-    pub(super) fn peer(&self) -> &Peer {
-        &self.peer
-    }
-
     pub(super) fn relocate(&mut self, new_offset: ByteOffset) {
         // TODO: bound the offset to the buffer length.
         // TODO: does Neovim already snap the end of the selection to the

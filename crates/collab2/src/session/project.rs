@@ -1,6 +1,7 @@
 use core::fmt;
 
 use collab_server::message::Peer;
+use collab_server::SessionId;
 use e31e::fs::{AbsPath, AbsPathBuf};
 use e31e::{
     CursorCreation,
@@ -63,6 +64,9 @@ pub(crate) struct Project {
     /// The [`Replica`] used to integrate remote messages on the project at
     /// [`project_root`](Self::project_root).
     pub(super) replica: Replica,
+
+    /// The [`SessionId`] of the session this projects is for.
+    pub(super) session_id: SessionId,
 }
 
 impl Project {
@@ -82,9 +86,14 @@ impl Project {
         self.remote_peers.values()
     }
 
-    /// Returns the absolute path to the root of the project.
+    /// The absolute path to the root of the project.
     pub(crate) fn root(&self) -> &AbsPath {
         &self.project_root
+    }
+
+    /// The [`SessionId`] of the session this projects is for.
+    pub(crate) fn session_id(&self) -> SessionId {
+        self.session_id
     }
 
     /// Returns the [`BufferCtx`] of the buffer displaying the file with the

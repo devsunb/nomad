@@ -1,4 +1,3 @@
-use collab_server::message::Message;
 use nomad::autocmds::BufUnloadArgs;
 use nomad::ctx::NeovimCtx;
 use nomad::{action_name, Action, ActionName, BufferId, Shared, ShouldDetach};
@@ -7,7 +6,6 @@ use super::Project;
 use crate::Collab;
 
 pub(super) struct DetachBufferActions {
-    pub(super) message_tx: flume::Sender<Message>,
     pub(super) project: Shared<Project>,
 }
 

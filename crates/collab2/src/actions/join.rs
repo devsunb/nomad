@@ -74,7 +74,6 @@ impl AsyncAction for Join {
 
 struct Joiner {
     ctx: NeovimCtx<'static>,
-    session_id: SessionId,
     session_status: Shared<SessionStatus>,
 }
 
@@ -239,7 +238,7 @@ impl Joiner {
             Some(err) => Err(err),
             None => {
                 session_status.set(SessionStatus::Joining(session_id));
-                Ok(Self { ctx, session_id, session_status })
+                Ok(Self { ctx, session_status })
             },
         }
     }
