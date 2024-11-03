@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, ItemFn, ItemImpl, LitStr};
+use syn::{parse_macro_input, LitStr};
 
 mod action_name;
 mod module_name;

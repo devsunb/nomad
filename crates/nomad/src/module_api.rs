@@ -24,6 +24,15 @@ impl<M: Module> ModuleApi<M> {
     }
 
     /// TODO: docs.
+    pub fn default_command<T>(mut self, command: T) -> Self
+    where
+        T: Command<Module = M>,
+    {
+        self.commands.add_default_command(command);
+        self
+    }
+
+    /// TODO: docs.
     pub fn event<T>(self, event: T) -> Self
     where
         T: for<'a> Event<Ctx<'a> = NeovimCtx<'a>>,
