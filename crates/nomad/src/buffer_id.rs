@@ -18,8 +18,10 @@ impl BufferId {
     }
 
     /// Returns the [`BufferId`] of the buffer with the given name.
-    pub fn of_name<T: AsRef<str>>(_name: T) -> Option<Self> {
-        todo!();
+    pub fn of_name<T: AsRef<str>>(name: T) -> Option<Self> {
+        api::call_function::<_, i32>("bufnr", (name.as_ref(),))
+            .ok()
+            .and_then(|handle| (handle != -1).then_some(Self { handle }))
     }
 
     /// Returns an iterator of the [`BufferId`]s of all the currently opened
