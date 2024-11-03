@@ -48,6 +48,17 @@ impl<'a> TryFrom<&'a mut CommandArgs> for () {
     }
 }
 
+impl<'a, const N: usize> TryFrom<&'a mut CommandArgs> for &'a [String; N] {
+    type Error = CommandArgsWrongNumError<'a>;
+
+    fn try_from(args: &'a mut CommandArgs) -> Result<Self, Self::Error> {
+        args.as_slice()
+            .try_into()
+            .ok()
+            .ok_or(CommandArgsWrongNumError { args, expected_num: N })
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct CommandArgsWrongNumError<'a> {
     args: &'a CommandArgs,
