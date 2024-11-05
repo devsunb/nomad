@@ -6,24 +6,23 @@ mod register_buffer_actions;
 mod sync_cursor;
 mod sync_replacement;
 
-use core::future::Future;
 use std::io;
 
 use collab_server::message::{
+    FileContents,
     Message,
     Peer,
     Peers,
-    Project as CollabProject,
     ProjectRequest,
     ProjectResponse,
-    ProjectTree,
 };
 use collab_server::SessionId;
 use detach_buffer_actions::DetachBufferActions;
-use e31e::fs::{AbsPath, AbsPathBuf};
+use e31e::fs::AbsPathBuf;
 use futures_util::{
     pin_mut,
     select,
+    stream,
     FutureExt,
     Sink,
     SinkExt,
@@ -342,41 +341,51 @@ impl Session {
             let this = self.clone();
             let respond_to = project_request.request_from;
             async move {
-                match this.read_project().await {
-                    Ok(project) => {
-                        let _ = message_tx.send(Message::ProjectResponse(
-                            Box::new(ProjectResponse {
-                                respond_to: respond_to.id(),
-                                project,
-                            }),
-                        ));
-                    },
+                let contents = match this.read_file_contents().await {
+                    Ok(contents) => contents,
                     Err(err) => {
                         ReadProjectError { err, respond_to }.emit();
+                        return;
                     },
                 };
+                let response = this.project.with(move |p| ProjectResponse {
+                    respond_to: respond_to.id(),
+                    file_contents: contents,
+                    peers: p.all_peers().cloned().collect(),
+                    replica: p.replica.encode(),
+                });
+                let _ = message_tx
+                    .send(Message::ProjectResponse(Box::new(response)));
             }
         });
     }
 
-    async fn read_project(&self) -> io::Result<CollabProject> {
-        let (peers, replica) = self.project.with(|p| {
-            (p.all_peers().cloned().collect::<Peers>(), p.replica.clone())
+    async fn read_file_contents(&self) -> io::Result<FileContents> {
+        let project_root = self.project.with(|p| p.project_root.clone());
+        let mut read_files = self.project.with(|p| {
+            p.replica
+                .files()
+                .map(|file| {
+                    let file_id = file.id();
+                    let mut file_path = project_root.clone();
+                    file_path.concat(&file.path());
+                    async move {
+                        let contents =
+                            async_fs::read_to_string(file_path).await?;
+                        Ok::<_, io::Error>((
+                            file_id,
+                            contents.into_boxed_str(),
+                        ))
+                    }
+                })
+                .collect::<stream::FuturesUnordered<_>>()
         });
-
-        match ProjectTree::new(replica, |file_path| self.read_file(file_path))
-            .await
-        {
-            Ok(tree) => Ok(CollabProject { peers, tree: tree.encode() }),
-            Err((err, _)) => Err(err),
+        let mut file_contents = FileContents::new();
+        while let Some(result) = read_files.next().await {
+            let (file_id, contents) = result?;
+            file_contents.set(file_id, contents);
         }
-    }
-
-    fn read_file<'a>(
-        &'a self,
-        _file_path: &AbsPath,
-    ) -> impl Future<Output = std::io::Result<Box<str>>> + 'a {
-        async move { Ok("".into()) }
+        Ok(file_contents)
     }
 }
 

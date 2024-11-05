@@ -2,18 +2,17 @@ use std::io;
 use std::rc::Rc;
 
 use collab_server::message::{
-    DirectoryRef,
-    FileRef,
+    FileContents,
     GitHubHandle,
     Message,
     Peer,
     Peers,
     ProjectRequest,
-    ProjectTree,
+    ProjectResponse,
 };
 use collab_server::AuthInfos;
 use e31e::fs::AbsPathBuf;
-use e31e::{DirectoryId, Replica};
+use e31e::{DirectoryId, DirectoryRef, Replica};
 use futures_util::{future, stream, AsyncWriteExt, SinkExt, StreamExt};
 use nomad::ctx::NeovimCtx;
 use nomad::diagnostics::DiagnosticMessage;
@@ -104,7 +103,7 @@ struct FindProjectRoot {
     buffered: Vec<Message>,
     local_peer: Peer,
     joined: collab_server::client::Joined,
-    project: collab_server::message::Project,
+    project_response: Box<ProjectResponse>,
     joiner: Joiner,
 }
 
@@ -112,7 +111,7 @@ struct FlushProject {
     buffered: Vec<Message>,
     local_peer: Peer,
     joined: collab_server::client::Joined,
-    project: collab_server::message::Project,
+    project_response: Box<ProjectResponse>,
     project_root: AbsPathBuf,
     joiner: Joiner,
 }
@@ -316,11 +315,11 @@ impl RequestProject {
 
         let mut buffered = Vec::new();
 
-        let project = loop {
+        let project_response = loop {
             let res = self.joined.receiver.next().await.expect("never ends");
             let message = res.map_err(RequestProjectError::ReadResponse)?;
             match message {
-                Message::ProjectResponse(response) => break response.project,
+                Message::ProjectResponse(response) => break response,
                 other => buffered.push(other),
             };
         };
@@ -330,7 +329,7 @@ impl RequestProject {
             joined: self.joined,
             joiner: self.joiner,
             local_peer: self.local_peer,
-            project,
+            project_response,
         })
     }
 }
@@ -348,7 +347,7 @@ impl FindProjectRoot {
             joined: self.joined,
             local_peer: self.local_peer,
             joiner: self.joiner,
-            project: self.project,
+            project_response: self.project_response,
             project_root,
         })
     }
@@ -375,9 +374,11 @@ impl FlushProject {
         })?;
 
         let (err_tx, err_rx) = flume::unbounded();
-        let tree = self.project.tree.decode(self.local_peer.id());
-        let root_id = tree.root().id();
-        let tree = Rc::new(tree);
+        let encoded_replica = self.project_response.replica;
+        let replica = Replica::decode(self.local_peer.id(), encoded_replica);
+        let file_contents = self.project_response.file_contents;
+        let root_id = replica.root().id();
+        let tree = Rc::new(ProjectTree { replica, file_contents });
         recurse(
             Rc::clone(&tree),
             root_id,
@@ -386,7 +387,7 @@ impl FlushProject {
             self.joiner.ctx.reborrow(),
         );
 
-        let tree = match err_rx.recv_async().await {
+        let ProjectTree { replica, .. } = match err_rx.recv_async().await {
             Ok(err) => return Err(err),
             Err(_all_senders_dropped_err) => {
                 // All the senders have been dropped, so all the other
@@ -400,8 +401,8 @@ impl FlushProject {
             joined: self.joined,
             local_peer: self.local_peer,
             project_root: self.project_root,
-            remote_peers: self.project.peers,
-            replica: tree.into_replica(),
+            remote_peers: self.project_response.peers,
+            replica,
             joiner: self.joiner,
         })
     }
@@ -458,6 +459,11 @@ impl RemoveProjectRoot {
     }
 }
 
+struct ProjectTree {
+    replica: Replica,
+    file_contents: FileContents,
+}
+
 #[derive(Clone)]
 struct ErrTx {
     has_errored: Shared<bool>,
@@ -488,19 +494,22 @@ fn recurse(
     }
 
     ctx.spawn(|ctx| async move {
-        let parent = tree.directory(parent_id).expect("ID is valid");
+        let replica = &tree.replica;
+        let file_contents = &tree.file_contents;
+        let parent = replica.directory(parent_id).expect("ID is valid");
 
-        let create_directories = parent.directory_children().map(|dir| {
+        let create_directories = parent.child_directories().map(|dir| {
             let mut dir_path = parent_path.clone();
             dir_path.push(dir.name().expect("can't be root"));
             let err_tx = err_tx.clone();
             create_directory(&tree, dir, dir_path, err_tx, ctx.reborrow())
         });
 
-        let create_files = parent.file_children().map(|file| {
+        let create_files = parent.child_files().map(|file| {
             let mut file_path = parent_path.clone();
             file_path.push(file.name());
-            create_file(file, file_path)
+            let contents = file_contents.get(file.id()).expect("ID is valid");
+            create_file(contents, file_path)
         });
 
         let mut create_children = create_directories
@@ -519,7 +528,7 @@ fn recurse(
 }
 
 async fn create_file(
-    file_ref: FileRef<'_>,
+    file_contents: &str,
     file_path: AbsPathBuf,
 ) -> Result<(), FlushProjectError> {
     let mut file = match async_fs::File::create(&file_path).await {
@@ -528,7 +537,7 @@ async fn create_file(
             return Err(FlushProjectError::CreateFile { file_path, err });
         },
     };
-    if let Err(err) = file.write_all(file_ref.contents().as_bytes()).await {
+    if let Err(err) = file.write_all(file_contents.as_bytes()).await {
         return Err(FlushProjectError::WriteFile { file_path, err });
     }
     match file.flush().await {
