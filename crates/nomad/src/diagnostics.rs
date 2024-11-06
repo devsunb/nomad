@@ -58,17 +58,23 @@ impl DiagnosticSource {
 
 impl fmt::Display for DiagnosticSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use fmt::Write;
+
         write!(f, "[{}", crate::Nomad::DIAGNOSTICS_SEGMENT_NAME)?;
 
+        if !self.segments.is_empty() {
+            f.write_char('.')?;
+        }
+
         for (idx, segment) in self.segments.iter().enumerate() {
+            f.write_str(segment)?;
             let is_last = idx + 1 == self.segments.len();
-            write!(f, "{}", segment)?;
             if !is_last {
-                write!(f, ".")?;
+                f.write_char('.')?;
             }
         }
 
-        write!(f, "]")
+        f.write_char(']')
     }
 }
 
