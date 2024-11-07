@@ -219,8 +219,14 @@ impl SetupError {
         let mut message = DiagnosticMessage::new();
         match self {
             Self::ConfigNotDict(kind) => {
+                let article = match kind {
+                    NvimObjectKind::Array | NvimObjectKind::Integer => "an",
+                    _ => "a",
+                };
                 message
-                    .push_str("expected a dictionary, got a ")
+                    .push_str("expected a dictionary, got ")
+                    .push_str(article)
+                    .push_str(" ")
                     .push_str_highlighted(
                         kind.as_static(),
                         HighlightGroup::special(),
