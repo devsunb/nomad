@@ -7,6 +7,7 @@ use core::task::{Context, Poll};
 use futures_util::{Stream, StreamExt};
 use fxhash::FxHashMap;
 use nvim_oxi::{
+    Dictionary as NvimDictionary,
     Object as NvimObject,
     ObjectKind as NvimObjectKind,
     String as NvimString,
@@ -104,6 +105,19 @@ impl Setup {
             NvimObjectKind::Dictionary => {
                 // SAFETY: the object's kind is a dictionary.
                 unsafe { config.into_dict_unchecked() }
+            },
+            // An empty table is ok, but it could be mistaken for an array, so
+            // let's check for that.
+            NvimObjectKind::Array => {
+                // SAFETY: the object's kind is an array.
+                let array = unsafe { config.into_array_unchecked() };
+                if array.is_empty() {
+                    NvimDictionary::default()
+                } else {
+                    return Err(vec![SetupError::ConfigNotDict(
+                        NvimObjectKind::Array,
+                    )]);
+                }
             },
             other => return Err(vec![SetupError::ConfigNotDict(other)]),
         };
