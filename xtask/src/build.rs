@@ -1,4 +1,5 @@
-use core::{fmt, str};
+use core::{fmt, iter, str};
+use std::borrow::{Borrow, Cow};
 
 use anyhow::{anyhow, Context};
 use fs::os_fs::OsFs;
@@ -7,12 +8,12 @@ use futures_executor::block_on;
 use root_finder::markers;
 use xshell::cmd;
 
-pub(crate) fn build(_release: bool) -> anyhow::Result<()> {
+pub(crate) fn build(release: bool) -> anyhow::Result<()> {
     let sh = xshell::Shell::new()?;
     let project_root = find_project_root(&sh)?;
     let package_name = parse_package_name(&project_root)?;
     let nvim_version = detect_nvim_version(&sh)?;
-    build_plugin(&project_root, &package_name, nvim_version, &sh)?;
+    build_plugin(&project_root, &package_name, nvim_version, release, &sh)?;
     fix_library_name(&project_root, &package_name, &sh)?;
     Ok(())
 }
@@ -56,16 +57,53 @@ fn detect_nvim_version(sh: &xshell::Shell) -> anyhow::Result<NeovimVersion> {
         .ok_or_else(|| anyhow!("Failed to parse Neovim version"))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_plugin(
-    project_root: &AbsPathBuf,
+    project_root: &AbsPath,
     package_name: &str,
     nvim_version: NeovimVersion,
+    release: bool,
     sh: &xshell::Shell,
 ) -> anyhow::Result<()> {
-    println!("project_root: {:?}", project_root);
-    println!("package_name: {:?}", package_name);
-    println!("nvim_version: {:?}", nvim_version);
-    todo!();
+    struct Arg<'a>(Cow<'a, str>);
+
+    impl AsRef<std::ffi::OsStr> for Arg<'_> {
+        fn as_ref(&self) -> &std::ffi::OsStr {
+            self.0.as_ref().as_ref()
+        }
+    }
+
+    // Setting the artifact directory is still unstable.
+    let artifact_dir_args = ["-Zunstable-options", "--artifact-dir"]
+        .into_iter()
+        .map(Cow::Borrowed)
+        .chain(iter::once(Cow::Owned(artifact_dir(project_root).to_string())));
+
+    // Specify which package to build.
+    let package_args =
+        ["--package", package_name].into_iter().map(Cow::Borrowed);
+
+    // Compile the plugin for Nightly if the user is using a Nightly version of
+    // Neovim.
+    let feature_args = nvim_version
+        .is_nightly()
+        .then_some(["--features", "neovim-nightly"])
+        .into_iter()
+        .flatten()
+        .map(Cow::Borrowed);
+
+    let profile_args =
+        release.then_some("--release").into_iter().map(Cow::Borrowed);
+
+    let args = artifact_dir_args
+        .chain(package_args)
+        .chain(feature_args)
+        .chain(profile_args)
+        .map(Arg);
+
+    cmd!(sh, "cargo build {args...}").run()?;
+
+    Ok(())
 }
 
 fn fix_library_name(
@@ -74,6 +112,13 @@ fn fix_library_name(
     sh: &xshell::Shell,
 ) -> anyhow::Result<()> {
     todo!();
+}
+
+fn artifact_dir(project_root: &AbsPath) -> AbsPathBuf {
+    let mut dir = project_root.to_owned();
+    #[allow(clippy::unwrap_used)]
+    dir.push(<&FsNodeName>::try_from("lua").unwrap());
+    dir
 }
 
 /// The possible Neovim versions the Nomad plugin can be built for.
@@ -90,6 +135,12 @@ struct SemanticVersion {
     major: u8,
     minor: u8,
     patch: u8,
+}
+
+impl NeovimVersion {
+    fn is_nightly(&self) -> bool {
+        matches!(self, Self::Nightly)
+    }
 }
 
 impl str::FromStr for NeovimVersion {
