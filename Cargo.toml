@@ -36,6 +36,7 @@ collab = { path = "./crates/collab" }
 fs = { path = "./crates/fs" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
+version = { path = "./crates/version" }
 
 [workspace.lints.clippy]
 bool_to_int_with_if = "deny"
@@ -74,3 +75,4 @@ neovim-nightly = ["nomad/neovim-nightly"]
 auth = { workspace = true }
 collab = { workspace = true }
 nomad = { workspace = true }
+version = { workspace = true }

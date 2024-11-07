@@ -992,6 +992,7 @@ dependencies = [
  "auth",
  "collab",
  "nomad",
+ "version",
 ]
 
 [[package]]
@@ -1725,6 +1726,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "655d0cf8bfc2bd1f079e767f7ff613cbfa0ef06ca3ceaf1fd6b6cde08cbd012a"
 dependencies = [
  "rustc_version",
+]
+
+[[package]]
+name = "version"
+version = "0.1.0"
+dependencies = [
+ "nomad",
 ]
 
 [[package]]
