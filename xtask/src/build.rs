@@ -1,6 +1,8 @@
-use std::io;
-
-use fs::AbsPathBuf;
+use anyhow::anyhow;
+use fs::os_fs::OsFs;
+use fs::{AbsPath, AbsPathBuf};
+use futures_executor::block_on;
+use root_finder::markers;
 
 pub(crate) fn build(_release: bool) -> anyhow::Result<()> {
     let sh = xshell::Shell::new()?;
@@ -12,12 +14,16 @@ pub(crate) fn build(_release: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn find_project_root(sh: &xshell::Shell) -> io::Result<AbsPathBuf> {
-    todo!();
+fn find_project_root(sh: &xshell::Shell) -> anyhow::Result<AbsPathBuf> {
+    let current_dir = sh.current_dir();
+    let current_dir = <&AbsPath>::try_from(&*current_dir)?;
+    let root_finder = root_finder::Finder::new(OsFs);
+    block_on(root_finder.find_root(current_dir, markers::Git))?
+        .ok_or_else(|| anyhow!("Could not find the project root"))
 }
 
 fn parse_package_name(
-    project_root: &AbsPathBuf,
+    project_root: &AbsPath,
     sh: &xshell::Shell,
 ) -> anyhow::Result<String> {
     todo!();

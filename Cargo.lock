@@ -543,7 +543,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "e31e"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/e31e.git#4048af74f3cb4d68b9e56c371ae5f6c3fc133a72"
+source = "git+ssh://git@github.com/nomad/e31e.git#ed013f45f827be528ed1e6bfefad393663635cb5"
 dependencies = [
  "cola",
  "compact_str",
@@ -2066,6 +2066,7 @@ dependencies = [
  "anyhow",
  "clap",
  "fs",
+ "futures-executor",
  "root-finder",
  "xshell",
 ]
