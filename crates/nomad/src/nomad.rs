@@ -12,6 +12,7 @@ use crate::nomad_command::NomadCommand;
 use crate::Module;
 
 /// TODO: docs.
+#[derive(Default)]
 pub struct Nomad {
     api: NvimDictionary,
     command: NomadCommand,
@@ -35,13 +36,7 @@ impl Nomad {
 
     /// TODO: docs.
     pub fn new() -> Self {
-        Self {
-            api: NvimDictionary::default(),
-            command: NomadCommand::default(),
-            neovim_ctx: NeovimCtx::default(),
-            run: Vec::default(),
-            setup: Setup::default(),
-        }
+        Self::default()
     }
 
     /// TODO: docs.
@@ -96,11 +91,11 @@ impl lua::Pushable for Nomad {
         state: *mut lua::ffi::State,
     ) -> Result<i32, lua::Error> {
         crate::log::init(&self.log_dir());
-        //
-        // // Start each module's event loop.
-        // for fut in self.run.drain(..) {
-        //     crate::executor::spawn(fut).detach();
-        // }
+
+        // Start each module's event loop.
+        for fut in self.run.drain(..) {
+            crate::executor::spawn(fut).detach();
+        }
 
         self.command.create();
 
