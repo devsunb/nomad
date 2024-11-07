@@ -1,7 +1,7 @@
 use core::future::Future;
 use core::pin::Pin;
 
-use e31e::fs::{AbsPathBuf, FsNodeName};
+use e31e::fs::{AbsPath, AbsPathBuf, FsNodeName};
 use nvim_oxi::{lua, Dictionary as NvimDictionary, Function as NvimFunction};
 
 use crate::config::Setup;
@@ -68,10 +68,11 @@ impl Nomad {
     pub(crate) fn log_dir(&self) -> AbsPathBuf {
         #[cfg(target_family = "unix")]
         {
-            let mut home: AbsPathBuf = match home::home_dir() {
+            let mut home = match home::home_dir() {
                 Some(home) if !home.as_os_str().is_empty() => {
-                    AbsPathBuf::root()
-                    // AbsPathBuf::from_path_buf(home).expect("home is absolute")
+                    <&AbsPath>::try_from(&*home)
+                        .expect("home is absolute")
+                        .to_owned()
                 },
                 _ => panic!("failed to get the home directory"),
             };
@@ -95,11 +96,11 @@ impl lua::Pushable for Nomad {
         state: *mut lua::ffi::State,
     ) -> Result<i32, lua::Error> {
         crate::log::init(&self.log_dir());
-
-        // Start each module's event loop.
-        for fut in self.run.drain(..) {
-            crate::executor::spawn(fut).detach();
-        }
+        //
+        // // Start each module's event loop.
+        // for fut in self.run.drain(..) {
+        //     crate::executor::spawn(fut).detach();
+        // }
 
         self.command.create();
 
