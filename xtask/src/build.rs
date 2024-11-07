@@ -16,7 +16,7 @@ pub(crate) fn build(release: bool) -> anyhow::Result<()> {
     let sh = xshell::Shell::new()?;
     let project_root = find_project_root(&sh)?;
     let package = parse_package(&project_root)?;
-    let nvim_version = detect_nvim_version(&sh)?;
+    let nvim_version = detect_nvim_version(&sh);
     build_plugin(&project_root, &package.name, nvim_version, release, &sh)?;
     fix_library_name(&project_root, &package)?;
     Ok(())
@@ -50,24 +50,18 @@ fn parse_package(
     })
 }
 
-fn detect_nvim_version(sh: &xshell::Shell) -> anyhow::Result<NeovimVersion> {
+fn detect_nvim_version(sh: &xshell::Shell) -> Option<NeovimVersion> {
     let version = "--version";
-    let stdout = cmd!(sh, "nvim {version}").read()?;
-    stdout
-        .lines()
-        .next()
-        .ok_or_else(|| anyhow!("Couldn't get Neovim version"))?
-        .split_once("NVIM v")
-        .map(|(_, rest)| rest.parse::<NeovimVersion>())
-        .transpose()?
-        .ok_or_else(|| anyhow!("Failed to parse Neovim version"))
+    let stdout = cmd!(sh, "nvim {version}").read().ok()?;
+    let (_, rest) = stdout.lines().next()?.split_once("NVIM v")?;
+    rest.parse::<NeovimVersion>().ok()
 }
 
 #[allow(clippy::too_many_arguments)]
 fn build_plugin(
     project_root: &AbsPath,
     package_name: &str,
-    nvim_version: NeovimVersion,
+    nvim_version: Option<NeovimVersion>,
     release: bool,
     sh: &xshell::Shell,
 ) -> anyhow::Result<()> {
@@ -92,7 +86,8 @@ fn build_plugin(
     // Compile the plugin for Nightly if the user is using a Nightly version of
     // Neovim.
     let feature_args = nvim_version
-        .is_nightly()
+        .map(|v| v.is_nightly())
+        .unwrap_or(false)
         .then_some(["--features", "neovim-nightly"])
         .into_iter()
         .flatten()
