@@ -1,4 +1,32 @@
-//! TODO: docs.
+#![allow(missing_docs)]
 
-/// TODO: docs.
-pub fn run() {}
+mod r#build;
+
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+#[command(about)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    /// Build the Nomad plugin.
+    #[command(visible_alias = "b")]
+    Build {
+        /// Build the plugin in release mode.
+        #[clap(long, short)]
+        release: bool,
+    },
+}
+
+/// The entrypoint of the `xtask` binary.
+pub fn run() {
+    let args = Args::parse();
+
+    match args.command {
+        Command::Build { release } => build::build(release),
+    }
+}
