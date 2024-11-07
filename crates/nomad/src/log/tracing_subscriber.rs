@@ -2,6 +2,7 @@ use e31e::fs::AbsPath;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
+use tracing_appender::rolling::{InitError, RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::fmt::{self, format};
 use tracing_subscriber::{filter, fmt as fmt_builder};
@@ -13,11 +14,11 @@ use tracing_subscriber::{filter, fmt as fmt_builder};
 /// log files will be named like `nomad.log.2020-01-01`.
 const LOG_FILE_NAME: &str = "nomad.log";
 
-pub(super) fn init(log_dir: &AbsPath) {
-    let subscriber = NomadTracingSubscriber::new(log_dir);
-
-    tracing::subscriber::set_global_default(subscriber)
-        .expect("failed to set the global default subscriber");
+pub(super) fn init(log_dir: &AbsPath) -> Result<(), InitError> {
+    NomadTracingSubscriber::new(log_dir).map(|sub| {
+        tracing::subscriber::set_global_default(sub)
+            .expect("this is the only place where we set the global default")
+    })
 }
 
 type FmtSubscriber = fmt::Subscriber<
@@ -40,9 +41,11 @@ struct NomadTracingSubscriber {
 }
 
 impl NomadTracingSubscriber {
-    fn new(log_dir: &AbsPath) -> Self {
-        let file_appender =
-            tracing_appender::rolling::daily(log_dir.as_str(), LOG_FILE_NAME);
+    fn new(log_dir: &AbsPath) -> Result<Self, InitError> {
+        let file_appender = RollingFileAppender::builder()
+            .rotation(Rotation::DAILY)
+            .filename_prefix(LOG_FILE_NAME)
+            .build(log_dir)?;
 
         let (non_blocking, _guard) =
             tracing_appender::non_blocking(file_appender);
@@ -58,7 +61,7 @@ impl NomadTracingSubscriber {
             .with_writer(non_blocking)
             .finish();
 
-        Self { subscriber, _guard }
+        Ok(Self { subscriber, _guard })
     }
 }
 
