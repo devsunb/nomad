@@ -19,6 +19,10 @@ enum Command {
         /// Build the plugin in release mode.
         #[clap(long, short)]
         release: bool,
+
+        /// Build the plugin for the latest nightly version of Neovim.
+        #[clap(long)]
+        nightly: bool,
     },
 }
 
@@ -27,6 +31,6 @@ pub fn run() -> anyhow::Result<()> {
     let args = Args::parse();
 
     match args.command {
-        Command::Build { release } => build::build(release),
+        Command::Build { release, nightly } => build::build(release, nightly),
     }
 }

@@ -12,12 +12,13 @@ use xshell::cmd;
 /// The desired name of the library to placed in the `/lua` directory.
 const LIBRARY_NAME: &str = "nomad";
 
-pub(crate) fn build(release: bool) -> anyhow::Result<()> {
+pub(crate) fn build(is_release: bool, is_nightly: bool) -> anyhow::Result<()> {
     let sh = xshell::Shell::new()?;
     let project_root = find_project_root(&sh)?;
     let package = parse_package(&project_root)?;
-    let nvim_version = detect_nvim_version(&sh);
-    build_plugin(&project_root, &package.name, nvim_version, release, &sh)?;
+    let is_nightly = is_nightly
+        || detect_nvim_version(&sh).map(|v| v.is_nightly()).unwrap_or(false);
+    build_plugin(&project_root, &package.name, is_release, is_nightly, &sh)?;
     fix_library_name(&project_root, &package)?;
     Ok(())
 }
@@ -61,8 +62,8 @@ fn detect_nvim_version(sh: &xshell::Shell) -> Option<NeovimVersion> {
 fn build_plugin(
     project_root: &AbsPath,
     package_name: &str,
-    nvim_version: Option<NeovimVersion>,
-    release: bool,
+    is_release: bool,
+    is_nightly: bool,
     sh: &xshell::Shell,
 ) -> anyhow::Result<()> {
     struct Arg<'a>(Cow<'a, str>);
@@ -83,18 +84,13 @@ fn build_plugin(
     let package_args =
         ["--package", package_name].into_iter().map(Cow::Borrowed);
 
-    // Compile the plugin for Nightly if the user is using a Nightly version of
-    // Neovim.
-    let feature_args = nvim_version
-        .map(|v| v.is_nightly())
-        .unwrap_or(false)
-        .then_some(["--features", "neovim-nightly"])
+    let feature_args = is_nightly
+        .then_some("--features=neovim-nightly")
         .into_iter()
-        .flatten()
         .map(Cow::Borrowed);
 
     let profile_args =
-        release.then_some("--release").into_iter().map(Cow::Borrowed);
+        is_release.then_some("--release").into_iter().map(Cow::Borrowed);
 
     let args = artifact_dir_args
         .chain(package_args)
