@@ -1,7 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "xtask"]
-default-members = ["crates/*"]
+members = ["crates/*", "lib/*", "xtask"]
 
 [workspace.package]
 version = "0.1.0"
@@ -20,15 +19,23 @@ futures = "0.3"
 futures-util = "0.3"
 fxhash = "0.2"
 nohash = "0.2"
-nvim = { git = "https://github.com/noib3/nvim-oxi", package = "nvim-oxi" }
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
 pin-project-lite = "0.2"
 quickcheck = "1"
 quickcheck_macros = "1"
 serde = "1.0"
 smallvec = "1.13"
 smol_str = "0.3"
-thiserror = "1.0"
+thiserror = "2.0"
 tracing = "0.1"
+
+nvimx = { path = "./lib/nvimx" }
+nvimx-common = { path = "./lib/nvimx/nvimx-common" }
+nvimx-executor = { path = "./lib/nvimx/nvimx-executor" }
+nvimx-macros = { path = "./lib/nvimx/nvimx-macros" }
+nvimx-project = { path = "./lib/nvimx/nvimx-project" }
+nvimx-tests = { path = "./lib/nvimx/nvimx-tests" }
+nvimx-ui = { path = "./lib/nvimx/nvimx-ui" }
 
 auth = { path = "./crates/auth" }
 clipboard = { path = "./crates/clipboard" }
@@ -69,10 +76,11 @@ authors.workspace = true
 crate-type = ["cdylib"]
 
 [features]
-neovim-nightly = ["nomad/neovim-nightly"]
+neovim-nightly = ["nomad/neovim-nightly", "nvimx/neovim-nightly"]
 
 [dependencies]
 auth = { workspace = true }
 collab = { workspace = true }
 nomad = { workspace = true }
+nvimx = { workspace = true }
 version = { workspace = true }

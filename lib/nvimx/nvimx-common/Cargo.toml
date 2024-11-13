@@ -6,7 +6,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
-smol_str = "0.2"
+smol_str = "0.3"
 
 [lints]
 workspace = true

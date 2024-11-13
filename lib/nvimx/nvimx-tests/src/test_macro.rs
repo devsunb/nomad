@@ -1,8 +1,8 @@
-use std::future::Future;
+use core::fmt;
+use core::future::Future;
 use std::path::PathBuf;
 
-use nvim_oxi::tests::IntoResult;
-use nvim_oxi::TestTerminator;
+use nvim_oxi::{IntoResult, TestTerminator};
 
 /// Returns the path where [`build`](crate::build) places the compiled dynamic
 /// library for the given crate.
@@ -20,7 +20,7 @@ pub fn library_path(crate_name: &str) -> PathBuf {
 pub fn run_async_test<F, R>(terminator: TestTerminator, test_body: F)
 where
     F: Future<Output = R> + 'static,
-    R: IntoResult,
+    R: IntoResult<(), Error: fmt::Display>,
 {
     run_async_test::run(terminator, test_body)
 }
@@ -62,7 +62,7 @@ mod run_async_test {
     pub(super) fn run<F, R>(terminator: TestTerminator, test_body: F)
     where
         F: Future<Output = R> + 'static,
-        R: IntoResult,
+        R: IntoResult<(), Error: fmt::Display>,
     {
         let terminator = Terminator::new(terminator);
 

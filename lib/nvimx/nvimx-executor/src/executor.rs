@@ -49,9 +49,7 @@ impl<'a> Executor<'a> {
                 // synchronization issues.
                 nvim_oxi::schedule(move |_| {
                     state.poll_all_woken();
-                    Ok(())
                 });
-                Ok::<_, core::convert::Infallible>(())
             })
             .expect("never fails(?)")
         };

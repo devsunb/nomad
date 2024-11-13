@@ -1,62 +1,12 @@
-[workspace]
-resolver = "2"
-members = ["nvimx-*", "nvimx-*/tests"]
-default-members = ["nvimx-*", "nvimx-*/tests"]
-
-[workspace.package]
-version = "0.0.0"
-edition = "2021"
-authors = ["Nomad <hello@nomad.foo>"]
-license = "MIT"
-
-[workspace.dependencies]
-nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
-thiserror = "1.0"
-
-nvimx = { path = "." }
-nvimx-common = { path = "./nvimx-common" }
-nvimx-executor = { path = "./nvimx-executor" }
-nvimx-macros = { path = "./nvimx-macros" }
-nvimx-project = { path = "./nvimx-project" }
-nvimx-tests = { path = "./nvimx-tests" }
-nvimx-ui = { path = "./nvimx-ui" }
-
-[workspace.lints.clippy]
-bool_to_int_with_if = "deny"
-cognitive_complexity = "deny"
-module_inception = "allow"
-multiple_crate_versions = "deny"
-needless_collect = "deny"
-same_name_method = "deny"
-too_many_arguments = "deny"
-too_many_lines = "deny"
-unwrap_used = "deny"
-
-[workspace.lints.rust]
-future_incompatible = { level = "deny", priority = -1 }
-missing_docs = "deny"
-nonstandard_style = { level = "deny", priority = -1 }
-refining_impl_trait = { level = "allow", priority = -1 }
-
-[workspace.lints.rustdoc]
-broken_intra_doc_links = "deny"
-private_intra_doc_links = "deny"
-
 [package]
 name = "nvimx"
-version = "0.0.0"
+version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
 [features]
 default = ["neovim-nightly"]
-executor = ["dep:nvimx-executor"]
-macros = ["dep:nvimx-macros"]
-project = ["dep:nvimx-project"]
-tests = ["dep:nvimx-tests"]
-ui = ["dep:nvimx-ui"]
-
 neovim-nightly = [
   "nvim-oxi/neovim-nightly",
   "nvimx-executor/neovim-nightly",
@@ -66,11 +16,11 @@ neovim-nightly = [
 
 [dependencies]
 nvim-oxi = { workspace = true }
-nvimx-executor = { workspace = true, optional = true }
-nvimx-macros = { workspace = true, optional = true }
-nvimx-project = { workspace = true, optional = true }
-nvimx-tests = { workspace = true, optional = true }
-nvimx-ui = { workspace = true, optional = true }
+nvimx-executor = { workspace = true }
+nvimx-macros = { workspace = true }
+nvimx-project = { workspace = true }
+nvimx-tests = { workspace = true }
+nvimx-ui = { workspace = true }
 
 [lints]
 workspace = true

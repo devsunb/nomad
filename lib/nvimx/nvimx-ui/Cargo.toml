@@ -12,7 +12,7 @@ neovim-nightly = ["nvim-oxi/neovim-nightly"]
 [dependencies]
 nvim-oxi = { workspace = true }
 
-compact_str = "0.7"
+compact_str = "0.8"
 str_indices = "0.4"
 
 [dev-dependencies]

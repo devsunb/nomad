@@ -100,7 +100,7 @@ impl BufferInner {
         let opts = BufAttachOpts::builder()
             .on_bytes(move |args: api::opts::OnBytesArgs| {
                 on_bytes(args.into());
-                Ok(false)
+                false
             })
             .build();
 
