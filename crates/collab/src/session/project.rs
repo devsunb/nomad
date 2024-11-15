@@ -23,8 +23,8 @@ use e31e::{
 };
 use fxhash::FxHashMap;
 use nohash::IntMap as NoHashMap;
-use nomad::ctx::{BufferCtx, NeovimCtx};
-use nomad::{ActorId, BufferId, Replacement, Shared, ShouldDetach};
+use nvimx::ctx::{ActorId, BufferCtx, BufferId, NeovimCtx, ShouldDetach};
+use nvimx::{Replacement, Shared};
 
 use super::{PeerSelection, PeerTooltip};
 

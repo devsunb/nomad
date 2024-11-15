@@ -1,7 +1,7 @@
 use core::error::Error;
 use core::fmt;
 
-use fs::{AbsPathBuf, DirEntry};
+use nvimx::fs::{self, AbsPathBuf, DirEntry};
 
 /// TODO: docs.
 pub enum FindRootError<Fs: fs::Fs> {

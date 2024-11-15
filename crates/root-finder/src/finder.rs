@@ -1,5 +1,5 @@
-use fs::{AbsPath, AbsPathBuf, DirEntry, FsNodeKind};
 use futures_util::{pin_mut, StreamExt};
+use nvimx::fs::{self, AbsPath, AbsPathBuf, DirEntry, FsNodeKind};
 
 use crate::{FindRootError, Marker};
 

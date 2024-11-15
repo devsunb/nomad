@@ -67,18 +67,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c95c10ba0b00a02636238b814946408b1322d5ac4760326e6fb8ec956d85775"
 
 [[package]]
-name = "async-broadcast"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20cd0e2e25ea8e5f7e9df04578dc6cf5c83577fd09b1a46aaf5c85e1c33f2a7e"
-dependencies = [
- "event-listener",
- "event-listener-strategy",
- "futures-core",
- "pin-project-lite",
-]
-
-[[package]]
 name = "async-channel"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -170,6 +158,7 @@ name = "auth"
 version = "0.1.0"
 dependencies = [
  "nomad",
+ "nvimx",
 ]
 
 [[package]]
@@ -415,12 +404,12 @@ dependencies = [
  "clipboard",
  "e31e",
  "flume",
- "fs",
  "futures-util",
  "fxhash",
  "nohash",
  "nomad",
  "nomad-server",
+ "nvimx",
  "pin-project-lite",
  "root-finder",
  "serde",
@@ -659,17 +648,6 @@ dependencies = [
  "futures-sink",
  "nanorand",
  "spin",
-]
-
-[[package]]
-name = "fs"
-version = "0.1.0"
-dependencies = [
- "async-fs",
- "e31e",
- "futures-util",
- "pin-project-lite",
- "thiserror 2.0.3",
 ]
 
 [[package]]
@@ -993,37 +971,8 @@ checksum = "a0f889fb66f7acdf83442c35775764b51fed3c606ab9cee51500dbde2cf528ca"
 name = "nomad"
 version = "0.1.0"
 dependencies = [
- "async-broadcast",
- "async-task",
- "compact_str",
- "concurrent-queue",
- "e31e",
- "flume",
- "futures-util",
- "fxhash",
  "home",
- "nohash",
- "nomad-macros",
- "nvim-oxi",
- "pin-project-lite",
- "serde",
- "serde_path_to_error",
- "smallvec",
- "smol_str",
- "time",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "nomad-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
- "syn-derive-args",
+ "nvimx",
 ]
 
 [[package]]
@@ -1143,9 +1092,14 @@ name = "nvimx"
 version = "0.1.0"
 dependencies = [
  "nvim-oxi",
+ "nvimx-common",
+ "nvimx-ctx",
+ "nvimx-diagnostics",
+ "nvimx-event",
  "nvimx-executor",
+ "nvimx-fs",
  "nvimx-macros",
- "nvimx-project",
+ "nvimx-plugin",
  "nvimx-tests",
  "nvimx-ui",
 ]
@@ -1154,7 +1108,42 @@ dependencies = [
 name = "nvimx-common"
 version = "0.1.0"
 dependencies = [
+ "compact_str",
+ "e31e",
+ "nvim-oxi",
+ "nvimx-diagnostics",
  "smol_str",
+]
+
+[[package]]
+name = "nvimx-ctx"
+version = "0.1.0"
+dependencies = [
+ "fxhash",
+ "nohash",
+ "nvim-oxi",
+ "nvimx-common",
+ "nvimx-diagnostics",
+ "nvimx-executor",
+ "nvimx-fs",
+]
+
+[[package]]
+name = "nvimx-diagnostics"
+version = "0.1.0"
+dependencies = [
+ "nvim-oxi",
+ "smol_str",
+]
+
+[[package]]
+name = "nvimx-event"
+version = "0.1.0"
+dependencies = [
+ "nvimx-common",
+ "nvimx-ctx",
+ "nvimx-diagnostics",
+ "nvimx-plugin",
 ]
 
 [[package]]
@@ -1168,6 +1157,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nvimx-fs"
+version = "0.1.0"
+dependencies = [
+ "async-fs",
+ "e31e",
+ "futures-util",
+ "pin-project-lite",
+ "thiserror 2.0.3",
+]
+
+[[package]]
 name = "nvimx-macros"
 version = "0.1.0"
 dependencies = [
@@ -1178,11 +1178,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "nvimx-project"
+name = "nvimx-plugin"
 version = "0.1.0"
 dependencies = [
- "nvim-oxi",
+ "flume",
+ "futures-util",
+ "fxhash",
  "nvimx-common",
+ "nvimx-ctx",
+ "nvimx-diagnostics",
+ "nvimx-fs",
+ "nvimx-plugin-macros",
+ "serde",
+ "serde_path_to_error",
+ "smol_str",
+ "time",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "nvimx-plugin-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.87",
+ "syn-derive-args",
 ]
 
 [[package]]
@@ -1437,8 +1460,8 @@ dependencies = [
 name = "root-finder"
 version = "0.1.0"
 dependencies = [
- "fs",
  "futures-util",
+ "nvimx",
 ]
 
 [[package]]
@@ -2327,8 +2350,8 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "clap",
- "fs",
  "futures-executor",
+ "nvimx",
  "root-finder",
  "xshell",
 ]

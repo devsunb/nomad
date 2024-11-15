@@ -1,9 +1,10 @@
 use core::any::type_name;
 
 use collab_server::message::Message;
-use nomad::buf_attach::BufAttachArgs;
-use nomad::ctx::BufferCtx;
-use nomad::{action_name, Action, ActionName, Shared, ShouldDetach};
+use nvimx::ctx::{ShouldDetach, TextBufferCtx};
+use nvimx::event::OnBytesArgs;
+use nvimx::plugin::{action_name, Action, ActionName};
+use nvimx::Shared;
 
 use super::Project;
 use crate::Collab;
@@ -14,14 +15,18 @@ pub(super) struct SyncReplacement {
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
-impl<'a> Action<BufferCtx<'a>> for SyncReplacement {
+impl Action<Collab> for SyncReplacement {
     const NAME: ActionName = action_name!("synchronize-replacement");
-    type Args = BufAttachArgs;
+    type Args = OnBytesArgs;
+    type Ctx<'a> = TextBufferCtx<'a>;
     type Docs = ();
-    type Module = Collab;
     type Return = ShouldDetach;
 
-    fn execute(&mut self, args: Self::Args, _: BufferCtx<'a>) -> Self::Return {
+    fn execute<'a>(
+        &'a mut self,
+        args: Self::Args,
+        _: Self::Ctx<'a>,
+    ) -> Self::Return {
         let message = self.project.with_mut(|project| {
             if args.actor_id == project.actor_id {
                 return None;

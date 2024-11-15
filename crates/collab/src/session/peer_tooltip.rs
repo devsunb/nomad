@@ -1,7 +1,7 @@
 use collab_server::message::Peer;
-use nomad::ctx::BufferCtx;
-use nomad::diagnostics::HighlightGroup;
-use nomad::{BufferId, ByteOffset, Selection};
+use nvimx::ctx::{BufferCtx, BufferId, Selection};
+use nvimx::diagnostics::HighlightGroup;
+use nvimx::ByteOffset;
 
 /// TODO: docs.
 pub(super) struct PeerTooltip {

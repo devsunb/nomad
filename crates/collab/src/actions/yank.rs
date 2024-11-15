@@ -1,6 +1,7 @@
-use nomad::ctx::NeovimCtx;
-use nomad::diagnostics::DiagnosticMessage;
-use nomad::{action_name, Action, ActionName, Shared};
+use nvimx::ctx::NeovimCtx;
+use nvimx::diagnostics::DiagnosticMessage;
+use nvimx::plugin::{action_name, Action, ActionName};
+use nvimx::Shared;
 
 use crate::session_status::SessionStatus;
 use crate::Collab;
@@ -16,15 +17,15 @@ impl Yank {
     }
 }
 
-impl<'a> Action<NeovimCtx<'a>> for Yank {
+impl Action<Collab> for Yank {
     const NAME: ActionName = action_name!("yank");
     type Args = ();
+    type Ctx<'a> = NeovimCtx<'a>;
     type Docs = ();
-    type Module = Collab;
     type Return = ();
 
-    fn execute(
-        &mut self,
+    fn execute<'a>(
+        &'a mut self,
         _: Self::Args,
         _: NeovimCtx<'a>,
     ) -> Result<(), YankError> {

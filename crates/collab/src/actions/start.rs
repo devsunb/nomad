@@ -5,11 +5,12 @@ use collab_server::message::{GitHubHandle, Peer, Peers};
 use collab_server::AuthInfos;
 use e31e::fs::{AbsPathBuf, FsNodeName};
 use e31e::{Replica, ReplicaBuilder};
-use fs::os_fs::OsFs;
 use futures_util::StreamExt;
-use nomad::ctx::{BufferCtx, NeovimCtx};
-use nomad::diagnostics::DiagnosticMessage;
-use nomad::{action_name, ActionName, AsyncAction, Shared};
+use nvimx::ctx::{BufferCtx, NeovimCtx};
+use nvimx::diagnostics::DiagnosticMessage;
+use nvimx::fs::os_fs::OsFs;
+use nvimx::plugin::{action_name, ActionName, AsyncAction};
+use nvimx::Shared;
 use root_finder::markers;
 
 use super::UserBusyError;
@@ -28,11 +29,11 @@ impl Start {
     }
 }
 
-impl AsyncAction for Start {
+impl AsyncAction<Collab> for Start {
     const NAME: ActionName = action_name!("start");
+
     type Args = ();
     type Docs = ();
-    type Module = Collab;
 
     async fn execute(
         &mut self,

@@ -1,6 +1,7 @@
-use nomad::autocmds::BufUnloadArgs;
-use nomad::ctx::NeovimCtx;
-use nomad::{action_name, Action, ActionName, BufferId, Shared, ShouldDetach};
+use nvimx::ctx::{BufferCtx, BufferId, ShouldDetach};
+use nvimx::event::BufUnloadArgs;
+use nvimx::plugin::{action_name, Action, ActionName};
+use nvimx::Shared;
 
 use super::Project;
 use crate::Collab;
@@ -26,16 +27,18 @@ impl DetachBufferActions {
     }
 }
 
-impl<'a> Action<NeovimCtx<'a>> for DetachBufferActions {
+impl Action<Collab> for DetachBufferActions {
     const NAME: ActionName = action_name!("detach-buffer-actions");
     type Args = BufUnloadArgs;
+    type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
-    type Module = Collab;
     type Return = ();
 
-    fn execute(&mut self, args: Self::Args, _: NeovimCtx<'a>) {
-        self.detach_actions(args.buffer_id);
+    fn execute<'a>(&'a mut self, _: Self::Args, ctx: Self::Ctx<'a>) {
+        self.detach_actions(ctx.buffer_id());
     }
 
     fn docs(&self) {}
 }
+
+// [mad.BufUnload.detach-buffer-actions]

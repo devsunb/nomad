@@ -1,19 +1,10 @@
 use std::collections::hash_map::Entry;
 
 use collab_server::message::Message;
-use nomad::autocmds::BufAddArgs;
-use nomad::buf_attach::BufAttach;
-use nomad::ctx::NeovimCtx;
-use nomad::events::CursorEvent;
-use nomad::{
-    action_name,
-    Action,
-    ActionName,
-    BufferId,
-    Event,
-    Shared,
-    ShouldDetach,
-};
+use nvimx::ctx::{BufferCtx, BufferId, ShouldDetach};
+use nvimx::event::{BufAddArgs, Cursor, Event, OnBytes};
+use nvimx::plugin::{action_name, Action, ActionName};
+use nvimx::Shared;
 use smallvec::SmallVec;
 use tracing::error;
 
@@ -72,14 +63,14 @@ impl RegisterBufferActions {
 
             let text_buffer_ctx = text_file_ctx.as_text_buffer();
 
-            BufAttach::new(SyncReplacement {
+            OnBytes::new(SyncReplacement {
                 message_tx: self.message_tx.clone(),
                 project: self.project.clone(),
                 should_detach: should_detach.clone(),
             })
             .register(text_buffer_ctx.reborrow());
 
-            CursorEvent::new(SyncCursor {
+            Cursor::new(SyncCursor {
                 message_tx: self.message_tx.clone(),
                 project: self.project.clone(),
                 should_detach: should_detach.clone(),
@@ -144,15 +135,15 @@ impl RegisterBufferActions {
     }
 }
 
-impl Action for RegisterBufferActions {
+impl Action<Collab> for RegisterBufferActions {
     const NAME: ActionName = action_name!("register-buffer-actions");
     type Args = BufAddArgs;
+    type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
-    type Module = Collab;
     type Return = ();
 
-    fn execute(&mut self, args: Self::Args, _: NeovimCtx<'static>) {
-        self.register_actions(args.buffer_id);
+    fn execute<'a>(&'a mut self, _: Self::Args, ctx: Self::Ctx<'a>) {
+        self.register_actions(ctx.buffer_id());
     }
 
     fn docs(&self) {}

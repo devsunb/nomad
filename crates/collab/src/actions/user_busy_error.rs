@@ -1,5 +1,5 @@
-use nomad::diagnostics::{DiagnosticMessage, HighlightGroup};
-use nomad::Shared;
+use nvimx::diagnostics::{DiagnosticMessage, HighlightGroup};
+use nvimx::Shared;
 
 use crate::session::Project;
 use crate::session_status::SessionStatus;
