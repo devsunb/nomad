@@ -7,22 +7,8 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-e31e = { workspace = true }
-flume = { version = "0.11", features = ["async"] }
-futures-util = { workspace = true }
-fxhash = { workspace = true }
 home = "0.5"
-nohash = { workspace = true }
-nomad-macros = { path = "./macros" }
-pin-project-lite = { workspace = true }
-serde = { workspace = true }
-serde_path_to_error = "0.1"
-smallvec = { workspace = true }
-smol_str = { workspace = true }
-time = { version = "0.3", features = ["macros"] }
-tracing = { workspace = true }
-tracing-appender = "0.2"
-tracing-subscriber = { version = "0.3", features = ["time"] }
+nvimx = { workspace = true }
 
 [lints]
 workspace = true

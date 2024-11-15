@@ -120,6 +120,18 @@ impl<'ctx> NeovimCtx<'ctx> {
     }
 }
 
+impl NeovimCtx<'static> {
+    /// TODO: docs.
+    pub fn init(augroup_name: &str, namespace_name: &str) -> Self {
+        Self {
+            ctx: Boo::Owned(Shared::new(Ctx::new(
+                augroup_name,
+                namespace_name,
+            ))),
+        }
+    }
+}
+
 impl Ctx {
     fn new(augroup_name: &str, namespace_name: &str) -> Self {
         let augroup_id = {

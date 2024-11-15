@@ -970,32 +970,8 @@ checksum = "a0f889fb66f7acdf83442c35775764b51fed3c606ab9cee51500dbde2cf528ca"
 name = "nomad"
 version = "0.1.0"
 dependencies = [
- "e31e",
- "flume",
- "futures-util",
- "fxhash",
  "home",
- "nohash",
- "nomad-macros",
- "pin-project-lite",
- "serde",
- "serde_path_to_error",
- "smallvec",
- "smol_str",
- "time",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "nomad-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
- "syn-derive-args",
+ "nvimx",
 ]
 
 [[package]]

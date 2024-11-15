@@ -31,11 +31,6 @@ pub struct CursorMovedArgs {
     pub moved_to: ByteOffset,
 }
 
-pub struct CursorMovedAction<A, M> {
-    pub(crate) action: A,
-    pub(crate) module_name: PhantomData<M>,
-}
-
 impl<A, M> CursorMoved<A, M> {
     /// TODO: docs.
     pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {

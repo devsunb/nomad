@@ -1,4 +1,3 @@
-use nvimx_common::MaybeResult;
 use nvimx_fs::AbsPathBuf;
 
 /// TODO: docs.
@@ -16,5 +15,5 @@ pub trait Plugin {
     const NAMESPACE_NAME: &'static str;
 
     /// TODO: docs.
-    fn log_dir(&self) -> impl MaybeResult<AbsPathBuf>;
+    fn log_dir(&self) -> AbsPathBuf;
 }

@@ -1,5 +1,4 @@
 use core::future::Future;
-use core::marker::PhantomData;
 use core::pin::Pin;
 
 use nvimx_common::{oxi, MaybeResult};
@@ -16,19 +15,26 @@ pub struct PluginCtx<P: Plugin> {
     api: oxi::Dictionary,
     command: Command,
     neovim_ctx: NeovimCtx<'static>,
-    plugin: PhantomData<P>,
+    plugin: P,
     run: Vec<Pin<Box<dyn Future<Output = ()>>>>,
     setup: Setup,
 }
 
 impl<P: Plugin> PluginCtx<P> {
     /// TODO: docs.
-    pub fn new() -> Self {
-        todo!();
+    pub fn init(plugin: P) -> Self {
+        Self {
+            api: oxi::Dictionary::default(),
+            command: Command::new::<P>(),
+            neovim_ctx: NeovimCtx::init(P::AUGROUP_NAME, P::NAMESPACE_NAME),
+            plugin,
+            run: Vec::new(),
+            setup: Setup::default(),
+        }
     }
 
     /// TODO: docs.
-    pub fn with_module<M>(mut self, module: M) -> Self
+    pub fn with_module<M>(mut self) -> Self
     where
         M: Module<Plugin = Self>,
     {
@@ -48,5 +54,25 @@ impl<P: Plugin> PluginCtx<P> {
             })
         });
         self
+    }
+}
+
+impl<P: Plugin> oxi::lua::Pushable for PluginCtx<P> {
+    unsafe fn push(
+        mut self,
+        state: *mut oxi::lua::ffi::State,
+    ) -> Result<i32, oxi::lua::Error> {
+        crate::log::init(&self.plugin.log_dir());
+
+        // Start each module's event loop.
+        for fut in self.run.drain(..) {
+            self.neovim_ctx.spawn(|_| fut).detach();
+        }
+
+        self.command.create();
+
+        let setup = oxi::Function::from_fn(self.setup.into_fn());
+        self.api.insert(Setup::NAME, setup);
+        self.api.push(state)
     }
 }

@@ -1,66 +1,17 @@
-use core::future::Future;
-use core::pin::Pin;
-
-use e31e::fs::{AbsPath, AbsPathBuf, FsNodeName};
-use nvim_oxi::{lua, Dictionary as NvimDictionary, Function as NvimFunction};
-
-use crate::config::Setup;
-use crate::ctx::NeovimCtx;
-use crate::diagnostics::{DiagnosticSource, Level};
-use crate::maybe_result::MaybeResult;
-use crate::nomad_command::NomadCommand;
-use crate::Module;
+use nvimx::fs::{AbsPath, AbsPathBuf, FsNodeName};
+use nvimx::plugin::Plugin;
 
 /// TODO: docs.
 #[derive(Default)]
-pub struct Nomad {
-    api: NvimDictionary,
-    command: NomadCommand,
-    neovim_ctx: NeovimCtx<'static>,
-    run: Vec<Pin<Box<dyn Future<Output = ()>>>>,
-    setup: Setup,
-}
+pub struct Nomad;
 
-impl Nomad {
-    /// TODO: docs.
-    pub(crate) const AUGROUP_NAME: &'static str = "nomad";
+impl Plugin for Nomad {
+    const AUGROUP_NAME: &'static str = "nomad";
+    const COMMAND_NAME: &'static str = "Mad";
+    const DIAGNOSTIC_NAME: &'static str = "nomad";
+    const NAMESPACE_NAME: &'static str = "nomad-namespace";
 
-    /// TODO: docs.
-    pub(crate) const COMMAND_NAME: &'static str = "Mad";
-
-    /// TODO: docs.
-    pub(crate) const DIAGNOSTICS_SEGMENT_NAME: &'static str = "nomad";
-
-    /// TODO: docs.
-    pub(crate) const NAMESPACE_NAME: &'static str = "nomad-namespace";
-
-    /// TODO: docs.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// TODO: docs.
-    #[track_caller]
-    pub fn with_module<M: Module>(mut self) -> Self {
-        let config_rx = self.setup.add_module::<M>();
-        let module = M::from(config_rx);
-        let module_api = module.init(self.neovim_ctx.reborrow());
-        self.api.insert(M::NAME.as_str(), module_api.dictionary);
-        self.command.add_module(module_api.commands);
-        self.run.push({
-            let neovim_ctx = self.neovim_ctx.clone();
-            Box::pin(async move {
-                if let Err(err) = module.run(neovim_ctx).await.into_result() {
-                    let mut source = DiagnosticSource::new();
-                    source.push_segment(M::NAME.as_str());
-                    err.into().emit(Level::Error, source);
-                }
-            })
-        });
-        self
-    }
-
-    pub(crate) fn log_dir(&self) -> AbsPathBuf {
+    fn log_dir(&self) -> AbsPathBuf {
         #[cfg(target_family = "unix")]
         {
             let mut home = match home::home_dir() {
@@ -82,25 +33,5 @@ impl Nomad {
         {
             unimplemented!()
         }
-    }
-}
-
-impl lua::Pushable for Nomad {
-    unsafe fn push(
-        mut self,
-        state: *mut lua::ffi::State,
-    ) -> Result<i32, lua::Error> {
-        crate::log::init(&self.log_dir());
-
-        // Start each module's event loop.
-        for fut in self.run.drain(..) {
-            crate::executor::spawn(fut).detach();
-        }
-
-        self.command.create();
-
-        let setup = NvimFunction::from_fn(self.setup.into_fn());
-        self.api.insert(Setup::NAME, setup);
-        self.api.push(state)
     }
 }
