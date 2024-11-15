@@ -1,4 +1,4 @@
-use fs::{FsNodeKind, FsNodeName};
+use nvimx::fs::{FsNodeKind, FsNodeName};
 
 /// TODO: docs.
 pub trait Marker {
