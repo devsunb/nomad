@@ -6,7 +6,21 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+flume = { version = "0.11", features = ["async"] }
+futures-util = { workspace = true }
+fxhash = { workspace = true }
+nvimx-action = { workspace = true }
+nvimx-common = { workspace = true }
 nvimx-ctx = { workspace = true }
+nvimx-diagnostics = { workspace = true }
+nvimx-fs = { workspace = true }
+serde = { workspace = true }
+serde_path_to_error = "0.1"
+smol_str = { workspace = true }
+time = { version = "0.3", features = ["macros"] }
+tracing = { workspace = true }
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["time"] }
 
 [lints]
 workspace = true

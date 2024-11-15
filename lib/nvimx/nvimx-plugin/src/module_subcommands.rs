@@ -1,25 +1,29 @@
 use fxhash::FxHashMap;
+use nvimx_action::ActionNameStr;
+use nvimx_ctx::NeovimCtx;
 
-use crate::action_name::ActionNameStr;
-use crate::ctx::NeovimCtx;
-use crate::{Command, CommandArgs, Module, ModuleName};
+use crate::module::Module;
+use crate::module_name::ModuleName;
+use crate::subcommand::SubCommand;
+use crate::subcommand_args::SubCommandArgs;
 
-pub(super) struct ModuleCommands {
+pub(super) struct ModuleSubCommands {
     /// The name of the module these commands belong to.
     pub(super) module_name: ModuleName,
 
     /// The command to run when no command is specified.
-    pub(super) default_command: Option<Box<dyn FnMut(CommandArgs)>>,
+    pub(super) default_command: Option<Box<dyn FnMut(SubCommandArgs)>>,
 
     /// Map from command name to the corresponding [`Command`].
-    pub(super) commands: FxHashMap<ActionNameStr, Box<dyn FnMut(CommandArgs)>>,
+    pub(super) subcommands:
+        FxHashMap<ActionNameStr, Box<dyn FnMut(SubCommandArgs)>>,
 
     pub(super) neovim_ctx: NeovimCtx<'static>,
 }
 
-impl ModuleCommands {
+impl ModuleSubCommands {
     #[track_caller]
-    pub(crate) fn add_command<T: Command>(&mut self, command: T) {
+    pub(crate) fn add_subcommand<T: SubCommand>(&mut self, command: T) {
         if self.module_name != T::Module::NAME {
             panic!(
                 "trying to register a command for module '{}' in the API for \
@@ -28,7 +32,7 @@ impl ModuleCommands {
                 self.module_name
             );
         }
-        if self.commands.contains_key(&T::NAME.as_str()) {
+        if self.subcommands.contains_key(&T::NAME.as_str()) {
             panic!(
                 "a command with the name '{}' already exists in the API for \
                  module '{}'",
@@ -38,14 +42,17 @@ impl ModuleCommands {
         }
         let mut callback = command.into_callback();
         let ctx = self.neovim_ctx.clone();
-        self.commands.insert(
+        self.subcommands.insert(
             T::NAME.as_str(),
             Box::new(move |args| callback(args, ctx.reborrow())),
         );
     }
 
     #[track_caller]
-    pub(crate) fn add_default_command<T: Command>(&mut self, command: T) {
+    pub(crate) fn add_default_subcommand<T: SubCommand>(
+        &mut self,
+        command: T,
+    ) {
         if self.module_name != T::Module::NAME {
             panic!(
                 "trying to register a command for module '{}' in the API for \
@@ -66,30 +73,30 @@ impl ModuleCommands {
             Some(Box::new(move |args| callback(args, ctx.reborrow())));
     }
 
-    pub(crate) fn default_command(
+    pub(crate) fn default_subcommand(
         &mut self,
-    ) -> Option<&mut impl FnMut(CommandArgs)> {
+    ) -> Option<&mut impl FnMut(SubCommandArgs)> {
         self.default_command.as_mut()
     }
 
-    pub(crate) fn command<'a>(
+    pub(crate) fn subcommand<'a>(
         &'a mut self,
-        command_name: &'a str,
-    ) -> Option<&'a mut impl FnMut(CommandArgs)> {
-        self.commands.get_mut(command_name)
+        subcommand_name: &'a str,
+    ) -> Option<&'a mut impl FnMut(SubCommandArgs)> {
+        self.subcommands.get_mut(subcommand_name)
     }
 
-    pub(crate) fn command_names(
+    pub(crate) fn subcommand_names(
         &self,
     ) -> impl Iterator<Item = ActionNameStr> + '_ {
-        self.commands.keys().copied()
+        self.subcommands.keys().copied()
     }
 
     pub(crate) fn new<M: Module>(neovim_ctx: NeovimCtx<'static>) -> Self {
         Self {
             module_name: M::NAME,
             default_command: None,
-            commands: FxHashMap::default(),
+            subcommands: FxHashMap::default(),
             neovim_ctx,
         }
     }

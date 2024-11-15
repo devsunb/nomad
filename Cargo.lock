@@ -1213,7 +1213,21 @@ dependencies = [
 name = "nvimx-plugin"
 version = "0.1.0"
 dependencies = [
+ "flume",
+ "futures-util",
+ "fxhash",
+ "nvimx-action",
+ "nvimx-common",
  "nvimx-ctx",
+ "nvimx-diagnostics",
+ "nvimx-fs",
+ "serde",
+ "serde_path_to_error",
+ "smol_str",
+ "time",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]

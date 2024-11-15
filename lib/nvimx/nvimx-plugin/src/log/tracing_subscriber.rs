@@ -1,4 +1,4 @@
-use e31e::fs::AbsPath;
+use nvimx_fs::AbsPath;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};

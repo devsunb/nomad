@@ -1,21 +1,15 @@
 use core::fmt;
 
-use nvim_oxi::serde::{
-    DeserializeError as NvimDeserializeError,
-    Deserializer as NvimDeserializer,
-    Serializer as NvimSerializer,
-};
-use nvim_oxi::Object as NvimObject;
+use nvimx_common::oxi;
+use nvimx_diagnostics::{DiagnosticMessage, HighlightGroup};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::diagnostics::{DiagnosticMessage, HighlightGroup};
-
-pub(super) fn deserialize<T>(obj: NvimObject) -> Result<T, DeserializeError>
+pub(super) fn deserialize<T>(obj: oxi::Object) -> Result<T, DeserializeError>
 where
     T: DeserializeOwned,
 {
-    serde_path_to_error::deserialize(NvimDeserializer::new(obj))
+    serde_path_to_error::deserialize(oxi::serde::Deserializer::new(obj))
         .map_err(|inner| DeserializeError { inner })
 }
 
@@ -23,11 +17,11 @@ where
 ///
 /// Panics if the [`Serialize`] implementation for `T` returns an error.
 #[track_caller]
-pub(super) fn serialize<T>(item: &T) -> NvimObject
+pub(super) fn serialize<T>(item: &T) -> oxi::Object
 where
     T: Serialize,
 {
-    match item.serialize(NvimSerializer::new()) {
+    match item.serialize(oxi::serde::Serializer::new()) {
         Ok(obj) => obj,
         Err(err) => {
             panic!(
@@ -40,7 +34,7 @@ where
 }
 
 pub(super) struct DeserializeError {
-    inner: serde_path_to_error::Error<NvimDeserializeError>,
+    inner: serde_path_to_error::Error<oxi::serde::DeserializeError>,
 }
 
 impl DeserializeError {
@@ -61,20 +55,20 @@ impl DeserializeError {
         }
 
         match self.inner.inner() {
-            NvimDeserializeError::Custom { msg: err } => {
+            oxi::serde::DeserializeError::Custom { msg: err } => {
                 msg.push_str(err);
             },
-            NvimDeserializeError::DuplicateField { field } => {
+            oxi::serde::DeserializeError::DuplicateField { field } => {
                 msg.push_str("duplicate field '")
                     .push_str_highlighted(field, HighlightGroup::special())
                     .push_str("'");
             },
-            NvimDeserializeError::MissingField { field } => {
+            oxi::serde::DeserializeError::MissingField { field } => {
                 msg.push_str("missing field '")
                     .push_str_highlighted(field, HighlightGroup::special())
                     .push_str("'");
             },
-            NvimDeserializeError::UnknownField { field, expected } => {
+            oxi::serde::DeserializeError::UnknownField { field, expected } => {
                 msg.push_str("unknown field '")
                     .push_str_highlighted(field, HighlightGroup::special())
                     .push_str("', expected one of")
@@ -83,7 +77,10 @@ impl DeserializeError {
                         HighlightGroup::special(),
                     );
             },
-            NvimDeserializeError::UnknownVariant { variant, expected } => {
+            oxi::serde::DeserializeError::UnknownVariant {
+                variant,
+                expected,
+            } => {
                 msg.push_str("unknown variant '")
                     .push_str_highlighted(variant, HighlightGroup::special())
                     .push_str("', expected one of")

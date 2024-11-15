@@ -6,6 +6,6 @@ mod async_action;
 mod into_module_name;
 
 pub use action::Action;
-pub use action_name::ActionName;
+pub use action_name::{ActionName, ActionNameStr};
 pub use async_action::AsyncAction;
 pub use into_module_name::IntoModuleName;

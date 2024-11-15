@@ -1,16 +1,15 @@
 use std::vec::IntoIter;
 
-use nvim_oxi::api::types;
-
-use crate::diagnostics::{DiagnosticMessage, HighlightGroup};
+use nvimx_common::oxi::api::types;
+use nvimx_diagnostics::{DiagnosticMessage, HighlightGroup};
 
 /// TODO: docs.
 #[derive(Debug, Clone)]
-pub struct CommandArgs {
+pub struct SubCommandArgs {
     inner: IntoIter<String>,
 }
 
-impl CommandArgs {
+impl SubCommandArgs {
     /// TODO: docs.
     pub fn as_slice(&self) -> &[String] {
         self.inner.as_slice()
@@ -32,26 +31,26 @@ impl CommandArgs {
     }
 }
 
-impl From<types::CommandArgs> for CommandArgs {
+impl From<types::CommandArgs> for SubCommandArgs {
     fn from(args: types::CommandArgs) -> Self {
         Self { inner: args.fargs.into_iter() }
     }
 }
 
-impl<'a> TryFrom<&'a mut CommandArgs> for () {
+impl<'a> TryFrom<&'a mut SubCommandArgs> for () {
     type Error = CommandArgsWrongNumError<'a>;
 
-    fn try_from(args: &'a mut CommandArgs) -> Result<Self, Self::Error> {
+    fn try_from(args: &'a mut SubCommandArgs) -> Result<Self, Self::Error> {
         args.is_empty()
             .then_some(())
             .ok_or(CommandArgsWrongNumError { args, expected_num: 0 })
     }
 }
 
-impl<'a, const N: usize> TryFrom<&'a mut CommandArgs> for &'a [String; N] {
+impl<'a, const N: usize> TryFrom<&'a mut SubCommandArgs> for &'a [String; N] {
     type Error = CommandArgsWrongNumError<'a>;
 
-    fn try_from(args: &'a mut CommandArgs) -> Result<Self, Self::Error> {
+    fn try_from(args: &'a mut SubCommandArgs) -> Result<Self, Self::Error> {
         args.as_slice()
             .try_into()
             .ok()
@@ -61,7 +60,7 @@ impl<'a, const N: usize> TryFrom<&'a mut CommandArgs> for &'a [String; N] {
 
 #[derive(Debug, Copy, Clone)]
 pub struct CommandArgsWrongNumError<'a> {
-    args: &'a CommandArgs,
+    args: &'a SubCommandArgs,
     expected_num: usize,
 }
 

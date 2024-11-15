@@ -6,20 +6,20 @@ use core::task::{Context, Poll};
 
 use futures_util::{ready, Stream, StreamExt};
 use fxhash::FxHashMap;
-use nvim_oxi::{
+use nvimx_common::oxi::{
     Dictionary as NvimDictionary,
     Object as NvimObject,
     ObjectKind as NvimObjectKind,
     String as NvimString,
 };
-use smol_str::SmolStr;
-
-use crate::diagnostics::{
+use nvimx_diagnostics::{
     DiagnosticMessage,
     DiagnosticSource,
     HighlightGroup,
     Level,
 };
+use smol_str::SmolStr;
+
 use crate::module_name::ModuleNameStr;
 use crate::Module;
 

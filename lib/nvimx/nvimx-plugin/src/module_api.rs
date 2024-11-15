@@ -1,23 +1,23 @@
 use core::marker::PhantomData;
 
-use nvim_oxi::{Dictionary as NvimDictionary, Function as NvimFunction};
+use nvimx_common::oxi;
+use nvimx_ctx::NeovimCtx;
 
-use crate::ctx::NeovimCtx;
-use crate::module_commands::ModuleCommands;
-use crate::{Command, Event, Function, Module};
+use crate::module_subcommands::ModuleSubCommands;
+use crate::{Function, Module, SubCommand};
 
 /// TODO: docs.
 pub struct ModuleApi<M: Module> {
-    pub(crate) dictionary: NvimDictionary,
-    pub(crate) commands: ModuleCommands,
+    pub(crate) dictionary: oxi::Dictionary,
+    pub(crate) commands: ModuleSubCommands,
     ty: PhantomData<M>,
 }
 
 impl<M: Module> ModuleApi<M> {
     /// TODO: docs.
-    pub fn command<T>(mut self, command: T) -> Self
+    pub fn subcommand<T>(mut self, command: T) -> Self
     where
-        T: Command<Module = M>,
+        T: SubCommand<Module = M>,
     {
         self.commands.add_command(command);
         self
@@ -26,18 +26,9 @@ impl<M: Module> ModuleApi<M> {
     /// TODO: docs.
     pub fn default_command<T>(mut self, command: T) -> Self
     where
-        T: Command<Module = M>,
+        T: SubCommand<Module = M>,
     {
         self.commands.add_default_command(command);
-        self
-    }
-
-    /// TODO: docs.
-    pub fn event<T>(self, event: T) -> Self
-    where
-        T: for<'a> Event<Ctx<'a> = NeovimCtx<'a>>,
-    {
-        event.register(self.neovim_ctx());
         self
     }
 
@@ -58,7 +49,7 @@ impl<M: Module> ModuleApi<M> {
         let mut callback = function.into_callback();
         self.dictionary.insert(
             T::NAME.as_str(),
-            NvimFunction::from_fn_mut(move |obj| {
+            oxi::Function::from_fn_mut(move |obj| {
                 callback(obj, ctx.reborrow())
             }),
         );
@@ -68,8 +59,8 @@ impl<M: Module> ModuleApi<M> {
     /// Creates a new [`ModuleApi`].
     pub fn new(neovim_ctx: NeovimCtx<'static>) -> Self {
         Self {
-            dictionary: NvimDictionary::default(),
-            commands: ModuleCommands::new::<M>(neovim_ctx),
+            dictionary: oxi::Dictionary::default(),
+            commands: ModuleSubCommands::new::<M>(neovim_ctx),
             ty: PhantomData,
         }
     }

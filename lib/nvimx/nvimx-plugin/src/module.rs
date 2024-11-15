@@ -1,11 +1,12 @@
 use core::future::Future;
 
+use nvimx_common::MaybeResult;
+use nvimx_ctx::NeovimCtx;
 use serde::de::DeserializeOwned;
 
 use crate::config::ConfigReceiver;
-use crate::ctx::NeovimCtx;
-use crate::maybe_result::MaybeResult;
 use crate::module_api::ModuleApi;
+use crate::plugin::Plugin;
 use crate::ModuleName;
 
 /// TODO: docs.
@@ -15,6 +16,9 @@ pub trait Module: 'static + From<ConfigReceiver<Self>> {
 
     /// TODO: docs.
     type Config: Default + DeserializeOwned;
+
+    /// TODO: docs.
+    type Plugin: Plugin;
 
     /// TODO: docs.
     fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self>;
