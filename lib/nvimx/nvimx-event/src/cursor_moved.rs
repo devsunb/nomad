@@ -30,8 +30,8 @@ pub struct CursorMovedArgs {
 }
 
 pub struct CursorMovedAction<A, M> {
-    action: A,
-    module_name: PhantomData<M>,
+    pub(crate) action: A,
+    pub(crate) module_name: PhantomData<M>,
 }
 
 impl<A, M> CursorMoved<A, M> {
