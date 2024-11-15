@@ -1,7 +1,7 @@
-use nvimx::action::{action_name, Action, ActionName};
-use nvimx::common::Shared;
-use nvimx::ctx::{BufferId, NeovimCtx, ShouldDetach};
+use nvimx::ctx::{BufferCtx, BufferId, ShouldDetach};
 use nvimx::event::BufUnloadArgs;
+use nvimx::plugin::{action_name, Action, ActionName};
+use nvimx::Shared;
 
 use super::Project;
 use crate::Collab;
@@ -27,15 +27,15 @@ impl DetachBufferActions {
     }
 }
 
-impl Action for DetachBufferActions {
+impl Action<Collab> for DetachBufferActions {
     const NAME: ActionName = action_name!("detach-buffer-actions");
     type Args = BufUnloadArgs;
-    type Ctx<'a> = NeovimCtx<'a>;
+    type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
     type Return = ();
 
-    fn execute(&mut self, args: Self::Args, _: NeovimCtx<'a>) {
-        self.detach_actions(args.buffer_id);
+    fn execute<'a>(&'a mut self, _: Self::Args, ctx: Self::Ctx<'a>) {
+        self.detach_actions(ctx.buffer_id());
     }
 
     fn docs(&self) {}

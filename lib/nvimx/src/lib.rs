@@ -4,6 +4,8 @@
 
 pub use nvim_oxi::print;
 #[doc(inline)]
+pub use nvimx_common::*;
+#[doc(inline)]
 pub use nvimx_ctx as ctx;
 #[doc(inline)]
 pub use nvimx_diagnostics as diagnostics;

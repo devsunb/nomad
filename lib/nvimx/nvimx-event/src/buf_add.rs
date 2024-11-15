@@ -21,6 +21,13 @@ pub struct BufAdd<A, M> {
     module: PhantomData<M>,
 }
 
+/// TODO: docs.
+#[derive(Debug, Copy, Clone)]
+pub struct BufAddArgs {
+    /// The [`ActorId`] that added the buffer.
+    pub actor_id: ActorId,
+}
+
 impl<A, M> BufAdd<A, M> {
     /// TODO: docs.
     pub fn buffer_id(mut self, buffer_id: BufferId) -> Self {
@@ -36,7 +43,7 @@ impl<A, M> BufAdd<A, M> {
 
 impl<A, M> AutoCommand for BufAdd<A, M>
 where
-    A: for<'ctx> Action<M, Args = ActorId, Ctx<'ctx> = BufferCtx<'ctx>>,
+    A: for<'ctx> Action<M, Args = BufAddArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
     M: Module + 'static,
 {
@@ -50,6 +57,7 @@ where
         &'ctx AutoCommandCtx<'ctx>,
     ) -> Result<ShouldDetach, DiagnosticMessage> {
         move |actor_id, ctx| {
+            let args = BufAddArgs { actor_id };
             let buffer_id = BufferId::new(ctx.args().buffer.clone());
             let buffer_ctx = ctx
                 .deref()
@@ -57,7 +65,7 @@ where
                 .into_buffer(buffer_id)
                 .expect("buffer was just added, so its ID must be valid");
             self.action
-                .execute(actor_id, buffer_ctx)
+                .execute(args, buffer_ctx)
                 .into_result()
                 .map(Into::into)
                 .map_err(Into::into)

@@ -14,9 +14,10 @@ use collab_server::AuthInfos;
 use e31e::fs::AbsPathBuf;
 use e31e::{DirectoryId, DirectoryRef, Replica};
 use futures_util::{future, stream, AsyncWriteExt, SinkExt, StreamExt};
-use nomad::ctx::NeovimCtx;
-use nomad::diagnostics::DiagnosticMessage;
-use nomad::{action_name, ActionName, AsyncAction, Shared};
+use nvimx::ctx::NeovimCtx;
+use nvimx::diagnostics::DiagnosticMessage;
+use nvimx::plugin::{action_name, ActionName, AsyncAction};
+use nvimx::Shared;
 
 use super::UserBusyError;
 use crate::session::{NewSessionArgs, RunSessionError, Session};
@@ -35,11 +36,10 @@ impl Join {
     }
 }
 
-impl AsyncAction for Join {
+impl AsyncAction<Collab> for Join {
     const NAME: ActionName = action_name!("join");
     type Args = SessionId;
     type Docs = ();
-    type Module = Collab;
 
     async fn execute(
         &mut self,

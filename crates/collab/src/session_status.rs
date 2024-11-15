@@ -1,4 +1,4 @@
-use nomad::Shared;
+use nvimx::Shared;
 
 use crate::session::Project;
 use crate::session_id::SessionId;

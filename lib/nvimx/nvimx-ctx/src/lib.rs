@@ -19,6 +19,7 @@ pub use autocmd::{AutoCommand, AutoCommandEvent, ShouldDetach};
 pub use autocmd_ctx::AutoCommandCtx;
 pub use buffer_ctx::BufferCtx;
 pub use buffer_id::BufferId;
+pub use decoration_provider::Selection;
 pub use file_ctx::FileCtx;
 pub use neovim_ctx::NeovimCtx;
 pub use on_bytes::{OnBytesArgs, RegisterOnBytesArgs};

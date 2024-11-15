@@ -29,15 +29,16 @@ use futures_util::{
     Stream,
     StreamExt,
 };
-use nomad::autocmds::{BufAdd, BufUnload};
-use nomad::ctx::NeovimCtx;
-use nomad::diagnostics::{
+use nvimx::ctx::{BufferId, NeovimCtx};
+use nvimx::diagnostics::{
     DiagnosticMessage,
     DiagnosticSource,
     HighlightGroup,
     Level,
 };
-use nomad::{BufferId, Event, Module, Shared};
+use nvimx::event::{BufAdd, BufUnload, Event};
+use nvimx::plugin::Module;
+use nvimx::Shared;
 use peer_selection::PeerSelection;
 use peer_tooltip::PeerTooltip;
 pub(crate) use project::Project;

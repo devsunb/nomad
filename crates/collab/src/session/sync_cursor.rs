@@ -1,9 +1,10 @@
 use core::any::type_name;
 
 use collab_server::message::Message;
-use nomad::ctx::BufferCtx;
-use nomad::events::{Cursor, CursorAction};
-use nomad::{action_name, Action, ActionName, Shared, ShouldDetach};
+use nvimx::ctx::{BufferCtx, ShouldDetach};
+use nvimx::event::{CursorArgs, CursorKind};
+use nvimx::plugin::{action_name, Action, ActionName};
+use nvimx::Shared;
 
 use super::Project;
 use crate::Collab;
@@ -15,17 +16,17 @@ pub(super) struct SyncCursor {
     pub(super) should_detach: Shared<ShouldDetach>,
 }
 
-impl<'a> Action<BufferCtx<'a>> for SyncCursor {
+impl Action<Collab> for SyncCursor {
     const NAME: ActionName = action_name!("synchronize-cursor");
-    type Args = Cursor;
+    type Args = CursorArgs;
+    type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
-    type Module = Collab;
     type Return = ShouldDetach;
 
-    fn execute(
-        &mut self,
+    fn execute<'a>(
+        &'a mut self,
         cursor: Self::Args,
-        _: BufferCtx<'a>,
+        _: Self::Ctx<'a>,
     ) -> Self::Return {
         let message = self.project.with_mut(|project| {
             if cursor.moved_by == project.actor_id {
@@ -41,8 +42,8 @@ impl<'a> Action<BufferCtx<'a>> for SyncCursor {
                 );
             };
 
-            Some(match cursor.action {
-                CursorAction::Created(byte_offset) => {
+            Some(match cursor.kind {
+                CursorKind::Created(byte_offset) => {
                     let (cursor_id, creation) =
                         file.sync_created_cursor(byte_offset.into_u64());
                     assert!(
@@ -53,14 +54,14 @@ impl<'a> Action<BufferCtx<'a>> for SyncCursor {
                     project.local_cursor_id = Some(cursor_id);
                     Message::CreatedCursor(creation)
                 },
-                CursorAction::Moved(byte_offset) => {
+                CursorKind::Moved(byte_offset) => {
                     let relocation = project
                         .local_cursor_mut()
                         .expect("cursor is being moved, so it must exist")
                         .sync_relocated(byte_offset.into_u64())?;
                     Message::MovedCursor(relocation)
                 },
-                CursorAction::Removed => {
+                CursorKind::Removed => {
                     let removal = project
                         .local_cursor_mut()
                         .expect("cursor is being removed, so it must exist")

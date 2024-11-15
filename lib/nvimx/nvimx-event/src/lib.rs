@@ -9,14 +9,14 @@ mod cursor_moved;
 mod cursor_moved_i;
 mod on_bytes;
 
-pub use buf_add::BufAdd;
+pub use buf_add::{BufAdd, BufAddArgs};
 pub use buf_enter::{BufEnter, BufEnterArgs};
 pub use buf_leave::{BufLeave, BufLeaveArgs};
 pub use buf_unload::{BufUnload, BufUnloadArgs};
-pub use cursor::{Cursor, CursorArgs};
+pub use cursor::{Cursor, CursorArgs, CursorKind};
 pub use cursor_moved::{CursorMoved, CursorMovedArgs};
 pub use cursor_moved_i::CursorMovedI;
-pub use on_bytes::OnBytes;
+pub use on_bytes::{OnBytes, OnBytesArgs};
 
 /// TODO: docs.
 pub trait Event: Sized {

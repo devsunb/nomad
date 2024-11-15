@@ -1,5 +1,5 @@
-use nomad::diagnostics::DiagnosticMessage;
-use nomad::CommandArgs;
+use nvimx::diagnostics::DiagnosticMessage;
+use nvimx::plugin::SubCommandArgs;
 
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct SessionId(collab_server::SessionId);
@@ -10,10 +10,10 @@ impl SessionId {
     }
 }
 
-impl TryFrom<&mut CommandArgs> for SessionId {
+impl TryFrom<&mut SubCommandArgs> for SessionId {
     type Error = DiagnosticMessage;
 
-    fn try_from(args: &mut CommandArgs) -> Result<Self, Self::Error> {
+    fn try_from(args: &mut SubCommandArgs) -> Result<Self, Self::Error> {
         let [id] = <&[String; 1]>::try_from(args)?;
         id.parse().map(Self).map_err(|err| {
             let mut msg = DiagnosticMessage::new();

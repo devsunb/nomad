@@ -1,6 +1,12 @@
-use nomad::config::ConfigReceiver;
-use nomad::ctx::NeovimCtx;
-use nomad::{module_name, Module, ModuleApi, ModuleName, Shared};
+use nvimx::ctx::NeovimCtx;
+use nvimx::plugin::{
+    module_name,
+    ConfigReceiver,
+    Module,
+    ModuleApi,
+    ModuleName,
+};
+use nvimx::Shared;
 
 use crate::actions::{Join, Start, Yank};
 use crate::config::Config;
@@ -17,6 +23,7 @@ impl Module for Collab {
     const NAME: ModuleName = module_name!("collab");
 
     type Config = Config;
+    type Plugin = nomad::Nomad;
 
     fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self> {
         let join = Join::new(self.session_status.clone());
@@ -24,9 +31,9 @@ impl Module for Collab {
         let yank = Yank::new(self.session_status.clone());
 
         ModuleApi::new(ctx.to_static())
-            .command(join.clone())
-            .command(start.clone())
-            .command(yank.clone())
+            .subcommand(join.clone())
+            .subcommand(start.clone())
+            .subcommand(yank.clone())
             .function(join)
             .function(start)
             .function(yank)

@@ -1092,6 +1092,7 @@ name = "nvimx"
 version = "0.1.0"
 dependencies = [
  "nvim-oxi",
+ "nvimx-common",
  "nvimx-ctx",
  "nvimx-diagnostics",
  "nvimx-event",
