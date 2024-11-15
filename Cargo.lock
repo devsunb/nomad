@@ -1132,6 +1132,7 @@ name = "nvimx-action"
 version = "0.1.0"
 dependencies = [
  "nvimx-common",
+ "nvimx-ctx",
  "nvimx-diagnostics",
 ]
 
@@ -1153,7 +1154,6 @@ dependencies = [
  "fxhash",
  "nohash",
  "nvim-oxi",
- "nvimx-action",
  "nvimx-common",
  "nvimx-diagnostics",
  "nvimx-executor",
@@ -1175,6 +1175,7 @@ dependencies = [
  "nvimx-action",
  "nvimx-common",
  "nvimx-ctx",
+ "nvimx-diagnostics",
 ]
 
 [[package]]

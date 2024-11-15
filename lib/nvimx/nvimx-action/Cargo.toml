@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 nvimx-common = { workspace = true }
+nvimx-ctx = { workspace = true }
 nvimx-diagnostics = { workspace = true }
 
 [lints]

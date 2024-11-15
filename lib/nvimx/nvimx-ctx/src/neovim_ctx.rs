@@ -6,12 +6,12 @@ use nvimx_executor::{Executor as LocalExecutor, JoinHandle};
 
 use crate::actor_id::ActorId;
 use crate::actor_map::ActorMap;
-use crate::autocmd::{AugroupId, AutoCommandMap};
+use crate::autocmd::{AugroupId, AutoCommand, AutoCommandMap};
 use crate::boo::Boo;
-use crate::buf_attach::BufAttachMap;
 use crate::buffer_ctx::BufferCtx;
 use crate::buffer_id::BufferId;
 use crate::decoration_provider::{DecorationProvider, NamespaceId};
+use crate::on_bytes::OnBytesMap;
 
 /// TODO: docs.
 #[derive(Clone)]
@@ -23,7 +23,7 @@ struct Ctx {
     actor_map: ActorMap,
     augroup_id: AugroupId,
     autocmd_map: AutoCommandMap,
-    buf_attach_map: BufAttachMap,
+    buf_attach_map: OnBytesMap,
     decoration_provider: Option<DecorationProvider>,
     local_executor: LocalExecutor,
     namespace_id: NamespaceId,
@@ -49,6 +49,17 @@ impl<'ctx> NeovimCtx<'ctx> {
     /// TODO: docs.
     pub fn reborrow(&self) -> NeovimCtx<'_> {
         NeovimCtx { ctx: self.ctx.as_ref() }
+    }
+
+    /// TODO: docs.
+    pub fn register_auto_command<A>(&self, auto_command: A)
+    where
+        A: AutoCommand,
+    {
+        let ctx = self.to_static();
+        self.with_autocmd_map(move |map| {
+            map.register(auto_command, ctx);
+        });
     }
 
     /// TODO: docs.
@@ -91,7 +102,7 @@ impl<'ctx> NeovimCtx<'ctx> {
 
     pub(crate) fn with_buf_attach_map<F, R>(&self, fun: F) -> R
     where
-        F: FnOnce(&mut BufAttachMap) -> R,
+        F: FnOnce(&mut OnBytesMap) -> R,
     {
         self.ctx.with_mut(|ctx| fun(&mut ctx.buf_attach_map))
     }
@@ -122,7 +133,7 @@ impl Ctx {
             actor_map: ActorMap::default(),
             augroup_id,
             autocmd_map: AutoCommandMap::default(),
-            buf_attach_map: BufAttachMap::default(),
+            buf_attach_map: OnBytesMap::default(),
             decoration_provider: None,
             local_executor: LocalExecutor::register(),
             namespace_id: NamespaceId::new(namespace_name),

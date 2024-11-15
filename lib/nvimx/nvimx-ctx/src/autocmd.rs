@@ -1,8 +1,7 @@
 use fxhash::FxHashMap;
 use nvim_oxi::api::{self, opts, types};
-use nvimx_action::{Action, IntoModuleName};
-use nvimx_common::{MaybeResult, Shared};
-use nvimx_diagnostics::{DiagnosticSource, Level};
+use nvimx_common::Shared;
+use nvimx_diagnostics::{DiagnosticMessage, DiagnosticSource, Level};
 
 use crate::actor_id::ActorId;
 use crate::autocmd_ctx::AutoCommandCtx;
@@ -12,18 +11,10 @@ use crate::neovim_ctx::NeovimCtx;
 /// TODO: docs.
 pub trait AutoCommand: Sized {
     /// TODO: docs.
-    type Action: for<'ctx> Action<
-        Self::OnModule,
-        Args: From<ActorId>,
-        Ctx<'ctx> = &'ctx AutoCommandCtx<'ctx>,
-        Return: Into<ShouldDetach>,
-    >;
+    const MODULE_NAME: Option<&'static str>;
 
     /// TODO: docs.
-    type OnModule: IntoModuleName;
-
-    /// TODO: docs.
-    fn into_action(self) -> Self::Action;
+    const CALLBACK_NAME: Option<&'static str>;
 
     /// TODO: docs.
     fn on_event(&self) -> AutoCommandEvent;
@@ -37,33 +28,11 @@ pub trait AutoCommand: Sized {
     /// TODO: docs.
     fn into_callback(
         self,
-    ) -> impl for<'ctx> FnMut(ActorId, &'ctx AutoCommandCtx<'ctx>) -> ShouldDetach
-           + 'static {
-        let on_buffer = self.on_buffer();
-        let on_event = self.on_event();
-        let mut action = self.into_action();
-        move |actor_id, ctx: &AutoCommandCtx| {
-            if let Some(buffer_id) = on_buffer {
-                if BufferId::new(ctx.args().buffer.clone()) != buffer_id {
-                    return ShouldDetach::No;
-                }
-            }
-            match action.execute(actor_id.into(), ctx).into_result() {
-                Ok(res) => res.into(),
-                Err(err) => {
-                    let mut source = DiagnosticSource::new();
-                    if let Some(module_name) = Self::OnModule::NAME {
-                        source.push_segment(module_name);
-                    }
-                    source
-                        .push_segment(on_event.as_str())
-                        .push_segment(Self::Action::NAME.as_str());
-                    err.into().emit(Level::Error, source);
-                    ShouldDetach::Yes
-                },
-            }
-        }
-    }
+    ) -> impl for<'ctx> FnMut(
+        ActorId,
+        &'ctx AutoCommandCtx<'ctx>,
+    ) -> Result<ShouldDetach, DiagnosticMessage>
+           + 'static;
 }
 
 /// TODO: docs.
@@ -111,12 +80,40 @@ impl AutoCommandMap {
         ctx: NeovimCtx<'static>,
     ) {
         let event = autocmd.on_event();
+        let buffer_id = autocmd.on_buffer();
         let mut has_event_been_registered = true;
         let callbacks = self.inner.entry(event).or_insert_with(|| {
             has_event_been_registered = false;
             Vec::new()
         });
-        callbacks.push(Box::new(autocmd.into_callback()));
+        let callback = {
+            let mut callback = autocmd.into_callback();
+            move |actor_id, autocmd_ctx: &AutoCommandCtx<'_>| {
+                if let Some(buffer_id) = buffer_id {
+                    if BufferId::new(autocmd_ctx.args().buffer.clone())
+                        == buffer_id
+                    {
+                        return ShouldDetach::No;
+                    }
+                }
+                match callback(actor_id, autocmd_ctx) {
+                    Ok(shoud_detach) => shoud_detach,
+                    Err(message) => {
+                        let mut source = DiagnosticSource::new();
+                        if let Some(module_name) = A::MODULE_NAME {
+                            source.push_segment(module_name);
+                        }
+                        source.push_segment(event.as_str());
+                        if let Some(callback_name) = A::CALLBACK_NAME {
+                            source.push_segment(callback_name);
+                        }
+                        message.emit(Level::Error, source);
+                        ShouldDetach::Yes
+                    },
+                }
+            }
+        };
+        callbacks.push(Box::new(callback));
         if !has_event_been_registered {
             register_autocmd::<A>(event, ctx.clone());
         }

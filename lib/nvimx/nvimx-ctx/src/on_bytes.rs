@@ -1,18 +1,29 @@
 use nohash::IntMap as NoHashMap;
 use nvim_oxi::api::opts;
-use nvimx_action::{Action, IntoModuleName};
-use nvimx_common::{MaybeResult, Replacement};
-use nvimx_diagnostics::{DiagnosticSource, Level};
+use nvimx_common::Replacement;
+use nvimx_diagnostics::{DiagnosticMessage, DiagnosticSource, Level};
 
 use crate::autocmd::ShouldDetach;
-use crate::buffer_ctx::BufferCtx;
 use crate::buffer_id::BufferId;
 use crate::neovim_ctx::NeovimCtx;
+use crate::text_buffer_ctx::TextBufferCtx;
 use crate::ActorId;
 
 /// TODO: docs.
+pub struct RegisterOnBytesArgs<Callback> {
+    /// TODO: docs.
+    pub callback: Callback,
+
+    /// TODO: docs.
+    pub module_name: Option<&'static str>,
+
+    /// TODO: docs.
+    pub callback_name: Option<&'static str>,
+}
+
+/// TODO: docs.
 #[derive(Clone)]
-pub struct BufAttachArgs {
+pub struct OnBytesArgs {
     /// TODO: docs.
     pub actor_id: ActorId,
 
@@ -24,46 +35,47 @@ pub struct BufAttachArgs {
 }
 
 #[derive(Default)]
-pub(crate) struct BufAttachMap {
-    inner: NoHashMap<BufferId, Vec<BufAttachCallback>>,
+pub(crate) struct OnBytesMap {
+    inner: NoHashMap<BufferId, Vec<OnBytesCallback>>,
 }
 
-type BufAttachCallback = Box<dyn FnMut(BufAttachArgs) -> ShouldDetach>;
+type OnBytesCallback = Box<dyn FnMut(OnBytesArgs) -> ShouldDetach>;
 
-impl BufAttachMap {
-    pub(crate) fn register<M, A>(
+impl OnBytesMap {
+    pub(crate) fn register<Callback>(
         &mut self,
+        mut args: RegisterOnBytesArgs<Callback>,
         buffer_id: BufferId,
-        mut action: A,
         ctx: NeovimCtx<'static>,
     ) where
-        M: IntoModuleName,
-        A: for<'ctx> Action<
-            M,
-            Ctx<'ctx> = BufferCtx<'ctx>,
-            Args: From<BufAttachArgs>,
-            Return: Into<ShouldDetach>,
-        >,
+        Callback: for<'ctx> FnMut(
+                OnBytesArgs,
+                TextBufferCtx<'ctx>,
+            )
+                -> Result<ShouldDetach, DiagnosticMessage>
+            + 'static,
     {
         let callback = {
             let ctx = ctx.clone();
-            move |buf_attach_args: BufAttachArgs| {
-                let buffer_ctx = ctx
+            move |buf_attach_args: OnBytesArgs| {
+                let text_buffer_ctx = ctx
                     .reborrow()
                     .into_buffer(buf_attach_args.buffer_id)
-                    .expect("buffer ID is valid");
-                let args = buf_attach_args.into();
-                match action.execute(args, buffer_ctx).into_result() {
-                    Ok(res) => res.into(),
-                    Err(err) => {
+                    .expect("buffer ID is valid")
+                    .into_text_buffer()
+                    .expect("buffer is text buffer");
+                match (args.callback)(buf_attach_args, text_buffer_ctx) {
+                    Ok(res) => res,
+                    Err(msg) => {
                         let mut source = DiagnosticSource::new();
-                        if let Some(module_name) = M::NAME {
+                        if let Some(module_name) = args.module_name {
                             source.push_segment(module_name);
                         }
-                        source
-                            .push_segment("BufAttach")
-                            .push_segment(A::NAME.as_str());
-                        err.into().emit(Level::Error, source);
+                        source.push_segment("BufAttach");
+                        if let Some(callback_name) = args.callback_name {
+                            source.push_segment(callback_name);
+                        }
+                        msg.emit(Level::Error, source);
                         ShouldDetach::Yes
                     },
                 }
@@ -102,7 +114,7 @@ fn attach_to(buffer_id: BufferId, ctx: NeovimCtx<'static>) {
                      text buffer",
                 );
 
-            let buf_attach_args = BufAttachArgs {
+            let buf_attach_args = OnBytesArgs {
                 actor_id: ctx
                     .with_actor_map(|m| m.take_edited_buffer(&buffer_id)),
                 buffer_id,

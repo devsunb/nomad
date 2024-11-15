@@ -1,11 +1,10 @@
 use core::future::Future;
 
 use nvimx_common::MaybeResult;
+use nvimx_ctx::NeovimCtx;
 use nvimx_diagnostics::{DiagnosticSource, Level};
 
-use crate::action_name::ActionName;
-use crate::into_module_name::IntoModuleName;
-use crate::Action;
+use crate::{Action, ActionName, IntoModuleName};
 
 /// TODO: docs
 pub trait AsyncAction<M: IntoModuleName>: 'static {
@@ -13,10 +12,7 @@ pub trait AsyncAction<M: IntoModuleName>: 'static {
     const NAME: ActionName;
 
     /// TODO: docs
-    type Args;
-
-    /// TODO: docs
-    type Ctx<'a>;
+    type Args: 'static;
 
     /// TODO: docs
     type Docs;
@@ -25,7 +21,7 @@ pub trait AsyncAction<M: IntoModuleName>: 'static {
     fn execute(
         &mut self,
         args: Self::Args,
-        ctx: Self::Ctx<'_>,
+        ctx: NeovimCtx<'_>,
     ) -> impl Future<Output = impl MaybeResult<()>>;
 
     /// TODO: docs
@@ -39,23 +35,25 @@ where
 {
     const NAME: ActionName = T::NAME;
     type Args = T::Args;
-    type Ctx<'a> = T::Ctx<'a>;
+    type Ctx<'a> = NeovimCtx<'a>;
     type Docs = T::Docs;
     type Return = ();
 
-    fn execute<'a>(&'a mut self, args: Self::Args, ctx: Self::Ctx<'a>) {
-        todo!();
-        // let mut this = self.clone();
-        // ctx.spawn(|ctx| async move {
-        //     if let Err(message) =
-        //         this.execute(args, ctx).await.into_result().map_err(Into::into)
-        //     {
-        //         let mut source = DiagnosticSource::new();
-        //         source.push_segment(M::NAME).push_segment(Self::NAME.as_str());
-        //         message.emit(Level::Warning, source);
-        //     }
-        // })
-        // .detach();
+    fn execute<'a>(&'a mut self, args: Self::Args, ctx: NeovimCtx<'a>) {
+        let mut this = self.clone();
+        ctx.spawn(|ctx| async move {
+            if let Err(message) =
+                this.execute(args, ctx).await.into_result().map_err(Into::into)
+            {
+                let mut source = DiagnosticSource::new();
+                if let Some(module_name) = M::NAME {
+                    source.push_segment(module_name);
+                }
+                source.push_segment(Self::NAME.as_str());
+                message.emit(Level::Warning, source);
+            }
+        })
+        .detach();
     }
 
     fn docs(&self) -> Self::Docs {

@@ -9,6 +9,7 @@ license.workspace = true
 nvimx-action = { workspace = true }
 nvimx-common = { workspace = true }
 nvimx-ctx = { workspace = true }
+nvimx-diagnostics = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use nvimx_action::{Action, IntoModuleName};
 use nvimx_ctx::{
     ActorId,
@@ -10,12 +8,13 @@ use nvimx_ctx::{
     BufferId,
     ShouldDetach,
 };
+use nvimx_diagnostics::DiagnosticMessage;
 
-use crate::cursor_moved::{CursorMoved, CursorMovedAction, CursorMovedArgs};
+use crate::cursor_moved::{CursorMoved, CursorMovedArgs};
 
 /// TODO: docs.
 pub struct CursorMovedI<A, M> {
-    action: CursorMovedAction<A, M>,
+    inner: CursorMoved<A, M>,
     buffer_id: Option<BufferId>,
 }
 
@@ -28,10 +27,7 @@ impl<A, M> CursorMovedI<A, M> {
 
     /// Creates a new [`CursorMovedI`] with the given action.
     pub fn new(action: A) -> Self {
-        Self {
-            action: CursorMovedAction { action, module_name: PhantomData },
-            buffer_id: None,
-        }
+        Self { inner: CursorMoved::new(action), buffer_id: None }
     }
 }
 
@@ -45,11 +41,16 @@ where
     A::Return: Into<ShouldDetach>,
     M: IntoModuleName + 'static,
 {
-    type Action = CursorMovedAction<A, M>;
-    type OnModule = M;
+    const MODULE_NAME: Option<&'static str> = M::NAME;
+    const CALLBACK_NAME: Option<&'static str> = Some(A::NAME.as_str());
 
-    fn into_action(self) -> Self::Action {
-        self.action
+    fn into_callback(
+        self,
+    ) -> impl for<'ctx> FnMut(
+        ActorId,
+        &'ctx AutoCommandCtx<'ctx>,
+    ) -> Result<ShouldDetach, DiagnosticMessage> {
+        self.inner.into_callback()
     }
 
     fn on_event(&self) -> AutoCommandEvent {

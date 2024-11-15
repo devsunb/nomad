@@ -1,12 +1,12 @@
 use core::ops::{Deref, Range, RangeBounds};
 
 use nvim_oxi::api::{self, opts};
-use nvimx_action::{Action, IntoModuleName};
 use nvimx_common::{ByteOffset, Point, Replacement, Text};
+use nvimx_diagnostics::DiagnosticMessage;
 
 use crate::autocmd::ShouldDetach;
-use crate::buf_attach::BufAttachArgs;
 use crate::buffer_ctx::BufferCtx;
+use crate::on_bytes::{OnBytesArgs, RegisterOnBytesArgs};
 use crate::text_file_ctx::TextFileCtx;
 use crate::ActorId;
 
@@ -19,19 +19,20 @@ pub struct TextBufferCtx<'ctx> {
 
 impl<'ctx> TextBufferCtx<'ctx> {
     /// TODO: docs.
-    pub fn attach<M, A>(&self, action: A)
-    where
-        M: IntoModuleName,
-        A: for<'a> Action<
-            M,
-            Ctx<'a> = BufferCtx<'a>,
-            Args: From<BufAttachArgs>,
-            Return: Into<ShouldDetach>,
-        >,
+    pub fn register_on_bytes<Callback>(
+        &self,
+        args: RegisterOnBytesArgs<Callback>,
+    ) where
+        Callback: for<'a> FnMut(
+                OnBytesArgs,
+                TextBufferCtx<'a>,
+            )
+                -> Result<ShouldDetach, DiagnosticMessage>
+            + 'static,
     {
         self.with_buf_attach_map(|m| {
             let neovim_ctx = self.to_static();
-            m.register(self.buffer_id(), action, neovim_ctx);
+            m.register(args, self.buffer_id(), neovim_ctx);
         });
     }
 

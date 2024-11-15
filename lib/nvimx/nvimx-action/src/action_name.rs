@@ -31,7 +31,7 @@ impl AsRef<str> for ActionName {
 impl ActionName {
     /// TODO: docs
     #[inline]
-    pub fn as_str(&self) -> ActionNameStr {
+    pub const fn as_str(&self) -> ActionNameStr {
         self.name
     }
 
