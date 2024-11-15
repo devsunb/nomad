@@ -1,10 +1,10 @@
 use nvimx_common::MaybeResult;
 
 use crate::action_name::ActionName;
-use crate::into_module_name::IntoModuleName;
+use crate::module::Module;
 
 /// TODO: docs
-pub trait Action<M: IntoModuleName = ()>: 'static {
+pub trait Action<M: Module>: 'static {
     /// TODO: docs
     const NAME: ActionName;
 

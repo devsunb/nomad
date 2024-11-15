@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 
-use nvimx_common::oxi;
+use nvimx_common::{oxi, MaybeResult};
 use nvimx_ctx::NeovimCtx;
+use nvimx_diagnostics::{DiagnosticSource, Level};
 
 use crate::module_subcommands::ModuleSubCommands;
 use crate::{Function, Module, SubCommand};
@@ -17,25 +18,25 @@ impl<M: Module> ModuleApi<M> {
     /// TODO: docs.
     pub fn subcommand<T>(mut self, command: T) -> Self
     where
-        T: SubCommand<Module = M>,
+        T: SubCommand<M>,
     {
-        self.commands.add_command(command);
+        self.commands.add_subcommand(command);
         self
     }
 
     /// TODO: docs.
     pub fn default_command<T>(mut self, command: T) -> Self
     where
-        T: SubCommand<Module = M>,
+        T: SubCommand<M>,
     {
-        self.commands.add_default_command(command);
+        self.commands.add_default_subcommand(command);
         self
     }
 
     /// TODO: docs.
     pub fn function<T>(mut self, function: T) -> Self
     where
-        T: Function<Module = M>,
+        T: Function<M>,
     {
         if self.dictionary.get(T::NAME.as_str()).is_some() {
             panic!(
@@ -46,7 +47,7 @@ impl<M: Module> ModuleApi<M> {
             );
         }
         let ctx = self.neovim_ctx().to_static();
-        let mut callback = function.into_callback();
+        let mut callback = callback_of_function(function);
         self.dictionary.insert(
             T::NAME.as_str(),
             oxi::Function::from_fn_mut(move |obj| {
@@ -67,5 +68,35 @@ impl<M: Module> ModuleApi<M> {
 
     fn neovim_ctx(&self) -> NeovimCtx<'_> {
         self.commands.neovim_ctx.reborrow()
+    }
+}
+
+fn callback_of_function<M: Module, T: Function<M>>(
+    mut function: T,
+) -> impl for<'ctx> FnMut(oxi::Object, NeovimCtx<'ctx>) -> oxi::Object {
+    move |args, ctx| {
+        let args = match crate::serde::deserialize(args) {
+            Ok(args) => args,
+            Err(err) => {
+                let mut source = DiagnosticSource::new();
+                source
+                    .push_segment(M::NAME.as_str())
+                    .push_segment(T::NAME.as_str());
+                err.into_msg().emit(Level::Warning, source);
+                return oxi::Object::nil();
+            },
+        };
+        let ret = match function.execute(args, ctx).into_result() {
+            Ok(ret) => ret,
+            Err(err) => {
+                let mut source = DiagnosticSource::new();
+                source
+                    .push_segment(M::NAME.as_str())
+                    .push_segment(T::NAME.as_str());
+                err.into().emit(Level::Warning, source);
+                return oxi::Object::nil();
+            },
+        };
+        crate::serde::serialize(&ret)
     }
 }

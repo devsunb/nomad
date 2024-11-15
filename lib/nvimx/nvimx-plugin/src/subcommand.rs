@@ -1,61 +1,60 @@
-use crate::ctx::NeovimCtx;
-use crate::diagnostics::{DiagnosticMessage, DiagnosticSource, Level};
-use crate::maybe_result::MaybeResult;
-use crate::subcommand_args::SubommandArgs;
+use nvimx_common::MaybeResult;
+use nvimx_ctx::NeovimCtx;
+use nvimx_diagnostics::DiagnosticMessage;
+
+use crate::action_name::ActionName;
+use crate::subcommand_args::SubCommandArgs;
 use crate::{Action, Module};
 
-/// TODO: docs.
-pub trait SubCommand:
-    for<'ctx> Action<
-    NeovimCtx<'ctx>,
-    Args: Clone
-              + for<'args> TryFrom<
-        &'args mut SubommandArgs,
-        Error: Into<DiagnosticMessage>,
-    >,
-    Return = (),
->
-{
-    /// TODO: docs.
-    fn into_callback(
-        self,
-    ) -> impl for<'ctx> FnMut(SubommandArgs, NeovimCtx<'ctx>) + 'static;
+/// TODO: docs
+pub trait SubCommand<M: Module>: 'static {
+    /// TODO: docs
+    const NAME: ActionName;
+
+    /// TODO: docs
+    type Args: Clone
+        + for<'args> TryFrom<
+            &'args mut SubCommandArgs,
+            Error: Into<DiagnosticMessage>,
+        >;
+
+    /// TODO: docs
+    type Docs;
+
+    /// TODO: docs
+    fn execute<'a>(
+        &'a mut self,
+        args: Self::Args,
+        ctx: NeovimCtx<'a>,
+    ) -> impl MaybeResult<()>;
+
+    /// TODO: docs
+    fn docs(&self) -> Self::Docs;
 }
 
-impl<T> SubCommand for T
+impl<A, M> SubCommand<M> for A
 where
-    T: for<'ctx> Action<
-        NeovimCtx<'ctx>,
-        Args: Clone
-                  + for<'args> TryFrom<
-            &'args mut SubommandArgs,
+    A: for<'a> Action<M, Ctx<'a> = NeovimCtx<'a>, Return = ()>,
+    A::Args: Clone
+        + for<'args> TryFrom<
+            &'args mut SubCommandArgs,
             Error: Into<DiagnosticMessage>,
         >,
-        Return = (),
-    >,
+    M: Module,
 {
-    fn into_callback(
-        mut self,
-    ) -> impl for<'ctx> FnMut(SubommandArgs, NeovimCtx<'ctx>) + 'static {
-        Box::new(move |mut args, ctx: NeovimCtx<'_>| {
-            let args = match T::Args::try_from(&mut args) {
-                Ok(args) => args,
-                Err(err) => {
-                    let mut source = DiagnosticSource::new();
-                    source
-                        .push_segment(T::Module::NAME.as_str())
-                        .push_segment(T::NAME.as_str());
-                    err.into().emit(Level::Error, source);
-                    return;
-                },
-            };
-            if let Err(err) = self.execute(args, ctx).into_result() {
-                let mut source = DiagnosticSource::new();
-                source
-                    .push_segment(T::Module::NAME.as_str())
-                    .push_segment(T::NAME.as_str());
-                err.into().emit(Level::Error, source);
-            }
-        })
+    const NAME: ActionName = A::NAME;
+    type Args = A::Args;
+    type Docs = A::Docs;
+
+    fn execute<'a>(
+        &'a mut self,
+        args: Self::Args,
+        ctx: NeovimCtx<'a>,
+    ) -> impl MaybeResult<()> {
+        A::execute(self, args, ctx)
+    }
+
+    fn docs(&self) -> Self::Docs {
+        A::docs(self)
     }
 }

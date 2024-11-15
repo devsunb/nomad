@@ -4,8 +4,6 @@
 
 pub use nvim_oxi as oxi;
 #[doc(inline)]
-pub use nvimx_action as action;
-#[doc(inline)]
 pub use nvimx_ctx as ctx;
 #[doc(inline)]
 pub use nvimx_diagnostics as diagnostics;

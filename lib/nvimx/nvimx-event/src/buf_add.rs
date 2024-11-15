@@ -1,7 +1,6 @@
 use core::marker::PhantomData;
 use core::ops::Deref;
 
-use nvimx_action::{Action, IntoModuleName};
 use nvimx_common::MaybeResult;
 use nvimx_ctx::{
     ActorId,
@@ -13,12 +12,13 @@ use nvimx_ctx::{
     ShouldDetach,
 };
 use nvimx_diagnostics::DiagnosticMessage;
+use nvimx_plugin::{Action, Module};
 
 /// TODO: docs.
 pub struct BufAdd<A, M> {
     action: A,
     buffer_id: Option<BufferId>,
-    module_name: PhantomData<M>,
+    module: PhantomData<M>,
 }
 
 impl<A, M> BufAdd<A, M> {
@@ -30,7 +30,7 @@ impl<A, M> BufAdd<A, M> {
 
     /// Creates a new [`BufAdd`] with the given action.
     pub fn new(action: A) -> Self {
-        Self { action, module_name: PhantomData, buffer_id: None }
+        Self { action, buffer_id: None, module: PhantomData }
     }
 }
 
@@ -38,9 +38,9 @@ impl<A, M> AutoCommand for BufAdd<A, M>
 where
     A: for<'ctx> Action<M, Args = ActorId, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
-    M: IntoModuleName + 'static,
+    M: Module + 'static,
 {
-    const MODULE_NAME: Option<&'static str> = M::NAME;
+    const MODULE_NAME: Option<&'static str> = Some(M::NAME.as_str());
     const CALLBACK_NAME: Option<&'static str> = Some(A::NAME.as_str());
 
     fn into_callback(

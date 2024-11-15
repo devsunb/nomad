@@ -1,4 +1,3 @@
-use nvimx_action::{Action, IntoModuleName};
 use nvimx_ctx::{
     ActorId,
     AutoCommand,
@@ -9,6 +8,7 @@ use nvimx_ctx::{
     ShouldDetach,
 };
 use nvimx_diagnostics::DiagnosticMessage;
+use nvimx_plugin::{Action, Module};
 
 use crate::cursor_moved::{CursorMoved, CursorMovedArgs};
 
@@ -39,9 +39,9 @@ where
         Ctx<'ctx> = BufferCtx<'ctx>,
     >,
     A::Return: Into<ShouldDetach>,
-    M: IntoModuleName + 'static,
+    M: Module + 'static,
 {
-    const MODULE_NAME: Option<&'static str> = M::NAME;
+    const MODULE_NAME: Option<&'static str> = Some(M::NAME.as_str());
     const CALLBACK_NAME: Option<&'static str> = Some(A::NAME.as_str());
 
     fn into_callback(

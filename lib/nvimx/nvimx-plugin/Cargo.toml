@@ -9,7 +9,6 @@ license.workspace = true
 flume = { version = "0.11", features = ["async"] }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
-nvimx-action = { workspace = true }
 nvimx-common = { workspace = true }
 nvimx-ctx = { workspace = true }
 nvimx-diagnostics = { workspace = true }

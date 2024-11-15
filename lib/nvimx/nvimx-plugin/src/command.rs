@@ -1,7 +1,4 @@
-use core::marker::PhantomData;
-
 use fxhash::FxHashMap;
-use nvimx_action::ActionNameStr;
 use nvimx_common::oxi::api;
 use nvimx_diagnostics::{
     DiagnosticMessage,
@@ -10,18 +7,19 @@ use nvimx_diagnostics::{
     Level,
 };
 
+use crate::action_name::ActionNameStr;
 use crate::module_name::{ModuleName, ModuleNameStr};
 use crate::module_subcommands::ModuleSubCommands;
 use crate::plugin::Plugin;
 use crate::subcommand_args::SubCommandArgs;
 
-pub(crate) struct Command<P> {
+pub(crate) struct Command {
+    command_name: &'static str,
     /// A map from module name to the subcommands for that module.
     subcommands: FxHashMap<ModuleNameStr, ModuleSubCommands>,
-    plugin: PhantomData<P>,
 }
 
-impl<P: Plugin> Command<P> {
+impl Command {
     pub(crate) fn add_module(&mut self, module_commands: ModuleSubCommands) {
         let module_name = module_commands.module_name.as_str();
         if self.subcommands.contains_key(&module_name) {
@@ -39,7 +37,7 @@ impl<P: Plugin> Command<P> {
             .build();
 
         api::create_user_command(
-            P::COMMAND_NAME,
+            self.command_name,
             move |args| {
                 let args = SubCommandArgs::from(args);
                 if let Err(err) = self.call(args) {
@@ -49,6 +47,13 @@ impl<P: Plugin> Command<P> {
             &opts,
         )
         .expect("all the arguments are valid");
+    }
+
+    pub(crate) fn new<P: Plugin>() -> Self {
+        Self {
+            command_name: P::COMMAND_NAME,
+            subcommands: FxHashMap::default(),
+        }
     }
 
     fn call(&mut self, mut args: SubCommandArgs) -> Result<(), CommandError> {

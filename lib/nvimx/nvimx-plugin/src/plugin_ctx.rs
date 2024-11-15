@@ -14,7 +14,7 @@ use crate::plugin::Plugin;
 /// TODO: docs.
 pub struct PluginCtx<P: Plugin> {
     api: oxi::Dictionary,
-    command: Command<P>,
+    command: Command,
     neovim_ctx: NeovimCtx<'static>,
     plugin: PhantomData<P>,
     run: Vec<Pin<Box<dyn Future<Output = ()>>>>,

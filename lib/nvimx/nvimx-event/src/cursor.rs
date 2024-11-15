@@ -1,6 +1,8 @@
-use nvimx_action::{Action, ActionName, IntoModuleName};
+use core::marker::PhantomData;
+
 use nvimx_common::{ByteOffset, MaybeResult, Shared};
 use nvimx_ctx::{ActorId, BufferCtx, BufferId, ShouldDetach};
+use nvimx_plugin::{Action, ActionName, Module};
 
 use crate::{
     BufEnter,
@@ -14,8 +16,9 @@ use crate::{
 };
 
 /// TODO: docs.
-pub struct Cursor<A> {
+pub struct Cursor<A, M> {
     action: A,
+    module: PhantomData<M>,
 }
 
 /// TODO: docs.
@@ -50,9 +53,10 @@ struct CursorMovedAction<A> {
     should_detach: Shared<ShouldDetach>,
 }
 
-struct BufEnterAction {
+struct BufEnterAction<M> {
     has_just_entered_buf: Shared<bool>,
     should_detach: Shared<ShouldDetach>,
+    module: PhantomData<M>,
 }
 
 struct BufLeaveAction<A> {
@@ -60,10 +64,10 @@ struct BufLeaveAction<A> {
     should_detach: Shared<ShouldDetach>,
 }
 
-impl<A> Cursor<A> {
+impl<A, M> Cursor<A, M> {
     /// Creates a new [`Cursor`] with the given action.
     pub fn new(action: A) -> Self {
-        Self { action }
+        Self { action, module: PhantomData }
     }
 }
 
@@ -77,13 +81,15 @@ impl<A: Clone> CursorMovedAction<A> {
     }
 }
 
-impl<A> Event for Cursor<A>
+impl<A, M> Event for Cursor<A, M>
 where
     A: for<'ctx> Action<
+            M,
             Ctx<'ctx> = BufferCtx<'ctx>,
             Args = CursorArgs,
             Return: Into<ShouldDetach>,
         > + Clone,
+    M: Module + 'static,
 {
     type Ctx<'a> = BufferCtx<'a>;
 
@@ -98,40 +104,37 @@ where
             should_detach: should_detach.clone(),
         };
 
-        let buf_enter_action = BufEnterAction {
+        let buf_enter_action = BufEnterAction::<M> {
             has_just_entered_buf: has_just_entered_buf.clone(),
             should_detach: should_detach.clone(),
+            module: PhantomData,
         };
 
         let buf_leave_action = BufLeaveAction { action, should_detach };
 
         CursorMoved::new(cursor_moved_action.clone())
             .buffer_id(ctx.buffer_id())
-            .register((&*ctx).reborrow());
+            .register((*ctx).reborrow());
 
         CursorMovedI::new(cursor_moved_action)
             .buffer_id(ctx.buffer_id())
-            .register((&*ctx).reborrow());
+            .register((*ctx).reborrow());
 
         BufEnter::new(buf_enter_action)
             .buffer_id(ctx.buffer_id())
-            .register((&*ctx).reborrow());
+            .register((*ctx).reborrow());
 
         BufLeave::new(buf_leave_action)
             .buffer_id(ctx.buffer_id())
-            .register((&*ctx).reborrow());
+            .register((*ctx).reborrow());
     }
 }
-
-// Action<M> for CursorMovedAction<A> |v
-//
-// Action<M> for T where T: AsyncAction + Clone
 
 impl<A, M> Action<M> for CursorMovedAction<A>
 where
     A: for<'ctx> Action<M, Args = CursorArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
-    M: IntoModuleName + 'static,
+    M: Module + 'static,
 {
     const NAME: ActionName = A::NAME;
     type Args = CursorMovedArgs;
@@ -158,13 +161,12 @@ where
             self.should_detach.set(ret.into());
             self.should_detach.get()
         })
-        // .map_err(Into::into)
     }
 
     fn docs(&self) {}
 }
 
-impl Action for BufEnterAction {
+impl<M: Module> Action<M> for BufEnterAction<M> {
     const NAME: ActionName = ActionName::from_str("");
     type Args = BufEnterArgs;
     type Ctx<'ctx> = BufferCtx<'ctx>;
@@ -187,7 +189,7 @@ impl<A, M> Action<M> for BufLeaveAction<A>
 where
     A: for<'ctx> Action<M, Args = CursorArgs, Ctx<'ctx> = BufferCtx<'ctx>>,
     A::Return: Into<ShouldDetach>,
-    M: IntoModuleName + 'static,
+    M: Module + 'static,
 {
     const NAME: ActionName = A::NAME;
     type Args = BufLeaveArgs;
@@ -214,7 +216,6 @@ where
                 self.should_detach.set(ret.into());
                 self.should_detach.get()
             })
-        // .map_err(Into::into)
     }
 
     fn docs(&self) {}

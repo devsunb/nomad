@@ -4,10 +4,10 @@ use nvimx_common::MaybeResult;
 use nvimx_ctx::NeovimCtx;
 use nvimx_diagnostics::{DiagnosticSource, Level};
 
-use crate::{Action, ActionName, IntoModuleName};
+use crate::{Action, ActionName, Module};
 
 /// TODO: docs
-pub trait AsyncAction<M: IntoModuleName>: 'static {
+pub trait AsyncAction<M: Module>: 'static {
     /// TODO: docs
     const NAME: ActionName;
 
@@ -30,7 +30,7 @@ pub trait AsyncAction<M: IntoModuleName>: 'static {
 
 impl<M, T> Action<M> for T
 where
-    M: IntoModuleName,
+    M: Module,
     T: AsyncAction<M> + Clone,
 {
     const NAME: ActionName = T::NAME;
@@ -46,10 +46,9 @@ where
                 this.execute(args, ctx).await.into_result().map_err(Into::into)
             {
                 let mut source = DiagnosticSource::new();
-                if let Some(module_name) = M::NAME {
-                    source.push_segment(module_name);
-                }
-                source.push_segment(Self::NAME.as_str());
+                source
+                    .push_segment(M::NAME.as_str())
+                    .push_segment(Self::NAME.as_str());
                 message.emit(Level::Warning, source);
             }
         })

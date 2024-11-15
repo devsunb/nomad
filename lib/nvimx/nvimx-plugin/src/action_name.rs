@@ -1,5 +1,5 @@
 /// The output of calling [`as_str`](ActionName::as_str) on an [`ActionName`].
-pub type ActionNameStr = &'static str;
+pub(crate) type ActionNameStr = &'static str;
 
 /// TODO: docs
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]

@@ -1,7 +1,9 @@
 use fxhash::FxHashMap;
-use nvimx_action::ActionNameStr;
+use nvimx_common::MaybeResult;
 use nvimx_ctx::NeovimCtx;
+use nvimx_diagnostics::{DiagnosticSource, Level};
 
+use crate::action_name::ActionNameStr;
 use crate::module::Module;
 use crate::module_name::ModuleName;
 use crate::subcommand::SubCommand;
@@ -23,12 +25,16 @@ pub(super) struct ModuleSubCommands {
 
 impl ModuleSubCommands {
     #[track_caller]
-    pub(crate) fn add_subcommand<T: SubCommand>(&mut self, command: T) {
-        if self.module_name != T::Module::NAME {
+    pub(crate) fn add_subcommand<M, T>(&mut self, subcommand: T)
+    where
+        M: Module,
+        T: SubCommand<M>,
+    {
+        if self.module_name != M::NAME {
             panic!(
                 "trying to register a command for module '{}' in the API for \
                  module '{}'",
-                T::Module::NAME,
+                M::NAME,
                 self.module_name
             );
         }
@@ -40,7 +46,7 @@ impl ModuleSubCommands {
                 self.module_name
             );
         }
-        let mut callback = command.into_callback();
+        let mut callback = callback_of_subcommand(subcommand);
         let ctx = self.neovim_ctx.clone();
         self.subcommands.insert(
             T::NAME.as_str(),
@@ -49,15 +55,16 @@ impl ModuleSubCommands {
     }
 
     #[track_caller]
-    pub(crate) fn add_default_subcommand<T: SubCommand>(
-        &mut self,
-        command: T,
-    ) {
-        if self.module_name != T::Module::NAME {
+    pub(crate) fn add_default_subcommand<M, T>(&mut self, subcommand: T)
+    where
+        M: Module,
+        T: SubCommand<M>,
+    {
+        if self.module_name != M::NAME {
             panic!(
                 "trying to register a command for module '{}' in the API for \
                  module '{}'",
-                T::Module::NAME,
+                M::NAME,
                 self.module_name
             );
         }
@@ -67,7 +74,7 @@ impl ModuleSubCommands {
                 self.module_name
             );
         }
-        let mut callback = command.into_callback();
+        let mut callback = callback_of_subcommand(subcommand);
         let ctx = self.neovim_ctx.clone();
         self.default_command =
             Some(Box::new(move |args| callback(args, ctx.reborrow())));
@@ -98,6 +105,31 @@ impl ModuleSubCommands {
             default_command: None,
             subcommands: FxHashMap::default(),
             neovim_ctx,
+        }
+    }
+}
+
+fn callback_of_subcommand<M: Module, T: SubCommand<M>>(
+    mut subcommand: T,
+) -> impl for<'ctx> FnMut(SubCommandArgs, NeovimCtx<'ctx>) {
+    move |mut args, ctx: NeovimCtx<'_>| {
+        let args = match T::Args::try_from(&mut args) {
+            Ok(args) => args,
+            Err(err) => {
+                let mut source = DiagnosticSource::new();
+                source
+                    .push_segment(M::NAME.as_str())
+                    .push_segment(T::NAME.as_str());
+                err.into().emit(Level::Error, source);
+                return;
+            },
+        };
+        if let Err(err) = subcommand.execute(args, ctx).into_result() {
+            let mut source = DiagnosticSource::new();
+            source
+                .push_segment(M::NAME.as_str())
+                .push_segment(T::NAME.as_str());
+            err.into().emit(Level::Error, source);
         }
     }
 }

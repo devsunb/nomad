@@ -1,5 +1,8 @@
 //! TODO: docs.
 
+mod action;
+mod action_name;
+mod async_action;
 mod command;
 mod config;
 mod function;
@@ -14,6 +17,9 @@ mod serde;
 mod subcommand;
 mod subcommand_args;
 
+pub use action::Action;
+pub use action_name::ActionName;
+pub use async_action::AsyncAction;
 pub use function::Function;
 pub use module::Module;
 pub use module_api::ModuleApi;

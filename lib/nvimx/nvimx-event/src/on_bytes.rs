@@ -1,16 +1,23 @@
 use core::marker::PhantomData;
 
-use nvimx_action::{Action, IntoModuleName};
 use nvimx_common::MaybeResult;
 pub use nvimx_ctx::OnBytesArgs;
 use nvimx_ctx::{RegisterOnBytesArgs, ShouldDetach, TextBufferCtx};
+use nvimx_plugin::{Action, Module};
 
 use crate::Event;
 
 /// TODO: docs.
 pub struct OnBytes<A, M> {
     action: A,
-    module_name: PhantomData<M>,
+    module: PhantomData<M>,
+}
+
+impl<A, M> OnBytes<A, M> {
+    /// Creates a new [`OnBytes`] with the given action.
+    pub fn new(action: A) -> Self {
+        Self { action, module: PhantomData }
+    }
 }
 
 impl<A, M> Event for OnBytes<A, M>
@@ -21,7 +28,7 @@ where
         Ctx<'ctx> = TextBufferCtx<'ctx>,
     >,
     A::Return: Into<ShouldDetach>,
-    M: IntoModuleName + 'static,
+    M: Module + 'static,
 {
     type Ctx<'ctx> = TextBufferCtx<'ctx>;
 
@@ -35,7 +42,7 @@ where
         };
         let args = RegisterOnBytesArgs {
             callback,
-            module_name: M::NAME,
+            module_name: Some(M::NAME.as_str()),
             callback_name: Some(A::NAME.as_str()),
         };
         ctx.register_on_bytes(args);

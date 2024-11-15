@@ -1,57 +1,57 @@
-use nvim_oxi::Object as NvimObject;
+use nvimx_common::MaybeResult;
+use nvimx_ctx::NeovimCtx;
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::ctx::NeovimCtx;
-use crate::diagnostics::{DiagnosticSource, Level};
-use crate::maybe_result::MaybeResult;
+use crate::action_name::ActionName;
 use crate::{Action, Module};
 
-/// TODO: docs.
-pub trait Function:
-    for<'ctx> Action<NeovimCtx<'ctx>, Args: DeserializeOwned, Return: Serialize>
-{
-    /// TODO: docs.
-    fn into_callback(
-        self,
-    ) -> impl for<'ctx> FnMut(NvimObject, NeovimCtx<'ctx>) -> NvimObject;
+/// TODO: docs
+pub trait Function<M: Module>: 'static {
+    /// TODO: docs
+    const NAME: ActionName;
+
+    /// TODO: docs
+    type Args: DeserializeOwned;
+
+    /// TODO: docs
+    type Docs;
+
+    /// TODO: docs
+    type Return: Serialize;
+
+    /// TODO: docs
+    fn execute<'a>(
+        &'a mut self,
+        args: Self::Args,
+        ctx: NeovimCtx<'a>,
+    ) -> impl MaybeResult<Self::Return>;
+
+    /// TODO: docs
+    fn docs(&self) -> Self::Docs;
 }
 
-impl<T> Function for T
+impl<A, M> Function<M> for A
 where
-    T: for<'ctx> Action<
-        NeovimCtx<'ctx>,
-        Args: DeserializeOwned,
-        Return: Serialize,
-    >,
+    A: for<'a> Action<M, Ctx<'a> = NeovimCtx<'a>>,
+    A::Args: DeserializeOwned,
+    A::Return: Serialize,
+    M: Module,
 {
-    fn into_callback(
-        mut self,
-    ) -> impl for<'ctx> FnMut(NvimObject, NeovimCtx<'ctx>) -> NvimObject {
-        move |args, ctx| {
-            let args = match crate::serde::deserialize(args) {
-                Ok(args) => args,
-                Err(err) => {
-                    let mut source = DiagnosticSource::new();
-                    source
-                        .push_segment(T::Module::NAME.as_str())
-                        .push_segment(T::NAME.as_str());
-                    err.into_msg().emit(Level::Warning, source);
-                    return NvimObject::nil();
-                },
-            };
-            let ret = match self.execute(args, ctx).into_result() {
-                Ok(ret) => ret,
-                Err(err) => {
-                    let mut source = DiagnosticSource::new();
-                    source
-                        .push_segment(T::Module::NAME.as_str())
-                        .push_segment(T::NAME.as_str());
-                    err.into().emit(Level::Warning, source);
-                    return NvimObject::nil();
-                },
-            };
-            crate::serde::serialize(&ret)
-        }
+    const NAME: ActionName = A::NAME;
+    type Args = A::Args;
+    type Docs = A::Docs;
+    type Return = A::Return;
+
+    fn execute<'a>(
+        &'a mut self,
+        args: Self::Args,
+        ctx: NeovimCtx<'a>,
+    ) -> impl MaybeResult<Self::Return> {
+        A::execute(self, args, ctx)
+    }
+
+    fn docs(&self) -> Self::Docs {
+        A::docs(self)
     }
 }

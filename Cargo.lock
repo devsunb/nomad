@@ -1115,7 +1115,6 @@ name = "nvimx"
 version = "0.1.0"
 dependencies = [
  "nvim-oxi",
- "nvimx-action",
  "nvimx-ctx",
  "nvimx-diagnostics",
  "nvimx-event",
@@ -1125,15 +1124,6 @@ dependencies = [
  "nvimx-plugin",
  "nvimx-tests",
  "nvimx-ui",
-]
-
-[[package]]
-name = "nvimx-action"
-version = "0.1.0"
-dependencies = [
- "nvimx-common",
- "nvimx-ctx",
- "nvimx-diagnostics",
 ]
 
 [[package]]
@@ -1172,10 +1162,10 @@ dependencies = [
 name = "nvimx-event"
 version = "0.1.0"
 dependencies = [
- "nvimx-action",
  "nvimx-common",
  "nvimx-ctx",
  "nvimx-diagnostics",
+ "nvimx-plugin",
 ]
 
 [[package]]
@@ -1216,7 +1206,6 @@ dependencies = [
  "flume",
  "futures-util",
  "fxhash",
- "nvimx-action",
  "nvimx-common",
  "nvimx-ctx",
  "nvimx-diagnostics",
