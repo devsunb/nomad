@@ -1,3 +1,4 @@
+use core::time::Duration;
 use std::io;
 use std::rc::Rc;
 
@@ -13,9 +14,17 @@ use collab_server::message::{
 use collab_server::AuthInfos;
 use e31e::fs::AbsPathBuf;
 use e31e::{DirectoryId, DirectoryRef, Replica};
-use futures_util::{future, stream, AsyncWriteExt, SinkExt, StreamExt};
+use futures_util::{
+    future,
+    stream,
+    AsyncWriteExt,
+    SinkExt,
+    Stream,
+    StreamExt,
+};
 use nvimx::ctx::NeovimCtx;
 use nvimx::diagnostics::DiagnosticMessage;
+use nvimx::emit::{Emit, EmitExt, EmitMessage, Severity};
 use nvimx::plugin::{action_name, ActionName, AsyncAction};
 use nvimx::Shared;
 
@@ -36,10 +45,11 @@ impl Join {
     }
 }
 
-impl AsyncAction<Collab> for Join {
+impl AsyncAction for Join {
     const NAME: ActionName = action_name!("join");
     type Args = SessionId;
     type Docs = ();
+    type Module = Collab;
 
     async fn execute(
         &mut self,
@@ -52,51 +62,61 @@ impl AsyncAction<Collab> for Join {
                 .expect("it's valid"),
         };
 
-        #[rustfmt::skip]
-        Joiner::new(self.session_status.clone(), session_id, ctx.to_static())?
-            .connect_to_server().await?
-            .authenticate(auth_infos).await?
-            .join_session(session_id.into_inner()).await?
-            .confirm_join().await?
-            .request_project().await?
-            .find_project_root().await?
-            .flush_project().await?
-            .jump_to_host()
-            .run_session().await?
-            .remove_project_root().await;
+        let guard = JoinGuard::new(self.session_status.clone(), session_id)?;
 
-        Ok(())
+        #[rustfmt::skip]
+        let step = ConnectToServer { guard }
+            .connect_to_server().emitting(spin::<ConnectToServer>()).await?
+            .authenticate(auth_infos).emitting(spin::<Authenticate>()).await?
+            .join_session(session_id).emitting(spin::<JoinSession>()).await?
+            .confirm_join().await?
+            .request_project().emitting(spin::<RequestProject>()).await?
+            .find_project_root().emitting(spin::<FindProjectRoot>()).await?
+            .flush_project(ctx.reborrow()).emitting(spin::<FlushProject>()).await?
+            .jump_to_host();
+
+        JoinedProject(&step).clear_after(Duration::from_secs(4)).emit();
+
+        let (step, maybe_err) = step.run_session(ctx.to_static()).await;
+
+        step.remove_project_root()
+            .await
+            .map_err(Into::into)
+            .map_err(|err| maybe_err.map(Into::into).unwrap_or(err))
     }
 
     fn docs(&self) {}
 }
 
-struct Joiner {
-    ctx: NeovimCtx<'static>,
+struct JoinGuard {
     session_status: Shared<SessionStatus>,
+}
+
+struct ConnectToServer {
+    guard: JoinGuard,
 }
 
 struct Authenticate {
     io: collab_server::Io,
-    joiner: Joiner,
+    guard: JoinGuard,
 }
 
 struct JoinSession {
     authenticated: collab_server::client::Authenticated,
     auth_infos: AuthInfos,
-    joiner: Joiner,
+    guard: JoinGuard,
 }
 
 struct ConfirmJoin {
     joined: collab_server::client::Joined,
     local_peer: Peer,
-    joiner: Joiner,
+    guard: JoinGuard,
 }
 
 struct RequestProject {
     joined: collab_server::client::Joined,
     local_peer: Peer,
-    joiner: Joiner,
+    guard: JoinGuard,
 }
 
 struct FindProjectRoot {
@@ -104,7 +124,7 @@ struct FindProjectRoot {
     local_peer: Peer,
     joined: collab_server::client::Joined,
     project_response: Box<ProjectResponse>,
-    joiner: Joiner,
+    guard: JoinGuard,
 }
 
 struct FlushProject {
@@ -113,7 +133,7 @@ struct FlushProject {
     joined: collab_server::client::Joined,
     project_response: Box<ProjectResponse>,
     project_root: AbsPathBuf,
-    joiner: Joiner,
+    guard: JoinGuard,
 }
 
 struct JumpToHost {
@@ -123,7 +143,7 @@ struct JumpToHost {
     project_root: AbsPathBuf,
     remote_peers: Peers,
     replica: Replica,
-    joiner: Joiner,
+    guard: JoinGuard,
 }
 
 struct RemoveProjectRoot {
@@ -137,8 +157,10 @@ struct RunSession {
     project_root: AbsPathBuf,
     remote_peers: Peers,
     replica: Replica,
-    joiner: Joiner,
+    guard: JoinGuard,
 }
+
+struct JoinedProject<'a>(&'a RunSession);
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum JoinError {
@@ -168,6 +190,9 @@ pub(crate) enum JoinError {
 
     #[error(transparent)]
     RunSession(#[from] RunSessionError<io::Error, io::Error>),
+
+    #[error(transparent)]
+    RemoveProjectRoot(#[from] RemoveProjectRootError),
 
     #[error(transparent)]
     UserBusy(#[from] UserBusyError<false>),
@@ -227,27 +252,39 @@ pub(crate) enum FlushProjectError {
 #[error("")]
 pub(crate) struct JumpToHostError;
 
-impl Joiner {
+#[derive(Debug, thiserror::Error)]
+#[error("")]
+pub(crate) struct RemoveProjectRootError {
+    #[from]
+    inner: io::Error,
+}
+
+impl JoinGuard {
     fn new(
         session_status: Shared<SessionStatus>,
         session_id: SessionId,
-        ctx: NeovimCtx<'static>,
     ) -> Result<Self, UserBusyError<false>> {
         match session_status.with(|s| UserBusyError::try_from(s)).ok() {
             Some(err) => Err(err),
             None => {
                 session_status.set(SessionStatus::Joining(session_id));
-                Ok(Self { ctx, session_status })
+                Ok(Self { session_status })
             },
         }
     }
 
+    fn set_in_session(&self, session: &Session) {
+        self.session_status.set(SessionStatus::InSession(session.project()));
+    }
+}
+
+impl ConnectToServer {
     async fn connect_to_server(
         self,
     ) -> Result<Authenticate, ConnectToServerError> {
         collab_server::Io::connect()
             .await
-            .map(|io| Authenticate { io, joiner: self })
+            .map(|io| Authenticate { io, guard: self.guard })
             .map_err(Into::into)
     }
 }
@@ -258,7 +295,7 @@ impl Authenticate {
         auth_infos: AuthInfos,
     ) -> Result<JoinSession, collab_server::client::AuthError> {
         self.io.authenticate(auth_infos.clone()).await.map(|authenticated| {
-            JoinSession { authenticated, auth_infos, joiner: self.joiner }
+            JoinSession { authenticated, auth_infos, guard: self.guard }
         })
     }
 }
@@ -266,11 +303,11 @@ impl Authenticate {
 impl JoinSession {
     async fn join_session(
         self,
-        session_id: collab_server::SessionId,
+        session_id: SessionId,
     ) -> Result<ConfirmJoin, JoinSessionError> {
         self.authenticated
             .join(collab_server::client::JoinRequest::JoinExistingSession(
-                session_id,
+                session_id.into_inner(),
             ))
             .await
             .map(|joined| ConfirmJoin {
@@ -279,7 +316,7 @@ impl JoinSession {
                     self.auth_infos.github_handle,
                 ),
                 joined,
-                joiner: self.joiner,
+                guard: self.guard,
             })
             .map_err(Into::into)
     }
@@ -290,7 +327,7 @@ impl ConfirmJoin {
         Ok(RequestProject {
             joined: self.joined,
             local_peer: self.local_peer,
-            joiner: self.joiner,
+            guard: self.guard,
         })
     }
 }
@@ -327,7 +364,7 @@ impl RequestProject {
         Ok(FindProjectRoot {
             buffered,
             joined: self.joined,
-            joiner: self.joiner,
+            guard: self.guard,
             local_peer: self.local_peer,
             project_response,
         })
@@ -346,7 +383,7 @@ impl FindProjectRoot {
             buffered: self.buffered,
             joined: self.joined,
             local_peer: self.local_peer,
-            joiner: self.joiner,
+            guard: self.guard,
             project_response: self.project_response,
             project_root,
         })
@@ -354,7 +391,10 @@ impl FindProjectRoot {
 }
 
 impl FlushProject {
-    async fn flush_project(self) -> Result<JumpToHost, FlushProjectError> {
+    async fn flush_project(
+        self,
+        neovim_ctx: NeovimCtx<'_>,
+    ) -> Result<JumpToHost, FlushProjectError> {
         if async_fs::metadata(&self.project_root).await.is_ok() {
             // Clean project root.
             async_fs::remove_dir_all(&self.project_root).await.map_err(
@@ -384,7 +424,7 @@ impl FlushProject {
             root_id,
             self.project_root.clone(),
             ErrTx { has_errored: Shared::new(false), inner: err_tx },
-            self.joiner.ctx.reborrow(),
+            neovim_ctx,
         );
 
         let ProjectTree { replica, .. } = match err_rx.recv_async().await {
@@ -403,7 +443,7 @@ impl FlushProject {
             project_root: self.project_root,
             remote_peers: self.project_response.peers,
             replica,
-            joiner: self.joiner,
+            guard: self.guard,
         })
     }
 }
@@ -417,7 +457,7 @@ impl JumpToHost {
             project_root: self.project_root,
             remote_peers: self.remote_peers,
             replica: self.replica,
-            joiner: self.joiner,
+            guard: self.guard,
         }
     }
 }
@@ -425,7 +465,9 @@ impl JumpToHost {
 impl RunSession {
     async fn run_session(
         self,
-    ) -> Result<RemoveProjectRoot, RunSessionError<io::Error, io::Error>> {
+        neovim_ctx: NeovimCtx<'static>,
+    ) -> (RemoveProjectRoot, Option<RunSessionError<io::Error, io::Error>>)
+    {
         let collab_server::client::Joined {
             sender: tx,
             receiver: rx,
@@ -440,22 +482,20 @@ impl RunSession {
             project_root: self.project_root.clone(),
             replica: self.replica,
             session_id,
-            neovim_ctx: self.joiner.ctx,
+            neovim_ctx,
         });
 
-        let status = SessionStatus::InSession(session.project());
-        self.joiner.session_status.set(status);
+        self.guard.set_in_session(&session);
 
         let rx = stream::iter(self.buffered.into_iter().map(Ok)).chain(rx);
-        session.run(tx, rx).await?;
-
-        Ok(RemoveProjectRoot { project_root: self.project_root })
+        let maybe_err = session.run(tx, rx).await.err();
+        (RemoveProjectRoot { project_root: self.project_root }, maybe_err)
     }
 }
 
 impl RemoveProjectRoot {
-    async fn remove_project_root(self) {
-        let _ = async_fs::remove_dir(self.project_root).await;
+    async fn remove_project_root(self) -> Result<(), RemoveProjectRootError> {
+        async_fs::remove_dir(self.project_root).await.map_err(Into::into)
     }
 }
 
@@ -564,6 +604,133 @@ async fn create_directory(
             dir_path: dir_path.to_owned(),
             err,
         }),
+    }
+}
+
+trait JoinStep {
+    const MESSAGE: &'static str;
+}
+
+struct SpinFrame {
+    spinner: Spinner,
+    step_message: &'static str,
+}
+
+#[derive(Copy, Clone)]
+#[repr(u8)]
+#[allow(dead_code)]
+enum Spinner {
+    Iter1 = 0,
+    Iter2,
+    Iter3,
+}
+
+fn spin<T: JoinStep>() -> impl Stream<Item = SpinFrame> {
+    async_stream::stream! {
+        let mut spinner = Spinner::Iter1;
+        loop {
+            yield SpinFrame::new(spinner, T::MESSAGE);
+            spinner.advance();
+            nvimx::executor::sleep(SpinFrame::DURATION).await;
+        }
+    }
+}
+
+impl SpinFrame {
+    const DURATION: Duration = Duration::from_millis(80);
+
+    fn new(spinner: Spinner, step_message: &'static str) -> Self {
+        Self { spinner, step_message }
+    }
+}
+
+impl Spinner {
+    const NUM_FRAMES: u8 = 3;
+
+    fn advance(&mut self) {
+        // SAFETY: `Self` is `repr(u8)`.
+        *self = unsafe {
+            core::mem::transmute::<u8, Self>(
+                *self as u8 + 1 % Self::NUM_FRAMES,
+            )
+        };
+    }
+
+    fn into_char(self) -> char {
+        match self {
+            Self::Iter1 => '🌍',
+            Self::Iter2 => '🌎',
+            Self::Iter3 => '🌏',
+        }
+    }
+}
+
+impl Emit for SpinFrame {
+    const ADD_TO_MESSAGE_HISTORY: bool = false;
+
+    type Action = Join;
+
+    fn message(&self) -> EmitMessage {
+        let mut msg = EmitMessage::new();
+        msg.push(self.spinner.into_char())
+            .push_str(" ")
+            .push_str(self.step_message);
+        msg
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Info
+    }
+}
+
+impl Emit for JoinedProject<'_> {
+    const ADD_TO_MESSAGE_HISTORY: bool = true;
+
+    type Action = Join;
+
+    fn message(&self) -> EmitMessage {
+        let Self(run) = self;
+        let mut msg = EmitMessage::new();
+        msg.push_str("joined project at ").push_str(&run.project_root);
+        msg
+    }
+
+    fn severity(&self) -> Severity {
+        Severity::Info
+    }
+}
+
+impl JoinStep for ConnectToServer {
+    const MESSAGE: &'static str = "Connecting to server";
+}
+
+impl JoinStep for Authenticate {
+    const MESSAGE: &'static str = "Authenticating";
+}
+
+impl JoinStep for JoinSession {
+    const MESSAGE: &'static str = "Joining session";
+}
+
+impl JoinStep for ConfirmJoin {
+    const MESSAGE: &'static str = "Confirming join";
+}
+
+impl JoinStep for RequestProject {
+    const MESSAGE: &'static str = "Requesting project";
+}
+
+impl JoinStep for FindProjectRoot {
+    const MESSAGE: &'static str = "Finding project root";
+}
+
+impl JoinStep for FlushProject {
+    const MESSAGE: &'static str = "Flushing project";
+}
+
+impl Drop for JoinGuard {
+    fn drop(&mut self) {
+        self.session_status.set(SessionStatus::NotInSession);
     }
 }
 

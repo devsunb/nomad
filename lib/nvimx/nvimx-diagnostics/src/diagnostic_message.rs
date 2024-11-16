@@ -9,18 +9,30 @@ use crate::level::Level;
 /// TODO: docs.
 #[derive(Default)]
 pub struct DiagnosticMessage {
-    chunks: Vec<(nvim_oxi::String, Option<HighlightGroup>)>,
+    #[doc(hidden)]
+    pub chunks: Vec<(nvim_oxi::String, Option<HighlightGroup>)>,
 }
 
 impl DiagnosticMessage {
     /// TODO: docs.
     pub fn emit(self, level: Level, source: DiagnosticSource) {
-        emit(level, source, self);
+        let source_chunk = (source.to_string().into(), Some(level.into()));
+        let space_chunk = (" ".into(), None);
+        let chunks = iter::once(source_chunk)
+            .chain(iter::once(space_chunk))
+            .chain(self.chunks);
+        let opts = api::opts::EchoOpts::default();
+        api::echo(chunks, true, &opts).expect("all parameters are valid");
     }
 
     /// Creates a new, empty [`DiagnosticMessage`].
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// TODO: docs.
+    pub fn push(&mut self, c: char) -> &mut Self {
+        self.push_chunk(c.into(), None)
     }
 
     /// TODO: docs.
@@ -53,7 +65,7 @@ impl DiagnosticMessage {
 
     /// TODO: docs.
     pub fn push_str<T: AsRef<str>>(&mut self, s: T) -> &mut Self {
-        self.push_chunk(s.as_ref(), None)
+        self.push_chunk(s.as_ref().into(), None)
     }
 
     /// TODO: docs.
@@ -62,15 +74,15 @@ impl DiagnosticMessage {
         s: T,
         hl: HighlightGroup,
     ) -> &mut Self {
-        self.push_chunk(s.as_ref(), Some(hl))
+        self.push_chunk(s.as_ref().into(), Some(hl))
     }
 
     fn push_chunk(
         &mut self,
-        s: &str,
+        s: nvim_oxi::String,
         hl: Option<HighlightGroup>,
     ) -> &mut Self {
-        self.chunks.push((nvim_oxi::String::from(s), hl));
+        self.chunks.push((s, hl));
         self
     }
 
@@ -96,16 +108,6 @@ impl DiagnosticMessage {
         }
         self
     }
-}
-
-fn emit(level: Level, source: DiagnosticSource, msg: DiagnosticMessage) {
-    let source_chunk = (source.to_string().into(), Some(level.into()));
-    let space_chunk = (" ".into(), None);
-    let chunks = iter::once(source_chunk)
-        .chain(iter::once(space_chunk))
-        .chain(msg.chunks);
-    let opts = api::opts::EchoOpts::default();
-    api::echo(chunks, true, &opts).expect("all parameters are valid");
 }
 
 impl From<core::convert::Infallible> for DiagnosticMessage {

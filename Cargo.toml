@@ -33,6 +33,7 @@ nvimx = { path = "./lib/nvimx" }
 nvimx-common = { path = "./lib/nvimx/nvimx-common" }
 nvimx-ctx = { path = "./lib/nvimx/nvimx-ctx" }
 nvimx-diagnostics = { path = "./lib/nvimx/nvimx-diagnostics" }
+nvimx-emit = { path = "./lib/nvimx/nvimx-emit" }
 nvimx-event = { path = "./lib/nvimx/nvimx-event" }
 nvimx-executor = { path = "./lib/nvimx/nvimx-executor" }
 nvimx-fs = { path = "./lib/nvimx/nvimx-fs" }
