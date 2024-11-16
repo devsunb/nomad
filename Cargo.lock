@@ -1095,6 +1095,7 @@ dependencies = [
  "nvimx-common",
  "nvimx-ctx",
  "nvimx-diagnostics",
+ "nvimx-emit",
  "nvimx-event",
  "nvimx-executor",
  "nvimx-fs",
@@ -1134,6 +1135,17 @@ version = "0.1.0"
 dependencies = [
  "nvim-oxi",
  "smol_str",
+]
+
+[[package]]
+name = "nvimx-emit"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "nvim-oxi",
+ "nvimx-diagnostics",
+ "nvimx-executor",
+ "nvimx-plugin",
 ]
 
 [[package]]

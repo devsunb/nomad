@@ -9,7 +9,8 @@ use crate::level::Level;
 /// TODO: docs.
 #[derive(Default)]
 pub struct DiagnosticMessage {
-    chunks: Vec<(nvim_oxi::String, Option<HighlightGroup>)>,
+    #[doc(hidden)]
+    pub chunks: Vec<(nvim_oxi::String, Option<HighlightGroup>)>,
 }
 
 impl DiagnosticMessage {

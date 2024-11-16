@@ -10,6 +10,8 @@ pub use nvimx_ctx as ctx;
 #[doc(inline)]
 pub use nvimx_diagnostics as diagnostics;
 #[doc(inline)]
+pub use nvimx_emit as emit;
+#[doc(inline)]
 pub use nvimx_event as event;
 #[doc(inline)]
 pub use nvimx_executor as executor;
