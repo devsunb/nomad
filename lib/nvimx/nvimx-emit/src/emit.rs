@@ -24,7 +24,9 @@ pub trait Emit: Sized {
         let tag_chunks = [
             "[",
             <<Self::Action as Action>::Module as Module>::Plugin::DIAGNOSTIC_NAME,
+            ".",
             <Self::Action as Action>::Module::NAME.as_str(),
+            ".",
             Self::Action::NAME.as_str(),
             "]"
         ].into_iter().map(|s| (s.into(), Some(self.severity().hl_group())));

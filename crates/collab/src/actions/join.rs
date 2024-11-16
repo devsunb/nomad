@@ -637,7 +637,7 @@ fn spin<T: JoinStep>() -> impl Stream<Item = SpinFrame> {
 }
 
 impl SpinFrame {
-    const DURATION: Duration = Duration::from_millis(300);
+    const DURATION: Duration = Duration::from_millis(80);
 
     fn new(spinner: Spinner, step_message: &'static str) -> Self {
         Self { spinner, step_message }
