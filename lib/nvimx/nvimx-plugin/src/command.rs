@@ -82,7 +82,7 @@ impl Command {
                 default.call(args);
                 Ok(())
             } else {
-                Err(CommandError::MissingCommand {
+                Err(CommandError::MissingSubCommand {
                     module_name: module_subcommands.module_name,
                     valid: module_subcommands.subcommand_names().collect(),
                 })
@@ -94,9 +94,9 @@ impl Command {
                 subcommand.call(args);
                 Ok(())
             },
-            None => Err(CommandError::UnknownCommand {
+            None => Err(CommandError::UnknownSubCommand {
                 module_name: module_subcommands.module_name,
-                command_name: subcommand_name,
+                subcommand_name,
                 valid: module_subcommands.subcommand_names().collect(),
             }),
         }
@@ -106,20 +106,18 @@ impl Command {
 /// The type of error that can occur when [`call`](NomadCommand::call)ing the
 /// [`NomadCommand`].
 enum CommandError<'args> {
-    /// TODO: docs.
-    MissingCommand { module_name: ModuleName, valid: Vec<ActionNameStr> },
-
-    /// TODO: docs.
-    MissingModule { valid: Vec<ModuleNameStr> },
-
-    /// TODO: docs.
-    UnknownCommand {
+    MissingSubCommand {
         module_name: ModuleName,
-        command_name: SubCommandArg<'args>,
         valid: Vec<ActionNameStr>,
     },
-
-    /// TODO: docs.
+    MissingModule {
+        valid: Vec<ModuleNameStr>,
+    },
+    UnknownSubCommand {
+        module_name: ModuleName,
+        subcommand_name: SubCommandArg<'args>,
+        valid: Vec<ActionNameStr>,
+    },
     UnknownModule {
         module_name: SubCommandArg<'args>,
         valid: Vec<ModuleNameStr>,
@@ -134,9 +132,11 @@ impl CommandError<'_> {
     fn message(&self) -> DiagnosticMessage {
         let mut message = DiagnosticMessage::new();
         match self {
-            Self::MissingCommand { valid, .. } => {
+            Self::MissingSubCommand { valid, .. } => {
                 message
-                    .push_str("missing command, the valid commands are: ")
+                    .push_str(
+                        "missing subcommand, the valid subcommands are: ",
+                    )
                     .push_comma_separated(valid, HighlightGroup::special());
             },
             Self::MissingModule { valid } => {
@@ -145,14 +145,18 @@ impl CommandError<'_> {
                     .push_comma_separated(valid, HighlightGroup::special());
             },
 
-            Self::UnknownCommand { command_name, valid, .. } => {
+            Self::UnknownSubCommand {
+                subcommand_name: command_name,
+                valid,
+                ..
+            } => {
                 message
-                    .push_str("unknown command '")
+                    .push_str("unknown subcommand '")
                     .push_str_highlighted(
                         command_name,
                         HighlightGroup::warning(),
                     )
-                    .push_str("', the valid commands are: ")
+                    .push_str("', the valid subcommands are: ")
                     .push_comma_separated(valid, HighlightGroup::special());
             },
             Self::UnknownModule { module_name, valid } => {
@@ -172,8 +176,8 @@ impl CommandError<'_> {
     fn source(&self) -> DiagnosticSource {
         let mut source = DiagnosticSource::new();
         match self {
-            Self::UnknownCommand { module_name, .. }
-            | Self::MissingCommand { module_name, .. } => {
+            Self::UnknownSubCommand { module_name, .. }
+            | Self::MissingSubCommand { module_name, .. } => {
                 source.push_segment(module_name.as_str());
             },
             _ => (),
