@@ -1,6 +1,6 @@
 use nvimx::ctx::NeovimCtx;
 use nvimx::diagnostics::DiagnosticMessage;
-use nvimx::plugin::{action_name, Action, ActionName};
+use nvimx::plugin::{action_name, Action, ActionName, ToCompletionFunc};
 use nvimx::Shared;
 
 use crate::session_status::SessionStatus;
@@ -45,6 +45,8 @@ impl Action for Yank {
 
     fn docs(&self) {}
 }
+
+impl ToCompletionFunc for Yank {}
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum YankError {

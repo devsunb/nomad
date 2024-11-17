@@ -8,6 +8,7 @@ use nvimx::plugin::{
     Module,
     ModuleApi,
     ModuleName,
+    ToCompletionFunc,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -43,6 +44,8 @@ impl Action for Version {
 
     fn docs(&self) -> Self::Docs {}
 }
+
+impl ToCompletionFunc for Version {}
 
 impl From<ConfigReceiver<Self>> for Version {
     fn from(_: ConfigReceiver<Self>) -> Self {

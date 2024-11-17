@@ -9,7 +9,7 @@ use futures_util::StreamExt;
 use nvimx::ctx::{BufferCtx, NeovimCtx};
 use nvimx::diagnostics::DiagnosticMessage;
 use nvimx::fs::os_fs::OsFs;
-use nvimx::plugin::{action_name, ActionName, AsyncAction};
+use nvimx::plugin::{action_name, ActionName, AsyncAction, ToCompletionFunc};
 use nvimx::Shared;
 use root_finder::markers;
 
@@ -61,6 +61,8 @@ impl AsyncAction for Start {
 
     fn docs(&self) -> Self::Docs {}
 }
+
+impl ToCompletionFunc for Start {}
 
 struct Starter {
     ctx: NeovimCtx<'static>,

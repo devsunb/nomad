@@ -25,7 +25,7 @@ use futures_util::{
 use nvimx::ctx::NeovimCtx;
 use nvimx::diagnostics::DiagnosticMessage;
 use nvimx::emit::{Emit, EmitExt, EmitMessage, Severity};
-use nvimx::plugin::{action_name, ActionName, AsyncAction};
+use nvimx::plugin::{action_name, ActionName, AsyncAction, ToCompletionFunc};
 use nvimx::Shared;
 
 use super::UserBusyError;
@@ -87,6 +87,8 @@ impl AsyncAction for Join {
 
     fn docs(&self) {}
 }
+
+impl ToCompletionFunc for Join {}
 
 struct JoinGuard {
     session_status: Shared<SessionStatus>,

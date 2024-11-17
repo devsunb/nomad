@@ -28,7 +28,7 @@ pub use module_name::ModuleName;
 pub use nvimx_plugin_macros::{action_name, module_name};
 pub use plugin::Plugin;
 pub use plugin_ctx::PluginCtx;
-pub use subcommand::SubCommand;
+pub use subcommand::{CompletionFunc, SubCommand, ToCompletionFunc};
 pub use subcommand_args::{
     SubCommandArg,
     SubCommandArgs,

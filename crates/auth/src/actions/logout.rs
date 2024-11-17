@@ -1,5 +1,5 @@
 use nvimx::ctx::NeovimCtx;
-use nvimx::plugin::{action_name, ActionName, AsyncAction};
+use nvimx::plugin::{action_name, ActionName, AsyncAction, ToCompletionFunc};
 
 use crate::Auth;
 
@@ -22,3 +22,5 @@ impl AsyncAction for Logout {
 
     fn docs(&self) -> Self::Docs {}
 }
+
+impl ToCompletionFunc for Logout {}
