@@ -14,13 +14,16 @@ pub(super) struct ModuleSubCommands {
     pub(super) module_name: ModuleName,
 
     /// The command to run when no command is specified.
-    pub(super) default_command: Option<Box<dyn FnMut(SubCommandArgs)>>,
+    pub(super) default_subcommand: Option<SubCommandHandle>,
 
     /// Map from command name to the corresponding [`Command`].
-    pub(super) subcommands:
-        FxHashMap<ActionNameStr, Box<dyn FnMut(SubCommandArgs)>>,
+    pub(super) subcommands: FxHashMap<ActionNameStr, SubCommandHandle>,
 
     pub(super) neovim_ctx: NeovimCtx<'static>,
+}
+
+pub(crate) struct SubCommandHandle {
+    callback: Box<dyn FnMut(SubCommandArgs)>,
 }
 
 impl ModuleSubCommands {
@@ -45,11 +48,9 @@ impl ModuleSubCommands {
                 self.module_name
             );
         }
-        let mut callback = callback_of_subcommand(subcommand);
-        let ctx = self.neovim_ctx.clone();
         self.subcommands.insert(
             T::NAME.as_str(),
-            Box::new(move |args| callback(args, ctx.reborrow())),
+            SubCommandHandle::new(subcommand, self.neovim_ctx.clone()),
         );
     }
 
@@ -66,28 +67,26 @@ impl ModuleSubCommands {
                 self.module_name
             );
         }
-        if self.default_command.is_some() {
+        if self.default_subcommand.is_some() {
             panic!(
                 "a default command has already been set for module '{}'",
                 self.module_name
             );
         }
-        let mut callback = callback_of_subcommand(subcommand);
-        let ctx = self.neovim_ctx.clone();
-        self.default_command =
-            Some(Box::new(move |args| callback(args, ctx.reborrow())));
+        self.default_subcommand =
+            Some(SubCommandHandle::new(subcommand, self.neovim_ctx.clone()));
     }
 
     pub(crate) fn default_subcommand(
         &mut self,
-    ) -> Option<&mut impl FnMut(SubCommandArgs)> {
-        self.default_command.as_mut()
+    ) -> Option<&mut SubCommandHandle> {
+        self.default_subcommand.as_mut()
     }
 
     pub(crate) fn subcommand<'a>(
         &'a mut self,
         subcommand_name: &'a str,
-    ) -> Option<&'a mut impl FnMut(SubCommandArgs)> {
+    ) -> Option<&'a mut SubCommandHandle> {
         self.subcommands.get_mut(subcommand_name)
     }
 
@@ -100,18 +99,30 @@ impl ModuleSubCommands {
     pub(crate) fn new<M: Module>(neovim_ctx: NeovimCtx<'static>) -> Self {
         Self {
             module_name: M::NAME,
-            default_command: None,
+            default_subcommand: None,
             subcommands: FxHashMap::default(),
             neovim_ctx,
         }
     }
 }
 
+impl SubCommandHandle {
+    pub(crate) fn call(&mut self, args: SubCommandArgs) {
+        (self.callback)(args);
+    }
+
+    fn new<T: SubCommand>(subcommand: T, ctx: NeovimCtx<'static>) -> Self {
+        let mut callback = callback_of_subcommand(subcommand);
+        let ctx = ctx.clone();
+        Self { callback: Box::new(move |args| callback(args, ctx.reborrow())) }
+    }
+}
+
 fn callback_of_subcommand<T: SubCommand>(
     mut subcommand: T,
-) -> impl for<'ctx> FnMut(SubCommandArgs, NeovimCtx<'ctx>) {
-    move |mut args, ctx: NeovimCtx<'_>| {
-        let args = match T::Args::try_from(&mut args) {
+) -> impl for<'a> FnMut(SubCommandArgs<'a>, NeovimCtx<'a>) {
+    move |args, ctx: NeovimCtx<'_>| {
+        let args = match T::Args::try_from(args) {
             Ok(args) => args,
             Err(err) => {
                 let mut source = DiagnosticSource::new();

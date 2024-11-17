@@ -44,7 +44,6 @@ impl DiagnosticMessage {
     where
         T: AsRef<str>,
         I: IntoIterator<Item = T>,
-        I::IntoIter: ExactSizeIterator,
     {
         self.push_separated(iter, hl, ", ")
     }
@@ -58,7 +57,6 @@ impl DiagnosticMessage {
     where
         T: AsRef<str>,
         I: IntoIterator<Item = T>,
-        I::IntoIter: ExactSizeIterator,
     {
         self.push_separated(iter, hl, ".")
     }
@@ -95,14 +93,14 @@ impl DiagnosticMessage {
     where
         T: AsRef<str>,
         I: IntoIterator<Item = T>,
-        I::IntoIter: ExactSizeIterator,
     {
-        let iter = iter.into_iter();
-        let len = iter.len();
-        for (idx, text) in iter.enumerate() {
+        let mut iter = iter.into_iter().peekable();
+        loop {
+            let Some(text) = iter.next() else {
+                break;
+            };
             self.push_str_highlighted(text.as_ref(), hl.clone());
-            let is_last = idx + 1 == len;
-            if !is_last {
+            if iter.peek().is_some() {
                 self.push_str(separator);
             }
         }

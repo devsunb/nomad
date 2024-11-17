@@ -14,7 +14,7 @@ pub trait SubCommand: 'static {
     /// TODO: docs
     type Args: Clone
         + for<'args> TryFrom<
-            &'args mut SubCommandArgs,
+            SubCommandArgs<'args>,
             Error: Into<DiagnosticMessage>,
         >;
 
@@ -40,7 +40,7 @@ where
     A: for<'a> Action<Ctx<'a> = NeovimCtx<'a>, Return = ()>,
     A::Args: Clone
         + for<'args> TryFrom<
-            &'args mut SubCommandArgs,
+            SubCommandArgs<'args>,
             Error: Into<DiagnosticMessage>,
         >,
 {

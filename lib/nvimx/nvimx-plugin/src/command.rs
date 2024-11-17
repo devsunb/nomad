@@ -1,5 +1,5 @@
 use fxhash::FxHashMap;
-use nvimx_common::oxi::api;
+use nvimx_common::oxi::{self, api};
 use nvimx_diagnostics::{
     DiagnosticMessage,
     DiagnosticSource,
@@ -11,7 +11,7 @@ use crate::action_name::ActionNameStr;
 use crate::module_name::{ModuleName, ModuleNameStr};
 use crate::module_subcommands::ModuleSubCommands;
 use crate::plugin::Plugin;
-use crate::subcommand_args::SubCommandArgs;
+use crate::subcommand_args::{SubCommandArg, SubCommandArgs};
 
 pub(crate) struct Command {
     command_name: &'static str,
@@ -38,8 +38,9 @@ impl Command {
 
         api::create_user_command(
             self.command_name,
-            move |args| {
-                let args = SubCommandArgs::from(args);
+            move |args: api::types::CommandArgs| {
+                let args =
+                    SubCommandArgs::new(args.args.as_deref().unwrap_or(""));
                 if let Err(err) = self.call(args) {
                     err.emit()
                 }
@@ -56,15 +57,17 @@ impl Command {
         }
     }
 
-    fn call(&mut self, mut args: SubCommandArgs) -> Result<(), CommandError> {
+    fn call<'a>(
+        &mut self,
+        mut args: SubCommandArgs<'a>,
+    ) -> Result<(), CommandError<'a>> {
         let Some(module_name) = args.pop_front() else {
             return Err(CommandError::MissingModule {
                 valid: self.subcommands.keys().copied().collect(),
             });
         };
 
-        let Some(module_commands) =
-            self.subcommands.get_mut(module_name.as_str())
+        let Some(module_subcommands) = self.subcommands.get_mut(&*module_name)
         else {
             return Err(CommandError::UnknownModule {
                 module_name,
@@ -72,28 +75,29 @@ impl Command {
             });
         };
 
-        let Some(command_name) = args.pop_front() else {
-            return if let Some(default) = module_commands.default_subcommand()
+        let Some(subcommand_name) = args.pop_front() else {
+            return if let Some(default) =
+                module_subcommands.default_subcommand()
             {
-                default(args);
+                default.call(args);
                 Ok(())
             } else {
                 Err(CommandError::MissingCommand {
-                    module_name: module_commands.module_name,
-                    valid: module_commands.subcommand_names().collect(),
+                    module_name: module_subcommands.module_name,
+                    valid: module_subcommands.subcommand_names().collect(),
                 })
             };
         };
 
-        match module_commands.subcommand(command_name.as_str()) {
-            Some(command) => {
-                command(args);
+        match module_subcommands.subcommand(&subcommand_name) {
+            Some(subcommand) => {
+                subcommand.call(args);
                 Ok(())
             },
             None => Err(CommandError::UnknownCommand {
-                module_name: module_commands.module_name,
-                command_name,
-                valid: module_commands.subcommand_names().collect(),
+                module_name: module_subcommands.module_name,
+                command_name: subcommand_name,
+                valid: module_subcommands.subcommand_names().collect(),
             }),
         }
     }
@@ -101,7 +105,7 @@ impl Command {
 
 /// The type of error that can occur when [`call`](NomadCommand::call)ing the
 /// [`NomadCommand`].
-enum CommandError {
+enum CommandError<'args> {
     /// TODO: docs.
     MissingCommand { module_name: ModuleName, valid: Vec<ActionNameStr> },
 
@@ -111,15 +115,18 @@ enum CommandError {
     /// TODO: docs.
     UnknownCommand {
         module_name: ModuleName,
-        command_name: String,
+        command_name: SubCommandArg<'args>,
         valid: Vec<ActionNameStr>,
     },
 
     /// TODO: docs.
-    UnknownModule { module_name: String, valid: Vec<ModuleNameStr> },
+    UnknownModule {
+        module_name: SubCommandArg<'args>,
+        valid: Vec<ModuleNameStr>,
+    },
 }
 
-impl CommandError {
+impl CommandError<'_> {
     fn emit(self) {
         self.message().emit(Level::Warning, self.source());
     }

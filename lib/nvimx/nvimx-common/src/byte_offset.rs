@@ -1,7 +1,9 @@
 use core::ops::{Add, AddAssign, Sub, SubAssign};
 
 /// A byte offset in a buffer.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub struct ByteOffset(usize);
 
 impl ByteOffset {

@@ -29,4 +29,9 @@ pub use nvimx_plugin_macros::{action_name, module_name};
 pub use plugin::Plugin;
 pub use plugin_ctx::PluginCtx;
 pub use subcommand::SubCommand;
-pub use subcommand_args::SubCommandArgs;
+pub use subcommand_args::{
+    SubCommandArg,
+    SubCommandArgs,
+    SubCommandArgsIter,
+    SubCommandCursor,
+};
