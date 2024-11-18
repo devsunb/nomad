@@ -28,8 +28,8 @@ pub(crate) struct Command {
 
 #[derive(Default)]
 struct CommandInner {
-    module_subcommands: FxHashMap<ModuleNameStr, ModuleSubCommands>,
     module_names: Vec<ModuleNameStr>,
+    module_subcommands: FxHashMap<ModuleNameStr, ModuleSubCommands>,
 }
 
 struct ModuleSubCommands {
@@ -40,13 +40,13 @@ struct ModuleSubCommands {
 
 struct CompletionFunc {
     command_name: &'static str,
-    module_names: Vec<String>,
     module_funcs: FxHashMap<ModuleNameStr, ModuleCompletionFunc>,
+    module_names: Vec<ModuleNameStr>,
 }
 
 struct ModuleCompletionFunc {
-    subcommand_names: Vec<ActionNameStr>,
     subcommand_funcs: FxHashMap<ActionNameStr, SubCommandCompletionFunc>,
+    subcommand_names: Vec<ActionNameStr>,
 }
 
 impl Command {
@@ -58,6 +58,8 @@ impl Command {
         assert!(!self.inner.module_subcommands.contains_key(&module_name));
 
         let subcommand_names = {
+            // Sort the subcommand names alphabetically to have nicer error
+            // messages.
             let mut v = module_commands
                 .subcommands
                 .keys()
@@ -84,7 +86,20 @@ impl Command {
     }
 
     pub(crate) fn create(self) {
-        let Self { inner, completion_func } = self;
+        let Self { mut inner, mut completion_func } = self;
+
+        let module_names = {
+            // Sort the module names alphabetically to have nicer error
+            // messages.
+            let mut v =
+                inner.module_subcommands.keys().copied().collect::<Vec<_>>();
+            v.sort_unstable();
+            v
+        };
+
+        inner.module_names = module_names.clone();
+        completion_func.module_names = module_names;
+
         let command_name = completion_func.command_name;
 
         let opts = api::opts::CreateCommandOpts::builder()
@@ -153,13 +168,6 @@ impl CommandInner {
     }
 
     fn into_fn(mut self) -> oxi::Function<api::types::CommandArgs, ()> {
-        self.module_names = {
-            let mut v =
-                self.module_subcommands.keys().cloned().collect::<Vec<_>>();
-            v.sort_unstable();
-            v
-        };
-
         oxi::Function::from_fn_mut(move |args: api::types::CommandArgs| {
             let args = SubCommandArgs::new(args.args.as_deref().unwrap_or(""));
             if let Err(err) = self.call(args) {
@@ -170,21 +178,49 @@ impl CommandInner {
 }
 
 impl CompletionFunc {
-    #[allow(clippy::too_many_lines)]
+    fn complete(
+        &mut self,
+        args: SubCommandArgs,
+        offset: ByteOffset,
+    ) -> Vec<String> {
+        let mut iter = args.iter();
+
+        let Some(arg) = iter.next() else {
+            return self
+                .module_names
+                .iter()
+                .copied()
+                .map(ToOwned::to_owned)
+                .collect();
+        };
+
+        if offset <= arg.idx().end {
+            let prefix = offset
+                .checked_sub(arg.idx().start)
+                .map(|o| &arg[..o.into()])
+                .unwrap_or("");
+            self.module_names
+                .iter()
+                .filter(|m| is_strict_prefix(m, prefix))
+                .copied()
+                .map(ToOwned::to_owned)
+                .collect()
+        } else {
+            match self.module_funcs.get_mut(&*arg) {
+                Some(func) => {
+                    let start_from = arg.idx().end;
+                    let s = &args.as_str()[start_from.into()..];
+                    let args = SubCommandArgs::new(s);
+                    func.complete(args, offset)
+                },
+                None => Vec::new(),
+            }
+        }
+    }
+
     fn into_fn(
         mut self,
     ) -> oxi::Function<(String, String, usize), Vec<String>> {
-        self.module_names = {
-            let mut v = self
-                .module_funcs
-                .keys()
-                .copied()
-                .map(ToOwned::to_owned)
-                .collect::<Vec<_>>();
-            v.sort_unstable();
-            v
-        };
-
         oxi::Function::from_fn_mut(
             move |(_, cmd_line, mut cursor_pos): (String, String, usize)| {
                 let initial_len = cmd_line.len();
@@ -199,64 +235,7 @@ impl CompletionFunc {
 
                 let args = SubCommandArgs::new(&cmd_line[start_from..]);
                 let offset = ByteOffset::from(cursor_pos - start_from);
-                let mut iter = args.iter();
-
-                let Some(first_arg) = iter.next() else {
-                    return self.module_names.clone();
-                };
-
-                let module_func = if offset <= first_arg.idx().end {
-                    let prefix = offset
-                        .checked_sub(first_arg.idx().start)
-                        .map(|o| &first_arg[..o.into()])
-                        .unwrap_or("");
-                    return self
-                        .module_names
-                        .iter()
-                        .filter(|m| is_strict_prefix(m, prefix))
-                        .cloned()
-                        .collect();
-                } else {
-                    match self.module_funcs.get_mut(&*first_arg) {
-                        Some(func) => func,
-                        None => return Vec::new(),
-                    }
-                };
-
-                let Some(second_arg) = iter.next() else {
-                    return module_func
-                        .subcommand_names
-                        .iter()
-                        .copied()
-                        .map(ToOwned::to_owned)
-                        .collect();
-                };
-
-                if offset <= second_arg.idx().end {
-                    let prefix = offset
-                        .checked_sub(first_arg.idx().start)
-                        .map(|o| &first_arg[..o.into()])
-                        .unwrap_or("");
-                    module_func
-                        .subcommand_names
-                        .iter()
-                        .filter(|&m| is_strict_prefix(m, prefix))
-                        .copied()
-                        .map(ToOwned::to_owned)
-                        .collect()
-                } else {
-                    match module_func.subcommand_funcs.get_mut(&*second_arg) {
-                        Some(sub) => {
-                            let start_from = second_arg.idx().end;
-                            let cmd_line = &cmd_line[start_from.into()..];
-                            let args = SubCommandArgs::new(cmd_line);
-                            let cursor =
-                                SubCommandCursor::new(&args, start_from);
-                            (sub)(args, cursor)
-                        },
-                        None => Vec::new(),
-                    }
-                }
+                self.complete(args, offset)
             },
         )
     }
@@ -266,6 +245,49 @@ impl CompletionFunc {
             command_name,
             module_names: Vec::new(),
             module_funcs: FxHashMap::default(),
+        }
+    }
+}
+
+impl ModuleCompletionFunc {
+    fn complete(
+        &mut self,
+        args: SubCommandArgs,
+        offset: ByteOffset,
+    ) -> Vec<String> {
+        let mut iter = args.iter();
+
+        let Some(arg) = iter.next() else {
+            return self
+                .subcommand_names
+                .iter()
+                .copied()
+                .map(ToOwned::to_owned)
+                .collect();
+        };
+
+        if offset <= arg.idx().end {
+            let prefix = offset
+                .checked_sub(arg.idx().start)
+                .map(|o| &arg[..o.into()])
+                .unwrap_or("");
+            self.subcommand_names
+                .iter()
+                .filter(|&m| is_strict_prefix(m, prefix))
+                .copied()
+                .map(ToOwned::to_owned)
+                .collect()
+        } else {
+            match self.subcommand_funcs.get_mut(&*arg) {
+                Some(sub) => {
+                    let start_from = arg.idx().end;
+                    let s = &args.as_str()[start_from.into()..];
+                    let args = SubCommandArgs::new(s);
+                    let cursor = SubCommandCursor::new(&args, start_from);
+                    (sub)(args, cursor)
+                },
+                None => Vec::new(),
+            }
         }
     }
 }

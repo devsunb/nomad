@@ -91,6 +91,10 @@ impl<'a> SubCommandArgs<'a> {
         self.iter().count()
     }
 
+    pub(crate) fn as_str(&self) -> &'a str {
+        self.args
+    }
+
     pub(crate) fn new(args: &'a str) -> Self {
         Self { args }
     }
@@ -112,17 +116,7 @@ impl SubCommandArg<'_> {
 }
 
 impl<'a> SubCommandArgsIter<'a> {
-    /// Returns the [`ByteOffset`] of the last yielded argument in the original
-    /// [`SubCommandArgs`], or:
-    ///
-    /// - 0 if [`next`](Self::next) has never been called;
-    /// - the length of the original [`SubCommandArgs`] if [`next`](Self::next)
-    ///   has returned `None`.
-    pub(crate) fn last_offset(&self) -> ByteOffset {
-        self.arg_offset
-    }
-
-    fn remainder(self) -> SubCommandArgs<'a> {
+    pub(crate) fn remainder(self) -> SubCommandArgs<'a> {
         SubCommandArgs { args: self.args }
     }
 }
@@ -340,30 +334,5 @@ impl From<SubCommandArgsWrongNumError<'_>> for DiagnosticMessage {
         }
 
         message
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn subcommand_args_iter() {
-        let args = SubCommandArgs::new("  foo bar  baz   ");
-
-        let mut iter = args.iter();
-        assert_eq!(iter.last_offset(), 0usize);
-
-        assert_eq!(iter.next().unwrap(), "foo");
-        assert_eq!(iter.last_offset(), 2usize);
-
-        assert_eq!(iter.next().unwrap(), "bar");
-        assert_eq!(iter.last_offset(), 6usize);
-
-        assert_eq!(iter.next().unwrap(), "baz");
-        assert_eq!(iter.last_offset(), 11usize);
-
-        assert!(iter.next().is_none());
-        assert_eq!(iter.last_offset(), 17usize);
     }
 }
