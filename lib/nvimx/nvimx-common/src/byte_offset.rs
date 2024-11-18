@@ -8,6 +8,12 @@ use core::ops::{Add, AddAssign, Sub, SubAssign};
 pub struct ByteOffset(usize);
 
 impl ByteOffset {
+    /// Returns the difference between two [`ByteOffset`]s, or `None` if the
+    /// result would be negative.
+    pub fn checked_sub(self, other: Self) -> Option<Self> {
+        self.0.checked_sub(other.0).map(Self)
+    }
+
     /// Converts the [`ByteOffset`] into a `u64`.
     pub fn into_u64(self) -> u64 {
         self.0.try_into().expect("too big to fail")

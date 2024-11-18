@@ -9,8 +9,11 @@ use nvimx_diagnostics::{
 };
 
 use crate::action_name::ActionNameStr;
-use crate::module_name::{ModuleName, ModuleNameStr};
-use crate::module_subcommands::ModuleSubCommands;
+use crate::module_name::ModuleNameStr;
+use crate::module_subcommands::{
+    SubCommandCallback,
+    SubCommandCompletionFunc,
+};
 use crate::plugin::Plugin;
 use crate::subcommand_args::{
     SubCommandArg,
@@ -19,218 +22,276 @@ use crate::subcommand_args::{
 };
 
 pub(crate) struct Command {
+    inner: CommandInner,
+    completion_func: CompletionFunc,
+}
+
+#[derive(Default)]
+struct CommandInner {
+    module_subcommands: FxHashMap<ModuleNameStr, ModuleSubCommands>,
+    module_names: Vec<ModuleNameStr>,
+}
+
+struct ModuleSubCommands {
+    default_subcommand: Option<SubCommandCallback>,
+    subcommands: FxHashMap<ActionNameStr, SubCommandCallback>,
+    subcommand_names: Vec<ActionNameStr>,
+}
+
+struct CompletionFunc {
     command_name: &'static str,
-    /// A map from module name to the subcommands for that module.
-    subcommands: FxHashMap<ModuleNameStr, ModuleSubCommands>,
+    module_names: Vec<String>,
+    module_funcs: FxHashMap<ModuleNameStr, ModuleCompletionFunc>,
+}
+
+struct ModuleCompletionFunc {
+    subcommand_names: Vec<ActionNameStr>,
+    subcommand_funcs: FxHashMap<ActionNameStr, SubCommandCompletionFunc>,
 }
 
 impl Command {
-    pub(crate) fn add_module(&mut self, module_commands: ModuleSubCommands) {
+    pub(crate) fn add_module(
+        &mut self,
+        module_commands: crate::module_subcommands::ModuleSubCommands,
+    ) {
         let module_name = module_commands.module_name.as_str();
-        if self.subcommands.contains_key(&module_name) {
-            panic!(
-                "subcommands from a module named '{}' have already been added",
-                module_name
-            );
-        }
-        self.subcommands.insert(module_name, module_commands);
+        assert!(!self.inner.module_subcommands.contains_key(&module_name));
+
+        let subcommand_names = {
+            let mut v = module_commands
+                .subcommands
+                .keys()
+                .copied()
+                .collect::<Vec<_>>();
+            v.sort_unstable();
+            v
+        };
+        self.inner.module_subcommands.insert(
+            module_name,
+            ModuleSubCommands {
+                default_subcommand: module_commands.default_subcommand,
+                subcommands: module_commands.subcommands,
+                subcommand_names: subcommand_names.clone(),
+            },
+        );
+        self.completion_func.module_funcs.insert(
+            module_name,
+            ModuleCompletionFunc {
+                subcommand_names,
+                subcommand_funcs: module_commands.completion_funcs,
+            },
+        );
     }
 
-    pub(crate) fn create(mut self) {
+    pub(crate) fn create(self) {
+        let Self { inner, completion_func } = self;
+        let command_name = completion_func.command_name;
+
         let opts = api::opts::CreateCommandOpts::builder()
+            .complete(completion_func.into())
+            .force(true)
             .nargs(api::types::CommandNArgs::Any)
-            .complete(api::types::CommandComplete::CustomList(
-                self.completion_func(),
-            ))
             .build();
 
-        api::create_user_command(
-            self.command_name,
-            move |args: api::types::CommandArgs| {
-                let args =
-                    SubCommandArgs::new(args.args.as_deref().unwrap_or(""));
-                if let Err(err) = self.call(args) {
-                    err.emit()
-                }
-            },
-            &opts,
-        )
-        .expect("all the arguments are valid");
+        api::create_user_command(command_name, inner.into_fn(), &opts)
+            .expect("all the arguments are valid");
     }
 
     pub(crate) fn new<P: Plugin>() -> Self {
         Self {
-            command_name: P::COMMAND_NAME,
-            subcommands: FxHashMap::default(),
+            inner: Default::default(),
+            completion_func: CompletionFunc::new(P::COMMAND_NAME),
         }
     }
+}
 
+impl CommandInner {
     fn call<'a>(
         &mut self,
         mut args: SubCommandArgs<'a>,
     ) -> Result<(), CommandError<'a>> {
         let Some(module_name) = args.pop_front() else {
             return Err(CommandError::MissingModule {
-                valid: self.subcommands.keys().copied().collect(),
+                valid: self.module_names.clone(),
             });
         };
 
-        let Some(module_subcommands) = self.subcommands.get_mut(&*module_name)
+        let Some(module_subcommands) =
+            self.module_subcommands.get_mut(&*module_name)
         else {
             return Err(CommandError::UnknownModule {
                 module_name,
-                valid: self.subcommands.keys().copied().collect(),
+                valid: self.module_names.clone(),
             });
         };
 
         let Some(subcommand_name) = args.pop_front() else {
             return if let Some(default) =
-                module_subcommands.default_subcommand()
+                &mut module_subcommands.default_subcommand
             {
-                default.call(args);
+                (default)(args);
                 Ok(())
             } else {
                 Err(CommandError::MissingSubCommand {
-                    module_name: module_subcommands.module_name,
-                    valid: module_subcommands.names().collect(),
+                    module_name,
+                    valid: module_subcommands.subcommand_names.clone(),
                 })
             };
         };
 
-        match module_subcommands.subcommand(&subcommand_name) {
+        match module_subcommands.subcommands.get_mut(&*subcommand_name) {
             Some(subcommand) => {
-                subcommand.call(args);
+                (subcommand)(args);
                 Ok(())
             },
             None => Err(CommandError::UnknownSubCommand {
-                module_name: module_subcommands.module_name,
+                module_name,
                 subcommand_name,
-                valid: module_subcommands.names().collect(),
+                valid: module_subcommands.subcommand_names.clone(),
             }),
         }
     }
 
-    fn completion_func(
-        &self,
-    ) -> oxi::Function<(String, String, usize), Vec<String>> {
-        let command_name = self.command_name;
-        let module_names = {
-            let mut v = self.subcommands.keys().copied().collect::<Vec<_>>();
+    fn into_fn(mut self) -> oxi::Function<api::types::CommandArgs, ()> {
+        self.module_names = {
+            let mut v =
+                self.module_subcommands.keys().cloned().collect::<Vec<_>>();
             v.sort_unstable();
             v
         };
-        let mut this = clone();
-        let func = move |(_, cmd_line, cursor_pos): (_, String, usize)| {
-            use CursorCompletePos::*;
-            let cmd_line = cmd_line.trim_start();
 
-            // The command line must start with "<Command> " for Neovim to
-            // invoke us.
-            let start_from = command_name.len() + 1;
-            debug_assert!(cmd_line.starts_with(&command_name));
-            debug_assert!(cursor_pos >= start_from);
-            let args = SubCommandArgs::new(&cmd_line[start_from..]);
-            let offset = ByteOffset::from(cursor_pos - start_from);
-
-            let names = module_names.iter().copied().map(ToOwned::to_owned);
-            let subcommands: &mut ModuleSubCommands = match pos() {
-                NoArgs { .. } | StartOfArg { .. } | BeforeArg { .. } => {
-                    return names.collect()
-                },
-                EndOfArg { arg } => {
-                    let arg = &*arg;
-                    return names
-                        .filter(|m| m.len() > arg.len() && m.starts_with(arg))
-                        .collect();
-                },
-                MiddleOfArg { arg, offset_in_arg } => {
-                    let arg = &arg[..offset_in_arg.into()];
-                    return names
-                        .filter(|m| m.len() > arg.len() && m.starts_with(arg))
-                        .collect();
-                },
-                AfterArg { arg } => match this.subcommands.get_mut(&*arg) {
-                    Some(subs) => subs,
-                    None => return Vec::new(),
-                },
-            };
-
-            let names = subcommands.names().map(ToOwned::to_owned);
-            match pos() {
-                NoArgs { .. } | StartOfArg { .. } | BeforeArg { .. } => {
-                    names.collect()
-                },
-                EndOfArg { arg } => {
-                    let arg = &*arg;
-                    names
-                        .filter(|m| m.len() > arg.len() && m.starts_with(arg))
-                        .collect()
-                },
-                MiddleOfArg { arg, offset_in_arg } => {
-                    let arg = &arg[..offset_in_arg.into()];
-                    names
-                        .filter(|m| m.len() > arg.len() && m.starts_with(arg))
-                        .collect()
-                },
-                AfterArg { arg } => {
-                    drop(names);
-                    match subcommands.subcommand(&*arg) {
-                        Some(sub) => {
-                            let cursor = SubCommandCursor::new(&args, offset);
-                            sub.complete(args, cursor)
-                        },
-                        None => Vec::new(),
-                    }
-                },
+        oxi::Function::from_fn_mut(move |args: api::types::CommandArgs| {
+            let args = SubCommandArgs::new(args.args.as_deref().unwrap_or(""));
+            if let Err(err) = self.call(args) {
+                err.emit()
             }
-        };
-        oxi::Function::from_fn_mut(func)
+        })
     }
 }
 
-fn clone() -> Command {
-    todo!();
+impl CompletionFunc {
+    #[allow(clippy::too_many_lines)]
+    fn into_fn(
+        mut self,
+    ) -> oxi::Function<(String, String, usize), Vec<String>> {
+        self.module_names = {
+            let mut v = self
+                .module_funcs
+                .keys()
+                .copied()
+                .map(ToOwned::to_owned)
+                .collect::<Vec<_>>();
+            v.sort_unstable();
+            v
+        };
+
+        oxi::Function::from_fn_mut(
+            move |(_, cmd_line, mut cursor_pos): (String, String, usize)| {
+                let initial_len = cmd_line.len();
+                let cmd_line = cmd_line.trim_start();
+                cursor_pos -= initial_len - cmd_line.len();
+
+                // The command line must start with "<Command> " for Neovim to
+                // invoke us.
+                let start_from = self.command_name.len() + 1;
+                debug_assert!(cmd_line.starts_with(self.command_name));
+                debug_assert!(cursor_pos >= start_from);
+
+                let args = SubCommandArgs::new(&cmd_line[start_from..]);
+                let offset = ByteOffset::from(cursor_pos - start_from);
+                let mut iter = args.iter();
+
+                let Some(first_arg) = iter.next() else {
+                    return self.module_names.clone();
+                };
+
+                let module_func = if offset <= first_arg.idx().end {
+                    let prefix = offset
+                        .checked_sub(first_arg.idx().start)
+                        .map(|o| &first_arg[..o.into()])
+                        .unwrap_or("");
+                    return self
+                        .module_names
+                        .iter()
+                        .filter(|m| is_strict_prefix(m, prefix))
+                        .cloned()
+                        .collect();
+                } else {
+                    match self.module_funcs.get_mut(&*first_arg) {
+                        Some(func) => func,
+                        None => return Vec::new(),
+                    }
+                };
+
+                let Some(second_arg) = iter.next() else {
+                    return module_func
+                        .subcommand_names
+                        .iter()
+                        .copied()
+                        .map(ToOwned::to_owned)
+                        .collect();
+                };
+
+                if offset <= second_arg.idx().end {
+                    let prefix = offset
+                        .checked_sub(first_arg.idx().start)
+                        .map(|o| &first_arg[..o.into()])
+                        .unwrap_or("");
+                    module_func
+                        .subcommand_names
+                        .iter()
+                        .filter(|&m| is_strict_prefix(m, prefix))
+                        .copied()
+                        .map(ToOwned::to_owned)
+                        .collect()
+                } else {
+                    match module_func.subcommand_funcs.get_mut(&*second_arg) {
+                        Some(sub) => {
+                            let start_from = second_arg.idx().end;
+                            let cmd_line = &cmd_line[start_from.into()..];
+                            let args = SubCommandArgs::new(cmd_line);
+                            let cursor =
+                                SubCommandCursor::new(&args, start_from);
+                            (sub)(args, cursor)
+                        },
+                        None => Vec::new(),
+                    }
+                }
+            },
+        )
+    }
+
+    fn new(command_name: &'static str) -> Self {
+        Self {
+            command_name,
+            module_names: Vec::new(),
+            module_funcs: FxHashMap::default(),
+        }
+    }
 }
 
-fn pos() -> CursorCompletePos<'static> {
-    CursorCompletePos::NoArgs
+fn is_strict_prefix(s: &str, prefix: &str) -> bool {
+    s.len() > prefix.len() && s.starts_with(prefix)
 }
 
-enum CursorCompletePos<'a> {
-    /// `|`.
-    NoArgs,
-
-    /// `|<Arg>`.
-    StartOfArg { arg: SubCommandArg<'a> },
-
-    /// `<Arg>|`.
-    EndOfArg { arg: SubCommandArg<'a> },
-
-    /// `<Ar|g>`.
-    MiddleOfArg { arg: SubCommandArg<'a>, offset_in_arg: ByteOffset },
-
-    /// `| <Arg>`.
-    ///
-    /// `Arg` is interpreted as a subcommand name, and we return the modules
-    /// that have a subcommand with that name.
-    BeforeArg { arg: SubCommandArg<'a> },
-
-    /// `<Arg> |`.
-    AfterArg { arg: SubCommandArg<'a> },
+impl From<CompletionFunc> for api::types::CommandComplete {
+    fn from(func: CompletionFunc) -> Self {
+        Self::CustomList(func.into_fn())
+    }
 }
 
 /// The type of error that can occur when [`call`](NomadCommand::call)ing the
 /// [`NomadCommand`].
 enum CommandError<'args> {
     MissingSubCommand {
-        module_name: ModuleName,
+        module_name: SubCommandArg<'args>,
         valid: Vec<ActionNameStr>,
     },
     MissingModule {
         valid: Vec<ModuleNameStr>,
     },
     UnknownSubCommand {
-        module_name: ModuleName,
+        module_name: SubCommandArg<'args>,
         subcommand_name: SubCommandArg<'args>,
         valid: Vec<ActionNameStr>,
     },
@@ -290,7 +351,7 @@ impl CommandError<'_> {
         match self {
             Self::UnknownSubCommand { module_name, .. }
             | Self::MissingSubCommand { module_name, .. } => {
-                source.push_segment(module_name.as_str());
+                source.push_segment(module_name);
             },
             _ => (),
         }

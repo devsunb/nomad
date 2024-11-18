@@ -24,8 +24,8 @@ pub struct SubCommandArg<'a> {
 /// The index of a [`SubCommandArg`] in a [`SubCommandArgs`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SubCommandArgIdx {
-    start: ByteOffset,
-    end: ByteOffset,
+    pub(crate) start: ByteOffset,
+    pub(crate) end: ByteOffset,
 }
 
 /// An iterator over the [`SubCommandArg`]s of a [`SubCommandArgs`].
@@ -70,7 +70,7 @@ pub struct SubCommandArgsWrongNumError<'a> {
 impl<'a> SubCommandArgs<'a> {
     /// TODO: docs.
     pub fn arg(&self, idx: SubCommandArgIdx) -> Option<SubCommandArg<'a>> {
-        (self.args.len() <= idx.end.into()).then_some(SubCommandArg {
+        (self.args.len() <= idx.end).then_some(SubCommandArg {
             idx,
             arg: &self.args[idx.start.into()..idx.end.into()],
         })

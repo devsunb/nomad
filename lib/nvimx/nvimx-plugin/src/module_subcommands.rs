@@ -9,23 +9,26 @@ use crate::module_name::ModuleName;
 use crate::subcommand::{CompletionFunc, SubCommand};
 use crate::subcommand_args::{SubCommandArgs, SubCommandCursor};
 
-pub(super) struct ModuleSubCommands {
+pub(crate) type SubCommandCallback = Box<dyn FnMut(SubCommandArgs)>;
+
+pub(crate) type SubCommandCompletionFunc =
+    Box<dyn FnMut(SubCommandArgs, SubCommandCursor) -> Vec<String>>;
+
+pub(crate) struct ModuleSubCommands {
     /// The name of the module these commands belong to.
-    pub(super) module_name: ModuleName,
+    pub(crate) module_name: ModuleName,
 
     /// The command to run when no command is specified.
-    pub(super) default_subcommand: Option<SubCommandHandle>,
+    pub(crate) default_subcommand: Option<SubCommandCallback>,
 
-    /// Map from command name to the corresponding [`Command`].
-    pub(super) subcommands: FxHashMap<ActionNameStr, SubCommandHandle>,
+    /// Map from command name to the corresponding [`SubCommandCallback`].
+    pub(crate) subcommands: FxHashMap<ActionNameStr, SubCommandCallback>,
 
-    pub(super) neovim_ctx: NeovimCtx<'static>,
-}
+    /// Map from command name to the corresponding [`SubCommandCompletionFunc`].
+    pub(crate) completion_funcs:
+        FxHashMap<ActionNameStr, SubCommandCompletionFunc>,
 
-pub(crate) struct SubCommandHandle {
-    callback: Box<dyn FnMut(SubCommandArgs)>,
-    completion_func:
-        Box<dyn FnMut(SubCommandArgs, SubCommandCursor) -> Vec<String>>,
+    pub(crate) neovim_ctx: NeovimCtx<'static>,
 }
 
 impl ModuleSubCommands {
@@ -49,7 +52,7 @@ impl ModuleSubCommands {
             );
         }
         self.default_subcommand =
-            Some(SubCommandHandle::new(subcommand, self.neovim_ctx.clone()));
+            Some(callback_of_subcommand(subcommand, self.neovim_ctx.clone()));
     }
 
     #[track_caller]
@@ -73,20 +76,19 @@ impl ModuleSubCommands {
                 self.module_name
             );
         }
+        self.completion_funcs.insert(
+            T::NAME.as_str(),
+            Box::new({
+                let mut func = subcommand.completion_func();
+                move |args: SubCommandArgs, cursor: SubCommandCursor| {
+                    func.call(args, cursor)
+                }
+            }),
+        );
         self.subcommands.insert(
             T::NAME.as_str(),
-            SubCommandHandle::new(subcommand, self.neovim_ctx.clone()),
+            callback_of_subcommand(subcommand, self.neovim_ctx.clone()),
         );
-    }
-
-    pub(crate) fn default_subcommand(
-        &mut self,
-    ) -> Option<&mut SubCommandHandle> {
-        self.default_subcommand.as_mut()
-    }
-
-    pub(crate) fn names(&self) -> impl Iterator<Item = ActionNameStr> + '_ {
-        self.subcommands.keys().copied()
     }
 
     pub(crate) fn new<M: Module>(neovim_ctx: NeovimCtx<'static>) -> Self {
@@ -94,51 +96,17 @@ impl ModuleSubCommands {
             module_name: M::NAME,
             default_subcommand: None,
             subcommands: FxHashMap::default(),
+            completion_funcs: FxHashMap::default(),
             neovim_ctx,
-        }
-    }
-
-    pub(crate) fn subcommand<'a>(
-        &'a mut self,
-        subcommand_name: &'a str,
-    ) -> Option<&'a mut SubCommandHandle> {
-        self.subcommands.get_mut(subcommand_name)
-    }
-}
-
-impl SubCommandHandle {
-    pub(crate) fn call(&mut self, args: SubCommandArgs) {
-        (self.callback)(args);
-    }
-
-    pub(crate) fn complete(
-        &mut self,
-        args: SubCommandArgs,
-        cursor: SubCommandCursor,
-    ) -> Vec<String> {
-        (self.completion_func)(args, cursor)
-    }
-
-    fn new<T: SubCommand>(subcommand: T, ctx: NeovimCtx<'static>) -> Self {
-        let completion_func = Box::new({
-            let mut func = subcommand.completion_func();
-            move |args: SubCommandArgs, cursor: SubCommandCursor| {
-                func.call(args, cursor)
-            }
-        });
-        let mut callback = callback_of_subcommand(subcommand);
-        let ctx = ctx.clone();
-        Self {
-            callback: Box::new(move |args| callback(args, ctx.reborrow())),
-            completion_func,
         }
     }
 }
 
 fn callback_of_subcommand<T: SubCommand>(
     mut subcommand: T,
-) -> impl for<'a> FnMut(SubCommandArgs<'a>, NeovimCtx<'a>) {
-    move |args, ctx: NeovimCtx<'_>| {
+    ctx: NeovimCtx<'static>,
+) -> SubCommandCallback {
+    Box::new(move |args| {
         let args = match T::Args::try_from(args) {
             Ok(args) => args,
             Err(err) => {
@@ -150,12 +118,14 @@ fn callback_of_subcommand<T: SubCommand>(
                 return;
             },
         };
-        if let Err(err) = subcommand.execute(args, ctx).into_result() {
+        if let Err(err) =
+            subcommand.execute(args, ctx.reborrow()).into_result()
+        {
             let mut source = DiagnosticSource::new();
             source
                 .push_segment(T::Module::NAME.as_str())
                 .push_segment(T::NAME.as_str());
             err.into().emit(Level::Error, source);
         }
-    }
+    })
 }
