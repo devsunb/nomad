@@ -15,6 +15,7 @@ pub struct SubCommandArgs<'a> {
 }
 
 /// A group of adjacent non-whitespace characters in a [`SubCommandArgs`].
+#[derive(Copy, Clone)]
 pub struct SubCommandArg<'a> {
     arg: &'a str,
     idx: SubCommandArgIdx,
@@ -38,9 +39,9 @@ pub enum SubCommandCursor<'a> {
     /// TODO: docs.
     InArg {
         /// TODO: docs.
-        argument: SubCommandArg<'a>,
+        arg: SubCommandArg<'a>,
         /// TODO: docs.
-        cursor_offset: ByteOffset,
+        offset: ByteOffset,
     },
 
     /// TODO: docs.
@@ -128,7 +129,20 @@ impl<'a> SubCommandArgsIter<'a> {
 
 impl<'a> SubCommandCursor<'a> {
     pub(crate) fn new(args: &SubCommandArgs<'a>, offset: ByteOffset) -> Self {
-        todo!();
+        debug_assert!(offset <= args.args.len());
+
+        let mut prev = None;
+        for arg in args.iter() {
+            let idx = arg.idx();
+            if offset < idx.start {
+                return Self::BetweenArgs { prev, next: Some(arg) };
+            }
+            if offset <= idx.end {
+                return Self::InArg { arg, offset: offset - idx.start };
+            }
+            prev = Some(arg);
+        }
+        Self::BetweenArgs { prev, next: None }
     }
 }
 
