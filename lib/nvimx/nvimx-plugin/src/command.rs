@@ -183,6 +183,8 @@ impl CompletionFunc {
         args: SubCommandArgs,
         offset: ByteOffset,
     ) -> Vec<String> {
+        debug_assert!(offset <= args.as_str().len());
+
         let mut iter = args.iter();
 
         let Some(arg) = iter.next() else {
@@ -211,7 +213,7 @@ impl CompletionFunc {
                     let start_from = arg.idx().end;
                     let s = &args.as_str()[start_from.into()..];
                     let args = SubCommandArgs::new(s);
-                    func.complete(args, offset)
+                    func.complete(args, offset - start_from)
                 },
                 None => Vec::new(),
             }
@@ -255,6 +257,8 @@ impl ModuleCompletionFunc {
         args: SubCommandArgs,
         offset: ByteOffset,
     ) -> Vec<String> {
+        debug_assert!(offset <= args.as_str().len());
+
         let mut iter = args.iter();
 
         let Some(arg) = iter.next() else {
@@ -283,7 +287,8 @@ impl ModuleCompletionFunc {
                     let start_from = arg.idx().end;
                     let s = &args.as_str()[start_from.into()..];
                     let args = SubCommandArgs::new(s);
-                    let cursor = SubCommandCursor::new(&args, start_from);
+                    let offset = offset - start_from;
+                    let cursor = SubCommandCursor::new(&args, offset);
                     (sub)(args, cursor)
                 },
                 None => Vec::new(),

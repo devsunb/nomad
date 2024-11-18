@@ -31,7 +31,7 @@ pub struct SubCommandArgIdx {
 /// An iterator over the [`SubCommandArg`]s of a [`SubCommandArgs`].
 pub struct SubCommandArgsIter<'a> {
     args: &'a str,
-    arg_offset: ByteOffset,
+    last_idx_end: ByteOffset,
 }
 
 /// TODO: docs.
@@ -83,7 +83,7 @@ impl<'a> SubCommandArgs<'a> {
 
     /// TODO: docs.
     pub fn iter(&self) -> SubCommandArgsIter<'a> {
-        SubCommandArgsIter { args: self.args, arg_offset: 0usize.into() }
+        SubCommandArgsIter { args: self.args, last_idx_end: 0usize.into() }
     }
 
     /// TODO: docs.
@@ -192,18 +192,15 @@ impl<'a> Iterator for SubCommandArgsIter<'a> {
         if args.is_empty() {
             return None;
         }
-        debug_assert!(args.starts_with(|c: char| !c.is_whitespace()));
-        let arg_len = args.find(char::is_whitespace).unwrap_or(args.len());
-        if arg_len == 0 {
-            self.args = "";
-            return None;
-        }
-        let idx_start = self.arg_offset;
-        self.arg_offset += arg_len.into();
-        let idx_end = self.arg_offset;
-        let arg = &args[..arg_len];
-        self.args = &args[arg_len..];
-        Some(SubCommandArg {
+        let len_whitespace = args.len() - args.trim_start().len();
+        let trimmed = &args[len_whitespace..];
+        let len_arg = trimmed.find(' ').unwrap_or(trimmed.len());
+        let (arg, rest) = trimmed.split_at(len_arg);
+        self.args = rest;
+        let idx_start = self.last_idx_end + len_whitespace;
+        let idx_end = idx_start + len_arg;
+        self.last_idx_end = idx_end;
+        (len_arg > 0).then_some(SubCommandArg {
             arg,
             idx: SubCommandArgIdx { start: idx_start, end: idx_end },
         })
@@ -334,5 +331,20 @@ impl From<SubCommandArgsWrongNumError<'_>> for DiagnosticMessage {
         }
 
         message
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn subcommand_args_iter() {
+        let args = SubCommandArgs::new("  foo bar  baz   ");
+        let mut iter = args.iter();
+        assert_eq!(iter.next().unwrap(), "foo");
+        assert_eq!(iter.next().unwrap(), "bar");
+        assert_eq!(iter.next().unwrap(), "baz");
+        assert!(iter.next().is_none());
     }
 }
