@@ -18,7 +18,7 @@ use collab_server::message::{
 };
 use collab_server::SessionId;
 use detach_buffer_actions::DetachBufferActions;
-use e31e::fs::AbsPathBuf;
+use eerie::fs::AbsPathBuf;
 use futures_util::{
     pin_mut,
     select,
@@ -77,7 +77,7 @@ pub(crate) struct NewSessionArgs {
     ///
     /// The files and directories in it are assumed to be in sync with the
     /// contents of the [`project_root`](Self::project_root).
-    pub(crate) replica: e31e::Replica,
+    pub(crate) replica: eerie::Replica,
 
     /// The ID of the session.
     pub(crate) session_id: SessionId,
@@ -195,14 +195,14 @@ impl Session {
         }
     }
 
-    fn integrate_created_cursor(&self, cursor_creation: e31e::CursorCreation) {
+    fn integrate_created_cursor(&self, cursor_creation: eerie::CursorCreation) {
         self.project
             .with_mut(|p| p.integrate_cursor_creation(cursor_creation));
     }
 
     fn integrate_created_directory(
         &self,
-        directory_creation: e31e::DirectoryCreation,
+        directory_creation: eerie::DirectoryCreation,
     ) {
         self.project.with_mut(|p| {
             if let Some(_create_directory) =
@@ -213,7 +213,7 @@ impl Session {
         });
     }
 
-    fn integrate_created_file(&self, file_creation: e31e::FileCreation) {
+    fn integrate_created_file(&self, file_creation: eerie::FileCreation) {
         let Some((_file_path, _replacements)) = self.project.with_mut(|p| {
             p.replica.integrate_file_creation(file_creation).map(
                 |create_file| (create_file.file.path(), create_file.hunks),
@@ -225,13 +225,13 @@ impl Session {
 
     fn integrate_created_selection(
         &self,
-        selection_creation: e31e::SelectionCreation,
+        selection_creation: eerie::SelectionCreation,
     ) {
         self.project
             .with_mut(|p| p.integrate_selection_creation(selection_creation));
     }
 
-    fn integrate_edited_buffer(&self, edit: e31e::Edit) {
+    fn integrate_edited_buffer(&self, edit: eerie::Edit) {
         if let Some((_file_path, _replacements)) =
             self.project.with_mut(|p| p.integrate_edit(edit))
         {
@@ -241,7 +241,7 @@ impl Session {
 
     fn integrate_moved_cursor(
         &self,
-        cursor_relocation: e31e::CursorRelocation,
+        cursor_relocation: eerie::CursorRelocation,
     ) {
         self.project
             .with_mut(|p| p.integrate_cursor_relocation(cursor_relocation));
@@ -249,7 +249,7 @@ impl Session {
 
     fn integrate_moved_directory(
         &self,
-        directory_relocation: e31e::DirectoryRelocation,
+        directory_relocation: eerie::DirectoryRelocation,
     ) {
         if let Some((_old_path, _new_path)) = self.project.with_mut(|p| {
             p.replica.integrate_directory_relocation(directory_relocation).map(
@@ -265,7 +265,7 @@ impl Session {
         }
     }
 
-    fn integrate_moved_file(&self, file_relocation: e31e::FileRelocation) {
+    fn integrate_moved_file(&self, file_relocation: eerie::FileRelocation) {
         if let Some((_old_path, _new_path)) = self.project.with_mut(|p| {
             p.replica.integrate_file_relocation(file_relocation).map(
                 |relocate_file| {
@@ -282,14 +282,14 @@ impl Session {
 
     fn integrate_moved_selection(
         &self,
-        selection_relocation: e31e::SelectionRelocation,
+        selection_relocation: eerie::SelectionRelocation,
     ) {
         self.project.with_mut(|p| {
             p.integrate_selection_relocation(selection_relocation)
         });
     }
 
-    fn integrate_peer_disconnected(&self, peer_id: e31e::PeerId) {
+    fn integrate_peer_disconnected(&self, peer_id: eerie::PeerId) {
         self.project.with_mut(|p| p.integrate_peer_left(peer_id));
     }
 
@@ -297,23 +297,23 @@ impl Session {
         self.project.with_mut(|p| p.integrate_peer_joined(peer));
     }
 
-    fn integrate_peer_left(&self, peer_id: e31e::PeerId) {
+    fn integrate_peer_left(&self, peer_id: eerie::PeerId) {
         self.project.with_mut(|p| p.integrate_peer_left(peer_id));
     }
 
-    fn integrate_removed_cursor(&self, cursor_removal: e31e::CursorRemoval) {
+    fn integrate_removed_cursor(&self, cursor_removal: eerie::CursorRemoval) {
         self.project.with_mut(|p| p.integrate_cursor_removal(cursor_removal));
     }
 
     fn integrate_removed_selection(
         &self,
-        selection_removal: e31e::SelectionRemoval,
+        selection_removal: eerie::SelectionRemoval,
     ) {
         self.project
             .with_mut(|p| p.integrate_selection_removal(selection_removal));
     }
 
-    fn integrate_removed_file(&self, file_removal: e31e::FileRemoval) {
+    fn integrate_removed_file(&self, file_removal: eerie::FileRemoval) {
         if let Some(_remove_file) = self
             .project
             .with_mut(|p| p.replica.integrate_file_removal(file_removal))
@@ -324,7 +324,7 @@ impl Session {
 
     fn integrate_removed_directory(
         &self,
-        directory_removal: e31e::DirectoryRemoval,
+        directory_removal: eerie::DirectoryRemoval,
     ) {
         if let Some(_remove_directory) = self.project.with_mut(|p| {
             p.replica.integrate_directory_removal(directory_removal)

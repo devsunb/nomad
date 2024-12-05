@@ -27,8 +27,8 @@ impl Replacement {
     }
 }
 
-impl From<e31e::Hunk> for Replacement {
-    fn from(hunk: e31e::Hunk) -> Self {
+impl From<eerie::Hunk> for Replacement {
+    fn from(hunk: eerie::Hunk) -> Self {
         let deleted_start = hunk.removed_range.start.into();
         let deleted_end = hunk.removed_range.start.into();
         let mut inserted_text = Text::new();
@@ -37,13 +37,13 @@ impl From<e31e::Hunk> for Replacement {
     }
 }
 
-impl From<Replacement> for e31e::Hunk {
+impl From<Replacement> for eerie::Hunk {
     fn from(replacement: Replacement) -> Self {
         let removed_start = replacement.deleted_range.start.into_u64();
         let removed_end = replacement.deleted_range.end.into_u64();
         Self {
             removed_range: removed_start..removed_end,
-            inserted_text: e31e::Text::new(replacement.inserted_text),
+            inserted_text: eerie::Text::new(replacement.inserted_text),
         }
     }
 }

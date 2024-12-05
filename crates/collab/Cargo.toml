@@ -11,8 +11,8 @@ async-fs = { workspace = true }
 async-stream = "0.3"
 async-recursion = "1"
 clipboard = { workspace = true }
-collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client"], package = "nomad-server" }
-e31e = { workspace = true }
+collab-server = { git = "ssh://git@github.com/nomad/collab.git" }
+eerie = { workspace = true }
 flume = { workspace = true }
 futures-util = { workspace = true }
 fxhash = { workspace = true }

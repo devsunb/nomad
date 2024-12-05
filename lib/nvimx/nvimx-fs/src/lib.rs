@@ -9,7 +9,7 @@ mod fs_node_kind;
 pub mod os_fs;
 
 pub use dir_entry::DirEntry;
-pub use e31e::fs::{
+pub use eerie::fs::{
     AbsPath,
     AbsPathBuf,
     FsNodeName,

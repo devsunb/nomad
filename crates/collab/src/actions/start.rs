@@ -3,8 +3,8 @@ use std::io;
 
 use collab_server::message::{GitHubHandle, Peer, Peers};
 use collab_server::AuthInfos;
-use e31e::fs::{AbsPathBuf, FsNodeName};
-use e31e::{Replica, ReplicaBuilder};
+use eerie::fs::{AbsPathBuf, FsNodeName};
+use eerie::{Replica, ReplicaBuilder};
 use futures_util::StreamExt;
 use nvimx::ctx::{BufferCtx, NeovimCtx};
 use nvimx::diagnostics::DiagnosticMessage;

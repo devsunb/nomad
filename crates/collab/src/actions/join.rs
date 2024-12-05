@@ -12,8 +12,8 @@ use collab_server::message::{
     ProjectResponse,
 };
 use collab_server::AuthInfos;
-use e31e::fs::AbsPathBuf;
-use e31e::{DirectoryId, DirectoryRef, Replica};
+use eerie::fs::AbsPathBuf;
+use eerie::{DirectoryId, DirectoryRef, Replica};
 use futures_util::{
     future,
     stream,
