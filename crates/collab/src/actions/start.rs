@@ -22,19 +22,15 @@ use nvimx::Shared;
 use root_finder::markers;
 
 use super::UserBusyError;
+use crate::config::Config;
 use crate::session::{NewSessionArgs, RunSessionError, Session};
 use crate::session_status::SessionStatus;
 use crate::Collab;
 
 #[derive(Clone)]
 pub(crate) struct Start {
+    config: Shared<Config>,
     session_status: Shared<SessionStatus>,
-}
-
-impl Start {
-    pub(crate) fn new(session_status: Shared<SessionStatus>) -> Self {
-        Self { session_status }
-    }
 }
 
 impl AsyncAction for Start {
@@ -58,7 +54,7 @@ impl AsyncAction for Start {
         Starter::new(self.session_status.clone(), ctx.to_static())?
             .find_project_root().await?
             .confirm_start().await?
-            .connect_to_server().await?
+            .connect_to_server(&self.config).await?
             .knock(auth_infos).await?
             .read_replica().await?
             .run_session().await?;
@@ -223,8 +219,17 @@ impl ConfirmStart {
 }
 
 impl ConnectToServer {
-    async fn connect_to_server(self) -> Result<Knock, ConnectToServerError> {
-        todo!();
+    async fn connect_to_server(
+        self,
+        config: &Shared<Config>,
+    ) -> Result<Knock, ConnectToServerError> {
+        let socket = config.with(|c| c.server_socket.clone());
+        let tcp_stream = TcpStream::connect(&*socket.as_deref_str()).await?;
+        Ok(Knock {
+            io: tcp_stream,
+            project_root: self.project_root,
+            starter: self.starter,
+        })
     }
 }
 
@@ -422,5 +427,14 @@ impl From<StartError> for DiagnosticMessage {
         let mut message = Self::new();
         message.push_str(err.to_string());
         message
+    }
+}
+
+impl From<&Collab> for Start {
+    fn from(collab: &Collab) -> Self {
+        Self {
+            config: collab.config.clone(),
+            session_status: collab.session_status.clone(),
+        }
     }
 }

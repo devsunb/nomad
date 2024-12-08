@@ -30,6 +30,7 @@ use nvimx::plugin::{action_name, ActionName, AsyncAction, ToCompletionFunc};
 use nvimx::Shared;
 
 use super::UserBusyError;
+use crate::config::Config;
 use crate::session::{NewSessionArgs, RunSessionError, Session};
 use crate::session_id::SessionId;
 use crate::session_status::SessionStatus;
@@ -37,13 +38,8 @@ use crate::Collab;
 
 #[derive(Clone)]
 pub(crate) struct Join {
+    config: Shared<Config>,
     session_status: Shared<SessionStatus>,
-}
-
-impl Join {
-    pub(crate) fn new(session_status: Shared<SessionStatus>) -> Self {
-        Self { session_status }
-    }
 }
 
 impl AsyncAction for Join {
@@ -67,7 +63,7 @@ impl AsyncAction for Join {
 
         #[rustfmt::skip]
         let step = ConnectToServer { guard }
-            .connect_to_server().emitting(spin::<ConnectToServer>()).await?
+            .connect_to_server(&self.config).emitting(spin::<ConnectToServer>()).await?
             .knock(auth_infos, session_id).emitting(spin::<Knock>()).await?
             .confirm_join().await?
             .request_project().emitting(spin::<RequestProject>()).await?
@@ -264,8 +260,13 @@ impl JoinGuard {
 }
 
 impl ConnectToServer {
-    async fn connect_to_server(self) -> Result<Knock, ConnectToServerError> {
-        todo!();
+    async fn connect_to_server(
+        self,
+        config: &Shared<Config>,
+    ) -> Result<Knock, ConnectToServerError> {
+        let socket = config.with(|c| c.server_socket.clone());
+        let tcp_stream = TcpStream::connect(&*socket.as_deref_str()).await?;
+        Ok(Knock { io: tcp_stream, guard: self.guard })
     }
 }
 
@@ -705,5 +706,14 @@ impl From<JoinError> for DiagnosticMessage {
         let mut message = Self::new();
         message.push_str(err.to_string());
         message
+    }
+}
+
+impl From<&Collab> for Join {
+    fn from(collab: &Collab) -> Self {
+        Self {
+            config: collab.config.clone(),
+            session_status: collab.session_status.clone(),
+        }
     }
 }

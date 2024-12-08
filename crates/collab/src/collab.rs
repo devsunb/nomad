@@ -14,9 +14,9 @@ use crate::session_status::SessionStatus;
 
 /// TODO: docs.
 pub struct Collab {
-    config: Config,
-    config_rx: ConfigReceiver<Self>,
-    session_status: Shared<SessionStatus>,
+    pub(crate) config: Shared<Config>,
+    pub(crate) config_rx: ConfigReceiver<Self>,
+    pub(crate) session_status: Shared<SessionStatus>,
 }
 
 impl Module for Collab {
@@ -26,8 +26,8 @@ impl Module for Collab {
     type Plugin = nomad::Nomad;
 
     fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self> {
-        let join = Join::new(self.session_status.clone());
-        let start = Start::new(self.session_status.clone());
+        let join = Join::from(self);
+        let start = Start::from(self);
         let yank = Yank::new(self.session_status.clone());
 
         ModuleApi::new(ctx.to_static())
@@ -41,7 +41,7 @@ impl Module for Collab {
 
     async fn run(mut self, _: NeovimCtx<'static>) {
         loop {
-            self.config = self.config_rx.recv().await;
+            self.config.set(self.config_rx.recv().await);
         }
     }
 }
@@ -49,7 +49,7 @@ impl Module for Collab {
 impl From<ConfigReceiver<Self>> for Collab {
     fn from(config_rx: ConfigReceiver<Self>) -> Self {
         Self {
-            config: Config::default(),
+            config: Shared::default(),
             config_rx,
             session_status: Shared::default(),
         }
