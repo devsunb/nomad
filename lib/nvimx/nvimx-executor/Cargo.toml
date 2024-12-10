@@ -13,6 +13,7 @@ neovim-nightly = ["nvim-oxi/neovim-nightly"]
 [dependencies]
 async-task = "4.7"
 concurrent-queue = "2.4"
+futures-util = { workspace = true }
 nvim-oxi = { workspace = true, features = ["libuv"] }
 pin-project-lite = "0.2"
 

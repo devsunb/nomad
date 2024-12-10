@@ -5,6 +5,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 use core::time::Duration;
 
+use futures_util::future::FusedFuture;
 use nvim_oxi::libuv;
 
 /// TODO: docs.
@@ -79,6 +80,12 @@ impl Future for Sleep {
             },
             State::Done => panic!("polled after completion"),
         }
+    }
+}
+
+impl FusedFuture for Sleep {
+    fn is_terminated(&self) -> bool {
+        matches!(self.state, State::Done)
     }
 }
 
