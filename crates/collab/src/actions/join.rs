@@ -205,6 +205,9 @@ pub(crate) enum RequestProjectError {
 
     #[error("couldn't read project response: {0}")]
     ReadResponse(ClientRxError),
+
+    #[error("session ended before we could join it")]
+    SessionEnded,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -329,8 +332,13 @@ impl RequestProject {
         let mut buffered = Vec::new();
 
         let project_response = loop {
-            let res = self.welcome.rx.next().await.expect("never ends");
-            let message = res.map_err(RequestProjectError::ReadResponse)?;
+            let message = self
+                .welcome
+                .rx
+                .next()
+                .await
+                .ok_or(RequestProjectError::SessionEnded)?
+                .map_err(RequestProjectError::ReadResponse)?;
             match message {
                 Message::ProjectResponse(response) => break response,
                 other => buffered.push(other),
