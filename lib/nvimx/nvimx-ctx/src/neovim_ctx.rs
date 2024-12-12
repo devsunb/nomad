@@ -64,6 +64,7 @@ impl<'ctx> NeovimCtx<'ctx> {
     }
 
     /// TODO: docs.
+    #[must_use = "JoinHandles do nothing unless awaited or detached"]
     pub fn spawn<F, Fut>(&self, callback: F) -> JoinHandle<Fut::Output>
     where
         F: FnOnce(NeovimCtx<'static>) -> Fut,

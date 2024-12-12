@@ -342,27 +342,30 @@ impl Session {
         project_request: ProjectRequest,
         message_tx: flume::Sender<Message>,
     ) {
-        self.neovim_ctx.spawn(|_| {
-            let this = self.clone();
-            let respond_to = project_request.requested_by;
-            async move {
-                let contents = match this.read_file_contents().await {
-                    Ok(contents) => contents,
-                    Err(err) => {
-                        ReadProjectError { err, respond_to }.emit();
-                        return;
-                    },
-                };
-                let response = this.project.with(move |p| ProjectResponse {
-                    respond_to: respond_to.id(),
-                    file_contents: contents,
-                    peers: p.all_peers().cloned().collect(),
-                    replica: p.replica.encode(),
-                });
-                let _ = message_tx
-                    .send(Message::ProjectResponse(Box::new(response)));
-            }
-        });
+        self.neovim_ctx
+            .spawn(|_| {
+                let this = self.clone();
+                let respond_to = project_request.requested_by;
+                async move {
+                    let contents = match this.read_file_contents().await {
+                        Ok(contents) => contents,
+                        Err(err) => {
+                            ReadProjectError { err, respond_to }.emit();
+                            return;
+                        },
+                    };
+                    let response =
+                        this.project.with(move |p| ProjectResponse {
+                            respond_to: respond_to.id(),
+                            file_contents: contents,
+                            peers: p.all_peers().cloned().collect(),
+                            replica: p.replica.encode(),
+                        });
+                    let _ = message_tx
+                        .send(Message::ProjectResponse(Box::new(response)));
+                }
+            })
+            .detach();
     }
 
     async fn read_file_contents(&self) -> io::Result<FileContents> {

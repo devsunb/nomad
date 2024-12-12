@@ -53,6 +53,7 @@ impl Executor {
     }
 
     /// TODO: docs
+    #[must_use = "JoinHandles do nothing unless awaited or detached"]
     pub fn spawn<F>(&self, future: F) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
