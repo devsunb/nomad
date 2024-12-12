@@ -315,7 +315,7 @@ impl RunSession {
             project_root: self.project_root,
             replica: self.replica,
             session_id,
-            neovim_ctx: self.starter.ctx,
+            neovim_ctx: self.starter.ctx.clone(),
         });
 
         let status = SessionStatus::InSession(session.project());
@@ -436,5 +436,11 @@ impl From<&Collab> for Start {
             config: collab.config.clone(),
             session_status: collab.session_status.clone(),
         }
+    }
+}
+
+impl Drop for Starter {
+    fn drop(&mut self) {
+        self.session_status.set(SessionStatus::NotInSession);
     }
 }
