@@ -29,45 +29,36 @@ impl Action for SyncCursor {
         cursor: Self::Args,
         _: Self::Ctx<'a>,
     ) -> Self::Return {
-        let maybe_message = self.project.with_mut(|project| {
-            if cursor.moved_by == project.actor_id {
+        let maybe_message = self.project.with_mut(|proj| {
+            if cursor.moved_by == proj.actor_id {
                 return None;
             }
 
-            let Some(mut file) =
-                project.file_mut_of_buffer_id(cursor.buffer_id)
-            else {
-                panic!(
-                    "couldn't convert BufferId to file in {}",
-                    type_name::<Self>()
-                );
-            };
-
             Some(match cursor.kind {
                 CursorKind::Created(byte_offset) => {
+                    let Some(mut file) =
+                        proj.file_mut_of_buffer_id(cursor.buffer_id)
+                    else {
+                        panic!(
+                            "couldn't convert BufferId to file in {}",
+                            type_name::<Self>()
+                        );
+                    };
                     let (cursor_id, creation) =
                         file.sync_created_cursor(byte_offset.into_u64());
                     assert!(
-                        project.local_cursor_id.is_none(),
+                        proj.local_cursor_id.is_none(),
                         "creating a new cursor when another already exists, \
                          but Neovim only supports a single cursor"
                     );
-                    project.local_cursor_id = Some(cursor_id);
+                    proj.local_cursor_id = Some(cursor_id);
                     Message::CreatedCursor(creation)
                 },
-                CursorKind::Moved(byte_offset) => {
-                    let relocation = project
-                        .local_cursor_mut()
-                        .expect("cursor is being moved, so it must exist")
-                        .sync_relocated(byte_offset.into_u64())?;
-                    Message::MovedCursor(relocation)
-                },
+                CursorKind::Moved(byte_offset) => Message::MovedCursor(
+                    proj.local_cursor().sync_relocated(byte_offset)?,
+                ),
                 CursorKind::Removed => {
-                    let removal = project
-                        .local_cursor_mut()
-                        .expect("cursor is being removed, so it must exist")
-                        .sync_removed();
-                    Message::RemovedCursor(removal)
+                    Message::RemovedCursor(proj.local_cursor().sync_removed())
                 },
             })
         });

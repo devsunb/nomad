@@ -24,7 +24,7 @@ use eerie::{
 use fxhash::FxHashMap;
 use nohash::IntMap as NoHashMap;
 use nvimx::ctx::{ActorId, BufferCtx, BufferId, NeovimCtx, ShouldDetach};
-use nvimx::{Replacement, Shared};
+use nvimx::{ByteOffset, Replacement, Shared};
 
 use super::{PeerSelection, PeerTooltip};
 
@@ -67,6 +67,10 @@ pub(crate) struct Project {
 
     /// The [`SessionId`] of the session this projects is for.
     pub(super) session_id: SessionId,
+}
+
+pub(crate) struct LocalCursor<'a> {
+    project: &'a mut Project,
 }
 
 impl Project {
@@ -335,8 +339,8 @@ impl Project {
         let _ = self.remote_selections.remove(&selection_id);
     }
 
-    pub(super) fn local_cursor_mut(&mut self) -> Option<CursorRefMut<'_>> {
-        self.local_cursor_id.and_then(|id| self.replica.cursor_mut(id))
+    pub(super) fn local_cursor(&mut self) -> LocalCursor<'_> {
+        LocalCursor { project: self }
     }
 
     pub(super) fn refresh_cursors(&mut self, file_id: FileId) {
@@ -372,6 +376,61 @@ impl Project {
             };
             peer_selection.relocate(selection_range);
         }
+    }
+}
+
+impl LocalCursor<'_> {
+    #[track_caller]
+    pub(crate) fn create_at(self, byte_offset: ByteOffset) -> CursorCreation {
+        let proj = self.project;
+
+        if let Some(cursor_id) = proj.local_cursor_id {
+            let cursor = proj.replica.cursor(cursor_id).expect("ID is valid");
+            let file_path = cursor.file().path();
+            let offset = ByteOffset::new(cursor.byte_offset() as usize);
+            panic!(
+                "tried to create cursor in '' at {byte_offset:?}, but \
+                 another one already exists in {file_path:?} at {offset:?}"
+            );
+        }
+
+        todo!("get file, etc.")
+    }
+
+    #[track_caller]
+    pub(crate) fn sync_relocated(
+        self,
+        new_byte_offset: ByteOffset,
+    ) -> Option<CursorRelocation> {
+        let proj = self.project;
+
+        let Some(cursor_id) = proj.local_cursor_id else {
+            panic!(
+                "tried to relocate local cursor for project at {:?}, but \
+                 none is set",
+                proj.root()
+            );
+        };
+
+        proj.replica
+            .cursor_mut(cursor_id)
+            .expect("ID is valid")
+            .sync_relocated(new_byte_offset.into_u64())
+    }
+
+    #[track_caller]
+    pub(crate) fn sync_removed(self) -> CursorRemoval {
+        let proj = self.project;
+
+        let Some(cursor_id) = proj.local_cursor_id.take() else {
+            panic!(
+                "tried to remove local cursor for project at {:?}, but none \
+                 is set",
+                proj.root()
+            );
+        };
+
+        proj.replica.cursor_mut(cursor_id).expect("ID is valid").sync_removed()
     }
 }
 
