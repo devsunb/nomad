@@ -15,26 +15,26 @@ use crate::{
     Event,
 };
 
-/// TODO: docs.
+/// An [`Event`] used to receive cursor updates on a specific buffer.
 pub struct Cursor<A> {
     action: A,
 }
 
-/// TODO: docs.
-#[derive(Clone)]
+/// Arguments given to the [`Action`] registered on the [`Cursor`] event.
+#[derive(Debug, Clone)]
 pub struct CursorArgs {
-    /// TODO: docs.
+    /// The kind of cursor event that occurred.
     pub kind: CursorKind,
 
-    /// TODO: docs.
+    /// The [`BufferId`] of the buffer the [`Cursor`] event was registered on.
     pub buffer_id: BufferId,
 
-    /// TODO: docs.
+    /// The [`ActorId`] of the actor that caused the cursor to move.
     pub moved_by: ActorId,
 }
 
 /// TODO: docs.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum CursorKind {
     /// The cursor has been moved into the buffer at the given offset.
     Created(ByteOffset),
