@@ -37,7 +37,7 @@ use nvimx::diagnostics::{
     HighlightGroup,
     Level,
 };
-use nvimx::event::{BufAdd, BufUnload, Event};
+use nvimx::event::{BufReadPost, BufUnload, Event};
 use nvimx::plugin::Module;
 use nvimx::Shared;
 use peer_selection::PeerSelection;
@@ -136,7 +136,7 @@ impl Session {
             register_buffer_actions.register_actions(buffer_id);
         }
 
-        BufAdd::new(register_buffer_actions)
+        BufReadPost::new(register_buffer_actions)
             .register(self.neovim_ctx.reborrow());
 
         BufUnload::new(detach_buffer_actions)

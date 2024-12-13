@@ -2,7 +2,7 @@ use std::collections::hash_map::Entry;
 
 use collab_server::message::Message;
 use nvimx::ctx::{BufferCtx, BufferId, ShouldDetach};
-use nvimx::event::{BufAddArgs, Cursor, Event, OnBytes};
+use nvimx::event::{BufReadPostArgs, Cursor, Event, OnBytes};
 use nvimx::plugin::{action_name, Action, ActionName};
 use nvimx::Shared;
 use smallvec::SmallVec;
@@ -139,7 +139,7 @@ impl RegisterBufferActions {
 
 impl Action for RegisterBufferActions {
     const NAME: ActionName = action_name!("register-buffer-actions");
-    type Args = BufAddArgs;
+    type Args = BufReadPostArgs;
     type Ctx<'a> = BufferCtx<'a>;
     type Docs = ();
     type Module = Collab;
