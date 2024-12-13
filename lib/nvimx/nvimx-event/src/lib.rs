@@ -3,6 +3,7 @@
 mod buf_add;
 mod buf_enter;
 mod buf_leave;
+mod buf_read_post;
 mod buf_unload;
 mod cursor;
 mod cursor_moved;
@@ -12,6 +13,7 @@ mod on_bytes;
 pub use buf_add::{BufAdd, BufAddArgs};
 pub use buf_enter::{BufEnter, BufEnterArgs};
 pub use buf_leave::{BufLeave, BufLeaveArgs};
+pub use buf_read_post::{BufReadPost, BufReadPostArgs};
 pub use buf_unload::{BufUnload, BufUnloadArgs};
 pub use cursor::{Cursor, CursorArgs, CursorKind};
 pub use cursor_moved::{CursorMoved, CursorMovedArgs};
