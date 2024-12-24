@@ -1,9 +1,9 @@
-use crate::Backend;
+use crate::{Backend, PluginApi};
 
 /// TODO: docs.
-pub trait Plugin<B: Backend>: 'static {
+pub trait Plugin<B: Backend>: 'static + Sized {
     /// TODO: docs.
-    const NAME: PluginName;
+    const NAME: &'static PluginName;
 
     /// TODO: docs.
     type Docs;
@@ -14,3 +14,6 @@ pub trait Plugin<B: Backend>: 'static {
     /// TODO: docs.
     fn docs() -> Self::Docs;
 }
+
+/// TODO: docs.
+pub struct PluginName(str);

@@ -1,11 +1,11 @@
 use serde::de::DeserializeOwned;
 
-use crate::{Backend, NeovimCtx, Plugin};
+use crate::{Backend, ModuleApi, NeovimCtx, Plugin};
 
 /// TODO: docs.
-pub trait Module<B: Backend>: 'static {
+pub trait Module<B: Backend>: 'static + Sized {
     /// TODO: docs.
-    const NAME: ModuleName;
+    const NAME: &'static ModuleName;
 
     /// TODO: docs.
     type Plugin: Plugin<B>;
@@ -29,3 +29,6 @@ pub trait Module<B: Backend>: 'static {
     /// TODO: docs.
     fn docs() -> Self::Docs;
 }
+
+/// TODO: docs.
+pub struct ModuleName(str);
