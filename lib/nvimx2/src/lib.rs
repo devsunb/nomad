@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+mod action;
 mod async_ctx;
 mod backend;
 pub mod executor;
@@ -11,6 +12,7 @@ mod plugin;
 mod plugin_api;
 mod shared;
 
+pub use action::{Action, ActionName};
 pub use async_ctx::AsyncCtx;
 pub use backend::Backend;
 pub use maybe_result::MaybeResult;
