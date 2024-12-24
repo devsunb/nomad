@@ -1,6 +1,6 @@
 use serde::de::DeserializeOwned;
 
-use crate::Backend;
+use crate::{Backend, NeovimCtx, Plugin};
 
 /// TODO: docs.
 pub trait Module<B: Backend>: 'static {
@@ -17,10 +17,14 @@ pub trait Module<B: Backend>: 'static {
     type Docs;
 
     /// TODO: docs.
-    fn module_api(&self, ctx: ModuleCtx<'_, B>) -> ModuleApi<Self, B>;
+    fn api(&self, ctx: ModuleCtx<'_, B>) -> ModuleApi<Self, B>;
 
     /// TODO: docs.
-    fn on_config_changed(&mut self, new_config: Self::Config);
+    fn on_config_changed(
+        &mut self,
+        new_config: Self::Config,
+        ctx: NeovimCtx<'_, B>,
+    );
 
     /// TODO: docs.
     fn docs() -> Self::Docs;
