@@ -3,6 +3,8 @@
 mod action;
 mod async_ctx;
 mod backend;
+mod command;
+mod command_args;
 pub mod executor;
 mod maybe_result;
 mod module;
@@ -15,6 +17,8 @@ mod shared;
 pub use action::{Action, ActionName};
 pub use async_ctx::AsyncCtx;
 pub use backend::Backend;
+pub use command::Command;
+pub use command_args::CommandArgs;
 pub use maybe_result::MaybeResult;
 pub use module::{Module, ModuleCtx, ModuleName};
 pub use module_api::ModuleApi;
