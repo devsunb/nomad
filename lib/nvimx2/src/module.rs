@@ -31,4 +31,9 @@ pub trait Module<B: Backend>: 'static + Sized {
 }
 
 /// TODO: docs.
+pub struct ModuleCtx<'a, B> {
+    neovim_ctx: NeovimCtx<'a, B>,
+}
+
+/// TODO: docs.
 pub struct ModuleName(str);
