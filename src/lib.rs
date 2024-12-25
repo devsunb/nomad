@@ -1,4 +1,3 @@
-use nvimx2::backends::{Neovim, Nightly};
 use nvimx2::{Backend, Plugin, PluginApi, PluginCtx, PluginName};
 
 #[nvimx::oxi::plugin(nvim_oxi = nvimx::oxi)]
@@ -9,11 +8,19 @@ fn nomad() -> nvimx::plugin::PluginCtx<nomad::Nomad> {
         .with_module::<version::Version>()
 }
 
-// #[nvimx::plugin(Nightly)]
+#[cfg(feature = "neovim-0-10")]
+// #[nvimx2::plugin(nvimx2::neovim::ZeroDotTen)]
 pub fn mad() -> Mad {
     Mad
 }
 
+#[cfg(feature = "neovim-nightly")]
+// #[nvimx2::plugin(nvimx2::neovim::Nightly)]
+pub fn mad() -> Mad {
+    Mad
+}
+
+/// TODO: docs.
 pub struct Mad;
 
 impl<B: Backend> Plugin<B> for Mad {

@@ -9,6 +9,9 @@ publish.workspace = true
 [lib]
 proc-macro = true
 
+[features]
+plugin = []
+
 [dependencies]
 
 [lints]

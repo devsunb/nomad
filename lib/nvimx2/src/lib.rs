@@ -3,7 +3,6 @@
 mod action;
 mod async_ctx;
 mod backend;
-pub mod backends;
 mod command;
 mod command_args;
 pub mod executor;
@@ -19,6 +18,8 @@ mod shared;
 pub use action::{Action, ActionName};
 pub use async_ctx::AsyncCtx;
 pub use backend::Backend;
+#[cfg(feature = "__neovim")]
+pub use backend_neovim as neovim;
 pub use command::Command;
 pub use command_args::CommandArgs;
 pub use function::Function;

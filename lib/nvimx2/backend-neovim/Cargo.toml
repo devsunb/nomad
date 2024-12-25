@@ -1,0 +1,17 @@
+[package]
+name = "backend-neovim"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+neovim-0-10 = ["nvim-oxi/neovim-0-10"]
+neovim-nightly = ["nvim-oxi/neovim-nightly"]
+
+[dependencies]
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
+
+[lints]
+workspace = true

@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use super::NeovimVersion;
+use crate::NeovimVersion;
 
 /// TODO: docs.
 pub struct Neovim<V: NeovimVersion> {

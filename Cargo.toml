@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "lib/*", "lib/nvimx2/macros", "xtask"]
+members = ["crates/*", "lib/*", "lib/nvimx2/*", "xtask"]
+exclude = ["lib/nvimx2/src"]
 
 [workspace.package]
 version = "0.1.0"
@@ -85,6 +86,7 @@ authors.workspace = true
 crate-type = ["cdylib"]
 
 [features]
+neovim-0-10 = ["nvimx/neovim-0-10"]
 neovim-nightly = ["nvimx/neovim-nightly"]
 
 [dependencies]

@@ -6,10 +6,17 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+neovim-0-10 = ["__neovim", "backend-neovim/neovim-0-10"]
+neovim-nightly = ["__neovim", "backend-neovim/neovim-nightly"]
+__neovim = ["dep:backend-neovim", "nvimx2-macros/plugin"]
+
 [dependencies]
-nvimx2-macros = { path = "./macros/" }
+nvimx2-macros = { path = "./nvimx-macros" }
 serde = { workspace = true }
 thiserror = { workspace = true }
+
+backend-neovim = { path = "./backend-neovim", optional = true }
 
 [lints]
 workspace = true
