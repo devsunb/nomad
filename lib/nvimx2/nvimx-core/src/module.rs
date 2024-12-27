@@ -1,3 +1,5 @@
+use core::mem::ManuallyDrop;
+
 use serde::de::DeserializeOwned;
 
 use crate::api::{Api, ModuleApi};
@@ -26,7 +28,7 @@ pub trait Module<B: Backend>: 'static + Sized {
     type Docs;
 
     /// TODO: docs.
-    fn api(&self, ctx: ModuleApiCtx<'_, '_, Self, B>);
+    fn api(&self, ctx: ModuleApiCtx<'_, Self, B>);
 
     /// TODO: docs.
     fn on_config_changed(
@@ -40,10 +42,12 @@ pub trait Module<B: Backend>: 'static + Sized {
 }
 
 /// TODO: docs.
-pub struct ModuleApiCtx<'a, 'b, M: Module<B>, B: Backend> {
-    pub(crate) api:
-        &'b mut <B::Api<M::Plugin> as Api<M::Plugin, B>>::ModuleApi<'a, M>,
-    pub(crate) backend: &'a BackendHandle<B>,
+pub struct ModuleApiCtx<'a, M: Module<B>, B: Backend> {
+    #[allow(clippy::type_complexity)]
+    api: ManuallyDrop<
+        <B::Api<M::Plugin> as Api<M::Plugin, B>>::ModuleApi<'a, M>,
+    >,
+    backend: &'a BackendHandle<B>,
 }
 
 /// TODO: docs.
@@ -51,14 +55,15 @@ pub struct ModuleApiCtx<'a, 'b, M: Module<B>, B: Backend> {
 #[repr(transparent)]
 pub struct ModuleName(str);
 
-impl<M, B> ModuleApiCtx<'_, '_, M, B>
+impl<'a, M, B> ModuleApiCtx<'a, M, B>
 where
     M: Module<B>,
     B: Backend,
 {
     /// TODO: docs.
+    #[track_caller]
     #[inline]
-    pub fn with_function<Fun>(self, mut fun: Fun) -> Self
+    pub fn with_function<Fun>(mut self, mut fun: Fun) -> Self
     where
         Fun: Function<B, Module = M>,
     {
@@ -84,6 +89,14 @@ where
         self.api.add_function::<Fun, _, _>(callback);
         self
     }
+
+    #[inline]
+    pub(crate) fn new(
+        api: &'a mut B::Api<M::Plugin>,
+        backend: &'a BackendHandle<B>,
+    ) -> Self {
+        Self { api: ManuallyDrop::new(api.with_module::<M>()), backend }
+    }
 }
 
 impl ModuleName {
@@ -100,5 +113,18 @@ impl ModuleName {
         assert!(name.len() <= 24);
         // SAFETY: `ModuleName` is a `repr(transparent)` newtype around `str`.
         unsafe { &*(name as *const str as *const Self) }
+    }
+}
+
+impl<M, B> Drop for ModuleApiCtx<'_, M, B>
+where
+    M: Module<B>,
+    B: Backend,
+{
+    #[inline]
+    fn drop(&mut self) {
+        // SAFETY: We never use the `ManuallyDrop` again.
+        let api = unsafe { ManuallyDrop::take(&mut self.api) };
+        api.finish();
     }
 }

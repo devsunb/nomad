@@ -42,16 +42,13 @@ where
     }
 
     /// TODO: docs.
+    #[track_caller]
     #[inline]
     pub fn with_module<M>(mut self, module: M) -> Self
     where
         M: Module<B, Plugin = P>,
     {
-        let mut module_api = self.api.with_module::<M>();
-        let ctx =
-            ModuleApiCtx { api: &mut module_api, backend: &self.backend };
-        module.api(ctx);
-        module_api.finish();
+        module.api(ModuleApiCtx::new(&mut self.api, &self.backend));
         self
     }
 
