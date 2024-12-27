@@ -15,8 +15,7 @@ pub(crate) fn plugin(attr: TokenStream, item: TokenStream) -> TokenStream {
             let mut __backend: ::nvimx2::neovim::Neovim<#version> = ::nvimx2::Backend::init();
             let __plugin_ctx = ::nvimx2::PluginCtx::new(&mut __backend);
             let __plugin = #fun_body;
-            let __plugin_api = ::nvimx2::Plugin::api(&__plugin, __plugin_ctx);
-            ::nvimx2::Backend::to_backend_api(&mut __backend, __plugin_api)
+            ::nvimx2::Plugin::api(&__plugin, __plugin_ctx).into()
         }
     }
     .into()

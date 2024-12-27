@@ -1,6 +1,7 @@
 //! TODO: docs.
 
 mod action;
+pub mod api;
 mod async_ctx;
 mod backend;
 mod command;

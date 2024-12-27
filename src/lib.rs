@@ -1,5 +1,5 @@
 use nvimx2::neovim::{self, Neovim, NeovimVersion};
-use nvimx2::{Plugin, PluginApi, PluginCtx, PluginName};
+use nvimx2::{Plugin, PluginCtx, PluginName};
 
 #[cfg(not(feature = "neovim-nightly"))]
 #[nvimx2::plugin(neovim::ZeroDotTen)]
@@ -24,7 +24,7 @@ impl<V: NeovimVersion> Plugin<Neovim<V>> for Mad {
     fn api(
         &self,
         _ctx: PluginCtx<'_, Neovim<V>>,
-    ) -> PluginApi<Self, Neovim<V>> {
+    ) -> neovim::api::NeovimApi<Self, V> {
         // PluginApi::new(ctx)
         //     .with_module(auth::Auth::new())
         //     .with_module(collab::Collab::new())

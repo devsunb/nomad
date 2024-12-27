@@ -1,13 +1,14 @@
 use core::marker::PhantomData;
 
-use nvimx_core::{Backend, Plugin, PluginApi};
+use nvimx_core::api::Api;
+use nvimx_core::{Backend, Plugin};
 
 use crate::{
     NeovimBackgroundExecutor,
     NeovimLocalExecutor,
     NeovimVersion,
+    api,
     notify,
-    oxi,
 };
 
 /// TODO: docs.
@@ -17,7 +18,7 @@ pub struct Neovim<V: NeovimVersion> {
 }
 
 impl<V: NeovimVersion> Backend for Neovim<V> {
-    type Api<P: Plugin<Self>> = oxi::Dictionary;
+    type Api<P: Plugin<Self>> = api::NeovimApi<P, V>;
     type LocalExecutor = NeovimLocalExecutor;
     type BackgroundExecutor = NeovimBackgroundExecutor;
     type Emitter<'a> = &'a mut notify::NeovimEmitter;
@@ -31,18 +32,14 @@ impl<V: NeovimVersion> Backend for Neovim<V> {
     }
 
     #[inline]
-    fn emitter(&mut self) -> Self::Emitter<'_> {
-        &mut self.emitter
+    fn api_builder<P: Plugin<Self>>(
+        &mut self,
+    ) -> <Self::Api<P> as Api<P, Self>>::Builder<'_> {
+        api::NeovimApi::<P, V>::default()
     }
 
     #[inline]
-    fn to_backend_api<P>(
-        &mut self,
-        _plugin_api: PluginApi<P, Self>,
-    ) -> Self::Api<P>
-    where
-        P: Plugin<Self>,
-    {
-        todo!();
+    fn emitter(&mut self) -> Self::Emitter<'_> {
+        &mut self.emitter
     }
 }

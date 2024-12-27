@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+pub mod api;
 mod background_executor;
 mod convert;
 mod local_executor;

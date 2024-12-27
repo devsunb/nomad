@@ -1,10 +1,11 @@
+use crate::api::Api;
 use crate::executor::{BackgroundExecutor, LocalExecutor};
-use crate::{Plugin, PluginApi, notify};
+use crate::{Plugin, notify};
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
     /// TODO: docs.
-    type Api<P: Plugin<Self>>;
+    type Api<P: Plugin<Self>>: Api<P, Self>;
 
     /// TODO: docs.
     type LocalExecutor: LocalExecutor;
@@ -16,16 +17,13 @@ pub trait Backend: 'static + Sized {
     type Emitter<'a>: notify::Emitter;
 
     /// TODO: docs.
+    fn api_builder<P: Plugin<Self>>(
+        &mut self,
+    ) -> <Self::Api<P> as Api<P, Self>>::Builder<'_>;
+
+    /// TODO: docs.
     fn init() -> Self;
 
     /// TODO: docs.
     fn emitter(&mut self) -> Self::Emitter<'_>;
-
-    /// TODO: docs.
-    fn to_backend_api<P>(
-        &mut self,
-        plugin_api: PluginApi<P, Self>,
-    ) -> Self::Api<P>
-    where
-        P: Plugin<Self>;
 }

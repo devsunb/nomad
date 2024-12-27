@@ -9,7 +9,7 @@ pub trait Plugin<B: Backend>: 'static + Sized {
     type Docs;
 
     /// TODO: docs.
-    fn api(&self, ctx: PluginCtx<'_, B>) -> PluginApi<Self, B>;
+    fn api(&self, ctx: PluginCtx<'_, B>) -> B::Api<Self>;
 
     /// TODO: docs.
     fn docs() -> Self::Docs;
