@@ -10,13 +10,16 @@ use crate::oxi;
 
 /// TODO: docs.
 pub trait VimNotifyProvider: 'static {
-    /// TODO: docs.
+    /// Converts the given `Notification` into the message that will be passed
+    /// as the first argument to `vim.notify()`.
     fn to_message(&mut self, notification: &Notification) -> String;
 
-    /// TODO: docs.
+    /// Converts the given `Notification` into the optional parameters that
+    /// will be passed as the third argument to `vim.notify()`.
     fn to_opts(&mut self, notification: &Notification) -> oxi::Dictionary;
 
-    /// TODO: docs.
+    /// Converts the return value of a call to `vim.notify()` into the
+    /// [`NotificationId`] of the notification that was emitted.
     fn to_notification_id(
         &mut self,
         notify_return: oxi::Object,
@@ -104,7 +107,8 @@ impl VimNotifyProvider for DefaultProvider {
     }
 
     #[inline]
-    fn to_notification_id(&mut self, _: oxi::Object) -> NotificationId {
+    fn to_notification_id(&mut self, obj: oxi::Object) -> NotificationId {
+        debug_assert!(obj.is_nil());
         NotificationId::new(0)
     }
 }
