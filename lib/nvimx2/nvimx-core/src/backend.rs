@@ -17,9 +17,7 @@ pub trait Backend: 'static + Sized {
     type Emitter<'a>: notify::Emitter;
 
     /// TODO: docs.
-    fn api_builder<P: Plugin<Self>>(
-        &mut self,
-    ) -> <Self::Api<P> as Api<P, Self>>::Builder<'_>;
+    fn api<P: Plugin<Self>>(&mut self) -> Self::Api<P>;
 
     /// TODO: docs.
     fn init() -> Self;

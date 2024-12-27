@@ -1,6 +1,5 @@
-use neovim::Neovim;
-use neovim::api::NeovimApi;
-use nvimx2::{Plugin, PluginCtx, PluginName, neovim};
+use neovim::{Neovim, NeovimApi};
+use nvimx2::{Plugin, PluginApiCtx, PluginName, neovim};
 
 #[neovim::plugin]
 fn mad() -> Mad {
@@ -15,12 +14,12 @@ impl Plugin<Neovim> for Mad {
 
     type Docs = ();
 
-    fn api(&self, _ctx: PluginCtx<'_, Neovim>) -> NeovimApi<Self> {
-        // PluginApi::new(ctx)
-        //     .with_module(auth::Auth::new())
+    fn api(&self, _ctx: PluginApiCtx<'_, Self, Neovim>) -> NeovimApi<Self> {
+        // ctx.with_module(auth::Auth::new())
         //     .with_module(collab::Collab::new())
         //     .with_module(version::Version::new())
-        todo!();
+        //     .into_api()
+        todo!()
     }
 
     fn docs() {}

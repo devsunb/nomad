@@ -1,9 +1,8 @@
 //! TODO: docs.
 
-use core::error::Error;
 use core::marker::PhantomData;
 
-use nvimx_core::api::{Api, ApiBuilder, ModuleApi, ModuleApiBuilder};
+use nvimx_core::api::{Api, ModuleApi};
 use nvimx_core::{Function, Module, Plugin, notify};
 use serde::de::Deserialize;
 use serde::ser::Serialize;
@@ -18,54 +17,35 @@ pub struct NeovimApi<P> {
 }
 
 /// TODO: docs.
-pub struct NeovimModuleApi<M> {
+pub struct NeovimModuleApi<'a, M: Module<Neovim>> {
+    plugin_api: &'a mut NeovimApi<M::Plugin>,
     dict: Dictionary,
-    _phantom: PhantomData<M>,
 }
 
 impl<P> Api<P, Neovim> for NeovimApi<P>
 where
     P: Plugin<Neovim>,
 {
-    type Builder<'a> = Self;
-    type ModuleApi<M: Module<Neovim, Plugin = P>> = NeovimModuleApi<M>;
-}
+    type ModuleApi<'a, M: Module<Neovim, Plugin = P>> = NeovimModuleApi<'a, M>;
 
-impl<P> ApiBuilder<NeovimApi<P>, P, Neovim> for NeovimApi<P>
-where
-    P: Plugin<Neovim>,
-{
+    #[track_caller]
     #[inline]
-    fn add_module<M>(&mut self, module_api: NeovimModuleApi<M>)
+    fn with_module<M>(&mut self) -> Self::ModuleApi<'_, M>
     where
         M: Module<Neovim, Plugin = P>,
     {
-        self.dict.insert(M::NAME.as_str(), module_api.dict);
-        todo!();
-    }
-
-    #[inline]
-    fn module_builder<M>(&mut self) -> NeovimModuleApi<M>
-    where
-        M: Module<Neovim, Plugin = P>,
-    {
-        NeovimModuleApi::default()
-    }
-
-    #[inline]
-    fn build(self) -> NeovimApi<P> {
-        self
+        if self.dict.get(M::NAME.as_str()).is_some() {
+            panic!(
+                "a module with name '{}' has already been added to {}'s API",
+                M::NAME.as_str(),
+                P::NAME.as_str(),
+            );
+        }
+        NeovimModuleApi { plugin_api: self, dict: Dictionary::default() }
     }
 }
 
-impl<M> ModuleApi<M, Neovim> for NeovimModuleApi<M>
-where
-    M: Module<Neovim>,
-{
-    type Builder<'a> = Self;
-}
-
-impl<M> ModuleApiBuilder<NeovimModuleApi<M>, M, Neovim> for NeovimModuleApi<M>
+impl<M> ModuleApi<M, Neovim> for NeovimModuleApi<'_, M>
 where
     M: Module<Neovim>,
 {
@@ -109,24 +89,15 @@ where
     }
 
     #[inline]
-    fn build(self) -> NeovimModuleApi<M> {
-        self
+    fn finish(self) {
+        self.plugin_api.dict.insert(M::NAME.as_str(), self.dict);
+        todo!()
     }
 }
 
 impl<P> Default for NeovimApi<P>
 where
     P: Plugin<Neovim>,
-{
-    #[inline]
-    fn default() -> Self {
-        Self { dict: Dictionary::default(), _phantom: PhantomData }
-    }
-}
-
-impl<M> Default for NeovimModuleApi<M>
-where
-    M: Module<Neovim>,
 {
     #[inline]
     fn default() -> Self {

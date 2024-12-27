@@ -14,6 +14,11 @@ pub(crate) struct BackendMut<'a, B> {
 }
 
 impl<B> BackendHandle<B> {
+    #[inline]
+    pub(crate) fn new(backend: B) -> Self {
+        Self { inner: Shared::new(backend) }
+    }
+
     #[track_caller]
     #[inline]
     pub(crate) fn with_mut<F, R>(&self, f: F) -> R

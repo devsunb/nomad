@@ -1,4 +1,7 @@
-use crate::{Backend, NeovimCtx, PluginApi};
+use core::marker::PhantomData;
+
+use crate::api::{Api, ModuleApi};
+use crate::{Backend, BackendHandle, Module, ModuleApiCtx};
 
 /// TODO: docs.
 pub trait Plugin<B: Backend>: 'static + Sized {
@@ -9,15 +12,17 @@ pub trait Plugin<B: Backend>: 'static + Sized {
     type Docs;
 
     /// TODO: docs.
-    fn api(&self, ctx: PluginCtx<'_, B>) -> B::Api<Self>;
+    fn api(&self, ctx: PluginApiCtx<'_, Self, B>) -> B::Api<Self>;
 
     /// TODO: docs.
     fn docs() -> Self::Docs;
 }
 
 /// TODO: docs.
-pub struct PluginCtx<'a, B> {
-    backend: &'a mut B,
+pub struct PluginApiCtx<'a, P: Plugin<B>, B: Backend> {
+    api: B::Api<P>,
+    backend: BackendHandle<B>,
+    _phantom: PhantomData<&'a ()>,
 }
 
 /// TODO: docs.
@@ -25,11 +30,36 @@ pub struct PluginCtx<'a, B> {
 #[repr(transparent)]
 pub struct PluginName(str);
 
-impl<'a, B: Backend> PluginCtx<'a, B> {
-    #[doc(hidden)]
+impl<P, B> PluginApiCtx<'_, P, B>
+where
+    P: Plugin<B>,
+    B: Backend,
+{
+    /// TODO: docs.
     #[inline]
-    pub fn new(backend: &'a mut B) -> Self {
-        Self { backend }
+    pub fn into_api(self) -> B::Api<P> {
+        self.api
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn with_module<M>(mut self, module: M) -> Self
+    where
+        M: Module<B, Plugin = P>,
+    {
+        let mut module_api = self.api.with_module::<M>();
+        let ctx =
+            ModuleApiCtx { api: &mut module_api, backend: &self.backend };
+        module.api(ctx);
+        module_api.finish();
+        self
+    }
+
+    #[doc(hidden)]
+    pub fn new(backend: B) -> Self {
+        let backend = BackendHandle::new(backend);
+        let api = backend.with_mut(|mut b| B::api::<P>(&mut b));
+        Self { api, backend, _phantom: PhantomData }
     }
 }
 

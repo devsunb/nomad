@@ -29,6 +29,6 @@ pub use maybe_result::MaybeResult;
 pub use module::{Module, ModuleApiCtx, ModuleName};
 pub use module_api::ModuleApi;
 pub use neovim_ctx::NeovimCtx;
-pub use plugin::{Plugin, PluginCtx, PluginName};
+pub use plugin::{Plugin, PluginApiCtx, PluginName};
 pub use plugin_api::PluginApi;
 pub use shared::Shared;

@@ -1,4 +1,3 @@
-use nvimx_core::api::Api;
 use nvimx_core::{Backend, Plugin};
 
 use crate::{NeovimBackgroundExecutor, NeovimLocalExecutor, api, notify};
@@ -20,9 +19,7 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn api_builder<P: Plugin<Self>>(
-        &mut self,
-    ) -> <Self::Api<P> as Api<P, Self>>::Builder<'_> {
+    fn api<P: Plugin<Self>>(&mut self) -> Self::Api<P> {
         api::NeovimApi::default()
     }
 

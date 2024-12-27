@@ -7,6 +7,7 @@ mod local_executor;
 mod neovim;
 pub mod notify;
 
+pub use api::NeovimApi;
 pub use background_executor::NeovimBackgroundExecutor;
 pub use local_executor::NeovimLocalExecutor;
 pub use neovim::Neovim;
