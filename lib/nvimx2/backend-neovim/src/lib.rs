@@ -6,10 +6,14 @@ mod convert;
 mod local_executor;
 mod neovim;
 pub mod notify;
+pub mod serde;
 
 pub use api::NeovimApi;
-pub use background_executor::NeovimBackgroundExecutor;
-pub use local_executor::NeovimLocalExecutor;
+pub mod executor {
+    //! TODO: docs.
+    pub use crate::background_executor::NeovimBackgroundExecutor;
+    pub use crate::local_executor::NeovimLocalExecutor;
+}
 pub use neovim::Neovim;
 #[doc(hidden)]
 pub use nvim_oxi as oxi;

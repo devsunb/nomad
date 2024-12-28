@@ -197,7 +197,9 @@ dependencies = [
  "nvimx-core",
  "nvimx2-macros",
  "serde",
+ "serde_path_to_error",
  "smallvec",
+ "thiserror 2.0.4",
 ]
 
 [[package]]

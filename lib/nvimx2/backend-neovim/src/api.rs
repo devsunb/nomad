@@ -3,12 +3,12 @@
 use core::marker::PhantomData;
 
 use nvimx_core::api::{Api, ModuleApi};
-use nvimx_core::{Function, Module, Plugin, notify};
+use nvimx_core::{ActionName, Module, Plugin, notify};
 use serde::de::Deserialize;
 use serde::ser::Serialize;
 
 use crate::Neovim;
-use crate::oxi::{self, Dictionary};
+use crate::oxi::{Dictionary, Function, Object};
 
 /// TODO: docs.
 pub struct NeovimApi<P> {
@@ -51,41 +51,24 @@ where
 {
     #[track_caller]
     #[inline]
-    fn add_function<Fun, Cb, Err>(&mut self, mut callback: Cb)
+    fn add_function<Fun, Err>(&mut self, fun_name: &ActionName, mut fun: Fun)
     where
-        Fun: Function<Neovim, Module = M>,
-        Cb: FnMut(Fun::Args) -> Result<Fun::Return, Err> + 'static,
+        Fun: FnMut(Object) -> Result<Object, Err> + 'static,
         Err: notify::Error,
     {
-        if self.dict.get(Fun::NAME.as_str()).is_some() {
+        if self.dict.get(fun_name.as_str()).is_some() {
             panic!(
                 "a field with name '{}' has already been added to {}.{}'s API",
-                Fun::NAME.as_str(),
+                fun_name.as_str(),
                 M::Plugin::NAME.as_str(),
                 M::NAME.as_str(),
             );
         }
 
-        let function = oxi::Function::from_fn_mut(move |args: oxi::Object| {
-            let args = match Fun::Args::deserialize(
-                oxi::serde::Deserializer::new(args),
-            ) {
-                Ok(args) => args,
-                Err(_err) => todo!(),
-            };
-
-            let ret = match callback(args) {
-                Ok(ret) => ret,
-                Err(_err) => todo!(),
-            };
-
-            match ret.serialize(oxi::serde::Serializer::new()) {
-                Ok(obj) => obj,
-                Err(_err) => todo!(),
-            }
-        });
-
-        self.dict.insert(Fun::NAME.as_str(), function);
+        self.dict.insert(
+            fun_name.as_str(),
+            Function::from_fn_mut(move |args| fun(args).unwrap_or_default()),
+        );
     }
 
     #[inline]

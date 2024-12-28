@@ -15,7 +15,9 @@ nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
 nvimx-core = { path = "../nvimx-core" }
 nvimx2-macros = { path = "../nvimx-macros" }
 serde = { workspace = true }
+serde_path_to_error = "0.1"
 smallvec = { workspace = true }
+thiserror = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,6 +1,6 @@
 use nvimx_core::{Backend, Plugin};
 
-use crate::{NeovimBackgroundExecutor, NeovimLocalExecutor, api, notify};
+use crate::{api, executor, notify, oxi, serde};
 
 /// TODO: docs.
 pub struct Neovim {
@@ -9,9 +9,12 @@ pub struct Neovim {
 
 impl Backend for Neovim {
     type Api<P: Plugin<Self>> = api::NeovimApi<P>;
-    type LocalExecutor = NeovimLocalExecutor;
-    type BackgroundExecutor = NeovimBackgroundExecutor;
+    type ApiValue = oxi::Object;
+    type LocalExecutor = executor::NeovimLocalExecutor;
+    type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'a> = &'a mut notify::NeovimEmitter;
+    type Serializer = serde::NeovimSerializer;
+    type Deserializer<'de> = serde::NeovimDeserializer;
 
     #[inline]
     fn init() -> Self {
@@ -26,5 +29,18 @@ impl Backend for Neovim {
     #[inline]
     fn emitter(&mut self) -> Self::Emitter<'_> {
         &mut self.emitter
+    }
+
+    #[inline]
+    fn serializer(&mut self) -> Self::Serializer {
+        serde::NeovimSerializer::default()
+    }
+
+    #[inline]
+    fn deserializer<'de>(
+        &mut self,
+        value: oxi::Object,
+    ) -> Self::Deserializer<'de> {
+        serde::NeovimDeserializer::new(value)
     }
 }
