@@ -23,16 +23,13 @@ pub trait Module<B: Backend>: 'static + Sized {
     const NAME: &'static ModuleName;
 
     /// TODO: docs.
-    type Namespace: Plugin<B>;
-
-    /// TODO: docs.
     type Config: DeserializeOwned;
 
     /// TODO: docs.
     type Docs;
 
     /// TODO: docs.
-    fn api(&self, ctx: ApiCtx<'_, Self, B>);
+    fn api<P: Plugin<B>>(&self, ctx: ApiCtx<'_, Self, P, B>);
 
     /// TODO: docs.
     fn on_config_changed(
@@ -46,11 +43,9 @@ pub trait Module<B: Backend>: 'static + Sized {
 }
 
 /// TODO: docs.
-pub struct ApiCtx<'a, M: Module<B>, B: Backend> {
+pub struct ApiCtx<'a, M: Module<B>, P: Plugin<B>, B: Backend> {
     #[allow(clippy::type_complexity)]
-    api: ManuallyDrop<
-        <B::Api<M::Namespace> as Api<M::Namespace, B>>::ModuleApi<'a, M>,
-    >,
+    api: ManuallyDrop<<B::Api<P> as Api<P, B>>::ModuleApi<'a, M>>,
     backend: &'a BackendHandle<B>,
 }
 
@@ -59,9 +54,10 @@ pub struct ApiCtx<'a, M: Module<B>, B: Backend> {
 #[repr(transparent)]
 pub struct ModuleName(str);
 
-impl<'a, M, B> ApiCtx<'a, M, B>
+impl<'a, M, P, B> ApiCtx<'a, M, P, B>
 where
     M: Module<B>,
+    P: Plugin<B>,
     B: Backend,
 {
     /// TODO: docs.
@@ -125,14 +121,14 @@ where
     #[inline]
     pub fn with_module<Mod>(mut self, mut module: Mod) -> Self
     where
-        Mod: Module<B, Namespace = M>,
+        Mod: Module<B>,
     {
         todo!();
     }
 
     #[inline]
     pub(crate) fn new(
-        api: &'a mut B::Api<M::Namespace>,
+        api: &'a mut B::Api<P>,
         backend: &'a BackendHandle<B>,
     ) -> Self {
         Self { api: ManuallyDrop::new(api.with_module::<M>()), backend }
@@ -162,9 +158,10 @@ impl ModuleName {
     }
 }
 
-impl<M, B> Drop for ApiCtx<'_, M, B>
+impl<M, P, B> Drop for ApiCtx<'_, M, P, B>
 where
     M: Module<B>,
+    P: Plugin<B>,
     B: Backend,
 {
     #[inline]

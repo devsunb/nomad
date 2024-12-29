@@ -1,4 +1,4 @@
-use nvimx2::module::{Module, ApiCtx, ModuleName};
+use nvimx2::module::{ApiCtx, Module, ModuleName};
 use nvimx2::neovim::{self, Neovim};
 use nvimx2::{NeovimCtx, Plugin};
 
@@ -14,11 +14,10 @@ impl Plugin<Neovim> for Mad {}
 
 impl Module<Neovim> for Mad {
     const NAME: &'static ModuleName = ModuleName::new("mad");
-    type Namespace = Self;
     type Config = ();
     type Docs = ();
 
-    fn api(&self, _ctx: ApiCtx<'_, Self, Neovim>) {
+    fn api<P: Plugin<Neovim>>(&self, _ctx: ApiCtx<'_, Self, P, Neovim>) {
         // ctx.with_module(auth::Auth::new())
         //     .with_module(collab::Collab::new())
         //     .with_module(version::Version::new())

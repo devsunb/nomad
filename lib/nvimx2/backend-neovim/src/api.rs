@@ -17,8 +17,9 @@ pub struct NeovimApi<P> {
 }
 
 /// TODO: docs.
-pub struct NeovimModuleApi<'a, M: Module<Neovim>> {
-    plugin_api: &'a mut NeovimApi<M::Namespace>,
+pub struct NeovimModuleApi<'a, P: Plugin<Neovim>, M: Module<Neovim>> {
+    plugin_api: &'a mut NeovimApi<P>,
+    module: PhantomData<M>,
     dict: Dictionary,
 }
 
@@ -26,8 +27,7 @@ impl<P> Api<P, Neovim> for NeovimApi<P>
 where
     P: Plugin<Neovim>,
 {
-    type ModuleApi<'a, M: Module<Neovim, Namespace = P>> =
-        NeovimModuleApi<'a, M>;
+    type ModuleApi<'a, M: Module<Neovim>> = NeovimModuleApi<'a, P, M>;
 
     #[inline]
     fn add_command<Cmd, CompFun, Comps>(
@@ -92,7 +92,7 @@ where
     #[inline]
     fn with_module<M>(&mut self) -> Self::ModuleApi<'_, M>
     where
-        M: Module<Neovim, Namespace = P>,
+        M: Module<Neovim>,
     {
         if self.dict.get(M::NAME.as_str()).is_some() {
             panic!(
@@ -101,12 +101,17 @@ where
                 P::NAME.as_str(),
             );
         }
-        NeovimModuleApi { plugin_api: self, dict: Dictionary::default() }
+        NeovimModuleApi {
+            plugin_api: self,
+            module: PhantomData,
+            dict: Dictionary::default(),
+        }
     }
 }
 
-impl<M> ModuleApi<M, Neovim> for NeovimModuleApi<'_, M>
+impl<P, M> ModuleApi<M, Neovim> for NeovimModuleApi<'_, P, M>
 where
+    P: Plugin<Neovim>,
     M: Module<Neovim>,
 {
     #[track_caller]
@@ -120,7 +125,7 @@ where
             panic!(
                 "a field with name '{}' has already been added to {}.{}'s API",
                 fun_name.as_str(),
-                M::Namespace::NAME.as_str(),
+                P::NAME.as_str(),
                 M::NAME.as_str(),
             );
         }
