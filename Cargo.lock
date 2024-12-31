@@ -1133,6 +1133,7 @@ version = "0.1.0"
 dependencies = [
  "fxhash",
  "serde",
+ "smallvec",
  "smol_str",
  "thiserror 2.0.4",
 ]

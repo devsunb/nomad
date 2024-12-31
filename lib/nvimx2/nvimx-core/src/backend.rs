@@ -57,21 +57,25 @@ pub trait Backend: 'static + Sized {
 
 /// TODO: docs.
 pub(crate) trait BackendExt: Backend {
-    fn emit_err<Err: notify::Error>(&mut self, err: Err);
+    fn emit_err<Err: notify::Error>(
+        &mut self,
+        namespace: &notify::Namespace,
+        err: Err,
+    );
 }
 
 impl<B: Backend> BackendExt for B {
     #[inline]
-    fn emit_err<Err: notify::Error>(&mut self, err: Err) {
+    fn emit_err<Err: notify::Error>(
+        &mut self,
+        namespace: &notify::Namespace,
+        err: Err,
+    ) {
         let Some(level) = err.to_level() else { return };
 
         let notification = notify::Notification {
             level,
-            source: notify::Source {
-                plugin_name: crate::module::ModuleName::new("yoo"),
-                module_name: None,
-                action_name: None,
-            },
+            namespace,
             message: err.to_message(),
             updates_prev: None,
         };

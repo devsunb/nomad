@@ -1,12 +1,12 @@
-use super::{Level, Message, NotificationId, Source};
+use super::{Level, Message, Namespace, NotificationId};
 
 /// TODO: docs.
-pub struct Notification {
+pub struct Notification<'ns> {
     /// TODO: docs.
     pub level: Level,
 
     /// TODO: docs.
-    pub source: Source,
+    pub namespace: &'ns Namespace,
 
     /// TODO: docs.
     pub message: Message,

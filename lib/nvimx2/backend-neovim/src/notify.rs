@@ -1,6 +1,7 @@
 //! TODO: docs.
 
-use core::iter;
+use core::fmt::Write;
+use core::{fmt, iter};
 
 use nvimx_core::notify::{Emitter, Level, Notification, NotificationId};
 use smallvec::SmallVec;
@@ -90,15 +91,18 @@ impl Default for VimNotify {
 impl VimNotifyProvider for DefaultProvider {
     #[inline]
     fn to_message(&mut self, notification: &Notification) -> String {
-        let src = &notification.source;
-
-        let tag = iter::once(src.plugin_name.as_str())
-            .chain(src.module_name.map(|n| n.as_str()))
-            .chain(src.action_name.map(|n| n.as_str()))
-            .collect::<SmallVec<[_; 3]>>()
-            .join(".");
-
-        format!("[{tag}] {}", notification.message)
+        let mut msg = String::from("[");
+        let mut iter = notification.namespace.components();
+        if let Some(first) = iter.next() {
+            msg.push_str(first);
+            for item in iter {
+                msg.push('.');
+                msg.push_str(item);
+            }
+        }
+        msg.push_str("] ");
+        msg.push_str(notification.message.as_str());
+        msg
     }
 
     #[inline]

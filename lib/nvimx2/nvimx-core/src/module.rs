@@ -44,6 +44,7 @@ pub trait Module<B: Backend>: 'static + Sized {
 pub struct ApiCtx<'a, 'b, M: Module<B>, P: Plugin<B>, B: Backend> {
     module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
     command_builder: &'a mut CommandBuilder<B>,
+    namespace: &'a mut notify::Namespace,
     backend: &'b BackendHandle<B>,
 }
 
@@ -76,12 +77,15 @@ where
         Fun: Function<B>,
     {
         let backend = self.backend.clone();
+        let mut namespace = self.namespace.clone();
+        namespace.set_action(Fun::NAME);
         let fun = move |value| {
             let fun = &mut function;
+            let namespace = &namespace;
             backend.with_mut(move |mut backend| {
                 let args = backend.deserialize::<Fun::Args>(value).map_err(
                     |err| {
-                        backend.emit_err(&err);
+                        backend.emit_err(namespace, &err);
                         FunctionError::Deserialize(err)
                     },
                 )?;
@@ -102,12 +106,12 @@ where
                         Box::new(err) as Box<dyn notify::Error>
                     })
                     .map_err(|err| {
-                        backend.emit_err(&err);
+                        backend.emit_err(namespace, &err);
                         FunctionError::Call(err)
                     })?;
 
                 backend.serialize(&ret).map_err(|err| {
-                    backend.emit_err(&err);
+                    backend.emit_err(namespace, &err);
                     FunctionError::Serialize(err)
                 })
             })
@@ -118,16 +122,22 @@ where
 
     /// TODO: docs.
     #[inline]
-    pub fn with_module<Mod>(self, module: Mod) -> Self
+    pub fn with_module<Mod>(mut self, module: Mod) -> Self
     where
         Mod: Module<B>,
     {
         let mut module_api = self.module_api.as_module::<Mod>();
         let command_builder = self.command_builder.add_module::<Mod>();
-        let api_ctx =
-            ApiCtx::new(&mut module_api, command_builder, self.backend);
+        self.namespace.push_module(Mod::NAME);
+        let api_ctx = ApiCtx::new(
+            &mut module_api,
+            command_builder,
+            &mut self.namespace,
+            self.backend,
+        );
         Module::api(&module, api_ctx);
         module_api.finish();
+        self.namespace.pop();
         self
     }
 
@@ -135,9 +145,10 @@ where
     pub(crate) fn new(
         module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
         command_builder: &'a mut CommandBuilder<B>,
+        namespace: &'a mut notify::Namespace,
         backend: &'b BackendHandle<B>,
     ) -> Self {
-        Self { module_api, command_builder, backend }
+        Self { module_api, command_builder, namespace, backend }
     }
 }
 
@@ -201,9 +212,8 @@ mod command_builder {
     use fxhash::FxHashMap;
 
     use super::{Module, ModuleName};
-    use crate::backend_handle::BackendMut;
     use crate::command::{Command, CommandArgs, CommandCompletion};
-    use crate::{Backend, ByteOffset, MaybeResult, NeovimCtx, notify};
+    use crate::{Backend, ByteOffset, MaybeResult, NeovimCtx};
 
     type CommandHandler<B> = Box<dyn FnMut(CommandArgs, NeovimCtx<B>)>;
 

@@ -10,6 +10,7 @@ publish.workspace = true
 fxhash = { workspace = true }
 serde = { workspace = true }
 smol_str = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]
