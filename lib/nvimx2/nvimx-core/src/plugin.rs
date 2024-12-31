@@ -27,6 +27,8 @@ pub trait Plugin<B: Backend>: Module<B> {
         );
         Module::api(self, api_ctx);
         module_api.finish();
+        let (command, completion_fn) = command_builder.build(&backend);
+        api.add_command(command, completion_fn);
         api
     }
 }

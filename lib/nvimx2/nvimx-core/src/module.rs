@@ -213,6 +213,7 @@ mod command_builder {
 
     use super::Module;
     use crate::backend::BackendExt;
+    use crate::backend_handle::BackendHandle;
     use crate::command::{Command, CommandArgs, CommandCompletion};
     use crate::{Backend, ByteOffset, MaybeResult, NeovimCtx, notify};
 
@@ -229,6 +230,39 @@ mod command_builder {
     }
 
     impl<B: Backend> CommandBuilder<B> {
+        #[inline]
+        pub(crate) fn build(
+            self,
+            backend: &BackendHandle<B>,
+        ) -> (
+            impl FnMut(CommandArgs) + 'static,
+            impl FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion> + 'static,
+        ) {
+            let command = |args: CommandArgs| {
+                // TODO.
+            };
+
+            let completion_fn = |args: CommandArgs, cursor: ByteOffset| {
+                // TODO.
+                Vec::new()
+            };
+
+            (command, completion_fn)
+        }
+
+        #[inline]
+        pub(crate) fn new<M>() -> Self
+        where
+            M: Module<B>,
+        {
+            Self {
+                module_name: M::NAME.as_str(),
+                commands: Default::default(),
+                completions: Default::default(),
+                submodules: Default::default(),
+            }
+        }
+
         #[track_caller]
         #[inline]
         pub(super) fn add_command<Cmd>(
@@ -284,19 +318,6 @@ mod command_builder {
                      {:?}'s API",
                     namespace, self.module_name
                 );
-            }
-        }
-
-        #[inline]
-        pub(crate) fn new<M>() -> Self
-        where
-            M: Module<B>,
-        {
-            Self {
-                module_name: M::NAME.as_str(),
-                commands: Default::default(),
-                completions: Default::default(),
-                submodules: Default::default(),
             }
         }
     }
