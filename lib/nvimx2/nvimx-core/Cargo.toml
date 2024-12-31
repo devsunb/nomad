@@ -7,6 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+fxhash = { workspace = true }
 serde = { workspace = true }
 smol_str = { workspace = true }
 thiserror = { workspace = true }

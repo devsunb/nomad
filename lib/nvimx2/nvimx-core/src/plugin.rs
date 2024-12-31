@@ -1,5 +1,5 @@
 use crate::api::{Api, ModuleApi};
-use crate::module::{ApiCtx, Module};
+use crate::module::{ApiCtx, CommandBuilder, Module};
 use crate::{ActionName, Backend, BackendHandle};
 
 /// TODO: docs.
@@ -16,7 +16,12 @@ pub trait Plugin<B: Backend>: Module<B> {
         let mut api = B::api::<Self>(&mut backend);
         let backend = BackendHandle::new(backend);
         let mut module_api = api.as_module();
-        let api_ctx = ApiCtx::<Self, _, _>::new(&mut module_api, &backend);
+        let mut command_builder = CommandBuilder::new::<Self, B>();
+        let api_ctx = ApiCtx::<Self, _, _>::new(
+            &mut module_api,
+            &mut command_builder,
+            &backend,
+        );
         Module::api(self, api_ctx);
         module_api.finish();
         api

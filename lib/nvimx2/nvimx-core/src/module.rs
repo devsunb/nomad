@@ -43,6 +43,7 @@ pub trait Module<B: Backend>: 'static + Sized {
 /// TODO: docs.
 pub struct ApiCtx<'a, 'b, M: Module<B>, P: Plugin<B>, B: Backend> {
     module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
+    command_builder: &'a mut CommandBuilder,
     backend: &'b BackendHandle<B>,
 }
 
@@ -59,11 +60,12 @@ where
 {
     /// TODO: docs.
     #[inline]
-    pub fn with_command<Cmd>(self, mut command: Cmd) -> Self
+    pub fn with_command<Cmd>(self, command: Cmd) -> Self
     where
         Cmd: Command<B>,
     {
-        todo!();
+        self.command_builder.add_command(command);
+        self
     }
 
     /// TODO: docs.
@@ -121,7 +123,9 @@ where
         Mod: Module<B>,
     {
         let mut module_api = self.module_api.as_module::<Mod>();
-        let api_ctx = ApiCtx::new(&mut module_api, self.backend);
+        let command_builder = self.command_builder.add_module::<Mod, B>();
+        let api_ctx =
+            ApiCtx::new(&mut module_api, command_builder, self.backend);
         Module::api(&module, api_ctx);
         module_api.finish();
         self
@@ -130,9 +134,10 @@ where
     #[inline]
     pub(crate) fn new(
         module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
+        command_builder: &'a mut CommandBuilder,
         backend: &'b BackendHandle<B>,
     ) -> Self {
-        Self { module_api, backend }
+        Self { module_api, command_builder, backend }
     }
 }
 
@@ -186,6 +191,87 @@ where
             Self::Deserialize(err) => err.to_message(),
             Self::Call(err) => err.to_message(),
             Self::Serialize(err) => err.to_message(),
+        }
+    }
+}
+
+pub(crate) use command_builder::CommandBuilder;
+
+mod command_builder {
+    use fxhash::FxHashMap;
+
+    use super::{Module, ModuleName};
+    use crate::command::{Command, CommandArgs, CommandCompletion};
+    use crate::{Backend, ByteOffset};
+
+    type CommandHandler = Box<dyn FnMut(CommandArgs)>;
+
+    type CommandCompletionFun =
+        Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
+
+    pub(crate) struct CommandBuilder {
+        module_name: &'static str,
+        commands: FxHashMap<&'static str, CommandHandler>,
+        completions: FxHashMap<&'static str, CommandCompletionFun>,
+        submodules: FxHashMap<&'static str, Self>,
+    }
+
+    impl CommandBuilder {
+        #[track_caller]
+        #[inline]
+        pub(super) fn add_command<C, B>(&mut self, command: C)
+        where
+            C: Command<B>,
+            B: Backend,
+        {
+            self.assert_namespace_is_available(C::NAME.as_str());
+            todo!();
+        }
+
+        #[track_caller]
+        #[inline]
+        pub(super) fn add_module<M, B>(&mut self) -> &mut Self
+        where
+            M: Module<B>,
+            B: Backend,
+        {
+            self.assert_namespace_is_available(M::NAME.as_str());
+            self.submodules
+                .entry(M::NAME.as_str())
+                .or_insert(Self::new::<M, B>())
+        }
+
+        #[track_caller]
+        #[inline]
+        pub(super) fn assert_namespace_is_available(&self, namespace: &str) {
+            if self.commands.contains_key(&namespace) {
+                panic!(
+                    "a command with name {:?} was already registered on \
+                     {:?}'s API",
+                    namespace, self.module_name
+                );
+            }
+            if self.submodules.contains_key(&namespace) {
+                panic!(
+                    "a submodule with name {:?} was already registered on \
+                     {:?}'s API",
+                    namespace, self.module_name
+                );
+            }
+        }
+
+        #[inline]
+        pub(crate) fn new<M, B>() -> Self
+        where
+            M: Module<B>,
+            B: Backend,
+        {
+            Self {
+                module_name: M::NAME.as_str(),
+                commands: Default::default(),
+                completions: Default::default(),
+                submodules: Default::default(),
+            }
         }
     }
 }
