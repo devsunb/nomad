@@ -1,5 +1,11 @@
 use crate::api::{Api, ModuleApi};
-use crate::module::{ApiCtx, CommandBuilder, Module};
+use crate::module::{
+    ApiCtx,
+    CommandBuilder,
+    CommandCompletionFns,
+    CommandHandlers,
+    Module,
+};
 use crate::{ActionName, Backend, BackendHandle, notify};
 
 /// TODO: docs.
@@ -16,18 +22,24 @@ pub trait Plugin<B: Backend>: Module<B> {
         let mut api = B::api::<Self>(&mut backend);
         let backend = BackendHandle::new(backend);
         let mut module_api = api.as_module();
-        let mut command_builder = CommandBuilder::new::<Self>();
+        let mut command_handlers = CommandHandlers::default();
+        let mut command_completions = CommandCompletionFns::default();
+        let command_builder = CommandBuilder::new::<Self>(
+            &mut command_handlers,
+            &mut command_completions,
+        );
         let mut namespace = notify::Namespace::default();
         namespace.push_module(Self::NAME);
         let api_ctx = ApiCtx::<Self, _, _>::new(
             &mut module_api,
-            &mut command_builder,
+            command_builder,
             &mut namespace,
             &backend,
         );
         Module::api(self, api_ctx);
         module_api.finish();
-        let (command, completion_fn) = command_builder.build(&backend);
+        let command = command_handlers.build(backend.clone());
+        let completion_fn = command_completions.build(backend);
         api.add_command(command, completion_fn);
         api
     }

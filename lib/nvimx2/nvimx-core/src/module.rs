@@ -43,7 +43,7 @@ pub trait Module<B: Backend>: 'static + Sized {
 /// TODO: docs.
 pub struct ApiCtx<'a, 'b, M: Module<B>, P: Plugin<B>, B: Backend> {
     module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
-    command_builder: &'a mut CommandBuilder<B>,
+    command_builder: CommandBuilder<'a, B>,
     namespace: &'a mut notify::Namespace,
     backend: &'b BackendHandle<B>,
 }
@@ -61,7 +61,7 @@ where
 {
     /// TODO: docs.
     #[inline]
-    pub fn with_command<Cmd>(self, command: Cmd) -> Self
+    pub fn with_command<Cmd>(mut self, command: Cmd) -> Self
     where
         Cmd: Command<B>,
     {
@@ -122,7 +122,7 @@ where
 
     /// TODO: docs.
     #[inline]
-    pub fn with_module<Mod>(self, module: Mod) -> Self
+    pub fn with_module<Mod>(mut self, module: Mod) -> Self
     where
         Mod: Module<B>,
     {
@@ -144,7 +144,7 @@ where
     #[inline]
     pub(crate) fn new(
         module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
-        command_builder: &'a mut CommandBuilder<B>,
+        command_builder: CommandBuilder<'a, B>,
         namespace: &'a mut notify::Namespace,
         backend: &'b BackendHandle<B>,
     ) -> Self {
@@ -206,12 +206,16 @@ where
     }
 }
 
-pub(crate) use command_builder::CommandBuilder;
+pub(crate) use command_builder::{
+    CommandBuilder,
+    CommandCompletionFns,
+    CommandHandlers,
+};
 
 mod command_builder {
     use fxhash::FxHashMap;
 
-    use super::Module;
+    use super::{Module, ModuleName};
     use crate::backend::BackendExt;
     use crate::backend_handle::BackendHandle;
     use crate::command::{Command, CommandArgs, CommandCompletion};
@@ -219,60 +223,106 @@ mod command_builder {
 
     type CommandHandler<B> = Box<dyn FnMut(CommandArgs, NeovimCtx<B>)>;
 
-    type CommandCompletionFun =
+    type CommandCompletionFn =
         Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
 
-    pub(crate) struct CommandBuilder<B: Backend> {
-        module_name: &'static str,
-        commands: FxHashMap<&'static str, CommandHandler<B>>,
-        completions: FxHashMap<&'static str, CommandCompletionFun>,
+    pub(crate) struct CommandBuilder<'a, B> {
+        pub(crate) handlers: &'a mut CommandHandlers<B>,
+        pub(crate) completions: &'a mut CommandCompletionFns,
+        module_name: &'static ModuleName,
+    }
+
+    pub(crate) struct CommandHandlers<B> {
+        inner: FxHashMap<&'static str, CommandHandler<B>>,
         submodules: FxHashMap<&'static str, Self>,
     }
 
-    impl<B: Backend> CommandBuilder<B> {
+    #[derive(Default)]
+    pub(crate) struct CommandCompletionFns {
+        inner: FxHashMap<&'static str, CommandCompletionFn>,
+        submodules: FxHashMap<&'static str, Self>,
+    }
+
+    impl<'a, B: Backend> CommandBuilder<'a, B> {
         #[inline]
-        pub(crate) fn build(
-            self,
-            backend: &BackendHandle<B>,
-        ) -> (
-            impl FnMut(CommandArgs) + 'static,
-            impl FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion> + 'static,
-        ) {
-            let command = |args: CommandArgs| {
-                // TODO.
-            };
-
-            let completion_fn = |args: CommandArgs, cursor: ByteOffset| {
-                // TODO.
-                Vec::new()
-            };
-
-            (command, completion_fn)
-        }
-
-        #[inline]
-        pub(crate) fn new<M>() -> Self
+        pub(crate) fn new<M>(
+            handlers: &'a mut CommandHandlers<B>,
+            completions: &'a mut CommandCompletionFns,
+        ) -> Self
         where
             M: Module<B>,
         {
-            Self {
-                module_name: M::NAME.as_str(),
-                commands: Default::default(),
-                completions: Default::default(),
-                submodules: Default::default(),
-            }
+            Self { handlers, completions, module_name: M::NAME }
         }
 
         #[track_caller]
         #[inline]
         pub(super) fn add_command<Cmd>(
             &mut self,
+            namespace: notify::Namespace,
+            command: Cmd,
+        ) where
+            Cmd: Command<B>,
+        {
+            self.assert_namespace_is_available(Cmd::NAME.as_str());
+            self.handlers.add_command(namespace, command);
+        }
+
+        #[track_caller]
+        #[inline]
+        pub(super) fn add_module<M>(&mut self) -> CommandBuilder<'_, B>
+        where
+            M: Module<B>,
+        {
+            self.assert_namespace_is_available(M::NAME.as_str());
+            CommandBuilder {
+                module_name: M::NAME,
+                handlers: self.handlers.add_module(M::NAME),
+                completions: self.completions.add_module(M::NAME),
+            }
+        }
+
+        #[track_caller]
+        #[inline]
+        fn assert_namespace_is_available(&self, namespace: &str) {
+            if self.handlers.inner.contains_key(&namespace) {
+                panic!(
+                    "a command with name {:?} was already registered on \
+                     {:?}'s API",
+                    namespace,
+                    self.module_name.as_str()
+                );
+            }
+            if self.completions.inner.contains_key(&namespace) {
+                panic!(
+                    "a submodule with name {:?} was already registered on \
+                     {:?}'s API",
+                    namespace,
+                    self.module_name.as_str()
+                );
+            }
+        }
+    }
+
+    impl<B: Backend> CommandHandlers<B> {
+        #[inline]
+        pub(crate) fn build(
+            self,
+            backend: BackendHandle<B>,
+        ) -> impl FnMut(CommandArgs) + 'static {
+            move |args: CommandArgs| {
+                todo!();
+            }
+        }
+
+        #[inline]
+        fn add_command<Cmd>(
+            &mut self,
             mut namespace: notify::Namespace,
             mut command: Cmd,
         ) where
             Cmd: Command<B>,
         {
-            self.assert_namespace_is_available(Cmd::NAME.as_str());
             namespace.set_action(Cmd::NAME);
             let handler =
                 move |args: CommandArgs<'_>, mut ctx: NeovimCtx<'_, B>| {
@@ -289,36 +339,42 @@ mod command_builder {
                         ctx.backend_mut().emit_err(&namespace, &err);
                     }
                 };
-            self.commands.insert(Cmd::NAME.as_str(), Box::new(handler));
+            self.inner.insert(Cmd::NAME.as_str(), Box::new(handler));
         }
 
-        #[track_caller]
         #[inline]
-        pub(super) fn add_module<M>(&mut self) -> &mut Self
-        where
-            M: Module<B>,
+        fn add_module(
+            &mut self,
+            module_name: &'static ModuleName,
+        ) -> &mut Self {
+            self.submodules.entry(module_name.as_str()).or_default()
+        }
+    }
+
+    impl CommandCompletionFns {
+        #[inline]
+        pub(crate) fn build<B: Backend>(
+            self,
+            backend: BackendHandle<B>,
+        ) -> impl FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion> + 'static
         {
-            self.assert_namespace_is_available(M::NAME.as_str());
-            self.submodules.entry(M::NAME.as_str()).or_insert(Self::new::<M>())
+            move |args: CommandArgs, cursor: ByteOffset| {
+                todo!();
+            }
         }
-
-        #[track_caller]
         #[inline]
-        pub(super) fn assert_namespace_is_available(&self, namespace: &str) {
-            if self.commands.contains_key(&namespace) {
-                panic!(
-                    "a command with name {:?} was already registered on \
-                     {:?}'s API",
-                    namespace, self.module_name
-                );
-            }
-            if self.submodules.contains_key(&namespace) {
-                panic!(
-                    "a submodule with name {:?} was already registered on \
-                     {:?}'s API",
-                    namespace, self.module_name
-                );
-            }
+        fn add_module(
+            &mut self,
+            module_name: &'static ModuleName,
+        ) -> &mut Self {
+            self.submodules.entry(module_name.as_str()).or_default()
+        }
+    }
+
+    impl<B> Default for CommandHandlers<B> {
+        #[inline]
+        fn default() -> Self {
+            Self { inner: Default::default(), submodules: Default::default() }
         }
     }
 }
