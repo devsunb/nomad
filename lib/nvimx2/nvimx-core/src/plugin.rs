@@ -24,7 +24,7 @@ pub trait Plugin<B: Backend>: Module<B> {
         let mut module_api = api.as_module();
         let mut command_handlers = CommandHandlers::new::<Self>();
         let mut command_completions = CommandCompletionFns::default();
-        let command_builder = CommandBuilder::new::<Self>(
+        let command_builder = CommandBuilder::new(
             &mut command_handlers,
             &mut command_completions,
         );

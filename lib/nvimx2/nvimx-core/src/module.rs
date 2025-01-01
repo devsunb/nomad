@@ -218,7 +218,12 @@ mod command_builder {
     use super::{Module, ModuleName};
     use crate::backend::BackendExt;
     use crate::backend_handle::BackendHandle;
-    use crate::command::{Command, CommandArgs, CommandCompletion};
+    use crate::command::{
+        Command,
+        CommandArgs,
+        CommandCompletion,
+        CompletionFn,
+    };
     use crate::{Backend, ByteOffset, MaybeResult, NeovimCtx, notify};
 
     type CommandHandler<B> =
@@ -250,13 +255,10 @@ mod command_builder {
 
     impl<'a, B: Backend> CommandBuilder<'a, B> {
         #[inline]
-        pub(crate) fn new<M>(
+        pub(crate) fn new(
             handlers: &'a mut CommandHandlers<B>,
             completions: &'a mut CommandCompletionFns,
-        ) -> Self
-        where
-            M: Module<B>,
-        {
+        ) -> Self {
             Self { handlers, completions }
         }
 
@@ -267,6 +269,7 @@ mod command_builder {
             Cmd: Command<B>,
         {
             self.assert_namespace_is_available(Cmd::NAME.as_str());
+            self.completions.add_command(&command);
             self.handlers.add_command(command);
         }
 
@@ -389,6 +392,20 @@ mod command_builder {
             move |args: CommandArgs, cursor: ByteOffset| {
                 todo!();
             }
+        }
+
+        #[inline]
+        fn add_command<Cmd, B>(&mut self, command: &Cmd)
+        where
+            Cmd: Command<B>,
+            B: Backend,
+        {
+            let mut completion_fn = command.to_completion_fn();
+            let completion_fn: CommandCompletionFn =
+                Box::new(move |args, offset| {
+                    completion_fn.call(args, offset).into_iter().collect()
+                });
+            self.inner.insert(Cmd::NAME.as_str(), completion_fn);
         }
 
         #[inline]
