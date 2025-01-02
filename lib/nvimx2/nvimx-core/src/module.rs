@@ -220,6 +220,7 @@ mod command_builder {
     use crate::backend_handle::BackendHandle;
     use crate::command::{
         Command,
+        CommandArg,
         CommandArgs,
         CommandCompletion,
         CompletionFn,
@@ -255,7 +256,7 @@ mod command_builder {
 
     struct MissingCommandError<'a, B>(&'a CommandHandlers<B>);
 
-    struct UnknownCommandError<'a, B>(&'a CommandHandlers<B>, &'a str);
+    struct UnknownCommandError<'a, B>(&'a CommandHandlers<B>, CommandArg<'a>);
 
     impl<'a, B: Backend> CommandBuilder<'a, B> {
         #[inline]
@@ -294,13 +295,13 @@ mod command_builder {
         #[inline]
         fn assert_namespace_is_available(&self, namespace: &str) {
             let module_name = self.handlers.module_name.as_str();
-            if self.handlers.inner.contains_key(&namespace) {
+            if self.handlers.inner.contains_key(namespace) {
                 panic!(
                     "a command with name {namespace:?} was already \
                      registered on {module_name:?}'s API",
                 );
             }
-            if self.completions.inner.contains_key(&namespace) {
+            if self.completions.inner.contains_key(namespace) {
                 panic!(
                     "a submodule with name {namespace:?} was already \
                      registered on {module_name:?}'s API",
@@ -375,9 +376,10 @@ mod command_builder {
                 return ctx.backend_mut().emit_err(namespace, &err);
             };
 
-            if let Some(handler) = self.inner.get_mut(arg) {
+            if let Some(handler) = self.inner.get_mut(arg.as_str()) {
                 (handler)(args, namespace, ctx);
-            } else if let Some(module) = self.submodules.get_mut(arg) {
+            } else if let Some(module) = self.submodules.get_mut(arg.as_str())
+            {
                 module.handle(args, namespace, ctx);
             } else {
                 let err = UnknownCommandError(self, arg);
@@ -422,11 +424,51 @@ mod command_builder {
         #[inline]
         fn complete(
             &mut self,
-            args: CommandArgs,
+            mut args: CommandArgs,
             offset: ByteOffset,
         ) -> Vec<CommandCompletion> {
             debug_assert!(offset <= args.byte_len());
-            todo!();
+
+            let Some(arg) = args.next() else {
+                return self
+                    .inner
+                    .keys()
+                    .chain(self.submodules.keys())
+                    .copied()
+                    .map(CommandCompletion::from_static_str)
+                    .collect();
+            };
+
+            if offset <= arg.end() {
+                let prefix = offset
+                    .checked_sub(arg.start())
+                    .map(|off| &arg.as_str()[..off.into()])
+                    .unwrap_or("");
+
+                return self
+                    .inner
+                    .keys()
+                    .chain(self.submodules.keys())
+                    .filter(|&candidate| candidate.starts_with(prefix))
+                    .copied()
+                    .map(CommandCompletion::from_static_str)
+                    .collect();
+            }
+
+            let start_from = arg.end();
+            let s = &args.as_str()[start_from.into()..];
+            let args = CommandArgs::new(s);
+            let offset = offset - start_from;
+
+            if let Some(command) = self.inner.get_mut(arg.as_str()) {
+                (command)(args, offset - start_from)
+            } else if let Some(submodule) =
+                self.submodules.get_mut(arg.as_str())
+            {
+                submodule.complete(args, offset)
+            } else {
+                Vec::new()
+            }
         }
     }
 
@@ -434,16 +476,6 @@ mod command_builder {
         #[inline]
         fn contains_key(&self, key: K) -> bool {
             self.get_idx(&key).is_ok()
-        }
-
-        #[inline]
-        fn get<Q>(&self, key: &Q) -> Option<&V>
-        where
-            K: Borrow<Q>,
-            Q: ?Sized + Ord,
-        {
-            let idx = self.get_idx(key).ok()?;
-            Some(&self.inner[idx].1)
         }
 
         #[inline]
@@ -472,6 +504,11 @@ mod command_builder {
             let idx = self.get_idx(&key).unwrap_or_else(|x| x);
             self.inner.insert(idx, (key, value));
             &mut self.inner[idx].1
+        }
+
+        #[inline]
+        fn keys(&self) -> impl Iterator<Item = &K> + '_ {
+            self.inner.iter().map(|(k, _)| k)
         }
     }
 

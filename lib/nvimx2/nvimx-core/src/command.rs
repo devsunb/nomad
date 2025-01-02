@@ -62,11 +62,20 @@ pub trait ToCompletionFn {
 pub struct CommandArgs<'a>(&'a str);
 
 /// TODO: docs.
+pub struct CommandArg<'a>(&'a str);
+
+/// TODO: docs.
 pub struct CommandCompletion {
     inner: SmolStr,
 }
 
 impl<'a> CommandArgs<'a> {
+    /// TODO: docs.
+    #[inline]
+    pub fn as_str(&self) -> &'a str {
+        self.0
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn byte_len(&self) -> ByteOffset {
@@ -81,7 +90,27 @@ impl<'a> CommandArgs<'a> {
 
     /// TODO: docs.
     #[inline]
-    pub fn next(&mut self) -> Option<&'a str> {
+    pub fn next(&mut self) -> Option<CommandArg<'a>> {
+        todo!()
+    }
+}
+
+impl<'a> CommandArg<'a> {
+    /// TODO: docs.
+    #[inline]
+    pub fn as_str(&self) -> &'a str {
+        todo!()
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn end(&self) -> ByteOffset {
+        todo!()
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn start(&self) -> ByteOffset {
         todo!()
     }
 }
@@ -91,6 +120,12 @@ impl CommandCompletion {
     #[inline]
     pub fn as_str(&self) -> &str {
         self.inner.as_str()
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn from_static_str(s: &'static str) -> Self {
+        todo!()
     }
 }
 
