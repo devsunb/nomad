@@ -6,6 +6,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 use crate::oxi;
+use crate::value::NeovimValue;
 
 /// TODO: docs.
 #[derive(Debug, thiserror::Error)]
@@ -24,17 +25,20 @@ pub struct NeovimDeserializeError {
 #[inline]
 pub(crate) fn serialize<T: ?Sized + Serialize>(
     value: &T,
-) -> Result<oxi::Object, NeovimSerializeError> {
+) -> Result<NeovimValue, NeovimSerializeError> {
     serde_path_to_error::serialize(value, oxi::serde::Serializer::new())
+        .map(NeovimValue::new)
         .map_err(|inner| NeovimSerializeError { inner })
 }
 
 #[inline]
 pub(crate) fn deserialize<T: DeserializeOwned>(
-    object: Object,
+    value: NeovimValue,
 ) -> Result<T, NeovimDeserializeError> {
-    serde_path_to_error::deserialize(oxi::serde::Deserializer::new(object))
-        .map_err(|inner| NeovimDeserializeError { inner })
+    serde_path_to_error::deserialize(oxi::serde::Deserializer::new(
+        value.into_inner(),
+    ))
+    .map_err(|inner| NeovimDeserializeError { inner })
 }
 
 impl notify::Error for NeovimSerializeError {

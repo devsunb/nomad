@@ -9,6 +9,7 @@ use nvimx_core::{ActionName, ByteOffset, Plugin, notify};
 
 use crate::Neovim;
 use crate::oxi::{Dictionary, Function, Object, api};
+use crate::value::NeovimValue;
 
 /// TODO: docs.
 pub struct NeovimApi<P> {
@@ -128,7 +129,7 @@ where
     #[inline]
     fn add_function<Fun, Err>(&mut self, fun_name: &ActionName, mut fun: Fun)
     where
-        Fun: FnMut(Object) -> Result<Object, Err> + 'static,
+        Fun: FnMut(NeovimValue) -> Result<NeovimValue, Err> + 'static,
         Err: notify::Error,
     {
         self.insert(

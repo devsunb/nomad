@@ -7,6 +7,7 @@ mod local_executor;
 mod neovim;
 pub mod notify;
 pub mod serde;
+pub mod value;
 
 pub use api::NeovimApi;
 pub mod executor {

@@ -1,6 +1,6 @@
 use nvimx_core::{Backend, Plugin};
 
-use crate::{api, executor, notify, oxi, serde};
+use crate::{api, executor, notify, serde, value};
 
 /// TODO: docs.
 pub struct Neovim {
@@ -9,7 +9,7 @@ pub struct Neovim {
 
 impl Backend for Neovim {
     type Api<P: Plugin<Self>> = api::NeovimApi<P>;
-    type ApiValue = oxi::Object;
+    type ApiValue = value::NeovimValue;
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;

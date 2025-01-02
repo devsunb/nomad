@@ -12,7 +12,7 @@ pub trait Backend: 'static + Sized {
     type Api<P: Plugin<Self>>: Api<P, Self>;
 
     /// TODO: docs.
-    type ApiValue;
+    type ApiValue: Value;
 
     /// TODO: docs.
     type LocalExecutor: LocalExecutor;
@@ -53,6 +53,50 @@ pub trait Backend: 'static + Sized {
     ) -> Result<T, Self::DeserializeError>
     where
         T: DeserializeOwned;
+}
+
+/// TODO: docs.
+pub trait Value: 'static {
+    /// TODO: docs.
+    type MapAccess<'a>: MapAccess<Pair<'a>: KeyValuePair<Value = Self>>;
+
+    /// TODO: docs.
+    type MapAccessError<'a>: notify::Error
+    where
+        Self: 'a;
+
+    /// TODO: docs.
+    fn map_access(
+        &mut self,
+    ) -> Result<Self::MapAccess<'_>, Self::MapAccessError<'_>>;
+}
+
+/// TODO: docs.
+pub trait MapAccess {
+    /// TODO: docs.
+    type Pair<'a>: KeyValuePair
+    where
+        Self: 'a;
+
+    /// TODO: docs.
+    fn next_pair(&mut self) -> Option<Self::Pair<'_>>;
+}
+
+/// TODO: docs.
+pub trait KeyValuePair {
+    /// TODO: docs.
+    type Key<'a>: PartialEq<str>
+    where
+        Self: 'a;
+
+    /// TODO: docs.
+    type Value;
+
+    /// TODO: docs.
+    fn key(&self) -> Self::Key<'_>;
+
+    /// TODO: docs.
+    fn take_value(self) -> Self::Value;
 }
 
 /// TODO: docs.
