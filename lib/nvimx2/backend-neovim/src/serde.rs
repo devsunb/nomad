@@ -1,6 +1,5 @@
 //! TODO: docs.
 
-use nvim_oxi::Object;
 use nvimx_core::notify;
 use serde::Serialize;
 use serde::de::DeserializeOwned;

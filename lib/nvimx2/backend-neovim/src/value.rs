@@ -18,7 +18,8 @@ pub struct NeovimMapAccess<'a> {
 
 /// TODO: docs.
 pub struct NeovimMapPair<'a> {
-    key: NeovimMapKey<'a>,
+    dict: &'a mut Dictionary,
+    dict_idx: usize,
 }
 
 /// TODO: docs.
@@ -101,11 +102,16 @@ impl KeyValuePair for NeovimMapPair<'_> {
     type Value = NeovimValue;
 
     fn key(&self) -> Self::Key<'_> {
+        // let (dict_key, _) = self.dict.get_by_index(self.dict_idx).unwrap();
+        // NeovimMapKey { dict_key, dict_idx: self.dict_idx }
         todo!();
     }
 
     fn take_value(self) -> Self::Value {
-        todo!()
+        // let idx = self.dict_idx;
+        // let (_, value) = self.dict.swap_remove_by_index(idx).unwrap();
+        // value
+        todo!();
     }
 }
 
@@ -118,7 +124,7 @@ impl PartialEq<str> for NeovimMapKey<'_> {
 
 impl notify::Error for NeovimMapAccessError {
     fn to_level(&self) -> Option<notify::Level> {
-        todo!()
+        Some(notify::Level::Error)
     }
 
     fn to_message(&self) -> notify::Message {

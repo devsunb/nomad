@@ -1,0 +1,51 @@
+use core::borrow::Borrow;
+
+pub(crate) struct OrderedMap<K, V> {
+    inner: Vec<(K, V)>,
+}
+
+impl<K: Ord, V> OrderedMap<K, V> {
+    #[inline]
+    pub(crate) fn contains_key(&self, key: K) -> bool {
+        self.get_idx(&key).is_ok()
+    }
+
+    #[inline]
+    pub(crate) fn get_mut<Q>(&mut self, key: &Q) -> Option<&mut V>
+    where
+        K: Borrow<Q>,
+        Q: ?Sized + Ord,
+    {
+        let idx = self.get_idx(key).ok()?;
+        Some(&mut self.inner[idx].1)
+    }
+
+    #[inline]
+    pub(crate) fn insert(&mut self, key: K, value: V) -> &mut V {
+        let idx = self.get_idx(&key).unwrap_or_else(|x| x);
+        self.inner.insert(idx, (key, value));
+        &mut self.inner[idx].1
+    }
+
+    #[inline]
+    pub(crate) fn keys(&self) -> impl Iterator<Item = &K> + '_ {
+        self.inner.iter().map(|(k, _)| k)
+    }
+
+    #[inline]
+    fn get_idx<Q>(&self, key: &Q) -> Result<usize, usize>
+    where
+        K: Borrow<Q>,
+        Q: ?Sized + Ord,
+    {
+        self.inner
+            .binary_search_by(|(probe, _)| Borrow::<Q>::borrow(probe).cmp(key))
+    }
+}
+
+impl<K, V> Default for OrderedMap<K, V> {
+    #[inline]
+    fn default() -> Self {
+        Self { inner: Vec::new() }
+    }
+}

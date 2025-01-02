@@ -56,7 +56,7 @@ pub trait Backend: 'static + Sized {
 }
 
 /// TODO: docs.
-pub trait Value: 'static {
+pub trait Value: Default + 'static {
     /// TODO: docs.
     type MapAccess<'a>: MapAccess<Pair<'a>: KeyValuePair<Value = Self>>;
 

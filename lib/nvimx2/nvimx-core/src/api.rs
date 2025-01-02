@@ -14,9 +14,6 @@ where
     type ModuleApi<'a, M: Module<B>>: ModuleApi<Self, P, M, B>;
 
     /// TODO: docs.
-    fn as_module(&mut self) -> Self::ModuleApi<'_, P>;
-
-    /// TODO: docs.
     fn add_command<Cmd, CompFun, Comps>(
         &mut self,
         command: Cmd,
@@ -25,6 +22,9 @@ where
         Cmd: FnMut(CommandArgs) + 'static,
         CompFun: FnMut(CommandArgs, ByteOffset) -> Comps + 'static,
         Comps: IntoIterator<Item = CommandCompletion>;
+
+    /// TODO: docs.
+    fn as_module(&mut self) -> Self::ModuleApi<'_, P>;
 }
 
 /// TODO: docs.

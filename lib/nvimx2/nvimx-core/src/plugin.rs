@@ -1,6 +1,8 @@
+use core::convert::Infallible;
+
 use crate::api::{Api, ModuleApi};
 use crate::command::{CommandBuilder, CommandCompletionFns, CommandHandlers};
-use crate::module::{ApiCtx, Module};
+use crate::module::{ApiCtx, ConfigFnBuilder, Module};
 use crate::{ActionName, Backend, BackendHandle, notify};
 
 /// TODO: docs.
@@ -12,8 +14,9 @@ pub trait Plugin<B: Backend>: Module<B> {
     /// TODO: docs.
     const CONFIG_FN_NAME: &'static ActionName = ActionName::new("setup");
 
+    #[track_caller]
     #[doc(hidden)]
-    fn api(&self, mut backend: B) -> B::Api<Self> {
+    fn api(self, mut backend: B) -> B::Api<Self> {
         let mut api = B::api::<Self>(&mut backend);
         let backend = BackendHandle::new(backend);
         let mut module_api = api.as_module();
@@ -23,19 +26,31 @@ pub trait Plugin<B: Backend>: Module<B> {
             &mut command_handlers,
             &mut command_completions,
         );
+        let mut config_builder = ConfigFnBuilder::new();
         let mut namespace = notify::Namespace::default();
         namespace.push_module(Self::NAME);
         let api_ctx = ApiCtx::<Self, _, _>::new(
             &mut module_api,
             command_builder,
+            &mut config_builder,
             &mut namespace,
             &backend,
         );
-        Module::api(self, api_ctx);
+        Module::api(&self, api_ctx);
+
+        config_builder.finish(self);
+        let mut config_fn = config_builder.build(backend.clone());
+        module_api.add_function(Self::CONFIG_FN_NAME, move |value| {
+            config_fn(value);
+            Ok::<_, Infallible>(B::ApiValue::default())
+        });
+
         module_api.finish();
+
         let command = command_handlers.build(backend);
         let completion_fn = command_completions.build();
         api.add_command(command, completion_fn);
+
         api
     }
 }

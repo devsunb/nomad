@@ -4,6 +4,7 @@ use serde::de::DeserializeOwned;
 
 use crate::api::{Api, ModuleApi};
 use crate::command::{Command, CommandBuilder};
+use crate::util::OrderedMap;
 use crate::{
     Backend,
     BackendExt,
@@ -44,14 +45,22 @@ pub trait Module<B: Backend>: 'static + Sized {
 pub struct ApiCtx<'a, 'b, M: Module<B>, P: Plugin<B>, B: Backend> {
     module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
     command_builder: CommandBuilder<'a, B>,
+    config_builder: &'a mut ConfigFnBuilder<B>,
     namespace: &'a mut notify::Namespace,
     backend: &'b BackendHandle<B>,
 }
 
 /// TODO: docs.
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct ModuleName(str);
+
+pub(crate) struct ConfigFnBuilder<B: Backend> {
+    config_handler: Box<
+        dyn FnMut(B::ApiValue, &mut notify::Namespace, NeovimCtx<B>) + 'static,
+    >,
+    submodules: OrderedMap<&'static ModuleName, Self>,
+}
 
 impl<'a, 'b, M, P, B> ApiCtx<'a, 'b, M, P, B>
 where
@@ -127,17 +136,18 @@ where
         Mod: Module<B>,
     {
         let mut module_api = self.module_api.as_module::<Mod>();
-        let command_builder = self.command_builder.add_module::<Mod>();
         self.namespace.push_module(Mod::NAME);
         let api_ctx = ApiCtx::new(
             &mut module_api,
-            command_builder,
+            self.command_builder.add_module::<Mod>(),
+            self.config_builder.add_module::<Mod>(),
             self.namespace,
             self.backend,
         );
         Module::api(&module, api_ctx);
         module_api.finish();
         self.namespace.pop();
+        self.config_builder.finish(module);
         self
     }
 
@@ -145,10 +155,17 @@ where
     pub(crate) fn new(
         module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
         command_builder: CommandBuilder<'a, B>,
+        config_builder: &'a mut ConfigFnBuilder<B>,
         namespace: &'a mut notify::Namespace,
         backend: &'b BackendHandle<B>,
     ) -> Self {
-        Self { module_api, command_builder, namespace, backend }
+        Self {
+            module_api,
+            command_builder,
+            config_builder,
+            namespace,
+            backend,
+        }
     }
 }
 
@@ -172,6 +189,40 @@ impl ModuleName {
     #[inline]
     pub const fn uppercase_first(&self) -> &Self {
         todo!();
+    }
+}
+
+impl<B: Backend> ConfigFnBuilder<B> {
+    #[inline]
+    pub(crate) fn build(
+        self,
+        backend: BackendHandle<B>,
+    ) -> impl FnMut(B::ApiValue) + 'static {
+        move |value| {
+            let mut namespace = notify::Namespace::default();
+            todo!();
+        }
+    }
+
+    #[inline]
+    pub(crate) fn finish<M: Module<B>>(&mut self, mut module: M) {
+        self.config_handler = Box::new(move |value, namespace, ctx| {
+            let config: M::Config = todo!();
+            module.on_config_changed(config, ctx);
+        });
+    }
+
+    #[inline]
+    pub(crate) fn new() -> Self {
+        Self {
+            config_handler: Box::new(|_, _, _| {}),
+            submodules: Default::default(),
+        }
+    }
+
+    #[inline]
+    fn add_module<M: Module<B>>(&mut self) -> &mut Self {
+        self.submodules.insert(M::NAME, ConfigFnBuilder::new())
     }
 }
 

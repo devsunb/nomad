@@ -15,6 +15,7 @@ mod neovim_ctx;
 pub mod notify;
 mod plugin;
 mod shared;
+mod util;
 
 pub use action::{Action, ActionName};
 pub use async_ctx::AsyncCtx;

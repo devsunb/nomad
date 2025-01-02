@@ -113,7 +113,6 @@ where
             .expect("all arguments are valid");
     }
 
-    #[track_caller]
     #[inline]
     fn as_module(&mut self) -> Self::ModuleApi<'_, P> {
         NeovimModuleApi::new(&mut self.dictionary)
