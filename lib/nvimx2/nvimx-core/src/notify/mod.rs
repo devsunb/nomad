@@ -11,7 +11,7 @@ mod notification_id;
 pub use emitter::Emitter;
 pub use error::Error;
 pub use level::Level;
-pub use message::Message;
+pub use message::{Message, SpanKind};
 pub use namespace::Namespace;
 pub use nofitication::Notification;
 pub use notification_id::NotificationId;

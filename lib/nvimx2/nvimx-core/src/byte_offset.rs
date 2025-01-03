@@ -1,5 +1,5 @@
 use core::cmp::Ordering;
-use core::ops::{Add, AddAssign, Sub, SubAssign};
+use core::ops::{Add, AddAssign, Range, Sub, SubAssign};
 
 /// A byte offset in a buffer.
 #[derive(
@@ -22,6 +22,11 @@ impl ByteOffset {
     /// Creates a new [`ByteOffset`] from the given offset.
     pub fn new(offset: usize) -> Self {
         Self(offset)
+    }
+
+    /// Creates a new [`ByteOffset`] from the given offset.
+    pub fn range(byte_range: Range<usize>) -> Range<Self> {
+        Range { start: Self(byte_range.start), end: Self(byte_range.end) }
     }
 }
 
