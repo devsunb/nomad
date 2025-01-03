@@ -13,7 +13,15 @@ pub struct NeovimValue {
 }
 
 /// TODO: docs.
-pub struct NeovimMapAccess<'a> {
+pub enum NeovimMapAccess<'a> {
+    /// TODO: docs.
+    Dict(NeovimDictAccess<'a>),
+    /// TODO: docs.
+    Nil,
+}
+
+/// TODO: docs.
+pub struct NeovimDictAccess<'a> {
     dict: &'a mut Dictionary,
     dict_idx: usize,
 }
@@ -55,11 +63,23 @@ impl Value for NeovimValue {
         &mut self,
     ) -> Result<Self::MapAccess<'_>, Self::MapAccessError<'_>> {
         match self.object.kind() {
-            ObjectKind::Dictionary => Ok(NeovimMapAccess {
-                // SAFETY: the object's kind is a `Dictionary`.
-                dict: unsafe { self.object.as_dictionary_unchecked_mut() },
-                dict_idx: 0,
-            }),
+            ObjectKind::Dictionary => {
+                Ok(NeovimMapAccess::Dict(NeovimDictAccess {
+                    // SAFETY: the object's kind is a `Dictionary`.
+                    dict: unsafe { self.object.as_dictionary_unchecked_mut() },
+                    dict_idx: 0,
+                }))
+            },
+            ObjectKind::Array => {
+                // SAFETY: the object's kind is an `Array`.
+                let array = unsafe { self.object.as_array_unchecked() };
+                if array.is_empty() {
+                    Ok(NeovimMapAccess::Nil)
+                } else {
+                    Err(NeovimMapAccessError(ObjectKind::Array))
+                }
+            },
+            ObjectKind::Nil => Ok(NeovimMapAccess::Nil),
             other => Err(NeovimMapAccessError(other)),
         }
     }
@@ -85,6 +105,30 @@ impl lua::Pushable for NeovimValue {
 }
 
 impl MapAccess for NeovimMapAccess<'_> {
+    type Key<'a>
+        = NeovimMapKey<'a>
+    where
+        Self: 'a;
+    type Value = NeovimValue;
+
+    #[inline]
+    fn next_key(&mut self) -> Option<Self::Key<'_>> {
+        match self {
+            Self::Dict(dict) => dict.next_key(),
+            Self::Nil => None,
+        }
+    }
+
+    #[inline]
+    fn take_next_value(&mut self) -> NeovimValue {
+        match self {
+            Self::Dict(dict) => dict.take_next_value(),
+            Self::Nil => unreachable!(),
+        }
+    }
+}
+
+impl MapAccess for NeovimDictAccess<'_> {
     type Key<'a>
         = NeovimMapKey<'a>
     where
