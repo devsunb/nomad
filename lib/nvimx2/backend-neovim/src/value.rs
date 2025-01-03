@@ -142,17 +142,15 @@ impl MapAccess for NeovimDictAccess<'_> {
         if self.dict_idx == self.dict.len() {
             return None;
         }
-        todo!();
-        // let (key, _) = self.dict.get_by_index(self.dict_idx).unwrap();
-        // self.dict_idx += 1;
-        // Some(NeovimMapKey(key))
+        let pair = &self.dict.as_slice()[self.dict_idx];
+        self.dict_idx += 1;
+        Some(NeovimMapKey(pair.key()))
     }
 
     #[inline]
     fn take_next_value(&mut self) -> NeovimValue {
-        // self.dict_idx -= 1;
-        // self.dict.swap_remove_by_index(self.dict_idx).unwrap().1
-        todo!();
+        self.dict_idx -= 1;
+        NeovimValue::new(self.dict.swap_remove(self.dict_idx).into_value())
     }
 }
 
