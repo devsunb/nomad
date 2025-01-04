@@ -28,7 +28,12 @@ impl<K: Ord, V> OrderedMap<K, V> {
     }
 
     #[inline]
-    pub(crate) fn keys(&self) -> impl Iterator<Item = &K> + '_ {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
+    #[inline]
+    pub(crate) fn keys(&self) -> impl ExactSizeIterator<Item = &K> + '_ {
         self.inner.iter().map(|(k, _)| k)
     }
 

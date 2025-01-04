@@ -305,6 +305,38 @@ impl CommandCompletion {
     }
 }
 
+impl<B> CommandHandlers<B> {
+    /// Pushes the list of valid commands and submodules to the given message.
+    #[inline]
+    fn push_valid(&self, message: &mut notify::Message) {
+        let commands = self.inner.keys();
+        let has_commands = commands.len() > 0;
+        if has_commands {
+            let valid_preface = if commands.len() == 1 {
+                "the only valid command is "
+            } else {
+                "the valid commands are "
+            };
+            message
+                .push_str(valid_preface)
+                .push_comma_separated(commands, notify::SpanKind::Expected);
+        }
+
+        let submodules = self.submodules.keys();
+        if submodules.len() > 0 {
+            let valid_preface = if submodules.len() == 1 {
+                "the only valid module is "
+            } else {
+                "the valid modules are "
+            };
+            message
+                .push_str(if has_commands { "; " } else { "" })
+                .push_str(valid_preface)
+                .push_comma_separated(submodules, notify::SpanKind::Expected);
+        }
+    }
+}
+
 struct ArgsList<'a>(CommandArgsIter<'a>);
 
 impl fmt::Debug for ArgsList<'_> {
@@ -694,7 +726,23 @@ impl<B> notify::Error for MissingCommandError<'_, B> {
 
     #[inline]
     fn to_message(&self) -> notify::Message {
-        todo!()
+        let Self(handlers) = self;
+        let mut message = notify::Message::new();
+        let missing = match (
+            handlers.inner.is_empty(),
+            handlers.submodules.is_empty(),
+        ) {
+            (false, false) => "command or submodule",
+            (false, true) => "command",
+            (true, false) => "submodule",
+            (true, true) => unreachable!(),
+        };
+        message
+            .push_str("missing ")
+            .push_str(missing)
+            .push_str(", ")
+            .push_with(|message| handlers.push_valid(message));
+        message
     }
 }
 

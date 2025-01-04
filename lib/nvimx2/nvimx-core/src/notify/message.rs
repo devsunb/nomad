@@ -145,6 +145,16 @@ impl Message {
 
     /// TODO: docs.
     #[inline]
+    pub fn push_with<F>(&mut self, fun: F) -> &mut Self
+    where
+        F: FnOnce(&mut Self),
+    {
+        fun(self);
+        self
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn spans(&self) -> Spans<'_> {
         Spans::new(self)
     }
