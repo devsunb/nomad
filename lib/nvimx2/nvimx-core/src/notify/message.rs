@@ -113,8 +113,12 @@ impl Message {
         s: S,
         span_kind: SpanKind,
     ) -> &mut Self {
+        let s = s.as_ref();
+        if s.is_empty() {
+            return self;
+        }
         let start = self.inner.len().into();
-        self.inner.push_str(s.as_ref());
+        self.inner.push_str(s);
         let end = self.inner.len().into();
         self.spans.push(SpanInner { byte_range: start..end, kind: span_kind });
         self
