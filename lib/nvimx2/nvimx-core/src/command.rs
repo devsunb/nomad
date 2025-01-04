@@ -4,7 +4,7 @@ use core::fmt;
 use core::mem::{self, MaybeUninit};
 use core::ops::Deref;
 
-use smol_str::SmolStr;
+use smol_str::{SmolStr, ToSmolStr};
 
 use crate::backend::BackendExt;
 use crate::backend_handle::BackendHandle;
@@ -784,32 +784,28 @@ impl notify::Error for CommandArgsWrongNumError<'_> {
 
     #[inline]
     fn to_message(&self) -> notify::Message {
-        todo!()
-        // assert_ne!(err.args.len(), err.expected_num);
-        //
-        // let mut message = DiagnosticMessage::new();
-        // message
-        //     .push_str("expected ")
-        //     .push_str_highlighted(
-        //         err.expected_num.to_string(),
-        //         HighlightGroup::special(),
-        //     )
-        //     .push_str(" argument")
-        //     .push_str(if err.expected_num == 1 { "" } else { "s" })
-        //     .push_str(", but got ")
-        //     .push_str_highlighted(
-        //         err.actual_num.to_string(),
-        //         HighlightGroup::warning(),
-        //     );
-        //
-        // if !err.args.is_empty() {
-        //     message.push_str(": ").push_comma_separated(
-        //         err.args.iter(),
-        //         HighlightGroup::warning(),
-        //     );
-        // }
-        //
-        // message
+        debug_assert_ne!(self.args.len(), self.expected_num);
+
+        let mut message = notify::Message::new();
+        message
+            .push_str("expected ")
+            .push_span(
+                self.expected_num.to_smolstr(),
+                notify::SpanKind::Expected,
+            )
+            .push_str(" argument")
+            .push_str(if self.expected_num == 1 { "" } else { "s" })
+            .push_str(", but got ")
+            .push_span(self.actual_num.to_smolstr(), notify::SpanKind::Actual);
+
+        if !self.args.is_empty() {
+            message.push_str(": ").push_comma_separated(
+                self.args.iter(),
+                notify::SpanKind::Warning,
+            );
+        }
+
+        message
     }
 }
 
