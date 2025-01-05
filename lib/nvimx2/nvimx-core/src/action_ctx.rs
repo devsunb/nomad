@@ -15,7 +15,7 @@ pub struct ActionCtx<'a, B> {
 /// TODO: docs.
 #[derive(Clone)]
 pub(crate) struct ModulePath {
-    names: SmallVec<[&'static ModuleName; 2]>,
+    names: SmallVec<[ModuleName; 2]>,
 }
 
 impl<'a, B: Backend> ActionCtx<'a, B> {
@@ -54,19 +54,19 @@ impl ModulePath {
     #[inline]
     pub(crate) fn names(
         &self,
-    ) -> impl ExactSizeIterator<Item = &'static ModuleName> + '_ {
+    ) -> impl ExactSizeIterator<Item = ModuleName> + '_ {
         self.names.iter().copied()
     }
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn new(base_module: &'static ModuleName) -> Self {
+    pub(crate) fn new(base_module: ModuleName) -> Self {
         Self { names: smallvec![base_module] }
     }
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn push(&mut self, module_name: &'static ModuleName) {
+    pub(crate) fn push(&mut self, module_name: ModuleName) {
         self.names.push(module_name);
     }
 

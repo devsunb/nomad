@@ -157,7 +157,7 @@ pub(crate) struct CommandBuilder<'a, B> {
 }
 
 pub(crate) struct CommandHandlers<B> {
-    module_name: &'static ModuleName,
+    module_name: ModuleName,
     inner: OrderedMap<&'static str, CommandHandler<B>>,
     submodules: OrderedMap<&'static str, Self>,
 }
@@ -663,7 +663,7 @@ impl CommandCompletionFns {
     }
 
     #[inline]
-    fn add_module(&mut self, module_name: &'static ModuleName) -> &mut Self {
+    fn add_module(&mut self, module_name: ModuleName) -> &mut Self {
         self.submodules.insert(module_name.as_str(), Default::default())
     }
 

@@ -22,7 +22,7 @@ use crate::{
 /// TODO: docs.
 pub trait Module<B: Backend>: 'static + Sized {
     /// TODO: docs.
-    const NAME: &'static ModuleName;
+    const NAME: ModuleName;
 
     /// TODO: docs.
     type Config: DeserializeOwned;
@@ -54,12 +54,12 @@ pub struct ApiCtx<'a, 'b, M: Module<B>, P: Plugin<B>, B: Backend> {
 }
 
 /// TODO: docs.
-#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct ModuleName(str);
+pub struct ModuleName(&'static str);
 
 pub(crate) struct ConfigFnBuilder<B: Backend> {
-    module_name: &'static ModuleName,
+    module_name: ModuleName,
     config_handler:
         Box<dyn FnMut(B::ApiValue, &ModulePath, &mut NeovimCtx<B>) + 'static>,
     submodules: OrderedMap<&'static str, Self>,
@@ -179,17 +179,15 @@ where
 impl ModuleName {
     /// TODO: docs.
     #[inline]
-    pub const fn as_str(&self) -> &str {
-        &self.0
+    pub const fn as_str(&self) -> &'static str {
+        self.0
     }
 
     /// TODO: docs.
     #[inline]
-    pub const fn new(name: &str) -> &Self {
+    pub const fn new(name: &'static str) -> Self {
         assert!(!name.is_empty());
-        assert!(name.len() <= 24);
-        // SAFETY: `ModuleName` is a `repr(transparent)` newtype around `str`.
-        unsafe { &*(name as *const str as *const Self) }
+        Self(name)
     }
 
     /// TODO: docs.

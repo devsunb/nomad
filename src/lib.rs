@@ -13,7 +13,7 @@ struct Mad;
 impl Plugin<Neovim> for Mad {}
 
 impl Module<Neovim> for Mad {
-    const NAME: &'static ModuleName = ModuleName::new("mad");
+    const NAME: ModuleName = ModuleName::new("mad");
     type Config = ();
     type Docs = ();
 
