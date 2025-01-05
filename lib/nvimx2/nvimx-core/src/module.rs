@@ -28,9 +28,6 @@ pub trait Module<P: Plugin<B>, B: Backend>: 'static + Sized {
     type Config: DeserializeOwned;
 
     /// TODO: docs.
-    type Docs;
-
-    /// TODO: docs.
     fn api(&self, ctx: &mut ApiCtx<Self, P, B>);
 
     /// TODO: docs.
@@ -39,9 +36,6 @@ pub trait Module<P: Plugin<B>, B: Backend>: 'static + Sized {
         new_config: Self::Config,
         ctx: &mut NeovimCtx<B>,
     );
-
-    /// TODO: docs.
-    fn docs() -> Self::Docs;
 }
 
 /// TODO: docs.

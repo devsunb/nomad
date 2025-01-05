@@ -14,17 +14,11 @@ pub trait Action<B: Backend>: 'static {
     type Return;
 
     /// TODO: docs.
-    type Docs;
-
-    /// TODO: docs.
     fn call(
         &mut self,
         args: Self::Args,
         ctx: &mut ActionCtx<B>,
     ) -> impl MaybeResult<Self::Return>;
-
-    /// TODO: docs.
-    fn docs() -> Self::Docs;
 }
 
 /// TODO: docs.
@@ -36,17 +30,11 @@ pub trait AsyncAction<B: Backend>: 'static {
     type Args;
 
     /// TODO: docs.
-    type Docs;
-
-    /// TODO: docs.
     fn call(
         &mut self,
         args: Self::Args,
         ctx: &mut AsyncCtx<B>,
     ) -> impl Future<Output = impl MaybeResult<()>>;
-
-    /// TODO: docs.
-    fn docs() -> Self::Docs;
 }
 
 /// TODO: docs.
@@ -76,7 +64,6 @@ where
     const NAME: ActionName = T::NAME;
     type Args = T::Args;
     type Return = ();
-    type Docs = T::Docs;
 
     #[inline]
     fn call(&mut self, args: Self::Args, ctx: &mut ActionCtx<B>) {
@@ -93,10 +80,5 @@ where
                 });
             }
         });
-    }
-
-    #[inline]
-    fn docs() -> Self::Docs {
-        T::docs()
     }
 }

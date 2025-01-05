@@ -15,17 +15,11 @@ pub trait Function<B: Backend>: 'static {
     type Return: Serialize + 'static;
 
     /// TODO: docs.
-    type Docs;
-
-    /// TODO: docs.
     fn call(
         &mut self,
         args: Self::Args,
         ctx: &mut ActionCtx<B>,
     ) -> impl MaybeResult<Self::Return>;
-
-    /// TODO: docs.
-    fn docs() -> Self::Docs;
 }
 
 impl<A, B> Function<B> for A
@@ -39,7 +33,6 @@ where
 
     type Args = A::Args;
     type Return = A::Return;
-    type Docs = A::Docs;
 
     #[inline]
     fn call(
@@ -48,10 +41,5 @@ where
         ctx: &mut ActionCtx<B>,
     ) -> impl MaybeResult<Self::Return> {
         A::call(self, args, ctx)
-    }
-
-    #[inline]
-    fn docs() -> Self::Docs {
-        A::docs()
     }
 }

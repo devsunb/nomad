@@ -38,9 +38,6 @@ pub trait Command<B: Backend>: 'static {
     type Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error>;
 
     /// TODO: docs.
-    type Docs;
-
-    /// TODO: docs.
     fn call(
         &mut self,
         args: Self::Args,
@@ -49,9 +46,6 @@ pub trait Command<B: Backend>: 'static {
 
     /// TODO: docs.
     fn to_completion_fn(&self) -> impl CompletionFn {}
-
-    /// TODO: docs.
-    fn docs() -> Self::Docs;
 }
 
 /// TODO: docs.
@@ -817,7 +811,6 @@ where
     const NAME: ActionName = A::NAME;
 
     type Args = A::Args;
-    type Docs = A::Docs;
 
     #[inline]
     fn call(
@@ -831,11 +824,6 @@ where
     #[inline]
     fn to_completion_fn(&self) -> impl CompletionFn {
         ToCompletionFn::to_completion_fn(self)
-    }
-
-    #[inline]
-    fn docs() -> Self::Docs {
-        A::docs()
     }
 }
 
