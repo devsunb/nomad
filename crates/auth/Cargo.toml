@@ -7,8 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
-nomad = { workspace = true }
-nvimx = { workspace = true }
+nvimx2 = { workspace = true }
 
 [lints]
 workspace = true

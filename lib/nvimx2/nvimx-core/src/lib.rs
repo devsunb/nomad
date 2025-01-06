@@ -19,7 +19,7 @@ mod plugin;
 mod shared;
 mod util;
 
-pub use action::{Action, ActionCtx};
+pub use action::{Action, ActionCtx, AsyncAction};
 pub use async_ctx::AsyncCtx;
 use backend::BackendExt;
 pub use backend::{Backend, Key, MapAccess, Value};

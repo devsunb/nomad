@@ -1,6 +1,7 @@
 //! TODO: docs.
 
-mod actions;
-mod auth;
+mod login;
+mod logout;
 
-pub use auth::Auth;
+pub use login::Login;
+pub use logout::Logout;
