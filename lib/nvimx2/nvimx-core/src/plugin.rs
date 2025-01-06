@@ -6,10 +6,12 @@ use crate::command::{CommandBuilder, CommandCompletionFns, CommandHandlers};
 use crate::module::{ApiCtx, ConfigFnBuilder, Module};
 use crate::{Backend, BackendHandle, Name};
 
+const NO_COMMAND_NAME: &str = "�";
+
 /// TODO: docs.
 pub trait Plugin<B: Backend>: Module<Self, B> {
     /// TODO: docs.
-    const COMMAND_NAME: Name = panic!();
+    const COMMAND_NAME: Name = NO_COMMAND_NAME;
 
     /// TODO: docs.
     const CONFIG_FN_NAME: Name = "setup";
@@ -58,7 +60,7 @@ pub trait Plugin<B: Backend>: Module<Self, B> {
 
         module_api.finish();
 
-        if command_has_been_added {
+        if command_has_been_added && Self::COMMAND_NAME != NO_COMMAND_NAME {
             let command = command_handlers.build(backend);
             let completion_fn = command_completions.build();
             api.add_command(command, completion_fn);
