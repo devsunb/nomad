@@ -1,5 +1,5 @@
 use nvimx2::command::ToCompletionFn;
-use nvimx2::{AsyncAction, AsyncCtx, Backend, Name};
+use nvimx2::{AsyncAction, AsyncCtx, Backend, Name, Plugin};
 
 /// TODO: docs.
 #[derive(Clone, Default)]
@@ -12,12 +12,16 @@ impl Logout {
     }
 }
 
-impl<B: Backend> AsyncAction<B> for Logout {
+impl<P, B> AsyncAction<P, B> for Logout
+where
+    P: Plugin<B>,
+    B: Backend,
+{
     const NAME: Name = "logout";
 
     type Args = ();
 
-    async fn call(&mut self, _: Self::Args, _: &mut AsyncCtx<'_, B>) {}
+    async fn call(&mut self, _: Self::Args, _: &mut AsyncCtx<'_, P, B>) {}
 }
 
 impl<B: Backend> ToCompletionFn<B> for Logout {

@@ -1,5 +1,7 @@
 //! TODO: docs.
 
+use core::convert::Infallible;
+
 use serde::de::DeserializeOwned;
 
 use crate::action_ctx::ModulePath;
@@ -37,23 +39,24 @@ pub trait Module<P: Plugin<B>, B: Backend>: 'static + Sized {
     fn on_new_config(
         &mut self,
         new_config: Self::Config,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut NeovimCtx<P, B>,
     );
 }
 
 /// TODO: docs.
 pub struct ApiCtx<'a, 'b, M: Module<P, B>, P: Plugin<B>, B: Backend> {
     module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
-    command_builder: CommandBuilder<'a, B>,
-    config_builder: &'a mut ConfigFnBuilder<B>,
+    command_builder: CommandBuilder<'a, P, B>,
+    config_builder: &'a mut ConfigFnBuilder<P, B>,
     module_path: &'a mut ModulePath,
     backend: &'b BackendHandle<B>,
 }
 
-pub(crate) struct ConfigFnBuilder<B: Backend> {
+pub(crate) struct ConfigFnBuilder<P: Plugin<B>, B: Backend> {
     module_name: Name,
-    config_handler:
-        Box<dyn FnMut(B::ApiValue, &ModulePath, &mut NeovimCtx<B>) + 'static>,
+    config_handler: Box<
+        dyn FnMut(B::ApiValue, &ModulePath, &mut NeovimCtx<P, B>) + 'static,
+    >,
     submodules: OrderedMap<&'static str, Self>,
 }
 
@@ -67,7 +70,7 @@ where
     #[inline]
     pub fn with_command<Cmd>(&mut self, command: Cmd) -> &mut Self
     where
-        Cmd: Command<B>,
+        Cmd: Command<P, B>,
     {
         self.command_builder.add_command(command);
         self
@@ -83,11 +86,18 @@ where
         let value = self.backend.with_mut(|mut backend| {
             match backend.serialize(&value) {
                 Ok(value) => value,
-                Err(err) => panic!(
-                    "couldn't serialize {:?}: {:?}",
-                    Const::NAME,
-                    err.to_message().as_str()
-                ),
+                Err(err) => {
+                    let msg = err
+                        .to_notification::<P, B>(self.module_path, None)
+                        .map(|(_, msg)| msg);
+                    panic!(
+                        "couldn't serialize {:?}{colon}{reason:?}",
+                        Const::NAME,
+                        colon = msg.is_some().then_some(": ").unwrap_or(""),
+                        reason =
+                            msg.as_ref().map(|msg| msg.as_str()).unwrap_or(""),
+                    );
+                },
             }
         });
         self.module_api.add_constant(Const::NAME, value);
@@ -99,7 +109,7 @@ where
     #[inline]
     pub fn with_function<Fun>(&mut self, mut function: Fun) -> &mut Self
     where
-        Fun: Function<B>,
+        Fun: Function<P, B>,
     {
         let backend = self.backend.clone();
         let module_path = self.module_path.clone();
@@ -109,7 +119,11 @@ where
             backend.with_mut(move |mut backend| {
                 let args = backend.deserialize::<Fun::Args>(value).map_err(
                     |err| {
-                        backend.emit_action_err(module_path, Fun::NAME, &err);
+                        backend.emit_err::<P, _>(
+                            module_path,
+                            Some(Fun::NAME),
+                            &err,
+                        );
                         FunctionError::Deserialize(err)
                     },
                 )?;
@@ -132,15 +146,25 @@ where
                         //
                         // FIXME: Is there a better way around this than boxing
                         // the error?
-                        Box::new(err) as Box<dyn notify::Error>
+                        // Box::new(err) as Box<dyn notify::Error>
+                        let a: Infallible = todo!();
+                        a
                     })
                     .map_err(|err| {
-                        backend.emit_action_err(module_path, Fun::NAME, &err);
+                        backend.emit_err::<P, _>(
+                            module_path,
+                            Some(Fun::NAME),
+                            &err,
+                        );
                         FunctionError::Call(err)
                     })?;
 
                 backend.serialize(&ret).map_err(|err| {
-                    backend.emit_action_err(module_path, Fun::NAME, &err);
+                    backend.emit_err::<P, _>(
+                        module_path,
+                        Some(Fun::NAME),
+                        &err,
+                    );
                     FunctionError::Serialize(err)
                 })
             })
@@ -159,8 +183,8 @@ where
         self.module_path.push(Mod::NAME);
         let mut api_ctx = ApiCtx::new(
             &mut module_api,
-            self.command_builder.add_module::<P, Mod>(),
-            self.config_builder.add_module::<P, Mod>(),
+            self.command_builder.add_module::<Mod>(),
+            self.config_builder.add_module::<Mod>(),
             self.module_path,
             self.backend,
         );
@@ -174,8 +198,8 @@ where
     #[inline]
     pub(crate) fn new(
         module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
-        command_builder: CommandBuilder<'a, B>,
-        config_builder: &'a mut ConfigFnBuilder<B>,
+        command_builder: CommandBuilder<'a, P, B>,
+        config_builder: &'a mut ConfigFnBuilder<P, B>,
         module_path: &'a mut ModulePath,
         backend: &'b BackendHandle<B>,
     ) -> Self {
@@ -189,7 +213,7 @@ where
     }
 }
 
-impl<B: Backend> ConfigFnBuilder<B> {
+impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
     #[inline]
     pub(crate) fn build(
         mut self,
@@ -208,24 +232,21 @@ impl<B: Backend> ConfigFnBuilder<B> {
     }
 
     #[inline]
-    pub(crate) fn finish<P: Plugin<B>, M: Module<P, B>>(
-        &mut self,
-        mut module: M,
-    ) {
+    pub(crate) fn finish<M: Module<P, B>>(&mut self, mut module: M) {
         self.config_handler = Box::new(move |value, module_path, ctx| {
             let backend = ctx.backend_mut();
             match backend.deserialize(value) {
                 Ok(config) => module.on_new_config(config, ctx),
                 Err(err) => {
                     // backend.emit_deserialize_config_error(namespace, err)
-                    backend.emit_err(module_path, err)
+                    backend.emit_err::<P, _>(module_path, None, err)
                 },
             }
         });
     }
 
     #[inline]
-    pub(crate) fn new<P: Plugin<B>, M: Module<P, B>>() -> Self {
+    pub(crate) fn new<M: Module<P, B>>() -> Self {
         Self {
             module_name: M::NAME,
             config_handler: Box::new(|_, _, _| {}),
@@ -234,8 +255,8 @@ impl<B: Backend> ConfigFnBuilder<B> {
     }
 
     #[inline]
-    fn add_module<P: Plugin<B>, M: Module<P, B>>(&mut self) -> &mut Self {
-        self.submodules.insert(M::NAME, ConfigFnBuilder::new::<P, M>())
+    fn add_module<M: Module<P, B>>(&mut self) -> &mut Self {
+        self.submodules.insert(M::NAME, ConfigFnBuilder::new::<M>())
     }
 
     #[inline]
@@ -243,14 +264,14 @@ impl<B: Backend> ConfigFnBuilder<B> {
         &mut self,
         mut value: B::ApiValue,
         module_path: &mut ModulePath,
-        ctx: &mut NeovimCtx<B>,
+        ctx: &mut NeovimCtx<P, B>,
     ) {
         let mut map_access = match value.map_access() {
             Ok(map_access) => map_access,
             Err(err) => {
                 // TODO: the namespace should just be the plugin and the
                 // config fn name.
-                ctx.backend_mut().emit_err(module_path, err);
+                ctx.backend_mut().emit_err::<P, _>(module_path, None, err);
                 return;
             },
         };
@@ -261,7 +282,7 @@ impl<B: Backend> ConfigFnBuilder<B> {
                 Ok(key) => key,
                 Err(err) => {
                     // TODO: same as above.
-                    ctx.backend_mut().emit_err(module_path, err);
+                    ctx.backend_mut().emit_err::<P, _>(module_path, None, err);
                     module_path.push(self.module_name);
                     return;
                 },
@@ -292,20 +313,25 @@ where
     S: notify::Error,
 {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
+    fn to_notification<P, B>(
+        &self,
+        module_path: &ModulePath,
+        action_name: Option<Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P: Plugin<B>,
+        B: Backend,
+    {
         match self {
-            Self::Deserialize(err) => err.to_level(),
-            Self::Call(err) => err.to_level(),
-            Self::Serialize(err) => err.to_level(),
-        }
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
-        match self {
-            Self::Deserialize(err) => err.to_message(),
-            Self::Call(err) => err.to_message(),
-            Self::Serialize(err) => err.to_message(),
+            Self::Deserialize(err) => {
+                err.to_notification::<P, B>(module_path, action_name)
+            },
+            Self::Call(err) => {
+                err.to_notification::<P, B>(module_path, action_name)
+            },
+            Self::Serialize(err) => {
+                err.to_notification::<P, B>(module_path, action_name)
+            },
         }
     }
 }

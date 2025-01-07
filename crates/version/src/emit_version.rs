@@ -1,6 +1,6 @@
 use nvimx2::command::ToCompletionFn;
 use nvimx2::notify::Message;
-use nvimx2::{Action, ActionCtx, Backend, Name};
+use nvimx2::{Action, ActionCtx, Backend, Name, Plugin};
 
 use crate::VERSION;
 
@@ -18,13 +18,17 @@ impl EmitVersion {
 
 // FIXME: why does implementing `Command` cause a `conflicting implementations`
 // error?
-impl<B: Backend> Action<B> for EmitVersion {
+impl<P, B> Action<P, B> for EmitVersion
+where
+    P: Plugin<B>,
+    B: Backend,
+{
     const NAME: Name = "version";
 
     type Args = ();
     type Return = ();
 
-    fn call(&mut self, _: Self::Args, ctx: &mut ActionCtx<B>) {
+    fn call(&mut self, _: Self::Args, ctx: &mut ActionCtx<P, B>) {
         ctx.emit_info(Message::from_debug(VERSION));
     }
 }

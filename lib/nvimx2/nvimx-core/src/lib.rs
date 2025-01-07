@@ -20,10 +20,11 @@ mod shared;
 mod util;
 
 pub use action::{Action, ActionCtx, AsyncAction};
+pub use action_ctx::ModulePath;
 pub use async_ctx::AsyncCtx;
 use backend::BackendExt;
 pub use backend::{Backend, Key, MapAccess, Value};
-use backend_handle::{BackendHandle, BackendMut};
+use backend_handle::BackendHandle;
 pub use byte_offset::ByteOffset;
 pub use constant::Constant;
 pub use function::Function;

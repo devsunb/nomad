@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use nvimx_core::notify;
+use nvimx_core::{Backend, ModulePath, Plugin, notify};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;
@@ -71,48 +71,68 @@ impl Path<'_> {
 
 impl notify::Error for NeovimSerializeError {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
-        Some(notify::Level::Error)
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
+    fn to_notification<P, B>(
+        &self,
+        _: &ModulePath,
+        _: Option<nvimx_core::Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P: Plugin<B>,
+        B: Backend,
+    {
         let mut message = notify::Message::new();
         message
             .push_str("couldn't serialize value")
             .push_with(|message| self.path().push_at(message))
             .push_str(": ")
             .push_str(self.inner.inner().to_string());
-        message
+        Some((notify::Level::Error, message))
     }
 }
 
 impl notify::Error for NeovimDeserializeError {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
-        Some(notify::Level::Error)
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
+    fn to_notification<P, B>(
+        &self,
+        module_path: &ModulePath,
+        action_name: Option<nvimx_core::Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P: Plugin<B>,
+        B: Backend,
+    {
         let mut message = notify::Message::new();
+
+        let what = (|| {
+            let default = "value";
+            let mut names = module_path.names();
+            let Some(module) = names.next() else { return default };
+            let None = names.next() else { return default };
+            if module == P::NAME && action_name == Some(P::CONFIG_FN_NAME) {
+                "config"
+            } else {
+                default
+            }
+        })();
+
         message
-            .push_str("couldn't deserialize value")
+            .push_str("couldn't deserialize ")
+            .push_str(what)
             .push_with(|message| self.path().push_at(message))
             .push_str(": ");
 
         let (actual, &expected) = match self.inner.inner() {
             oxi::serde::DeserializeError::Custom { msg } => {
                 message.push_str(msg);
-                return message;
+                return Some((notify::Level::Error, message));
             },
             oxi::serde::DeserializeError::DuplicateField { field } => {
                 message.push_str("duplicate field ").push_info(field);
-                return message;
+                return Some((notify::Level::Error, message));
             },
             oxi::serde::DeserializeError::MissingField { field } => {
                 message.push_str("missing field ").push_info(field);
-                return message;
+                return Some((notify::Level::Error, message));
             },
             oxi::serde::DeserializeError::UnknownField { field, expected } => {
                 message
@@ -157,6 +177,6 @@ impl notify::Error for NeovimDeserializeError {
                 .push_comma_separated(expected, notify::SpanKind::Expected);
         }
 
-        message
+        Some((notify::Level::Error, message))
     }
 }

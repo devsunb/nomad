@@ -1,10 +1,10 @@
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 
-use crate::{Action, ActionCtx, Backend, MaybeResult, Name};
+use crate::{Action, ActionCtx, Backend, MaybeResult, Name, Plugin};
 
 /// TODO: docs.
-pub trait Function<B: Backend>: 'static {
+pub trait Function<P: Plugin<B>, B: Backend>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -18,15 +18,16 @@ pub trait Function<B: Backend>: 'static {
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut ActionCtx<B>,
+        ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<Self::Return>;
 }
 
-impl<A, B> Function<B> for A
+impl<A, P, B> Function<P, B> for A
 where
-    A: Action<B>,
+    A: Action<P, B>,
     A::Args: DeserializeOwned,
     A::Return: Serialize,
+    P: Plugin<B>,
     B: Backend,
 {
     const NAME: Name = A::NAME;
@@ -38,7 +39,7 @@ where
     fn call(
         &mut self,
         args: A::Args,
-        ctx: &mut ActionCtx<B>,
+        ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<Self::Return> {
         A::call(self, args, ctx)
     }

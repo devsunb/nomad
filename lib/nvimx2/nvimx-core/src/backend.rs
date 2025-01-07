@@ -111,27 +111,22 @@ pub trait Key: fmt::Debug {
 /// TODO: docs.
 pub(crate) trait BackendExt: Backend {
     #[inline]
-    fn emit_action_err<Err: notify::Error>(
+    fn emit_err<P: Plugin<Self>, Err: notify::Error>(
         &mut self,
         module_path: &ModulePath,
-        _action_name: Name,
+        action_name: Option<Name>,
         err: Err,
     ) {
-        self.emit_err(module_path, err);
-    }
-
-    #[inline]
-    fn emit_err<Err: notify::Error>(
-        &mut self,
-        module_path: &ModulePath,
-        err: Err,
-    ) {
-        let Some(level) = err.to_level() else { return };
+        let Some((level, message)) =
+            err.to_notification::<P, Self>(module_path, action_name)
+        else {
+            return;
+        };
 
         let notification = notify::Notification {
             level,
             namespace: module_path,
-            message: err.to_message(),
+            message,
             updates_prev: None,
         };
 

@@ -24,13 +24,13 @@ use crate::{
     notify,
 };
 
-type CommandHandler<B> = Box<dyn FnMut(CommandArgs, &mut ActionCtx<B>)>;
+type CommandHandler<P, B> = Box<dyn FnMut(CommandArgs, &mut ActionCtx<P, B>)>;
 
 type CommandCompletionFn =
     Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
 
 /// TODO: docs.
-pub trait Command<B: Backend>: 'static {
+pub trait Command<P: Plugin<B>, B: Backend>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -41,7 +41,7 @@ pub trait Command<B: Backend>: 'static {
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut ActionCtx<B>,
+        ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<()>;
 
     /// TODO: docs.
@@ -146,15 +146,15 @@ pub struct CommandArgsWrongNumError<'a> {
     expected_num: usize,
 }
 
-pub(crate) struct CommandBuilder<'a, B> {
+pub(crate) struct CommandBuilder<'a, P, B> {
     pub(crate) command_has_been_added: &'a mut bool,
-    pub(crate) handlers: &'a mut CommandHandlers<B>,
+    pub(crate) handlers: &'a mut CommandHandlers<P, B>,
     pub(crate) completions: &'a mut CommandCompletionFns,
 }
 
-pub(crate) struct CommandHandlers<B> {
+pub(crate) struct CommandHandlers<P, B> {
     module_name: Name,
-    inner: OrderedMap<&'static str, CommandHandler<B>>,
+    inner: OrderedMap<&'static str, CommandHandler<P, B>>,
     submodules: OrderedMap<&'static str, Self>,
 }
 
@@ -164,9 +164,12 @@ pub(crate) struct CommandCompletionFns {
     submodules: OrderedMap<&'static str, Self>,
 }
 
-struct MissingCommandError<'a, B>(&'a CommandHandlers<B>);
+struct MissingCommandError<'a, P, B>(&'a CommandHandlers<P, B>);
 
-struct InvalidCommandError<'a, B>(&'a CommandHandlers<B>, CommandArg<'a>);
+struct InvalidCommandError<'a, P, B>(
+    &'a CommandHandlers<P, B>,
+    CommandArg<'a>,
+);
 
 impl<'a> CommandArgs<'a> {
     /// TODO: docs.
@@ -301,7 +304,7 @@ impl CommandCompletion {
     }
 }
 
-impl<B> CommandHandlers<B> {
+impl<P, B> CommandHandlers<P, B> {
     /// Pushes the list of valid commands and submodules to the given message.
     #[inline]
     fn push_valid(&self, message: &mut notify::Message) {
@@ -508,11 +511,11 @@ where
     }
 }
 
-impl<'a, B: Backend> CommandBuilder<'a, B> {
+impl<'a, P: Plugin<B>, B: Backend> CommandBuilder<'a, P, B> {
     #[inline]
     pub(crate) fn new(
         command_has_been_added: &'a mut bool,
-        handlers: &'a mut CommandHandlers<B>,
+        handlers: &'a mut CommandHandlers<P, B>,
         completions: &'a mut CommandCompletionFns,
     ) -> Self {
         Self { command_has_been_added, handlers, completions }
@@ -522,7 +525,7 @@ impl<'a, B: Backend> CommandBuilder<'a, B> {
     #[inline]
     pub(super) fn add_command<Cmd>(&mut self, command: Cmd)
     where
-        Cmd: Command<B>,
+        Cmd: Command<P, B>,
     {
         self.assert_namespace_is_available(Cmd::NAME);
         *self.command_has_been_added = true;
@@ -532,15 +535,14 @@ impl<'a, B: Backend> CommandBuilder<'a, B> {
 
     #[track_caller]
     #[inline]
-    pub(super) fn add_module<P, M>(&mut self) -> CommandBuilder<'_, B>
+    pub(super) fn add_module<M>(&mut self) -> CommandBuilder<'_, P, B>
     where
-        P: Plugin<B>,
         M: Module<P, B>,
     {
         self.assert_namespace_is_available(M::NAME);
         CommandBuilder {
             command_has_been_added: self.command_has_been_added,
-            handlers: self.handlers.add_module::<P, M>(),
+            handlers: self.handlers.add_module::<M>(),
             completions: self.completions.add_module(M::NAME),
         }
     }
@@ -564,7 +566,7 @@ impl<'a, B: Backend> CommandBuilder<'a, B> {
     }
 }
 
-impl<B: Backend> CommandHandlers<B> {
+impl<P: Plugin<B>, B: Backend> CommandHandlers<P, B> {
     #[inline]
     pub(crate) fn build(
         mut self,
@@ -579,7 +581,7 @@ impl<B: Backend> CommandHandlers<B> {
     }
 
     #[inline]
-    pub(crate) fn new<P: Plugin<B>, M: Module<P, B>>() -> Self {
+    pub(crate) fn new<M: Module<P, B>>() -> Self {
         Self {
             module_name: M::NAME,
             inner: Default::default(),
@@ -590,9 +592,9 @@ impl<B: Backend> CommandHandlers<B> {
     #[inline]
     fn add_command<Cmd>(&mut self, mut command: Cmd)
     where
-        Cmd: Command<B>,
+        Cmd: Command<P, B>,
     {
-        let handler: CommandHandler<B> = Box::new(move |args, ctx| {
+        let handler: CommandHandler<P, B> = Box::new(move |args, ctx| {
             let args = match Cmd::Args::try_from(args) {
                 Ok(args) => args,
                 Err(err) => {
@@ -608,12 +610,11 @@ impl<B: Backend> CommandHandlers<B> {
     }
 
     #[inline]
-    fn add_module<P, M>(&mut self) -> &mut Self
+    fn add_module<M>(&mut self) -> &mut Self
     where
-        P: Plugin<B>,
         M: Module<P, B>,
     {
-        self.submodules.insert(M::NAME, Self::new::<P, M>())
+        self.submodules.insert(M::NAME, Self::new::<M>())
     }
 
     #[inline]
@@ -621,11 +622,11 @@ impl<B: Backend> CommandHandlers<B> {
         &mut self,
         mut args: CommandArgs,
         module_path: &mut ModulePath,
-        mut ctx: NeovimCtx<B>,
+        mut ctx: NeovimCtx<P, B>,
     ) {
         let Some(arg) = args.pop_front() else {
             let err = MissingCommandError(self);
-            return ctx.backend_mut().emit_err(module_path, err);
+            return ctx.backend_mut().emit_err::<P, _>(module_path, None, err);
         };
 
         if let Some(handler) = self.inner.get_mut(arg.as_str()) {
@@ -636,7 +637,7 @@ impl<B: Backend> CommandHandlers<B> {
             module.handle(args, module_path, ctx);
         } else {
             let err = InvalidCommandError(self, arg);
-            ctx.backend_mut().emit_err(module_path, err);
+            ctx.backend_mut().emit_err::<P, _>(module_path, None, err);
         }
     }
 }
@@ -653,9 +654,10 @@ impl CommandCompletionFns {
     }
 
     #[inline]
-    fn add_command<Cmd, B>(&mut self, command: &Cmd)
+    fn add_command<Cmd, P, B>(&mut self, command: &Cmd)
     where
-        Cmd: Command<B>,
+        Cmd: Command<P, B>,
+        P: Plugin<B>,
         B: Backend,
     {
         let mut completion_fn = command.to_completion_fn();
@@ -720,14 +722,17 @@ impl CommandCompletionFns {
     }
 }
 
-impl<B> notify::Error for MissingCommandError<'_, B> {
+impl<P, B> notify::Error for MissingCommandError<'_, P, B> {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
-        Some(notify::Level::Error)
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
+    fn to_notification<P2, B2>(
+        &self,
+        _: &ModulePath,
+        _: Option<Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P2: Plugin<B2>,
+        B2: Backend,
+    {
         let Self(handlers) = self;
         let mut message = notify::Message::new();
         let missing = match (
@@ -744,18 +749,21 @@ impl<B> notify::Error for MissingCommandError<'_, B> {
             .push_str(missing)
             .push_str(", ")
             .push_with(|message| handlers.push_valid(message));
-        message
+        Some((notify::Level::Error, message))
     }
 }
 
-impl<B> notify::Error for InvalidCommandError<'_, B> {
+impl<P, B> notify::Error for InvalidCommandError<'_, P, B> {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
-        Some(notify::Level::Error)
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
+    fn to_notification<P2, B2>(
+        &self,
+        _: &ModulePath,
+        _: Option<Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P2: Plugin<B2>,
+        B2: Backend,
+    {
         let Self(handlers, arg) = self;
         let mut message = notify::Message::new();
         let invalid = match (
@@ -798,14 +806,15 @@ impl<B> notify::Error for InvalidCommandError<'_, B> {
             handlers.push_valid(&mut message);
         }
 
-        message
+        Some((notify::Level::Error, message))
     }
 }
 
-impl<A, B> Command<B> for A
+impl<A, P, B> Command<P, B> for A
 where
-    A: Action<B, Return = ()> + ToCompletionFn<B>,
+    A: Action<P, B, Return = ()> + ToCompletionFn<B>,
     A::Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error>,
+    P: Plugin<B>,
     B: Backend,
 {
     const NAME: Name = A::NAME;
@@ -816,7 +825,7 @@ where
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut ActionCtx<B>,
+        ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<()> {
         A::call(self, args, ctx)
     }
@@ -856,30 +865,37 @@ where
 
 impl<T: notify::Error> notify::Error for CommandArgsIntoSliceError<'_, T> {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
+    fn to_notification<P, B>(
+        &self,
+        module_path: &ModulePath,
+        action_name: Option<Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P: Plugin<B>,
+        B: Backend,
+    {
         match self {
-            Self::Item(err) => err.to_level(),
-            Self::WrongNum(err) => err.to_level(),
-        }
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
-        match self {
-            Self::Item(err) => err.to_message(),
-            Self::WrongNum(err) => err.to_message(),
+            Self::Item(err) => {
+                err.to_notification::<P, B>(module_path, action_name)
+            },
+            Self::WrongNum(err) => {
+                err.to_notification::<P, B>(module_path, action_name)
+            },
         }
     }
 }
 
 impl notify::Error for CommandArgsWrongNumError<'_> {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
-        Some(notify::Level::Error)
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
+    fn to_notification<P, B2>(
+        &self,
+        _: &ModulePath,
+        _: Option<Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P: Plugin<B2>,
+        B2: Backend,
+    {
         debug_assert_ne!(self.args.len(), self.expected_num);
 
         let mut message = notify::Message::new();
@@ -898,7 +914,7 @@ impl notify::Error for CommandArgsWrongNumError<'_> {
             );
         }
 
-        message
+        Some((notify::Level::Error, message))
     }
 }
 

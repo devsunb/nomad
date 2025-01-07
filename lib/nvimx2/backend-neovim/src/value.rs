@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use nvimx_core::{Key, MapAccess, Value, notify};
+use nvimx_core::{Backend, Key, MapAccess, ModulePath, Plugin, Value, notify};
 
 use crate::oxi::{self, Dictionary, Object, ObjectKind, lua};
 
@@ -169,12 +169,15 @@ impl Key for NeovimMapKey<'_> {
 
 impl notify::Error for NeovimMapAccessError {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
-        Some(notify::Level::Error)
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
+    fn to_notification<P, B>(
+        &self,
+        _: &ModulePath,
+        _: Option<nvimx_core::Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P: Plugin<B>,
+        B: Backend,
+    {
         let Self(kind) = self;
         let mut msg = notify::Message::new();
         let kind_article = match kind {
@@ -188,7 +191,7 @@ impl notify::Error for NeovimMapAccessError {
             .push_str(kind_article)
             .push_actual(kind.as_static())
             .push_str(" instead");
-        msg
+        Some((notify::Level::Error, msg))
     }
 }
 
@@ -201,16 +204,19 @@ impl fmt::Debug for NeovimMapKey<'_> {
 
 impl notify::Error for NeovimMapKeyAsStrError<'_> {
     #[inline]
-    fn to_level(&self) -> Option<notify::Level> {
-        Some(notify::Level::Error)
-    }
-
-    #[inline]
-    fn to_message(&self) -> notify::Message {
+    fn to_notification<P, B>(
+        &self,
+        _: &ModulePath,
+        _: Option<nvimx_core::Name>,
+    ) -> Option<(notify::Level, notify::Message)>
+    where
+        P: Plugin<B>,
+        B: Backend,
+    {
         let mut msg = notify::Message::new();
         msg.push_str("'")
             .push_str(self.0.to_string_lossy())
             .push_str("' is not a valid UTF-8 string");
-        msg
+        Some((notify::Level::Error, msg))
     }
 }

@@ -1,9 +1,9 @@
 pub use crate::action_ctx::ActionCtx;
 use crate::backend::BackendExt;
-use crate::{AsyncCtx, Backend, MaybeResult, Name};
+use crate::{AsyncCtx, Backend, MaybeResult, Name, Plugin};
 
 /// TODO: docs.
-pub trait Action<B: Backend>: 'static {
+pub trait Action<P: Plugin<B>, B: Backend>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -17,12 +17,12 @@ pub trait Action<B: Backend>: 'static {
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut ActionCtx<B>,
+        ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<Self::Return>;
 }
 
 /// TODO: docs.
-pub trait AsyncAction<B: Backend>: 'static {
+pub trait AsyncAction<P: Plugin<B>, B: Backend>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -33,13 +33,14 @@ pub trait AsyncAction<B: Backend>: 'static {
     fn call(
         &mut self,
         args: Self::Args,
-        ctx: &mut AsyncCtx<B>,
+        ctx: &mut AsyncCtx<P, B>,
     ) -> impl Future<Output = impl MaybeResult<()>>;
 }
 
-impl<T, B> Action<B> for T
+impl<T, P, B> Action<P, B> for T
 where
-    T: AsyncAction<B> + Clone,
+    T: AsyncAction<P, B> + Clone,
+    P: Plugin<B>,
     B: Backend,
 {
     const NAME: Name = T::NAME;
@@ -47,15 +48,15 @@ where
     type Return = ();
 
     #[inline]
-    fn call(&mut self, args: Self::Args, ctx: &mut ActionCtx<B>) {
+    fn call(&mut self, args: Self::Args, ctx: &mut ActionCtx<P, B>) {
         let mut this = self.clone();
         let module_path = ctx.module_path().clone();
         ctx.spawn_local(async move |ctx| {
             if let Err(err) = this.call(args, ctx).await.into_result() {
                 ctx.with_ctx(move |ctx| {
-                    ctx.backend_mut().emit_action_err(
+                    ctx.backend_mut().emit_err::<P, _>(
                         &module_path,
-                        Self::NAME,
+                        Some(Self::NAME),
                         err,
                     );
                 });

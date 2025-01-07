@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use crate::backend_handle::BackendMut;
 use crate::executor::{
     BackgroundExecutor,
@@ -5,18 +7,23 @@ use crate::executor::{
     Task,
     TaskBackground,
 };
-use crate::{AsyncCtx, Backend};
+use crate::{AsyncCtx, Backend, Plugin};
 
 /// TODO: docs.
-pub struct NeovimCtx<'a, B> {
+pub struct NeovimCtx<'a, P, B> {
     backend: BackendMut<'a, B>,
+    plugin: PhantomData<P>,
 }
 
-impl<'a, B: Backend> NeovimCtx<'a, B> {
+impl<'a, P, B> NeovimCtx<'a, P, B>
+where
+    P: Plugin<B>,
+    B: Backend,
+{
     /// TODO: docs.
     #[inline]
-    pub fn as_mut(&mut self) -> NeovimCtx<'_, B> {
-        NeovimCtx { backend: self.backend.as_mut() }
+    pub fn as_mut(&mut self) -> NeovimCtx<'_, P, B> {
+        NeovimCtx::new(self.backend.as_mut())
     }
 
     /// TODO: docs.
@@ -27,7 +34,7 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
 
     #[inline]
     pub(crate) fn new(handle: BackendMut<'a, B>) -> Self {
-        Self { backend: handle }
+        Self { backend: handle, plugin: PhantomData }
     }
 
     /// TODO: docs.
@@ -49,9 +56,10 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     #[inline]
     pub fn spawn_local<Fun>(&mut self, fun: Fun)
     where
-        Fun: AsyncFnOnce(&mut AsyncCtx<B>) + 'static,
+        Fun: AsyncFnOnce(&mut AsyncCtx<P, B>) + 'static,
     {
-        let mut async_ctx = AsyncCtx::<'static, _>::new(self.backend.handle());
+        let mut async_ctx =
+            AsyncCtx::<'static, _, _>::new(self.backend.handle());
         self.backend_mut()
             .local_executor()
             .spawn(async move { fun(&mut async_ctx).await })
