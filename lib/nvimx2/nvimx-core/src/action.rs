@@ -3,7 +3,11 @@ use crate::backend::BackendExt;
 use crate::{AsyncCtx, Backend, MaybeResult, Name, Plugin, notify};
 
 /// TODO: docs.
-pub trait Action<P: Plugin<B>, B: Backend>: 'static {
+pub trait Action<P, B>: 'static
+where
+    P: Plugin<B>,
+    B: Backend,
+{
     /// TODO: docs.
     const NAME: Name;
 
@@ -22,7 +26,11 @@ pub trait Action<P: Plugin<B>, B: Backend>: 'static {
 }
 
 /// TODO: docs.
-pub trait AsyncAction<P: Plugin<B>, B: Backend>: 'static {
+pub trait AsyncAction<P, B>: 'static
+where
+    P: Plugin<B>,
+    B: Backend,
+{
     /// TODO: docs.
     const NAME: Name;
 

@@ -7,6 +7,7 @@ use serde::de::DeserializeOwned;
 use crate::action_ctx::ModulePath;
 use crate::api::{Api, ModuleApi};
 use crate::backend::{Key, MapAccess, Value};
+use crate::backend_handle::BackendMut;
 use crate::command::{Command, CommandBuilder};
 use crate::notify::Error;
 use crate::util::OrderedMap;
@@ -54,10 +55,8 @@ pub struct ApiCtx<'a, 'b, M: Module<P, B>, P: Plugin<B>, B: Backend> {
 
 pub(crate) struct ConfigFnBuilder<P: Plugin<B>, B: Backend> {
     module_name: Name,
-    config_handler: Box<
-        dyn FnMut(B::ApiValue, &ModulePath, &mut NeovimCtx<P, B>) + 'static,
-    >,
-    submodules: OrderedMap<&'static str, Self>,
+    config_handler: Box<dyn FnMut(B::ApiValue, &mut NeovimCtx<P, B>)>,
+    submodules: OrderedMap<Name, Self>,
 }
 
 impl<'a, 'b, M, P, B> ApiCtx<'a, 'b, M, P, B>
@@ -131,8 +130,7 @@ where
                 )?;
 
                 let mut action_ctx = ActionCtx::new(
-                    NeovimCtx::new(backend.as_mut()),
-                    module_path,
+                    NeovimCtx::new(backend.as_mut(), module_path),
                     Fun::NAME,
                 );
 
@@ -217,29 +215,18 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
         move |value| {
             backend.with_mut(|backend| {
                 let mut module_path = ModulePath::new(self.module_name);
-
-                self.handle(
-                    value,
-                    &mut module_path,
-                    &mut NeovimCtx::new(backend),
-                )
+                self.handle(value, &mut module_path, backend)
             });
         }
     }
 
     #[inline]
     pub(crate) fn finish<M: Module<P, B>>(&mut self, mut module: M) {
-        self.config_handler = Box::new(move |value, module_path, ctx| {
+        self.config_handler = Box::new(move |value, ctx| {
             let backend = ctx.backend_mut();
             match backend.deserialize(value) {
                 Ok(config) => module.on_new_config(config, ctx),
-                Err(err) => {
-                    let source = notify::Source {
-                        module_path,
-                        action_name: Some(P::CONFIG_FN_NAME),
-                    };
-                    backend.emit_err::<P, _>(source, err);
-                },
+                Err(err) => ctx.emit_err(Some(P::CONFIG_FN_NAME), err),
             }
         });
     }
@@ -248,7 +235,7 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
     pub(crate) fn new<M: Module<P, B>>() -> Self {
         Self {
             module_name: M::NAME,
-            config_handler: Box::new(|_, _, _| {}),
+            config_handler: Box::new(|_, _| {}),
             submodules: Default::default(),
         }
     }
@@ -263,7 +250,7 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
         &mut self,
         mut value: B::ApiValue,
         module_path: &mut ModulePath,
-        ctx: &mut NeovimCtx<P, B>,
+        mut backend: BackendMut<B>,
     ) {
         let mut map_access = match value.map_access() {
             Ok(map_access) => map_access,
@@ -272,7 +259,7 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
                     module_path,
                     action_name: Some(P::CONFIG_FN_NAME),
                 };
-                ctx.backend_mut().emit_err::<P, _>(source, err);
+                backend.emit_err::<P, _>(source, err);
                 return;
             },
         };
@@ -285,7 +272,7 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
                         module_path,
                         action_name: Some(P::CONFIG_FN_NAME),
                     };
-                    ctx.backend_mut().emit_err::<P, _>(source, err);
+                    backend.emit_err::<P, _>(source, err);
                     return;
                 },
             };
@@ -295,11 +282,12 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
             drop(key);
             let value = map_access.take_next_value();
             module_path.push(submodule.module_name);
-            submodule.handle(value, module_path, ctx);
+            submodule.handle(value, module_path, backend.as_mut());
             module_path.pop();
         }
         drop(map_access);
-        (self.config_handler)(value, module_path, ctx);
+        let mut ctx = NeovimCtx::new(backend, module_path);
+        (self.config_handler)(value, &mut ctx);
     }
 }
 

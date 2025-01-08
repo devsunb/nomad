@@ -9,7 +9,7 @@ use smol_str::{SmolStr, ToSmolStr};
 
 use crate::action_ctx::ModulePath;
 use crate::backend::BackendExt;
-use crate::backend_handle::BackendHandle;
+use crate::backend_handle::{BackendHandle, BackendMut};
 use crate::module::Module;
 use crate::util::OrderedMap;
 use crate::{
@@ -575,7 +575,7 @@ impl<P: Plugin<B>, B: Backend> CommandHandlers<P, B> {
         move |args: CommandArgs| {
             backend.with_mut(|backend| {
                 let mut module_path = ModulePath::new(self.module_name);
-                self.handle(args, &mut module_path, NeovimCtx::new(backend));
+                self.handle(args, &mut module_path, backend);
             })
         }
     }
@@ -622,27 +622,27 @@ impl<P: Plugin<B>, B: Backend> CommandHandlers<P, B> {
         &mut self,
         mut args: CommandArgs,
         module_path: &mut ModulePath,
-        mut ctx: NeovimCtx<P, B>,
+        mut backend: BackendMut<B>,
     ) {
         let Some(arg) = args.pop_front() else {
             let err = MissingCommandError(self);
             let src = notify::Source { module_path, action_name: None };
-            ctx.backend_mut().emit_err::<P, _>(src, err);
+            backend.emit_err::<P, _>(src, err);
             return;
         };
 
         if let Some((name, handler)) =
             self.inner.get_key_value_mut(arg.as_str())
         {
-            let mut action_ctx = ActionCtx::new(ctx, module_path, *name);
-            (handler)(args, &mut action_ctx);
+            let ctx = NeovimCtx::new(backend, module_path);
+            (handler)(args, &mut ActionCtx::new(ctx, *name));
         } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
             module_path.push(module.module_name);
-            module.handle(args, module_path, ctx);
+            module.handle(args, module_path, backend);
         } else {
             let err = InvalidCommandError(self, arg);
             let src = notify::Source { module_path, action_name: None };
-            ctx.backend_mut().emit_err::<P, _>(src, err);
+            backend.emit_err::<P, _>(src, err);
         }
     }
 }

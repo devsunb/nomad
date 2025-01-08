@@ -2,14 +2,12 @@ use core::ops::{Deref, DerefMut};
 
 use smallvec::{SmallVec, smallvec};
 
-use crate::backend::BackendExt;
-use crate::notify::{Emitter, Source};
+use crate::notify::NotificationId;
 use crate::{Backend, Name, NeovimCtx, Plugin, notify};
 
 /// TODO: docs.
 pub struct ActionCtx<'a, P, B> {
     neovim_ctx: NeovimCtx<'a, P, B>,
-    module_path: &'a ModulePath,
     action_name: Name,
 }
 
@@ -26,16 +24,8 @@ where
 {
     /// TODO: docs.
     #[inline]
-    pub fn emit_info(&mut self, message: notify::Message) {
-        self.neovim_ctx.backend_mut().emitter().emit(notify::Notification {
-            level: notify::Level::Info,
-            source: Source {
-                module_path: &self.module_path,
-                action_name: Some(self.action_name),
-            },
-            message,
-            updates_prev: None,
-        });
+    pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
+        self.neovim_ctx.emit_info_inner(message, None)
     }
 
     #[inline]
@@ -43,28 +33,16 @@ where
     where
         Err: notify::Error<B>,
     {
-        self.neovim_ctx.backend_mut().emit_err::<P, _>(
-            Source {
-                module_path: &self.module_path,
-                action_name: Some(self.action_name),
-            },
-            err,
-        );
-    }
-
-    #[inline]
-    pub(crate) fn module_path(&self) -> &'a ModulePath {
-        self.module_path
+        self.neovim_ctx.emit_err(Some(self.action_name), err);
     }
 
     /// Constructs a new [`ActionCtx`].
     #[inline]
     pub(crate) fn new(
         neovim_ctx: NeovimCtx<'a, P, B>,
-        module_path: &'a ModulePath,
         action_name: Name,
     ) -> Self {
-        Self { neovim_ctx, module_path, action_name }
+        Self { neovim_ctx, action_name }
     }
 }
 

@@ -1,11 +1,12 @@
 use core::marker::PhantomData;
 
 use crate::executor::{BackgroundExecutor, TaskBackground};
-use crate::{Backend, BackendHandle, NeovimCtx, Plugin};
+use crate::{Backend, BackendHandle, ModulePath, NeovimCtx, Plugin};
 
 /// TODO: docs.
 pub struct AsyncCtx<'a, P, B> {
     backend: BackendHandle<B>,
+    module_path: ModulePath,
     plugin: PhantomData<P>,
     _non_static: PhantomData<&'a ()>,
 }
@@ -37,12 +38,23 @@ where
     where
         Fun: FnOnce(&mut NeovimCtx<P, B>) -> Out,
     {
-        self.backend.with_mut(|backend| fun(&mut NeovimCtx::new(backend)))
+        self.backend.with_mut(|backend| {
+            let mut ctx = NeovimCtx::new(backend, &self.module_path);
+            fun(&mut ctx)
+        })
     }
 
     /// TODO: docs.
     #[inline]
-    pub(crate) fn new(backend: BackendHandle<B>) -> Self {
-        Self { backend, plugin: PhantomData, _non_static: PhantomData }
+    pub(crate) fn new(
+        backend: BackendHandle<B>,
+        module_path: ModulePath,
+    ) -> Self {
+        Self {
+            backend,
+            module_path,
+            plugin: PhantomData,
+            _non_static: PhantomData,
+        }
     }
 }

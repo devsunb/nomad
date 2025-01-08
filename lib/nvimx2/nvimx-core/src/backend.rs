@@ -26,10 +26,10 @@ pub trait Backend: 'static + Sized {
     type Emitter<'this>: notify::Emitter;
 
     /// TODO: docs.
-    type SerializeError: notify::Error<Self> + 'static;
+    type SerializeError: notify::Error<Self>;
 
     /// TODO: docs.
-    type DeserializeError: notify::Error<Self> + 'static;
+    type DeserializeError: notify::Error<Self>;
 
     /// TODO: docs.
     fn api<P: Plugin<Self>>(&mut self) -> Self::Api<P>;
@@ -110,11 +110,11 @@ pub trait Key<B: Backend>: fmt::Debug {
 /// TODO: docs.
 pub(crate) trait BackendExt: Backend {
     #[inline]
-    fn emit_err<P: Plugin<Self>, Err: notify::Error<Self>>(
-        &mut self,
-        source: notify::Source,
-        err: Err,
-    ) {
+    fn emit_err<P, Err>(&mut self, source: notify::Source, err: Err)
+    where
+        P: Plugin<Self>,
+        Err: notify::Error<Self>,
+    {
         let Some((level, message)) = err.to_message::<P>(source) else {
             return;
         };
