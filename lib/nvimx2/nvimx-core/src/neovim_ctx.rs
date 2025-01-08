@@ -78,7 +78,7 @@ where
         Err: notify::Error<B>,
     {
         self.backend.emit_err::<P, _>(
-            Source { module_path: &self.module_path, action_name },
+            Source { module_path: self.module_path, action_name },
             err,
         );
     }

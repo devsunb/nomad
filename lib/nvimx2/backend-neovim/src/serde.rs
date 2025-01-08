@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use nvimx_core::{Backend, ModulePath, Plugin, notify};
+use nvimx_core::{Plugin, notify};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use smallvec::SmallVec;

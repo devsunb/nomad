@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use nvimx_core::{Backend, Key, MapAccess, ModulePath, Plugin, Value, notify};
+use nvimx_core::{Key, MapAccess, Plugin, Value, notify};
 
 use crate::Neovim;
 use crate::oxi::{self, Dictionary, Object, ObjectKind, lua};
@@ -23,12 +23,6 @@ pub enum NeovimMapAccess<'a> {
 
 /// TODO: docs.
 pub struct NeovimDictAccess<'a> {
-    dict: &'a mut Dictionary,
-    dict_idx: usize,
-}
-
-/// TODO: docs.
-pub struct NeovimMapPair<'a> {
     dict: &'a mut Dictionary,
     dict_idx: usize,
 }
