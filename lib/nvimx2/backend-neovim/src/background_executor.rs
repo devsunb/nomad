@@ -2,7 +2,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll, ready};
 
 use futures_executor::ThreadPool;
-use nvimx_core::executor::{BackgroundExecutor, Task};
+use nvimx_core::backend::{BackgroundExecutor, Task};
 
 /// TODO: docs.
 pub struct NeovimBackgroundExecutor {

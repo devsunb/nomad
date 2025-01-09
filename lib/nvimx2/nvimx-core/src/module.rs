@@ -5,14 +5,15 @@ use core::convert::Infallible;
 use serde::de::DeserializeOwned;
 
 use crate::action::ActionCtx;
-use crate::api::{Api, ModuleApi};
 use crate::backend::{
+    Api,
     Backend,
     BackendExt,
     BackendHandle,
     BackendMut,
     Key,
     MapAccess,
+    ModuleApi,
     Value,
 };
 use crate::command::{Command, CommandBuilder};
@@ -46,7 +47,7 @@ pub struct ApiCtx<'a, 'b, M: Module<P, B>, P: Plugin<B>, B: Backend> {
     command_builder: CommandBuilder<'a, P, B>,
     config_builder: &'a mut ConfigFnBuilder<P, B>,
     module_path: &'a mut ModulePath,
-    backend: &'b BackendHandle<B>,
+    backend: &'a BackendHandle<B>,
 }
 
 pub(crate) struct ConfigFnBuilder<P: Plugin<B>, B: Backend> {
@@ -168,7 +169,7 @@ where
     where
         Mod: Module<P, B>,
     {
-        let mut module_api = self.module_api.as_module::<Mod>();
+        let mut module_api = self.module_api.as_submodule::<Mod>();
         self.module_path.push(Mod::NAME);
         let mut api_ctx = ApiCtx::new(
             &mut module_api,
@@ -190,7 +191,7 @@ where
         command_builder: CommandBuilder<'a, P, B>,
         config_builder: &'a mut ConfigFnBuilder<P, B>,
         module_path: &'a mut ModulePath,
-        backend: &'b BackendHandle<B>,
+        backend: &'a BackendHandle<B>,
     ) -> Self {
         Self {
             module_api,

@@ -2,7 +2,7 @@
 
 use core::marker::PhantomData;
 
-use nvimx_core::api::{Api, ModuleApi};
+use nvimx_core::backend::{Api, ModuleApi};
 use nvimx_core::command::{CommandArgs, CommandCompletion};
 use nvimx_core::module::Module;
 use nvimx_core::notify::{self, Name};
@@ -151,7 +151,7 @@ where
 
     #[track_caller]
     #[inline]
-    fn as_module<M2: Module<P, Neovim>>(
+    fn as_submodule<M2: Module<P, Neovim>>(
         &mut self,
     ) -> NeovimModuleApi<'_, M2, P> {
         let obj = self.insert(M2::NAME, Dictionary::default());

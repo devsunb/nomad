@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use async_task::Builder;
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
-use nvimx_core::executor::{LocalExecutor, Task};
+use nvimx_core::backend::{LocalExecutor, Task};
 
 use crate::oxi::{self, libuv};
 

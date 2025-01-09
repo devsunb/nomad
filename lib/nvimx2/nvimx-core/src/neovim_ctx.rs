@@ -1,8 +1,10 @@
 use core::marker::PhantomData;
 
 use crate::AsyncCtx;
-use crate::backend::{Backend, BackendExt, BackendMut};
-use crate::executor::{
+use crate::backend::{
+    Backend,
+    BackendExt,
+    BackendMut,
     BackgroundExecutor,
     LocalExecutor,
     Task,

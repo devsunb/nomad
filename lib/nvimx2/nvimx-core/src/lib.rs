@@ -1,14 +1,11 @@
 //! TODO: docs.
 
 pub mod action;
-pub mod api;
 mod async_ctx;
 pub mod backend;
-mod backend_handle;
 mod byte_offset;
 pub mod command;
 mod constant;
-pub mod executor;
 mod function;
 pub mod module;
 mod neovim_ctx;
@@ -18,7 +15,6 @@ mod shared;
 mod util;
 
 pub use async_ctx::AsyncCtx;
-use backend_handle::BackendHandle;
 pub use byte_offset::ByteOffset;
 pub use constant::Constant;
 pub use function::Function;

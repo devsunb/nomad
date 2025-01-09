@@ -1,7 +1,6 @@
 use core::convert::Infallible;
 
-use crate::api::{Api, ModuleApi};
-use crate::backend::{Backend, BackendHandle};
+use crate::backend::{Api, Backend, BackendHandle, ModuleApi};
 use crate::command::{CommandBuilder, CommandCompletionFns, CommandHandlers};
 use crate::module::{ApiCtx, ConfigFnBuilder, Module};
 use crate::notify::{ModulePath, Name};

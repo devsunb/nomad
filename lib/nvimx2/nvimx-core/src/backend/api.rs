@@ -17,14 +17,14 @@ where
     type ModuleApi<'a, M: Module<P, B>>: ModuleApi<Self, P, M, B>;
 
     /// TODO: docs.
-    fn add_command<Cmd, CompFun, Comps>(
+    fn add_command<Command, CompletionFn, Completions>(
         &mut self,
-        command: Cmd,
-        completion_fun: CompFun,
+        command: Command,
+        completion_fn: CompletionFn,
     ) where
-        Cmd: FnMut(CommandArgs) + 'static,
-        CompFun: FnMut(CommandArgs, ByteOffset) -> Comps + 'static,
-        Comps: IntoIterator<Item = CommandCompletion>;
+        Command: FnMut(CommandArgs) + 'static,
+        CompletionFn: FnMut(CommandArgs, ByteOffset) -> Completions + 'static,
+        Completions: IntoIterator<Item = CommandCompletion>;
 
     /// TODO: docs.
     fn as_module(&mut self) -> Self::ModuleApi<'_, P>;
@@ -48,7 +48,7 @@ where
         Err: notify::Error<B>;
 
     /// TODO: docs.
-    fn as_module<M2>(&mut self) -> A::ModuleApi<'_, M2>
+    fn as_submodule<M2>(&mut self) -> A::ModuleApi<'_, M2>
     where
         M2: Module<P, B>;
 
