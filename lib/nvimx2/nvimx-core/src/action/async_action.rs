@@ -17,11 +17,11 @@ where
     type Args;
 
     /// TODO: docs.
-    fn call(
-        &mut self,
+    fn call<'this>(
+        &'this mut self,
         args: Self::Args,
         ctx: &mut AsyncCtx<P, B>,
-    ) -> impl Future<Output = impl MaybeResult<(), B>>;
+    ) -> impl Future<Output = impl MaybeResult<(), B> + 'this>;
 }
 
 impl<T, P, B> Action<P, B> for T
@@ -35,11 +35,11 @@ where
     type Return = ();
 
     #[inline]
-    fn call(
-        &mut self,
-        args: Self::Args<'_>,
+    fn call<'this, 'args>(
+        &'this mut self,
+        args: Self::Args<'args>,
         ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<Self::Return, B> {
+    ) -> impl MaybeResult<Self::Return, B> + use<'this, 'args, T, P, B> {
         let mut this = self.clone();
         let module_path = ctx.module_path().clone();
         ctx.spawn_local(async move |ctx| {

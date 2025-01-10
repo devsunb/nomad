@@ -6,7 +6,7 @@ use crate::notify;
 /// TODO: docs
 pub trait MaybeResult<T, B: Backend> {
     /// TODO: docs.
-    type Error: notify::Error<B> + 'static;
+    type Error: notify::Error<B>;
 
     /// TODO: docs
     fn into_result(self) -> Result<T, Self::Error>;
@@ -22,9 +22,7 @@ impl<T, B: Backend> MaybeResult<T, B> for T {
     }
 }
 
-impl<T, E: notify::Error<B> + 'static, B: Backend> MaybeResult<T, B>
-    for Result<T, E>
-{
+impl<T, E: notify::Error<B>, B: Backend> MaybeResult<T, B> for Result<T, E> {
     type Error = E;
 
     #[inline]

@@ -20,11 +20,11 @@ where
     type Args<'args>: TryFrom<CommandArgs<'args>, Error: notify::Error<B>>;
 
     /// TODO: docs.
-    fn call(
-        &mut self,
-        args: Self::Args<'_>,
+    fn call<'this, 'args>(
+        &'this mut self,
+        args: Self::Args<'args>,
         ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<(), B>;
+    ) -> impl MaybeResult<(), B> + use<'this, 'args, Self, P, B>;
 
     /// TODO: docs.
     fn to_completion_fn(&self) -> impl CompletionFn + 'static {}
@@ -94,11 +94,11 @@ where
     type Args<'a> = A::Args<'a>;
 
     #[inline]
-    fn call(
-        &mut self,
-        args: Self::Args<'_>,
+    fn call<'this, 'args>(
+        &'this mut self,
+        args: Self::Args<'args>,
         ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<(), B> {
+    ) -> impl MaybeResult<(), B> + use<'this, 'args, A, P, B> {
         A::call(self, args, ctx)
     }
 

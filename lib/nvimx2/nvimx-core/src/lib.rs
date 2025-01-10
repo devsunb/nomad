@@ -1,5 +1,7 @@
 //! TODO: docs.
 
+#![feature(precise_capturing_in_traits)]
+
 pub mod action;
 mod async_ctx;
 pub mod backend;

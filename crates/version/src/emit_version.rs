@@ -28,11 +28,11 @@ where
     type Args<'args> = ();
     type Return = ();
 
-    fn call(
-        &mut self,
-        _: Self::Args<'_>,
+    fn call<'this, 'args>(
+        &'this mut self,
+        _: Self::Args<'args>,
         ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<(), B> {
+    ) -> impl MaybeResult<(), B> + use<'this, 'args, P, B> {
         ctx.emit_info(Message::from_debug(VERSION));
     }
 }

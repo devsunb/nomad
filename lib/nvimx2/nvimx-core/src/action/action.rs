@@ -19,9 +19,9 @@ where
     type Return;
 
     /// TODO: docs.
-    fn call(
-        &mut self,
-        args: Self::Args<'_>,
+    fn call<'this, 'args>(
+        &'this mut self,
+        args: Self::Args<'args>,
         ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<Self::Return, B>;
+    ) -> impl MaybeResult<Self::Return, B> + use<'this, 'args, Self, P, B>;
 }

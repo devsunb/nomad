@@ -43,7 +43,7 @@ pub trait Backend: 'static + Sized {
     fn serialize<T>(
         &mut self,
         value: &T,
-    ) -> impl MaybeResult<Self::ApiValue, Self>
+    ) -> impl MaybeResult<Self::ApiValue, Self> + use<Self, T>
     where
         T: ?Sized + Serialize;
 
@@ -51,7 +51,7 @@ pub trait Backend: 'static + Sized {
     fn deserialize<'de, T>(
         &mut self,
         value: Self::ApiValue,
-    ) -> impl MaybeResult<T, Self>
+    ) -> impl MaybeResult<T, Self> + use<Self, T>
     where
         T: Deserialize<'de>;
 }
