@@ -33,14 +33,11 @@ where
 /// TODO: docs.
 pub trait CompletionFn<B: Backend>: 'static {
     /// TODO: docs.
-    type Completions: IntoIterator<Item = CommandCompletion>;
-
-    /// TODO: docs.
     fn call(
         &mut self,
         args: CommandArgs,
         offset: ByteOffset,
-    ) -> Self::Completions;
+    ) -> impl IntoIterator<Item = CommandCompletion>;
 }
 
 /// TODO: docs.
@@ -112,11 +109,13 @@ where
 }
 
 impl<B: Backend> CompletionFn<B> for () {
-    type Completions = core::iter::Empty<CommandCompletion>;
-
     #[inline]
-    fn call(&mut self, _: CommandArgs, _: ByteOffset) -> Self::Completions {
-        core::iter::empty()
+    fn call(
+        &mut self,
+        _: CommandArgs,
+        _: ByteOffset,
+    ) -> impl IntoIterator<Item = CommandCompletion> {
+        core::iter::empty::<CommandCompletion>()
     }
 }
 
@@ -126,14 +125,12 @@ where
     R: IntoIterator<Item = CommandCompletion>,
     B: Backend,
 {
-    type Completions = R;
-
     #[inline]
     fn call(
         &mut self,
         args: CommandArgs,
         offset: ByteOffset,
-    ) -> Self::Completions {
+    ) -> impl IntoIterator<Item = CommandCompletion> {
         (self)(args, offset)
     }
 }
