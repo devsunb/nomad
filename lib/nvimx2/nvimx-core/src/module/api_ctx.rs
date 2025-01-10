@@ -96,7 +96,7 @@ where
                     action_name: Some(Fun::NAME),
                 };
                 let args = match backend
-                    .deserialize::<Fun::Args>(value)
+                    .deserialize::<Fun::Args<'_>>(value)
                     .into_result()
                 {
                     Ok(args) => args,

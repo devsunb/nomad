@@ -1,4 +1,4 @@
-use serde::de::DeserializeOwned;
+use serde::de::Deserialize;
 use serde::ser::Serialize;
 
 use crate::action::{Action, ActionCtx};
@@ -16,7 +16,7 @@ where
     const NAME: Name;
 
     /// TODO: docs.
-    type Args: DeserializeOwned;
+    type Args<'args>: Deserialize<'args>;
 
     /// TODO: docs.
     type Return: Serialize + 'static;
@@ -24,7 +24,7 @@ where
     /// TODO: docs.
     fn call(
         &mut self,
-        args: Self::Args,
+        args: Self::Args<'_>,
         ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<Self::Return, B>;
 }
@@ -32,20 +32,20 @@ where
 impl<A, P, B> Function<P, B> for A
 where
     A: Action<P, B>,
-    A::Args: DeserializeOwned,
+    for<'args> A::Args<'args>: Deserialize<'args>,
     A::Return: Serialize,
     P: Plugin<B>,
     B: Backend,
 {
     const NAME: Name = A::NAME;
 
-    type Args = A::Args;
+    type Args<'a> = A::Args<'a>;
     type Return = A::Return;
 
     #[inline]
     fn call(
         &mut self,
-        args: A::Args,
+        args: A::Args<'_>,
         ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<Self::Return, B> {
         A::call(self, args, ctx)

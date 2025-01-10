@@ -1,7 +1,7 @@
 //! TODO: docs.
 
 use serde::Serialize;
-use serde::de::DeserializeOwned;
+use serde::de::Deserialize;
 
 use crate::backend::{Api, BackgroundExecutor, LocalExecutor, Value};
 use crate::notify::{self, MaybeResult};
@@ -48,10 +48,10 @@ pub trait Backend: 'static + Sized {
         T: ?Sized + Serialize;
 
     /// TODO: docs.
-    fn deserialize<T>(
+    fn deserialize<'de, T>(
         &mut self,
         value: Self::ApiValue,
     ) -> impl MaybeResult<T, Self>
     where
-        T: DeserializeOwned;
+        T: Deserialize<'de>;
 }

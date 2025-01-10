@@ -31,11 +31,15 @@ where
     B: Backend,
 {
     const NAME: Name = T::NAME;
-    type Args = T::Args;
+    type Args<'args> = T::Args;
     type Return = ();
 
     #[inline]
-    fn call(&mut self, args: Self::Args, ctx: &mut ActionCtx<P, B>) {
+    fn call(
+        &mut self,
+        args: Self::Args<'_>,
+        ctx: &mut ActionCtx<P, B>,
+    ) -> impl MaybeResult<Self::Return, B> {
         let mut this = self.clone();
         let module_path = ctx.module_path().clone();
         ctx.spawn_local(async move |ctx| {

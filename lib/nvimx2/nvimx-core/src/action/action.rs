@@ -13,7 +13,7 @@ where
     const NAME: Name;
 
     /// TODO: docs.
-    type Args;
+    type Args<'args>;
 
     /// TODO: docs.
     type Return;
@@ -21,7 +21,7 @@ where
     /// TODO: docs.
     fn call(
         &mut self,
-        args: Self::Args,
+        args: Self::Args<'_>,
         ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<Self::Return, B>;
 }

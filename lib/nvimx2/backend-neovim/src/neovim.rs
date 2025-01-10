@@ -1,3 +1,4 @@
+use ::serde::{Deserialize, Serialize};
 use nvimx_core::Plugin;
 use nvimx_core::backend::Backend;
 
@@ -47,7 +48,7 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn serialize<T: ?Sized + ::serde::Serialize>(
+    fn serialize<T: ?Sized + Serialize>(
         &mut self,
         value: &T,
     ) -> Result<Self::ApiValue, serde::NeovimSerializeError> {
@@ -55,7 +56,7 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn deserialize<T: ::serde::de::DeserializeOwned>(
+    fn deserialize<'de, T: Deserialize<'de>>(
         &mut self,
         object: Self::ApiValue,
     ) -> Result<T, serde::NeovimDeserializeError> {

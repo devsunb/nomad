@@ -1,8 +1,7 @@
 //! TODO: docs.
 
 use nvimx_core::{Plugin, notify};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
 use crate::value::NeovimValue;
@@ -36,7 +35,7 @@ pub(crate) fn serialize<T: ?Sized + Serialize>(
 }
 
 #[inline]
-pub(crate) fn deserialize<T: DeserializeOwned>(
+pub(crate) fn deserialize<'de, T: Deserialize<'de>>(
     value: NeovimValue,
 ) -> Result<T, NeovimDeserializeError> {
     serde_path_to_error::deserialize(oxi::serde::Deserializer::new(

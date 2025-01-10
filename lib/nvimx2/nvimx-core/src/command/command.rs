@@ -85,13 +85,13 @@ impl CommandCompletion {
 impl<A, P, B> Command<P, B> for A
 where
     A: Action<P, B, Return = ()> + ToCompletionFn<B>,
-    A::Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error<B>>,
+    for<'a> A::Args<'a>: TryFrom<CommandArgs<'a>, Error: notify::Error<B>>,
     P: Plugin<B>,
     B: Backend,
 {
     const NAME: Name = A::NAME;
 
-    type Args<'args> = A::Args;
+    type Args<'a> = A::Args<'a>;
 
     #[inline]
     fn call(
