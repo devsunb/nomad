@@ -17,12 +17,12 @@ where
     const NAME: Name;
 
     /// TODO: docs.
-    type Args: for<'args> TryFrom<CommandArgs<'args>, Error: notify::Error<B>>;
+    type Args<'args>: TryFrom<CommandArgs<'args>, Error: notify::Error<B>>;
 
     /// TODO: docs.
     fn call(
         &mut self,
-        args: Self::Args,
+        args: Self::Args<'_>,
         ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<(), B>;
 
@@ -36,7 +36,7 @@ pub trait CompletionFn {
     fn call(
         &mut self,
         args: CommandArgs,
-        offset: ByteOffset,
+        cursor_offset: ByteOffset,
     ) -> impl IntoIterator<Item = CommandCompletion>;
 }
 
@@ -91,12 +91,12 @@ where
 {
     const NAME: Name = A::NAME;
 
-    type Args = A::Args;
+    type Args<'args> = A::Args;
 
     #[inline]
     fn call(
         &mut self,
-        args: Self::Args,
+        args: Self::Args<'_>,
         ctx: &mut ActionCtx<P, B>,
     ) -> impl MaybeResult<(), B> {
         A::call(self, args, ctx)
