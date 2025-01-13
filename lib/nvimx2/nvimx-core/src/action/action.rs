@@ -1,12 +1,12 @@
 use crate::action::ActionCtx;
 use crate::backend::Backend;
+use crate::module::Module;
 use crate::notify::{MaybeResult, Name};
-use crate::plugin::Plugin;
 
 /// TODO: docs.
-pub trait Action<P, B>: 'static
+pub trait Action<M, B>: 'static
 where
-    P: Plugin<B>,
+    M: Module<B>,
     B: Backend,
 {
     /// TODO: docs.
@@ -32,6 +32,6 @@ where
     fn call<'slf: 'slf, 'args: 'args>(
         &'slf mut self,
         args: Self::Args<'args>,
-        ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<Self::Return, B> + use<'slf, 'args, Self, P, B>;
+        ctx: &mut ActionCtx<M, B>,
+    ) -> impl MaybeResult<Self::Return> + use<'slf, 'args, Self, M, B>;
 }

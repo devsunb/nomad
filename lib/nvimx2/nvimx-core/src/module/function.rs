@@ -3,13 +3,13 @@ use serde::ser::Serialize;
 
 use crate::action::{Action, ActionCtx};
 use crate::backend::Backend;
+use crate::module::Module;
 use crate::notify::{MaybeResult, Name};
-use crate::plugin::Plugin;
 
 /// TODO: docs.
-pub trait Function<P, B>: 'static
+pub trait Function<M, B>: 'static
 where
-    P: Plugin<B>,
+    M: Module<B>,
     B: Backend,
 {
     /// TODO: docs.
@@ -25,16 +25,16 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<Self::Return, B> + use<'this, 'args, Self, P, B>;
+        ctx: &mut ActionCtx<M, B>,
+    ) -> impl MaybeResult<Self::Return> + use<'this, 'args, Self, M, B>;
 }
 
-impl<A, P, B> Function<P, B> for A
+impl<A, M, B> Function<M, B> for A
 where
-    A: Action<P, B>,
+    A: Action<M, B>,
     for<'args> A::Args<'args>: Deserialize<'args>,
     A::Return: Serialize,
-    P: Plugin<B>,
+    M: Module<B>,
     B: Backend,
 {
     const NAME: Name = A::NAME;
@@ -46,8 +46,8 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: A::Args<'args>,
-        ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<Self::Return, B> + use<'this, 'args, A, P, B> {
+        ctx: &mut ActionCtx<M, B>,
+    ) -> impl MaybeResult<Self::Return> + use<'this, 'args, A, M, B> {
         A::call(self, args, ctx)
     }
 }

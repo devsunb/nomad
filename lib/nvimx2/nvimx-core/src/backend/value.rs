@@ -9,7 +9,7 @@ pub trait Value<B: Backend>: 'static {
     type MapAccess<'a>: MapAccess<B, Value = Self>;
 
     /// TODO: docs.
-    type MapAccessError<'a>: notify::Error<B>
+    type MapAccessError<'a>: notify::Error
     where
         Self: 'a;
 
@@ -39,7 +39,7 @@ pub trait MapAccess<B: Backend> {
 /// TODO: docs.
 pub trait Key<B: Backend>: fmt::Debug {
     /// TODO: docs.
-    type AsStrError<'a>: notify::Error<B>
+    type AsStrError<'a>: notify::Error
     where
         Self: 'a;
 

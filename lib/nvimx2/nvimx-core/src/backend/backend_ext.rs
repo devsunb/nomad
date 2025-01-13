@@ -1,16 +1,14 @@
 use crate::backend::Backend;
 use crate::notify::{self, Emitter};
-use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub(crate) trait BackendExt: Backend {
     #[inline]
-    fn emit_err<P, Err>(&mut self, source: notify::Source, err: Err)
+    fn emit_err<Err>(&mut self, source: notify::Source, err: Err)
     where
-        P: Plugin<Self>,
-        Err: notify::Error<Self>,
+        Err: notify::Error,
     {
-        let Some((level, message)) = err.to_message::<P>(source) else {
+        let Some((level, message)) = err.to_message(source) else {
             return;
         };
 

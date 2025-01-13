@@ -1,8 +1,6 @@
 //! TODO: docs.
 
-use core::marker::PhantomData;
-
-use nvimx_core::backend::{Api, ModuleApi};
+use nvimx_core::backend::Api;
 use nvimx_core::command::{CommandArgs, CommandCompletion};
 use nvimx_core::module::Module;
 use nvimx_core::notify::Name;
@@ -13,22 +11,17 @@ use crate::oxi::{Dictionary, Function, Object, api};
 use crate::value::NeovimValue;
 
 /// TODO: docs.
-pub struct NeovimApi<P> {
+pub struct NeovimApi {
     dictionary: Dictionary,
-    _plugin: PhantomData<P>,
+    module_name: Name,
 }
 
-/// TODO: docs.
-pub struct NeovimModuleApi<'a, M, P> {
-    dictionary: &'a mut Dictionary,
-    _module: PhantomData<(M, P)>,
-}
+impl NeovimApi {
+    #[inline]
+    pub(crate) fn new<M: Module<Neovim>>() -> Self {
+        Self { dictionary: Dictionary::new(), module_name: M::NAME }
+    }
 
-impl<'a, P, M> NeovimModuleApi<'a, M, P>
-where
-    P: Plugin<Neovim>,
-    M: Module<P, Neovim>,
-{
     #[track_caller]
     #[inline]
     fn insert(
@@ -39,29 +32,20 @@ where
         if self.dictionary.get(field_name).is_some() {
             panic!(
                 "a field with name '{}' has already been added to {}'s API",
-                field_name,
-                M::NAME,
+                field_name, self.module_name,
             );
         }
         let len = self.dictionary.len();
         self.dictionary.insert(field_name, value.into());
         self.dictionary.as_mut_slice()[len].value_mut()
     }
-
-    #[inline]
-    fn new(dictionary: &'a mut Dictionary) -> Self {
-        Self { dictionary, _module: PhantomData }
-    }
 }
 
-impl<P> Api<P, Neovim> for NeovimApi<P>
-where
-    P: Plugin<Neovim>,
-{
-    type ModuleApi<'a, M: Module<P, Neovim>> = NeovimModuleApi<'a, M, P>;
+impl Api<Neovim> for NeovimApi {
+    type Value = NeovimValue;
 
     #[inline]
-    fn add_command<Cmd, CompFun, Comps>(
+    fn add_command<P, Cmd, CompFun, Comps>(
         &mut self,
         mut command: Cmd,
         mut completion_fun: CompFun,
@@ -69,6 +53,7 @@ where
         Cmd: FnMut(CommandArgs) + 'static,
         CompFun: FnMut(CommandArgs, ByteOffset) -> Comps + 'static,
         Comps: IntoIterator<Item = CommandCompletion>,
+        P: Plugin<Neovim>,
     {
         let command_name = P::COMMAND_NAME;
 
@@ -119,17 +104,6 @@ where
             .expect("all arguments are valid");
     }
 
-    #[inline]
-    fn as_module(&mut self) -> Self::ModuleApi<'_, P> {
-        NeovimModuleApi::new(&mut self.dictionary)
-    }
-}
-
-impl<P, M> ModuleApi<NeovimApi<P>, P, M, Neovim> for NeovimModuleApi<'_, M, P>
-where
-    P: Plugin<Neovim>,
-    M: Module<P, Neovim>,
-{
     #[track_caller]
     #[inline]
     fn add_constant(&mut self, constant_name: Name, value: NeovimValue) {
@@ -150,35 +124,24 @@ where
 
     #[track_caller]
     #[inline]
-    fn as_submodule<M2: Module<P, Neovim>>(
-        &mut self,
-    ) -> NeovimModuleApi<'_, M2, P> {
-        let obj = self.insert(M2::NAME, Dictionary::default());
-        // SAFETY: We just inserted a dictionary.
-        let dictionary = unsafe { obj.as_dictionary_unchecked_mut() };
-        NeovimModuleApi::new(dictionary)
-    }
-
-    #[inline]
-    fn finish(self) {}
-}
-
-impl<P> Default for NeovimApi<P>
-where
-    P: Plugin<Neovim>,
-{
-    #[inline]
-    fn default() -> Self {
-        Self { dictionary: Dictionary::default(), _plugin: PhantomData }
+    fn add_submodule<S>(&mut self, module_api: Self)
+    where
+        S: Module<Neovim>,
+    {
+        self.insert(S::NAME, module_api);
     }
 }
 
-impl<P> From<NeovimApi<P>> for Dictionary
-where
-    P: Plugin<Neovim>,
-{
+impl From<NeovimApi> for Dictionary {
     #[inline]
-    fn from(api: NeovimApi<P>) -> Self {
+    fn from(api: NeovimApi) -> Self {
         api.dictionary
+    }
+}
+
+impl From<NeovimApi> for Object {
+    #[inline]
+    fn from(api: NeovimApi) -> Self {
+        api.dictionary.into()
     }
 }

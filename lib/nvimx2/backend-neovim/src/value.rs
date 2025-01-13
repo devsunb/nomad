@@ -3,7 +3,7 @@
 use core::fmt;
 
 use nvimx_core::backend::{Key, MapAccess, Value};
-use nvimx_core::{Plugin, notify};
+use nvimx_core::notify;
 
 use crate::Neovim;
 use crate::oxi::{self, Dictionary, Object, ObjectKind, lua};
@@ -163,15 +163,12 @@ impl Key<Neovim> for NeovimMapKey<'_> {
     }
 }
 
-impl notify::Error<Neovim> for NeovimMapAccessError {
+impl notify::Error for NeovimMapAccessError {
     #[inline]
-    fn to_message<P>(
+    fn to_message(
         &self,
         _: notify::Source,
-    ) -> Option<(notify::Level, notify::Message)>
-    where
-        P: Plugin<Neovim>,
-    {
+    ) -> Option<(notify::Level, notify::Message)> {
         let Self(kind) = self;
         let mut msg = notify::Message::new();
         let kind_article = match kind {
@@ -196,15 +193,12 @@ impl fmt::Debug for NeovimMapKey<'_> {
     }
 }
 
-impl notify::Error<Neovim> for NeovimMapKeyAsStrError<'_> {
+impl notify::Error for NeovimMapKeyAsStrError<'_> {
     #[inline]
-    fn to_message<P>(
+    fn to_message(
         &self,
         _: notify::Source,
-    ) -> Option<(notify::Level, notify::Message)>
-    where
-        P: Plugin<Neovim>,
-    {
+    ) -> Option<(notify::Level, notify::Message)> {
         let mut msg = notify::Message::new();
         msg.push_str("'")
             .push_str(self.0.to_string_lossy())

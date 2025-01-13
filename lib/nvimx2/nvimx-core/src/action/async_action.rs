@@ -1,13 +1,13 @@
 use crate::AsyncCtx;
 use crate::action::{Action, ActionCtx};
 use crate::backend::{Backend, BackendExt};
+use crate::module::Module;
 use crate::notify::{self, MaybeResult, Name};
-use crate::plugin::Plugin;
 
 /// TODO: docs.
-pub trait AsyncAction<P, B>: 'static
+pub trait AsyncAction<M, B>: 'static
 where
-    P: Plugin<B>,
+    M: Module<B>,
     B: Backend,
 {
     /// TODO: docs.
@@ -20,14 +20,14 @@ where
     fn call<'this>(
         &'this mut self,
         args: Self::Args,
-        ctx: &mut AsyncCtx<P, B>,
-    ) -> impl Future<Output = impl MaybeResult<(), B> + 'this>;
+        ctx: &mut AsyncCtx<M, B>,
+    ) -> impl Future<Output = impl MaybeResult<()> + 'this>;
 }
 
-impl<T, P, B> Action<P, B> for T
+impl<T, M, B> Action<M, B> for T
 where
-    T: AsyncAction<P, B> + Clone,
-    P: Plugin<B>,
+    T: AsyncAction<M, B> + Clone,
+    M: Module<B>,
     B: Backend,
 {
     const NAME: Name = T::NAME;
@@ -38,14 +38,14 @@ where
     fn call<'s: 's, 'a: 'a>(
         &mut self,
         args: Self::Args<'_>,
-        ctx: &mut ActionCtx<P, B>,
+        ctx: &mut ActionCtx<M, B>,
     ) {
         let mut this = self.clone();
         let module_path = ctx.module_path().clone();
         ctx.spawn_local(async move |ctx| {
             if let Err(err) = this.call(args, ctx).await.into_result() {
                 ctx.with_ctx(move |ctx| {
-                    ctx.backend_mut().emit_err::<P, _>(
+                    ctx.backend_mut().emit_err(
                         notify::Source {
                             module_path: &module_path,
                             action_name: Some(Self::NAME),

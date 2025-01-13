@@ -7,9 +7,12 @@ mod backend_handle;
 mod executor;
 mod value;
 
-pub use api::{Api, ModuleApi};
+pub use api::Api;
 pub use backend::Backend;
 pub(crate) use backend_ext::BackendExt;
 pub(crate) use backend_handle::{BackendHandle, BackendMut};
 pub use executor::{BackgroundExecutor, LocalExecutor, Task, TaskBackground};
 pub use value::{Key, MapAccess, Value};
+
+/// TODO: docs.
+pub type ApiValue<B> = <<B as Backend>::Api as Api<B>>::Value;

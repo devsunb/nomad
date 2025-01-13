@@ -3,17 +3,14 @@
 use serde::Serialize;
 use serde::de::Deserialize;
 
-use crate::backend::{Api, BackgroundExecutor, LocalExecutor, Value};
+use crate::backend::{Api, ApiValue, BackgroundExecutor, LocalExecutor};
+use crate::module::Module;
 use crate::notify::{self, MaybeResult};
-use crate::plugin::Plugin;
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
     /// TODO: docs.
-    type Api<P: Plugin<Self>>: Api<P, Self>;
-
-    /// TODO: docs.
-    type ApiValue: Value<Self>;
+    type Api: Api<Self>;
 
     /// TODO: docs.
     type LocalExecutor: LocalExecutor;
@@ -25,7 +22,7 @@ pub trait Backend: 'static + Sized {
     type Emitter<'this>: notify::Emitter;
 
     /// TODO: docs.
-    fn api<P: Plugin<Self>>(&mut self) -> Self::Api<P>;
+    fn api<M: Module<Self>>(&mut self) -> Self::Api;
 
     /// TODO: docs.
     fn init() -> Self;
@@ -43,15 +40,15 @@ pub trait Backend: 'static + Sized {
     fn serialize<T>(
         &mut self,
         value: &T,
-    ) -> impl MaybeResult<Self::ApiValue, Self> + use<Self, T>
+    ) -> impl MaybeResult<ApiValue<Self>> + use<Self, T>
     where
         T: ?Sized + Serialize;
 
     /// TODO: docs.
     fn deserialize<'de, T>(
         &mut self,
-        value: Self::ApiValue,
-    ) -> impl MaybeResult<T, Self> + use<Self, T>
+        value: ApiValue<Self>,
+    ) -> impl MaybeResult<T> + use<Self, T>
     where
         T: Deserialize<'de>;
 }

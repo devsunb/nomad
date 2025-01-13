@@ -1,11 +1,11 @@
 //! TODO: docs.
 
-use nvimx_core::{Plugin, notify};
+use nvimx_core::notify;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 
+use crate::oxi;
 use crate::value::NeovimValue;
-use crate::{Neovim, oxi};
 
 /// TODO: docs.
 #[derive(Debug, thiserror::Error)]
@@ -68,15 +68,12 @@ impl Path<'_> {
     }
 }
 
-impl notify::Error<Neovim> for NeovimSerializeError {
+impl notify::Error for NeovimSerializeError {
     #[inline]
-    fn to_message<P>(
+    fn to_message(
         &self,
         _: notify::Source,
-    ) -> Option<(notify::Level, notify::Message)>
-    where
-        P: Plugin<Neovim>,
-    {
+    ) -> Option<(notify::Level, notify::Message)> {
         let mut message = notify::Message::new();
         message
             .push_str("couldn't serialize value")
@@ -87,29 +84,20 @@ impl notify::Error<Neovim> for NeovimSerializeError {
     }
 }
 
-impl notify::Error<Neovim> for NeovimDeserializeError {
+impl notify::Error for NeovimDeserializeError {
     #[inline]
-    fn to_message<P>(
+    fn to_message(
         &self,
         source: notify::Source,
-    ) -> Option<(notify::Level, notify::Message)>
-    where
-        P: Plugin<Neovim>,
-    {
+    ) -> Option<(notify::Level, notify::Message)> {
         let mut message = notify::Message::new();
 
         let what = (|| {
             let default = "value";
             let mut names = source.module_path.names();
-            let Some(module_name) = names.next() else { return default };
+            let Some(plugin_name) = names.next() else { return default };
             let None = names.next() else { return default };
-            if module_name == P::NAME
-                && source.action_name == Some(P::CONFIG_FN_NAME)
-            {
-                "config"
-            } else {
-                default
-            }
+            default
         })();
 
         message

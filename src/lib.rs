@@ -16,16 +16,12 @@ impl Plugin<Neovim> for Mad {
     const COMMAND_NAME: Name = "Mad";
 }
 
-impl<P, B> Module<P, B> for Mad
-where
-    P: Plugin<B>,
-    B: Backend,
-{
+impl<B: Backend> Module<B> for Mad {
     const NAME: Name = "mad";
 
     type Config = ();
 
-    fn api(&self, ctx: &mut ApiCtx<Self, P, B>) {
+    fn api(&self, ctx: &mut ApiCtx<Self, B>) {
         ctx.with_command(auth::Login::new())
             .with_command(auth::Logout::new())
             .with_command(version::EmitVersion::new())
@@ -33,5 +29,5 @@ where
         // .with_module(collab::Collab::new());
     }
 
-    fn on_new_config(&mut self, _: (), _: &mut NeovimCtx<P, B>) {}
+    fn on_new_config(&self, _: (), _: &mut NeovimCtx<Self, B>) {}
 }

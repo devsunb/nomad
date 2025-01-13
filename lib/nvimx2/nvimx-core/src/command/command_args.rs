@@ -4,8 +4,6 @@ use core::ops::Deref;
 
 use smol_str::ToSmolStr;
 
-use crate::backend::Backend;
-use crate::plugin::Plugin;
 use crate::{ByteOffset, notify};
 
 /// TODO: docs.
@@ -359,33 +357,25 @@ where
     }
 }
 
-impl<T: notify::Error<B>, B: Backend> notify::Error<B>
-    for CommandArgsIntoSeqError<'_, T>
-{
+impl<T: notify::Error> notify::Error for CommandArgsIntoSeqError<'_, T> {
     #[inline]
-    fn to_message<P>(
+    fn to_message(
         &self,
         source: notify::Source,
-    ) -> Option<(notify::Level, notify::Message)>
-    where
-        P: Plugin<B>,
-    {
+    ) -> Option<(notify::Level, notify::Message)> {
         match self {
-            Self::Item(err) => err.to_message::<P>(source),
-            Self::WrongNum(err) => err.to_message::<P>(source),
+            Self::Item(err) => err.to_message(source),
+            Self::WrongNum(err) => err.to_message(source),
         }
     }
 }
 
-impl<B: Backend> notify::Error<B> for CommandArgsWrongNumError<'_> {
+impl notify::Error for CommandArgsWrongNumError<'_> {
     #[inline]
-    fn to_message<P>(
+    fn to_message(
         &self,
         _: notify::Source,
-    ) -> Option<(notify::Level, notify::Message)>
-    where
-        P: Plugin<B>,
-    {
+    ) -> Option<(notify::Level, notify::Message)> {
         debug_assert_ne!(self.args.len(), self.expected_num);
 
         let mut message = notify::Message::new();

@@ -39,16 +39,6 @@ impl<B> BackendMut<'_, B> {
     pub(crate) fn handle(&self) -> BackendHandle<B> {
         self.handle.clone()
     }
-
-    #[inline]
-    pub(crate) fn inner(&self) -> &B {
-        self.backend
-    }
-
-    #[inline]
-    pub(crate) fn inner_mut(&mut self) -> &mut B {
-        self.backend
-    }
 }
 
 impl<B> Clone for BackendHandle<B> {

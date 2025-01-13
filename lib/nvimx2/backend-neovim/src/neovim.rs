@@ -1,6 +1,6 @@
 use ::serde::{Deserialize, Serialize};
-use nvimx_core::Plugin;
 use nvimx_core::backend::Backend;
+use nvimx_core::module::Module;
 
 use crate::{api, executor, notify, serde, value};
 
@@ -12,8 +12,7 @@ pub struct Neovim {
 }
 
 impl Backend for Neovim {
-    type Api<P: Plugin<Self>> = api::NeovimApi<P>;
-    type ApiValue = value::NeovimValue;
+    type Api = api::NeovimApi;
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
@@ -28,8 +27,8 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn api<P: Plugin<Self>>(&mut self) -> Self::Api<P> {
-        api::NeovimApi::default()
+    fn api<M: Module<Self>>(&mut self) -> Self::Api {
+        api::NeovimApi::new::<M>()
     }
 
     #[inline]
@@ -51,15 +50,15 @@ impl Backend for Neovim {
     fn serialize<T: ?Sized + Serialize>(
         &mut self,
         value: &T,
-    ) -> Result<Self::ApiValue, serde::NeovimSerializeError> {
+    ) -> Result<value::NeovimValue, serde::NeovimSerializeError> {
         serde::serialize(value)
     }
 
     #[inline]
     fn deserialize<'de, T: Deserialize<'de>>(
         &mut self,
-        object: Self::ApiValue,
+        value: value::NeovimValue,
     ) -> Result<T, serde::NeovimDeserializeError> {
-        serde::deserialize(object)
+        serde::deserialize(value)
     }
 }

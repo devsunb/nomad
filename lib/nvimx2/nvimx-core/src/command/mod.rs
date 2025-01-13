@@ -14,8 +14,4 @@ pub use command_args::{
     CommandArgsWrongNumError,
     CommandCursor,
 };
-pub(crate) use command_builder::{
-    CommandBuilder,
-    CommandCompletionFns,
-    CommandHandlers,
-};
+pub(crate) use command_builder::{CommandBuilder, CommandCompletionsBuilder};

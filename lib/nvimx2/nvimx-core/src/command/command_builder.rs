@@ -11,45 +11,145 @@ use crate::command::{
 };
 use crate::module::Module;
 use crate::notify::{self, MaybeResult, ModulePath, Name};
-use crate::plugin::Plugin;
 use crate::util::OrderedMap;
 use crate::{ByteOffset, NeovimCtx};
 
-type CommandHandler<P, B> = Box<dyn FnMut(CommandArgs, &mut ActionCtx<P, B>)>;
+type CommandHandler<B> =
+    Box<dyn FnMut(CommandArgs, &mut ModulePath, BackendMut<B>)>;
 
 type CommandCompletionFn =
     Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
 
-pub(crate) struct CommandBuilder<'a, P, B> {
-    pub(crate) command_has_been_added: &'a mut bool,
-    pub(crate) handlers: &'a mut CommandHandlers<P, B>,
-    pub(crate) completions: &'a mut CommandCompletionFns,
-}
-
-pub(crate) struct CommandHandlers<P, B> {
+pub(crate) struct CommandBuilder<B> {
+    /// Map from command name to the handler for that command.
+    handlers: OrderedMap<Name, CommandHandler<B>>,
     module_name: Name,
-    inner: OrderedMap<Name, CommandHandler<P, B>>,
     submodules: OrderedMap<Name, Self>,
 }
 
 #[derive(Default)]
-pub(crate) struct CommandCompletionFns {
-    inner: OrderedMap<Name, CommandCompletionFn>,
+pub(crate) struct CommandCompletionsBuilder {
+    /// Map from command name to the completion function for that command.
+    handlers: OrderedMap<Name, CommandCompletionFn>,
     submodules: OrderedMap<Name, Self>,
 }
 
-struct MissingCommandError<'a, P, B>(&'a CommandHandlers<P, B>);
+struct MissingCommandError<'a, B>(&'a CommandBuilder<B>);
 
-struct InvalidCommandError<'a, P, B>(
-    &'a CommandHandlers<P, B>,
-    CommandArg<'a>,
-);
+struct InvalidCommandError<'a, B>(&'a CommandBuilder<B>, CommandArg<'a>);
 
-impl<P, B> CommandHandlers<P, B> {
+impl<B: Backend> CommandBuilder<B> {
+    #[track_caller]
+    #[inline]
+    pub(crate) fn add_command<Cmd, M>(&mut self, mut command: Cmd)
+    where
+        Cmd: Command<M, B>,
+        M: Module<B>,
+    {
+        self.assert_namespace_is_available(Cmd::NAME);
+        let handler: CommandHandler<B> =
+            Box::new(move |args, module_path, backend| {
+                let ctx = NeovimCtx::new(backend, module_path);
+                let mut ctx = ActionCtx::new(ctx, Cmd::NAME);
+                let args = match Cmd::Args::try_from(args) {
+                    Ok(args) => args,
+                    Err(err) => {
+                        ctx.emit_err(err);
+                        return;
+                    },
+                };
+                if let Err(err) = command.call(args, &mut ctx).into_result() {
+                    ctx.emit_err(err);
+                }
+            });
+        self.handlers.insert(Cmd::NAME, handler);
+    }
+
+    #[track_caller]
+    #[inline]
+    pub(crate) fn add_module<M>(&mut self) -> &mut Self
+    where
+        M: Module<B>,
+    {
+        self.assert_namespace_is_available(M::NAME);
+        self.submodules.insert(M::NAME, Self::new::<M>())
+    }
+
+    #[inline]
+    pub(crate) fn build(
+        mut self,
+        backend: BackendHandle<B>,
+    ) -> impl FnMut(CommandArgs) {
+        move |args: CommandArgs| {
+            backend.with_mut(|backend| {
+                let mut module_path = ModulePath::new(self.module_name);
+                self.handle(args, &mut module_path, backend);
+            })
+        }
+    }
+
+    #[inline]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.handlers.is_empty() && self.submodules.is_empty()
+    }
+
+    #[inline]
+    pub(crate) fn new<M: Module<B>>() -> Self {
+        Self {
+            module_name: M::NAME,
+            handlers: Default::default(),
+            submodules: Default::default(),
+        }
+    }
+
+    #[track_caller]
+    #[inline]
+    fn assert_namespace_is_available(&self, namespace: &str) {
+        let module_name = self.module_name;
+        if self.handlers.contains_key(namespace) {
+            panic!(
+                "a command with name {namespace:?} was already registered on \
+                 {module_name:?}'s API",
+            );
+        }
+        if self.submodules.contains_key(namespace) {
+            panic!(
+                "a submodule with name {namespace:?} was already registered \
+                 on {module_name:?}'s API",
+            );
+        }
+    }
+
+    #[inline]
+    fn handle(
+        &mut self,
+        mut args: CommandArgs,
+        module_path: &mut ModulePath,
+        mut backend: BackendMut<B>,
+    ) {
+        let Some(arg) = args.pop_front() else {
+            let err = MissingCommandError(self);
+            let src = notify::Source { module_path, action_name: None };
+            backend.emit_err(src, err);
+            return;
+        };
+
+        if let Some(handler) = self.handlers.get_mut(arg.as_str()) {
+            (handler)(args, module_path, backend);
+        } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
+            module_path.push(module.module_name);
+            module.handle(args, module_path, backend);
+        } else {
+            let err = InvalidCommandError(self, arg);
+            let src = notify::Source { module_path, action_name: None };
+            backend.emit_err(src, err);
+        }
+    }
+
     /// Pushes the list of valid commands and submodules to the given message.
     #[inline]
     fn push_valid(&self, message: &mut notify::Message) {
-        let commands = self.inner.keys();
+        let commands = self.handlers.keys();
         let has_commands = commands.len() > 0;
         if has_commands {
             let valid_preface = if commands.len() == 1 {
@@ -77,143 +177,31 @@ impl<P, B> CommandHandlers<P, B> {
     }
 }
 
-impl<'a, P: Plugin<B>, B: Backend> CommandBuilder<'a, P, B> {
+impl CommandCompletionsBuilder {
     #[inline]
-    pub(crate) fn new(
-        command_has_been_added: &'a mut bool,
-        handlers: &'a mut CommandHandlers<P, B>,
-        completions: &'a mut CommandCompletionFns,
-    ) -> Self {
-        Self { command_has_been_added, handlers, completions }
-    }
-
-    #[track_caller]
-    #[inline]
-    pub(crate) fn add_command<Cmd>(&mut self, command: Cmd)
+    pub(crate) fn add_command<Cmd, M, B>(&mut self, command: &Cmd)
     where
-        Cmd: Command<P, B>,
+        Cmd: Command<M, B>,
+        M: Module<B>,
+        B: Backend,
     {
-        self.assert_namespace_is_available(Cmd::NAME);
-        *self.command_has_been_added = true;
-        self.completions.add_command(&command);
-        self.handlers.add_command(command);
+        let mut completion_fn = command.to_completion_fn();
+        let completion_fn: CommandCompletionFn =
+            Box::new(move |args, offset| {
+                completion_fn.call(args, offset).into_iter().collect()
+            });
+        self.handlers.insert(Cmd::NAME, completion_fn);
     }
 
-    #[track_caller]
     #[inline]
-    pub(crate) fn add_module<M>(&mut self) -> CommandBuilder<'_, P, B>
+    pub(crate) fn add_module<M, B>(&mut self) -> &mut Self
     where
-        M: Module<P, B>,
+        M: Module<B>,
+        B: Backend,
     {
-        self.assert_namespace_is_available(M::NAME);
-        CommandBuilder {
-            command_has_been_added: self.command_has_been_added,
-            handlers: self.handlers.add_module::<M>(),
-            completions: self.completions.add_module(M::NAME),
-        }
+        self.submodules.insert(M::NAME, Default::default())
     }
 
-    #[track_caller]
-    #[inline]
-    fn assert_namespace_is_available(&self, namespace: &str) {
-        let module_name = self.handlers.module_name;
-        if self.handlers.inner.contains_key(namespace) {
-            panic!(
-                "a command with name {namespace:?} was already registered on \
-                 {module_name:?}'s API",
-            );
-        }
-        if self.completions.inner.contains_key(namespace) {
-            panic!(
-                "a submodule with name {namespace:?} was already registered \
-                 on {module_name:?}'s API",
-            );
-        }
-    }
-}
-
-impl<P: Plugin<B>, B: Backend> CommandHandlers<P, B> {
-    #[inline]
-    pub(crate) fn build(
-        mut self,
-        backend: BackendHandle<B>,
-    ) -> impl FnMut(CommandArgs) + 'static {
-        move |args: CommandArgs| {
-            backend.with_mut(|backend| {
-                let mut module_path = ModulePath::new(self.module_name);
-                self.handle(args, &mut module_path, backend);
-            })
-        }
-    }
-
-    #[inline]
-    pub(crate) fn new<M: Module<P, B>>() -> Self {
-        Self {
-            module_name: M::NAME,
-            inner: Default::default(),
-            submodules: Default::default(),
-        }
-    }
-
-    #[inline]
-    fn add_command<Cmd>(&mut self, mut command: Cmd)
-    where
-        Cmd: Command<P, B>,
-    {
-        let handler: CommandHandler<P, B> = Box::new(move |args, ctx| {
-            let args = match Cmd::Args::try_from(args) {
-                Ok(args) => args,
-                Err(err) => {
-                    ctx.emit_err(err);
-                    return;
-                },
-            };
-            if let Err(err) = command.call(args, ctx).into_result() {
-                ctx.emit_err(err);
-            }
-        });
-        self.inner.insert(Cmd::NAME, handler);
-    }
-
-    #[inline]
-    fn add_module<M>(&mut self) -> &mut Self
-    where
-        M: Module<P, B>,
-    {
-        self.submodules.insert(M::NAME, Self::new::<M>())
-    }
-
-    #[inline]
-    fn handle(
-        &mut self,
-        mut args: CommandArgs,
-        module_path: &mut ModulePath,
-        mut backend: BackendMut<B>,
-    ) {
-        let Some(arg) = args.pop_front() else {
-            let err = MissingCommandError(self);
-            let src = notify::Source { module_path, action_name: None };
-            backend.emit_err::<P, _>(src, err);
-            return;
-        };
-
-        if let Some((name, handler)) =
-            self.inner.get_key_value_mut(arg.as_str())
-        {
-            let ctx = NeovimCtx::new(backend, module_path);
-            (handler)(args, &mut ActionCtx::new(ctx, *name));
-        } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
-            module_path.push(module.module_name);
-            module.handle(args, module_path, backend);
-        } else {
-            let err = InvalidCommandError(self, arg);
-            let src = notify::Source { module_path, action_name: None };
-            backend.emit_err::<P, _>(src, err);
-        }
-    }
-}
-
-impl CommandCompletionFns {
     #[inline]
     pub(crate) fn build(
         mut self,
@@ -222,26 +210,6 @@ impl CommandCompletionFns {
         move |args: CommandArgs, cursor: ByteOffset| {
             self.complete(args, cursor)
         }
-    }
-
-    #[inline]
-    fn add_command<Cmd, P, B>(&mut self, command: &Cmd)
-    where
-        Cmd: Command<P, B>,
-        P: Plugin<B>,
-        B: Backend,
-    {
-        let mut completion_fn = command.to_completion_fn();
-        let completion_fn: CommandCompletionFn =
-            Box::new(move |args, offset| {
-                completion_fn.call(args, offset).into_iter().collect()
-            });
-        self.inner.insert(Cmd::NAME, completion_fn);
-    }
-
-    #[inline]
-    fn add_module(&mut self, module_name: Name) -> &mut Self {
-        self.submodules.insert(module_name, Default::default())
     }
 
     #[inline]
@@ -254,7 +222,7 @@ impl CommandCompletionFns {
 
         let Some(arg) = args.pop_front() else {
             return self
-                .inner
+                .handlers
                 .keys()
                 .chain(self.submodules.keys())
                 .copied()
@@ -269,7 +237,7 @@ impl CommandCompletionFns {
                 .unwrap_or("");
 
             return self
-                .inner
+                .handlers
                 .keys()
                 .chain(self.submodules.keys())
                 .filter(|&candidate| candidate.starts_with(prefix))
@@ -283,7 +251,7 @@ impl CommandCompletionFns {
         let args = CommandArgs::new(s);
         let offset = offset - start_from;
 
-        if let Some(command) = self.inner.get_mut(arg.as_str()) {
+        if let Some(command) = self.handlers.get_mut(arg.as_str()) {
             (command)(args, offset - start_from)
         } else if let Some(submodule) = self.submodules.get_mut(arg.as_str()) {
             submodule.complete(args, offset)
@@ -293,22 +261,16 @@ impl CommandCompletionFns {
     }
 }
 
-impl<P, B> notify::Error<B> for MissingCommandError<'_, P, B>
-where
-    B: Backend,
-{
+impl<B: Backend> notify::Error for MissingCommandError<'_, B> {
     #[inline]
-    fn to_message<P2>(
+    fn to_message(
         &self,
         _: notify::Source,
-    ) -> Option<(notify::Level, notify::Message)>
-    where
-        P2: Plugin<B>,
-    {
+    ) -> Option<(notify::Level, notify::Message)> {
         let Self(handlers) = self;
         let mut message = notify::Message::new();
         let missing = match (
-            handlers.inner.is_empty(),
+            handlers.handlers.is_empty(),
             handlers.submodules.is_empty(),
         ) {
             (false, false) => "command or submodule",
@@ -325,22 +287,16 @@ where
     }
 }
 
-impl<P, B> notify::Error<B> for InvalidCommandError<'_, P, B>
-where
-    B: Backend,
-{
+impl<B: Backend> notify::Error for InvalidCommandError<'_, B> {
     #[inline]
-    fn to_message<P2>(
+    fn to_message(
         &self,
         _: notify::Source,
-    ) -> Option<(notify::Level, notify::Message)>
-    where
-        P2: Plugin<B>,
-    {
+    ) -> Option<(notify::Level, notify::Message)> {
         let Self(handlers, arg) = self;
         let mut message = notify::Message::new();
         let invalid = match (
-            handlers.inner.is_empty(),
+            handlers.handlers.is_empty(),
             handlers.submodules.is_empty(),
         ) {
             (false, false) => "argument",
@@ -358,7 +314,7 @@ where
         let levenshtein_threshold = 2;
 
         let mut guesses = handlers
-            .inner
+            .handlers
             .keys()
             .chain(handlers.submodules.keys())
             .map(|candidate| {

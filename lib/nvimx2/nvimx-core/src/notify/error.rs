@@ -1,32 +1,22 @@
 use core::convert::Infallible;
 
-use crate::backend::Backend;
 use crate::notify::{Level, Message, Source};
-use crate::plugin::Plugin;
 
 /// TODO: docs.
-pub trait Error<B: Backend> {
+pub trait Error {
     /// TODO: docs.
-    fn to_message<P>(&self, source: Source) -> Option<(Level, Message)>
-    where
-        P: Plugin<B>;
+    fn to_message(&self, source: Source) -> Option<(Level, Message)>;
 }
 
-impl<B: Backend> Error<B> for Infallible {
-    fn to_message<P>(&self, _: Source) -> Option<(Level, Message)>
-    where
-        P: Plugin<B>,
-    {
+impl Error for Infallible {
+    fn to_message(&self, _: Source) -> Option<(Level, Message)> {
         unreachable!()
     }
 }
 
-impl<T: Error<B>, B: Backend> Error<B> for &T {
+impl<T: Error> Error for &T {
     #[inline]
-    fn to_message<P>(&self, source: Source) -> Option<(Level, Message)>
-    where
-        P: Plugin<B>,
-    {
-        (&**self).to_message::<P>(source)
+    fn to_message(&self, source: Source) -> Option<(Level, Message)> {
+        (&**self).to_message(source)
     }
 }

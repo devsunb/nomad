@@ -4,27 +4,27 @@ use crate::ByteOffset;
 use crate::action::{Action, ActionCtx};
 use crate::backend::Backend;
 use crate::command::CommandArgs;
+use crate::module::Module;
 use crate::notify::{self, MaybeResult, Name};
-use crate::plugin::Plugin;
 
 /// TODO: docs.
-pub trait Command<P, B>: 'static
+pub trait Command<M, B>: 'static
 where
-    P: Plugin<B>,
+    M: Module<B>,
     B: Backend,
 {
     /// TODO: docs.
     const NAME: Name;
 
     /// TODO: docs.
-    type Args<'args>: TryFrom<CommandArgs<'args>, Error: notify::Error<B>>;
+    type Args<'args>: TryFrom<CommandArgs<'args>, Error: notify::Error>;
 
     /// TODO: docs.
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<(), B> + use<'this, 'args, Self, P, B>;
+        ctx: &mut ActionCtx<M, B>,
+    ) -> impl MaybeResult<()> + use<'this, 'args, Self, M, B>;
 
     /// TODO: docs.
     fn to_completion_fn(&self) -> impl CompletionFn + 'static {}
@@ -82,11 +82,11 @@ impl CommandCompletion {
     }
 }
 
-impl<A, P, B> Command<P, B> for A
+impl<A, M, B> Command<M, B> for A
 where
-    A: Action<P, B, Return = ()> + ToCompletionFn<B>,
-    for<'a> A::Args<'a>: TryFrom<CommandArgs<'a>, Error: notify::Error<B>>,
-    P: Plugin<B>,
+    A: Action<M, B, Return = ()> + ToCompletionFn<B>,
+    for<'a> A::Args<'a>: TryFrom<CommandArgs<'a>, Error: notify::Error>,
+    M: Module<B>,
     B: Backend,
 {
     const NAME: Name = A::NAME;
@@ -97,8 +97,8 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut ActionCtx<P, B>,
-    ) -> impl MaybeResult<(), B> + use<'this, 'args, A, P, B> {
+        ctx: &mut ActionCtx<M, B>,
+    ) -> impl MaybeResult<()> + use<'this, 'args, A, M, B> {
         A::call(self, args, ctx)
     }
 

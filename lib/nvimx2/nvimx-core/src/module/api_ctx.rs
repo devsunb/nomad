@@ -1,49 +1,94 @@
+use core::marker::PhantomData;
+
 use crate::NeovimCtx;
 use crate::action::ActionCtx;
 use crate::backend::{
     Api,
+    ApiValue,
     Backend,
     BackendExt,
     BackendHandle,
     BackendMut,
     Key,
     MapAccess,
-    ModuleApi,
     Value,
 };
-use crate::command::{Command, CommandBuilder};
+use crate::command::{Command, CommandBuilder, CommandCompletionsBuilder};
 use crate::module::{Constant, Function, Module};
 use crate::notify::{self, Error, MaybeResult, ModulePath, Name};
-use crate::plugin::Plugin;
+use crate::plugin::{self, Plugin};
 use crate::util::OrderedMap;
 
 /// TODO: docs.
-pub struct ApiCtx<'a, 'b, M: Module<P, B>, P: Plugin<B>, B: Backend> {
-    module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
-    command_builder: CommandBuilder<'a, P, B>,
-    config_builder: &'a mut ConfigFnBuilder<P, B>,
-    module_path: &'a mut ModulePath,
-    backend: &'a BackendHandle<B>,
+pub(crate) fn build_api<P, B>(plugin: P, mut backend: BackendMut<B>) -> B::Api
+where
+    P: Plugin<B>,
+    B: Backend,
+{
+    let plugin = Box::leak(Box::new(plugin));
+    let mut command_builder = CommandBuilder::new::<P>();
+    let mut command_completions_builder = CommandCompletionsBuilder::default();
+    let mut config_builder = ConfigBuilder::new(plugin);
+    let mut module_path = ModulePath::new(P::NAME);
+    let mut api_ctx = ApiCtx {
+        module_api: backend.api::<P>(),
+        backend: backend.as_mut(),
+        command_builder: &mut command_builder,
+        completions_builder: &mut command_completions_builder,
+        config_builder: &mut config_builder,
+        module_path: &mut module_path,
+        module: PhantomData,
+    };
+    Module::api(plugin, &mut api_ctx);
+    let mut plugin_api = api_ctx.module_api;
+    plugin_api.add_function(
+        P::CONFIG_FN_NAME,
+        config_builder.build(backend.handle()),
+    );
+    if P::COMMAND_NAME != plugin::NO_COMMAND_NAME
+        && !command_builder.is_empty()
+    {
+        plugin_api.add_command::<P, _, _, _>(
+            command_builder.build(backend.handle()),
+            command_completions_builder.build(),
+        );
+    }
+    plugin_api
 }
 
-pub(crate) struct ConfigFnBuilder<P: Plugin<B>, B: Backend> {
+/// TODO: docs.
+pub struct ApiCtx<'a, M, B>
+where
+    M: Module<B>,
+    B: Backend,
+{
+    backend: BackendMut<'a, B>,
+    command_builder: &'a mut CommandBuilder<B>,
+    completions_builder: &'a mut CommandCompletionsBuilder,
+    config_builder: &'a mut ConfigBuilder<B>,
+    module_api: B::Api,
+    module_path: &'a mut ModulePath,
+    module: PhantomData<M>,
+}
+
+struct ConfigBuilder<B: Backend> {
+    handler: Box<dyn FnMut(ApiValue<B>, &mut ModulePath, BackendMut<B>)>,
     module_name: Name,
-    config_handler: Box<dyn FnMut(B::ApiValue, &mut NeovimCtx<P, B>)>,
     submodules: OrderedMap<Name, Self>,
 }
 
-impl<'a, 'b, M, P, B> ApiCtx<'a, 'b, M, P, B>
+impl<M, B> ApiCtx<'_, M, B>
 where
-    M: Module<P, B>,
-    P: Plugin<B>,
+    M: Module<B>,
     B: Backend,
 {
     /// TODO: docs.
     #[inline]
     pub fn with_command<Cmd>(&mut self, command: Cmd) -> &mut Self
     where
-        Cmd: Command<P, B>,
+        Cmd: Command<M, B>,
     {
+        self.completions_builder.add_command(&command);
         self.command_builder.add_command(command);
         self
     }
@@ -55,25 +100,23 @@ where
     where
         Const: Constant,
     {
-        let value = self.backend.with_mut(|mut backend| {
-            match backend.serialize(&value).into_result() {
-                Ok(value) => value,
-                Err(err) => {
-                    let source = notify::Source {
-                        module_path: self.module_path,
-                        action_name: Some(Const::NAME),
-                    };
-                    let msg = err.to_message::<P>(source).map(|(_, msg)| msg);
-                    panic!(
-                        "couldn't serialize {:?}{colon}{reason:?}",
-                        Const::NAME,
-                        colon = if msg.is_some() { ": " } else { "" },
-                        reason =
-                            msg.as_ref().map(|msg| msg.as_str()).unwrap_or(""),
-                    );
-                },
-            }
-        });
+        let value = match self.backend.serialize(&value).into_result() {
+            Ok(value) => value,
+            Err(err) => {
+                let source = notify::Source {
+                    module_path: self.module_path,
+                    action_name: Some(Const::NAME),
+                };
+                let msg = err.to_message(source).map(|(_, msg)| msg);
+                panic!(
+                    "couldn't serialize {:?}{colon}{reason:?}",
+                    Const::NAME,
+                    colon = if msg.is_some() { ": " } else { "" },
+                    reason =
+                        msg.as_ref().map(|msg| msg.as_str()).unwrap_or(""),
+                );
+            },
+        };
         self.module_api.add_constant(Const::NAME, value);
         self
     }
@@ -83,9 +126,9 @@ where
     #[inline]
     pub fn with_function<Fun>(&mut self, mut function: Fun) -> &mut Self
     where
-        Fun: Function<P, B>,
+        Fun: Function<M, B>,
     {
-        let backend = self.backend.clone();
+        let backend = self.backend.handle();
         let module_path = self.module_path.clone();
         let fun = move |value| {
             let fun = &mut function;
@@ -101,7 +144,7 @@ where
                 {
                     Ok(args) => args,
                     Err(err) => {
-                        backend.emit_err::<P, _>(source, err);
+                        backend.emit_err(source, err);
                         return None;
                     },
                 };
@@ -112,14 +155,14 @@ where
                 let ret = match fun.call(args, &mut action_ctx).into_result() {
                     Ok(ret) => ret,
                     Err(err) => {
-                        backend.emit_err::<P, _>(source, err);
+                        backend.emit_err(source, err);
                         return None;
                     },
                 };
                 match backend.serialize(&ret).into_result() {
                     Ok(ret) => Some(ret),
                     Err(err) => {
-                        backend.emit_err::<P, _>(source, err);
+                        backend.emit_err(source, err);
                         None
                     },
                 }
@@ -133,96 +176,68 @@ where
     #[inline]
     pub fn with_module<Mod>(&mut self, module: Mod) -> &mut Self
     where
-        Mod: Module<P, B>,
+        Mod: Module<B>,
     {
-        let mut module_api = self.module_api.as_submodule::<Mod>();
         self.module_path.push(Mod::NAME);
-        let mut api_ctx = ApiCtx::new(
-            &mut module_api,
-            self.command_builder.add_module::<Mod>(),
-            self.config_builder.add_module::<Mod>(),
-            self.module_path,
-            self.backend,
-        );
-        Module::api(&module, &mut api_ctx);
-        module_api.finish();
+        let submodule_api = self.add_submodule::<Mod>(module);
+        self.module_api.add_submodule::<Mod>(submodule_api);
         self.module_path.pop();
-        self.config_builder.finish(module);
         self
     }
 
     #[inline]
-    pub(crate) fn new(
-        module_api: &'a mut <B::Api<P> as Api<P, B>>::ModuleApi<'b, M>,
-        command_builder: CommandBuilder<'a, P, B>,
-        config_builder: &'a mut ConfigFnBuilder<P, B>,
-        module_path: &'a mut ModulePath,
-        backend: &'a BackendHandle<B>,
-    ) -> Self {
-        Self {
-            module_api,
-            command_builder,
-            config_builder,
-            module_path,
-            backend,
-        }
+    fn add_submodule<S: Module<B>>(&mut self, sub: S) -> B::Api {
+        let sub = Box::leak(Box::new(sub));
+        let mut ctx = ApiCtx {
+            module_api: self.backend.api::<S>(),
+            backend: self.backend.as_mut(),
+            command_builder: self.command_builder.add_module::<S>(),
+            completions_builder: self.completions_builder.add_module::<S, _>(),
+            config_builder: self.config_builder.add_module(sub),
+            module_path: self.module_path,
+            module: PhantomData,
+        };
+        sub.api(&mut ctx);
+        ctx.module_api
     }
 }
 
-impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
+impl<B: Backend> ConfigBuilder<B> {
     #[inline]
-    pub(crate) fn build(
+    fn add_module<M: Module<B>>(&mut self, module: &'static M) -> &mut Self {
+        self.submodules.insert(M::NAME, ConfigBuilder::new(module))
+    }
+
+    #[inline]
+    fn build(
         mut self,
         backend: BackendHandle<B>,
-    ) -> impl FnMut(B::ApiValue) + 'static {
-        move |value| {
+    ) -> impl FnMut(ApiValue<B>) -> Option<ApiValue<B>> {
+        move |config| {
             backend.with_mut(|backend| {
                 let mut module_path = ModulePath::new(self.module_name);
-                self.handle(value, &mut module_path, backend)
+                self.handle(config, &mut module_path, backend);
             });
+            None
         }
     }
 
     #[inline]
-    pub(crate) fn finish<M: Module<P, B>>(&mut self, mut module: M) {
-        self.config_handler = Box::new(move |value, ctx| {
-            let backend = ctx.backend_mut();
-            match backend.deserialize::<M::Config>(value).into_result() {
-                Ok(config) => module.on_new_config(config, ctx),
-                Err(err) => ctx.emit_err(Some(P::CONFIG_FN_NAME), err),
-            }
-        });
-    }
-
-    #[inline]
-    pub(crate) fn new<M: Module<P, B>>() -> Self {
-        Self {
-            module_name: M::NAME,
-            config_handler: Box::new(|_, _| {}),
-            submodules: Default::default(),
-        }
-    }
-
-    #[inline]
-    fn add_module<M: Module<P, B>>(&mut self) -> &mut Self {
-        self.submodules.insert(M::NAME, ConfigFnBuilder::new::<M>())
+    fn emit_err<E: notify::Error>(&mut self, _err: E) {
+        todo!();
     }
 
     #[inline]
     fn handle(
         &mut self,
-        mut value: B::ApiValue,
+        mut config: ApiValue<B>,
         module_path: &mut ModulePath,
         mut backend: BackendMut<B>,
     ) {
-        let mut map_access = match value.map_access() {
+        let mut map_access = match config.map_access() {
             Ok(map_access) => map_access,
             Err(err) => {
-                let source = notify::Source {
-                    module_path,
-                    action_name: Some(P::CONFIG_FN_NAME),
-                };
-                backend.emit_err::<P, _>(source, err);
+                self.emit_err(err);
                 return;
             },
         };
@@ -231,11 +246,7 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
             let key_str = match key.as_str() {
                 Ok(key) => key,
                 Err(err) => {
-                    let source = notify::Source {
-                        module_path,
-                        action_name: Some(P::CONFIG_FN_NAME),
-                    };
-                    backend.emit_err::<P, _>(source, err);
+                    self.emit_err(err);
                     return;
                 },
             };
@@ -243,13 +254,34 @@ impl<P: Plugin<B>, B: Backend> ConfigFnBuilder<P, B> {
                 continue;
             };
             drop(key);
-            let value = map_access.take_next_value();
+            let config = map_access.take_next_value();
             module_path.push(submodule.module_name);
-            submodule.handle(value, module_path, backend.as_mut());
+            submodule.handle(config, module_path, backend.as_mut());
             module_path.pop();
         }
         drop(map_access);
-        let mut ctx = NeovimCtx::new(backend, module_path);
-        (self.config_handler)(value, &mut ctx);
+        (self.handler)(config, module_path, backend);
+    }
+
+    #[inline]
+    fn new<M: Module<B>>(module: &'static M) -> Self {
+        Self {
+            handler: Box::new(
+                |config, module_path, mut backend| match backend
+                    .deserialize::<M::Config>(config)
+                    .into_result()
+                {
+                    Ok(config) => {
+                        module.on_new_config(
+                            config,
+                            &mut NeovimCtx::<M, _>::new(backend, module_path),
+                        );
+                    },
+                    Err(_err) => todo!(),
+                },
+            ),
+            module_name: M::NAME,
+            submodules: Default::default(),
+        }
     }
 }

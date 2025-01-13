@@ -7,20 +7,20 @@ use crate::backend::{
     BackgroundExecutor,
     TaskBackground,
 };
+use crate::module::Module;
 use crate::notify::ModulePath;
-use crate::plugin::Plugin;
 
 /// TODO: docs.
-pub struct AsyncCtx<'a, P, B> {
+pub struct AsyncCtx<'a, M, B> {
     backend: BackendHandle<B>,
     module_path: ModulePath,
-    plugin: PhantomData<P>,
+    module: PhantomData<M>,
     _non_static: PhantomData<&'a ()>,
 }
 
-impl<P, B> AsyncCtx<'_, P, B>
+impl<M, B> AsyncCtx<'_, M, B>
 where
-    P: Plugin<B>,
+    M: Module<B>,
     B: Backend,
 {
     /// TODO: docs.
@@ -43,7 +43,7 @@ where
     #[inline]
     pub fn with_ctx<Fun, Out>(&self, fun: Fun) -> Out
     where
-        Fun: FnOnce(&mut NeovimCtx<P, B>) -> Out,
+        Fun: FnOnce(&mut NeovimCtx<M, B>) -> Out,
     {
         self.backend.with_mut(|backend| {
             let mut ctx = NeovimCtx::new(backend, &self.module_path);
@@ -60,7 +60,7 @@ where
         Self {
             backend,
             module_path,
-            plugin: PhantomData,
+            module: PhantomData,
             _non_static: PhantomData,
         }
     }
