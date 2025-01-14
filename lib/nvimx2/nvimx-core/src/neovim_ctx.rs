@@ -8,6 +8,7 @@ use crate::backend::{
     Task,
     TaskBackground,
 };
+use crate::module::Module;
 use crate::notify::{self, Emitter, ModulePath, Name, NotificationId, Source};
 
 /// TODO: docs.
@@ -33,6 +34,19 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     #[inline]
     pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
         self.emit_info_inner(message, None)
+    }
+
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn get_module<M>(&self) -> &M
+    where
+        M: Module<B>,
+    {
+        match self.try_get_module::<M>() {
+            Some(module) => module,
+            None => panic!("module {:?} not found", M::NAME),
+        }
     }
 
     /// TODO: docs.
@@ -64,6 +78,15 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
             .local_executor()
             .spawn(async move { fun(&mut async_ctx).await })
             .detach();
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn try_get_module<M>(&self) -> Option<&M>
+    where
+        M: Module<B>,
+    {
+        todo!()
     }
 
     #[inline]
