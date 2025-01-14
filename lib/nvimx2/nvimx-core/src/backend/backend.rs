@@ -32,6 +32,12 @@ pub trait Backend: 'static + Sized {
     type Emitter<'this>: notify::Emitter;
 
     /// TODO: docs.
+    type SerializeError: notify::Error;
+
+    /// TODO: docs.
+    type DeserializeError: notify::Error;
+
+    /// TODO: docs.
     fn api<M: Module<Self>>(&mut self) -> Self::Api;
 
     /// TODO: docs.
@@ -50,7 +56,7 @@ pub trait Backend: 'static + Sized {
     fn serialize<T>(
         &mut self,
         value: &T,
-    ) -> impl MaybeResult<ApiValue<Self>> + use<Self, T>
+    ) -> impl MaybeResult<ApiValue<Self>, Error = Self::SerializeError>
     where
         T: ?Sized + Serialize;
 
@@ -58,24 +64,33 @@ pub trait Backend: 'static + Sized {
     fn deserialize<'de, T>(
         &mut self,
         value: ApiValue<Self>,
-    ) -> impl MaybeResult<T> + use<Self, T>
+    ) -> impl MaybeResult<T, Error = Self::DeserializeError>
     where
         T: Deserialize<'de>;
+
+    /// TODO: docs.
+    #[allow(unused_variables)]
+    fn emit_deserialize_error_in_config<P>(
+        &mut self,
+        config_path: &notify::ModulePath,
+        source: notify::Source,
+        err: Self::DeserializeError,
+    ) where
+        P: Plugin<Self>,
+    {
+        self.emit_err(source, err);
+    }
 
     /// TODO: docs.
     #[allow(unused_variables)]
     fn emit_map_access_error_in_config<P>(
         &mut self,
         config_path: &notify::ModulePath,
+        source: notify::Source,
         err: <ApiValue<Self> as Value<Self>>::MapAccessError<'_>,
     ) where
         P: Plugin<Self>,
     {
-        let module_path = notify::ModulePath::new(P::NAME);
-        let source = notify::Source {
-            module_path: &module_path,
-            action_name: Some(P::CONFIG_FN_NAME),
-        };
         self.emit_err(source, err);
     }
 
@@ -84,17 +99,13 @@ pub trait Backend: 'static + Sized {
     fn emit_key_as_str_error_in_config<P>(
         &mut self,
         config_path: &notify::ModulePath,
+        source: notify::Source,
         err: <<<ApiValue<Self> as Value<Self>>::MapAccess<'_> as MapAccess<
             Self,
         >>::Key<'_> as Key<Self>>::AsStrError<'_>,
     ) where
         P: Plugin<Self>,
     {
-        let module_path = notify::ModulePath::new(P::NAME);
-        let source = notify::Source {
-            module_path: &module_path,
-            action_name: Some(P::CONFIG_FN_NAME),
-        };
         self.emit_err(source, err);
     }
 }

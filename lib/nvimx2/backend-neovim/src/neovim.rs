@@ -16,6 +16,8 @@ impl Backend for Neovim {
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
+    type SerializeError = serde::NeovimSerializeError;
+    type DeserializeError = serde::NeovimDeserializeError;
 
     #[inline]
     fn init() -> Self {

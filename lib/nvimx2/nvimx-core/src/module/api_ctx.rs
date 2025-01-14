@@ -71,8 +71,15 @@ where
     module: PhantomData<M>,
 }
 
+type ConfigHandler<B> = Box<
+    dyn FnMut(
+        ApiValue<B>,
+        &mut NeovimCtx<B>,
+    ) -> Result<(), <B as Backend>::DeserializeError>,
+>;
+
 struct ConfigBuilder<B: Backend> {
-    handler: Box<dyn FnMut(ApiValue<B>, &mut NeovimCtx<B>)>,
+    handler: ConfigHandler<B>,
     module_name: Name,
     submodules: OrderedMap<Name, Self>,
 }
@@ -216,23 +223,34 @@ impl<B: Backend> ConfigBuilder<B> {
         move |config| {
             backend.with_mut(|backend| {
                 let mut config_path = ModulePath::new(self.module_name);
-                self.handle::<P>(config, &mut config_path, backend);
+                let module_path = notify::ModulePath::new(P::NAME);
+                let source = notify::Source {
+                    module_path: &module_path,
+                    action_name: Some(P::CONFIG_FN_NAME),
+                };
+                self.handle::<P>(config, source, &mut config_path, backend);
             });
             None
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     #[inline]
     fn handle<P: Plugin<B>>(
         &mut self,
         mut config: ApiValue<B>,
+        source: notify::Source,
         config_path: &mut ModulePath,
         mut backend: BackendMut<B>,
     ) {
         let mut map_access = match config.map_access() {
             Ok(map_access) => map_access,
             Err(err) => {
-                backend.emit_map_access_error_in_config::<P>(config_path, err);
+                backend.emit_map_access_error_in_config::<P>(
+                    config_path,
+                    source,
+                    err,
+                );
                 return;
             },
         };
@@ -243,6 +261,7 @@ impl<B: Backend> ConfigBuilder<B> {
                 Err(err) => {
                     backend.emit_key_as_str_error_in_config::<P>(
                         config_path,
+                        source,
                         err,
                     );
                     return;
@@ -254,27 +273,38 @@ impl<B: Backend> ConfigBuilder<B> {
             drop(key);
             let config = map_access.take_next_value();
             config_path.push(submodule.module_name);
-            submodule.handle::<P>(config, config_path, backend.as_mut());
+            submodule.handle::<P>(
+                config,
+                source,
+                config_path,
+                backend.as_mut(),
+            );
             config_path.pop();
         }
         drop(map_access);
-        (self.handler)(config, &mut NeovimCtx::new(backend, config_path));
+        let mut ctx = NeovimCtx::new(backend.as_mut(), source.module_path);
+        match (self.handler)(config, &mut ctx) {
+            Ok(()) => {},
+            Err(err) => {
+                backend.emit_deserialize_error_in_config::<P>(
+                    config_path,
+                    source,
+                    err,
+                );
+            },
+        }
     }
 
     #[inline]
     fn new<M: Module<B>>(module: &'static M) -> Self {
         Self {
             handler: Box::new(|config, ctx| {
-                match ctx
-                    .backend_mut()
+                ctx.backend_mut()
                     .deserialize::<M::Config>(config)
                     .into_result()
-                {
-                    Ok(config) => {
+                    .map(|config| {
                         module.on_new_config(config, ctx);
-                    },
-                    Err(err) => todo!(),
-                }
+                    })
             }),
             module_name: M::NAME,
             submodules: Default::default(),
