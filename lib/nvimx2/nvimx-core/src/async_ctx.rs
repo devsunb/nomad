@@ -19,6 +19,15 @@ pub struct AsyncCtx<'a, B> {
 impl<B: Backend> AsyncCtx<'_, B> {
     /// TODO: docs.
     #[inline]
+    pub fn emit_err<Err>(&mut self, err: Err)
+    where
+        Err: notify::Error,
+    {
+        self.emit_err_inner(None, err);
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn spawn_background<Fut>(
         &self,
         fut: Fut,
@@ -46,8 +55,11 @@ impl<B: Backend> AsyncCtx<'_, B> {
     }
 
     #[inline]
-    pub(crate) fn emit_err<Err>(&mut self, action_name: Option<Name>, err: Err)
-    where
+    pub(crate) fn emit_err_inner<Err>(
+        &mut self,
+        action_name: Option<Name>,
+        err: Err,
+    ) where
         Err: notify::Error,
     {
         self.with_ctx(move |ctx| ctx.emit_err(action_name, err));

@@ -1,5 +1,4 @@
-use crate::AsyncCtx;
-use crate::action::{Action, ActionCtx};
+use crate::action::{Action, ActionCtx, AsyncActionCtx};
 use crate::backend::Backend;
 use crate::notify::{MaybeResult, Name};
 
@@ -15,7 +14,7 @@ pub trait AsyncAction<B: Backend>: 'static {
     fn call<'this>(
         &'this mut self,
         args: Self::Args,
-        ctx: &mut AsyncCtx<B>,
+        ctx: &mut AsyncActionCtx<B>,
     ) -> impl Future<Output = impl MaybeResult<()> + 'this>;
 }
 
@@ -25,6 +24,7 @@ where
     B: Backend,
 {
     const NAME: Name = T::NAME;
+
     type Args<'args> = T::Args;
     type Return = ();
 
@@ -37,7 +37,7 @@ where
         let mut this = self.clone();
         ctx.spawn_local(async move |ctx| {
             if let Err(err) = this.call(args, ctx).await.into_result() {
-                ctx.emit_err(Some(Self::NAME), err);
+                ctx.emit_err(err);
             }
         });
     }

@@ -69,12 +69,8 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     where
         Fun: AsyncFnOnce(&mut AsyncCtx<B>) + 'static,
     {
-        let mut async_ctx = AsyncCtx::<'static, _>::new(
-            self.backend.handle(),
-            self.module_path.clone(),
-        );
-        self.backend_mut()
-            .local_executor()
+        let mut async_ctx = self.to_async();
+        self.local_executor()
             .spawn(async move { fun(&mut async_ctx).await })
             .detach();
     }
@@ -114,10 +110,20 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     }
 
     #[inline]
+    pub(crate) fn local_executor(&mut self) -> &mut B::LocalExecutor {
+        self.backend.local_executor()
+    }
+
+    #[inline]
     pub(crate) fn new(
         backend: BackendMut<'a, B>,
         module_path: &'a ModulePath,
     ) -> Self {
         Self { backend, module_path }
+    }
+
+    #[inline]
+    pub(crate) fn to_async(&self) -> AsyncCtx<'static, B> {
+        AsyncCtx::new(self.backend.handle(), self.module_path.clone())
     }
 }

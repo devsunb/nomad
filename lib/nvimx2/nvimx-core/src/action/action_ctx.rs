@@ -1,7 +1,8 @@
 use core::ops::{Deref, DerefMut};
 
 use crate::NeovimCtx;
-use crate::backend::Backend;
+use crate::action::AsyncActionCtx;
+use crate::backend::{Backend, LocalExecutor, Task};
 use crate::notify::{self, Name, NotificationId};
 
 /// TODO: docs.
@@ -15,6 +16,18 @@ impl<'a, B: Backend> ActionCtx<'a, B> {
     #[inline]
     pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
         self.neovim_ctx.emit_info_inner(message, None)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn spawn_local<Fun>(&mut self, fun: Fun)
+    where
+        Fun: AsyncFnOnce(&mut AsyncActionCtx<B>) + 'static,
+    {
+        let mut ctx = AsyncActionCtx::new(self.to_async(), self.action_name);
+        self.local_executor()
+            .spawn(async move { fun(&mut ctx).await })
+            .detach();
     }
 
     #[inline]
