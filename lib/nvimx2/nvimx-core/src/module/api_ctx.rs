@@ -81,6 +81,7 @@ where
     B: Backend,
 {
     /// TODO: docs.
+    #[track_caller]
     #[inline]
     pub fn with_command<Cmd>(&mut self, command: Cmd) -> &mut Self
     where
@@ -171,6 +172,7 @@ where
     }
 
     /// TODO: docs.
+    #[track_caller]
     #[inline]
     pub fn with_module<Mod>(&mut self, module: Mod) -> &mut Self
     where
@@ -183,6 +185,7 @@ where
         self
     }
 
+    #[track_caller]
     #[inline]
     fn add_submodule<S: Module<B>>(&mut self, sub: S) -> B::Api {
         let sub = self.state.add_module(sub);
