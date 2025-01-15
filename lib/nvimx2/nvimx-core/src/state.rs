@@ -7,7 +7,6 @@ use fxhash::FxHashMap;
 use crate::backend::Backend;
 use crate::module::Module;
 use crate::notify::ModulePath;
-use crate::plugin::Plugin;
 use crate::{NeovimCtx, Shared};
 
 /// TODO: docs.
