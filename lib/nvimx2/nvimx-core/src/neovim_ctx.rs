@@ -75,7 +75,7 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     where
         M: Module<B>,
     {
-        todo!()
+        self.state.get_module::<M>()
     }
 
     #[inline]
