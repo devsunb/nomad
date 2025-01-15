@@ -4,9 +4,11 @@ use std::collections::hash_map::Entry;
 
 use fxhash::FxHashMap;
 
-use crate::Shared;
 use crate::backend::Backend;
 use crate::module::Module;
+use crate::notify::ModulePath;
+use crate::plugin::Plugin;
+use crate::{NeovimCtx, Shared};
 
 /// TODO: docs.
 pub(crate) struct State<B> {
@@ -78,7 +80,7 @@ impl<B: Backend> StateHandle<B> {
     }
 }
 
-impl<B> StateMut<'_, B> {
+impl<B: Backend> StateMut<'_, B> {
     #[inline]
     pub(crate) fn as_mut(&mut self) -> StateMut<'_, B> {
         StateMut { state: self.state, handle: self.handle }
@@ -87,6 +89,20 @@ impl<B> StateMut<'_, B> {
     #[inline]
     pub(crate) fn handle(&self) -> StateHandle<B> {
         self.handle.clone()
+    }
+
+    #[inline]
+    pub(crate) fn with_ctx<F, R>(
+        &mut self,
+        module_path: &ModulePath,
+        fun: F,
+    ) -> R
+    where
+        F: FnOnce(&mut NeovimCtx<B>) -> R,
+    {
+        #[allow(deprecated)]
+        let mut ctx = NeovimCtx::new(module_path, self.as_mut());
+        fun(&mut ctx)
     }
 }
 

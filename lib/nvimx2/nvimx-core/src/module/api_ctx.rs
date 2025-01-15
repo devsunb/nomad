@@ -146,11 +146,11 @@ where
                         return None;
                     },
                 };
-                let mut action_ctx = ActionCtx::new(
-                    NeovimCtx::new(module_path, state.as_mut()),
-                    Fun::NAME,
-                );
-                let ret = match fun.call(args, &mut action_ctx).into_result() {
+                let res = state.with_ctx(module_path, |ctx| {
+                    let mut ctx = ActionCtx::new(ctx.as_mut(), Fun::NAME);
+                    fun.call(args, &mut ctx).into_result()
+                });
+                let ret = match res {
                     Ok(ret) => ret,
                     Err(err) => {
                         state.emit_err(source, err);
@@ -268,8 +268,9 @@ impl<B: Backend> ConfigBuilder<B> {
             config_path.pop();
         }
         drop(map_access);
-        let mut ctx = NeovimCtx::new(source.module_path, state.as_mut());
-        match (self.handler)(config, &mut ctx) {
+        match state
+            .with_ctx(source.module_path, |ctx| (self.handler)(config, ctx))
+        {
             Ok(()) => {},
             Err(err) => {
                 state.emit_deserialize_error_in_config::<P>(

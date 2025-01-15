@@ -79,6 +79,11 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     }
 
     #[inline]
+    pub(crate) fn as_mut(&mut self) -> NeovimCtx<'_, B> {
+        NeovimCtx { module_path: self.module_path, state: self.state.as_mut() }
+    }
+
+    #[inline]
     pub(crate) fn emit_err<Err>(&mut self, action_name: Option<Name>, err: Err)
     where
         Err: notify::Error,
@@ -108,6 +113,8 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
         self.state.local_executor()
     }
 
+    #[doc(hidden)]
+    #[deprecated(note = "use `StateMut::with_ctx()` instead")]
     #[inline]
     pub(crate) fn new(
         module_path: &'a ModulePath,

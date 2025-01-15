@@ -132,7 +132,7 @@ impl<B: Backend> CommandBuilder<B> {
         };
 
         if let Some(handler) = self.handlers.get_mut(arg.as_str()) {
-            (handler)(args, NeovimCtx::new(module_path, state));
+            state.with_ctx(module_path, |ctx| handler(args, ctx.as_mut()));
         } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
             module_path.push(module.module_name);
             module.handle(args, module_path, state);

@@ -44,10 +44,7 @@ impl<B: Backend> AsyncCtx<'_, B> {
     where
         Fun: FnOnce(&mut NeovimCtx<B>) -> Out,
     {
-        self.state.with_mut(|state| {
-            let mut ctx = NeovimCtx::new(&self.module_path, state);
-            fun(&mut ctx)
-        })
+        self.state.with_mut(|mut state| state.with_ctx(&self.module_path, fun))
     }
 
     #[inline]
