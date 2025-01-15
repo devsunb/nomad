@@ -37,7 +37,7 @@ where
         let mut this = self.clone();
         ctx.spawn_local(async move |ctx| {
             if let Err(err) = this.call(args, ctx).await.into_result() {
-                ctx.with_ctx(move |ctx| ctx.emit_err(Some(Self::NAME), err));
+                ctx.emit_err(Some(Self::NAME), err);
             }
         });
     }

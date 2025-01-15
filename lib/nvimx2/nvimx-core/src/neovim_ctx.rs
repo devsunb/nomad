@@ -114,11 +114,6 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     }
 
     #[inline]
-    pub(crate) fn module_path(&self) -> &'a ModulePath {
-        self.module_path
-    }
-
-    #[inline]
     pub(crate) fn new(
         backend: BackendMut<'a, B>,
         module_path: &'a ModulePath,

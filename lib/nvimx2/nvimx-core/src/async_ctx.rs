@@ -1,13 +1,13 @@
 use core::marker::PhantomData;
 
-use crate::NeovimCtx;
 use crate::backend::{
     Backend,
     BackendHandle,
     BackgroundExecutor,
     TaskBackground,
 };
-use crate::notify::ModulePath;
+use crate::notify::{ModulePath, Name};
+use crate::{NeovimCtx, notify};
 
 /// TODO: docs.
 pub struct AsyncCtx<'a, B> {
@@ -43,6 +43,14 @@ impl<B: Backend> AsyncCtx<'_, B> {
             let mut ctx = NeovimCtx::new(backend, &self.module_path);
             fun(&mut ctx)
         })
+    }
+
+    #[inline]
+    pub(crate) fn emit_err<Err>(&mut self, action_name: Option<Name>, err: Err)
+    where
+        Err: notify::Error,
+    {
+        self.with_ctx(move |ctx| ctx.emit_err(action_name, err));
     }
 
     /// TODO: docs.
