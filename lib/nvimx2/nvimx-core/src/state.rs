@@ -8,7 +8,7 @@ use fxhash::FxHashMap;
 use crate::backend::Backend;
 use crate::module::Module;
 use crate::notify::Namespace;
-use crate::{NeovimCtx, Shared};
+use crate::{NeovimCtx, Shared, plugin};
 
 /// TODO: docs.
 pub(crate) struct State<B> {
@@ -94,6 +94,7 @@ impl<B: Backend> StateMut<'_, B> {
     #[inline]
     pub(crate) fn with_ctx<F, R>(
         &mut self,
+        plugin_id: TypeId,
         namespace: &Namespace,
         fun: F,
     ) -> Option<R>
@@ -104,7 +105,18 @@ impl<B: Backend> StateMut<'_, B> {
         let mut ctx = NeovimCtx::new(namespace, self.as_mut());
         match panic::catch_unwind(panic::AssertUnwindSafe(|| fun(&mut ctx))) {
             Ok(ret) => Some(ret),
-            Err(_payload) => todo!(),
+            Err(payload) => {
+                let &handler = self
+                    .modules
+                    .get(&plugin_id)
+                    .expect("no plugin matching given TypeId")
+                    .downcast_ref::<&'static dyn plugin::PanicHandler<B>>()
+                    .expect("TypeId is of a Module, not a Plugin");
+                #[allow(deprecated)]
+                let mut ctx = NeovimCtx::new(namespace, self.as_mut());
+                handler.handle(payload, &mut ctx);
+                None
+            },
         }
     }
 }

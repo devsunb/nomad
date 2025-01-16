@@ -1,3 +1,5 @@
+use core::any::TypeId;
+
 use smallvec::SmallVec;
 
 use crate::backend::Backend;
@@ -10,6 +12,7 @@ use crate::command::{
 };
 use crate::module::Module;
 use crate::notify::{self, MaybeResult, Name, Namespace};
+use crate::plugin::Plugin;
 use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
 use crate::{ByteOffset, NeovimCtx};
@@ -20,6 +23,7 @@ type CommandCompletionFn =
     Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
 
 pub(crate) struct CommandBuilder<B> {
+    plugin_id: TypeId,
     /// Map from command name to the handler for that command.
     handlers: OrderedMap<Name, CommandHandler<B>>,
     module_name: Name,
@@ -61,7 +65,8 @@ impl<B: Backend> CommandBuilder<B> {
     #[inline]
     pub(crate) fn add_module<M: Module<B>>(&mut self) -> &mut Self {
         self.assert_namespace_is_available(M::NAME);
-        self.submodules.insert(M::NAME, Self::new::<M>())
+        let builder = self.new_for::<M>();
+        self.submodules.insert(M::NAME, builder)
     }
 
     #[inline]
@@ -83,9 +88,10 @@ impl<B: Backend> CommandBuilder<B> {
     }
 
     #[inline]
-    pub(crate) fn new<M: Module<B>>() -> Self {
+    pub(crate) fn new<P: Plugin<B>>() -> Self {
         Self {
-            module_name: M::NAME,
+            plugin_id: TypeId::of::<P>(),
+            module_name: P::NAME,
             handlers: Default::default(),
             submodules: Default::default(),
         }
@@ -126,7 +132,7 @@ impl<B: Backend> CommandBuilder<B> {
             self.handlers.get_key_value_mut(arg.as_str())
         {
             namespace.push(command_name);
-            state.with_ctx(namespace, |ctx| handler(args, ctx));
+            state.with_ctx(self.plugin_id, namespace, |cx| handler(args, cx));
             namespace.pop();
         } else if let Some(module) = self.submodules.get_mut(arg.as_str()) {
             namespace.push(module.module_name);
@@ -134,6 +140,16 @@ impl<B: Backend> CommandBuilder<B> {
         } else {
             let err = InvalidCommandError(self, arg);
             state.emit_err(namespace, err);
+        }
+    }
+
+    #[inline]
+    fn new_for<M: Module<B>>(&self) -> Self {
+        Self {
+            plugin_id: self.plugin_id,
+            module_name: M::NAME,
+            handlers: Default::default(),
+            submodules: Default::default(),
         }
     }
 

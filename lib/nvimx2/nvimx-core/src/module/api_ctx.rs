@@ -1,3 +1,4 @@
+use core::any::TypeId;
 use core::marker::PhantomData;
 
 use crate::NeovimCtx;
@@ -21,6 +22,7 @@ where
     let mut config_builder = ConfigBuilder::new(plugin);
     let mut namespace = Namespace::new(P::NAME);
     let mut api_ctx = ApiCtx {
+        plugin_id: TypeId::of::<P>(),
         module_api: state.api::<P>(),
         command_builder: &mut command_builder,
         completions_builder: &mut command_completions_builder,
@@ -52,6 +54,7 @@ where
     M: Module<B>,
     B: Backend,
 {
+    plugin_id: TypeId,
     command_builder: &'a mut CommandBuilder<B>,
     completions_builder: &'a mut CommandCompletionsBuilder,
     config_builder: &'a mut ConfigBuilder<B>,
@@ -123,6 +126,7 @@ where
         let state = self.state.handle();
         let mut namespace = self.namespace.clone();
         namespace.push(Fun::NAME);
+        let plugin_id = self.plugin_id;
         let fun = move |value| {
             let fun = &mut function;
             let namespace = &mut namespace;
@@ -137,7 +141,7 @@ where
                         return None;
                     },
                 };
-                let res = state.with_ctx(namespace, |ctx| {
+                let res = state.with_ctx(plugin_id, namespace, |ctx| {
                     fun.call(args, ctx).into_result()
                 });
                 let ret = match res? {
@@ -185,6 +189,7 @@ where
             config_builder: self.config_builder.add_module(sub),
             namespace: self.namespace,
             module: PhantomData,
+            plugin_id: self.plugin_id,
             state: self.state.as_mut(),
         };
         sub.api(&mut ctx);
@@ -263,7 +268,9 @@ impl<B: Backend> ConfigBuilder<B> {
         }
         drop(map_access);
         if let Some(Err(err)) =
-            state.with_ctx(namespace, |ctx| (self.handler)(config, ctx))
+            state.with_ctx(TypeId::of::<P>(), namespace, |ctx| {
+                (self.handler)(config, ctx)
+            })
         {
             state.emit_deserialize_error_in_config::<P>(
                 config_path,
