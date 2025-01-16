@@ -40,10 +40,7 @@ struct InvalidCommandError<'a, B>(&'a CommandBuilder<B>, CommandArg<'a>);
 impl<B: Backend> CommandBuilder<B> {
     #[track_caller]
     #[inline]
-    pub(crate) fn add_command<Cmd>(&mut self, mut command: Cmd)
-    where
-        Cmd: Command<B>,
-    {
+    pub(crate) fn add_command<Cmd: Command<B>>(&mut self, mut command: Cmd) {
         self.assert_namespace_is_available(Cmd::NAME);
         let handler: CommandHandler<B> = Box::new(move |args, ctx| {
             let args = match Cmd::Args::try_from(args) {
@@ -62,10 +59,7 @@ impl<B: Backend> CommandBuilder<B> {
 
     #[track_caller]
     #[inline]
-    pub(crate) fn add_module<M>(&mut self) -> &mut Self
-    where
-        M: Module<B>,
-    {
+    pub(crate) fn add_module<M: Module<B>>(&mut self) -> &mut Self {
         self.assert_namespace_is_available(M::NAME);
         self.submodules.insert(M::NAME, Self::new::<M>())
     }

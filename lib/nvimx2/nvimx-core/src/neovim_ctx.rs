@@ -25,22 +25,14 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn emit_err<Err>(&mut self, err: Err) -> NotificationId
-    where
-        Err: notify::Error,
-    {
-        self.state.emit_err(self.namespace, err)
+    pub fn emit_error(&mut self, message: notify::Message) -> NotificationId {
+        self.emit_message(notify::Level::Error, message)
     }
 
     /// TODO: docs.
     #[inline]
     pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
-        self.state.emitter().emit(notify::Notification {
-            level: notify::Level::Info,
-            namespace: self.namespace,
-            message,
-            updates_prev: None,
-        })
+        self.emit_message(notify::Level::Info, message)
     }
 
     /// TODO: docs.
@@ -90,6 +82,28 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
         M: Module<B>,
     {
         self.state.get_module::<M>()
+    }
+
+    #[inline]
+    pub(crate) fn emit_err<Err>(&mut self, err: Err) -> NotificationId
+    where
+        Err: notify::Error,
+    {
+        self.state.emit_err(self.namespace, err)
+    }
+
+    #[inline]
+    pub(crate) fn emit_message(
+        &mut self,
+        level: notify::Level,
+        message: notify::Message,
+    ) -> NotificationId {
+        self.state.emitter().emit(notify::Notification {
+            level,
+            namespace: self.namespace,
+            message,
+            updates_prev: None,
+        })
     }
 
     #[inline]
