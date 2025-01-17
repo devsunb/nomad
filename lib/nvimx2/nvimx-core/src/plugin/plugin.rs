@@ -1,8 +1,9 @@
-use core::any::Any;
+use smol_str::ToSmolStr;
 
 use crate::backend::Backend;
 use crate::module::{self, Module};
 use crate::notify::Name;
+use crate::plugin::PanicInfo;
 use crate::state::StateHandle;
 use crate::{NeovimCtx, notify};
 
@@ -23,19 +24,13 @@ pub trait Plugin<B: Backend>: Module<B> {
     }
 
     /// TODO: docs.
-    fn handle_panic(
-        &self,
-        panic_payload: Box<dyn Any + Send + 'static>,
-        ctx: &mut NeovimCtx<B>,
-    ) {
+    fn handle_panic(&self, panic_info: PanicInfo, ctx: &mut NeovimCtx<B>) {
         let mut message = notify::Message::from_str("panicked");
 
-        let maybe_payload_str = panic_payload
-            .downcast_ref::<String>()
-            .map(|s| &**s)
-            .or_else(|| panic_payload.downcast_ref::<&str>().copied());
-
-        if let Some(payload) = maybe_payload_str {
+        if let Some(location) = &panic_info.location {
+            message.push_str(" at ").push_info(location.to_smolstr());
+        }
+        if let Some(payload) = panic_info.payload_as_str() {
             message.push_str(": ").push_info(payload);
         }
 

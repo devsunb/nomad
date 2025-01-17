@@ -1,5 +1,7 @@
 use core::any::{self, Any, TypeId};
+use core::cell::Cell;
 use core::ops::{Deref, DerefMut};
+use std::backtrace::Backtrace;
 use std::collections::hash_map::Entry;
 use std::panic;
 
@@ -8,13 +10,14 @@ use fxhash::FxHashMap;
 use crate::backend::Backend;
 use crate::module::Module;
 use crate::notify::Namespace;
-use crate::plugin::Plugin;
+use crate::plugin::{PanicInfo, PanicLocation, Plugin};
 use crate::{NeovimCtx, Shared};
 
 /// TODO: docs.
 pub(crate) struct State<B: Backend> {
     backend: B,
     modules: FxHashMap<TypeId, ModuleState<B>>,
+    panic_hook: PanicHook,
 }
 
 /// TODO: docs.
@@ -33,12 +36,10 @@ struct ModuleState<B: Backend> {
     panic_handler: Option<&'static dyn PanicHandler<B>>,
 }
 
+struct PanicHook {}
+
 trait PanicHandler<B: Backend> {
-    fn handle_panic(
-        &self,
-        payload: Box<dyn Any + Send + 'static>,
-        ctx: &mut NeovimCtx<B>,
-    );
+    fn handle_panic(&self, info: PanicInfo, ctx: &mut NeovimCtx<B>);
 }
 
 impl<B: Backend> State<B> {
@@ -95,7 +96,11 @@ impl<B: Backend> State<B> {
 
     #[inline]
     pub(crate) fn new(backend: B) -> Self {
-        Self { backend, modules: FxHashMap::default() }
+        Self {
+            backend,
+            modules: FxHashMap::default(),
+            panic_hook: PanicHook::set(),
+        }
     }
 }
 
@@ -139,9 +144,10 @@ impl<B: Backend> StateMut<'_, B> {
             .expect("no plugin matching the given TypeId")
             .panic_handler
             .expect("TypeId is of a Module, not a Plugin");
+        let info = self.panic_hook.to_info(payload);
         #[allow(deprecated)]
         let mut ctx = NeovimCtx::new(namespace, plugin_id, self.as_mut());
-        handler.handle_panic(payload, &mut ctx);
+        handler.handle_panic(info, &mut ctx);
     }
 
     #[track_caller]
@@ -164,6 +170,33 @@ impl<B: Backend> StateMut<'_, B> {
                 None
             },
         }
+    }
+}
+
+impl PanicHook {
+    thread_local! {
+        static BACKTRACE: Cell<Option<Backtrace>> = const { Cell::new(None) };
+        static LOCATION: Cell<Option<PanicLocation>> = const { Cell::new(None) };
+    }
+
+    #[inline]
+    fn to_info(&self, payload: Box<dyn Any + Send + 'static>) -> PanicInfo {
+        let backtrace = Self::BACKTRACE.with(|b| b.take());
+        let location = Self::LOCATION.with(|l| l.take());
+        PanicInfo { backtrace, location, payload }
+    }
+
+    #[inline]
+    fn set() -> Self {
+        panic::set_hook({
+            Box::new(move |info| {
+                let trace = Backtrace::capture();
+                let location = info.location().map(Into::into);
+                Self::BACKTRACE.with(move |b| b.set(Some(trace)));
+                Self::LOCATION.with(move |l| l.set(location));
+            })
+        });
+        Self {}
     }
 }
 
@@ -220,11 +253,7 @@ where
     B: Backend,
 {
     #[inline]
-    fn handle_panic(
-        &self,
-        payload: Box<dyn Any + Send + 'static>,
-        ctx: &mut NeovimCtx<B>,
-    ) {
-        Plugin::handle_panic(self, payload, ctx);
+    fn handle_panic(&self, info: PanicInfo, ctx: &mut NeovimCtx<B>) {
+        Plugin::handle_panic(self, info, ctx);
     }
 }
