@@ -80,6 +80,21 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
 
         self.local_executor()
             .spawn(async move {
+                // Yielding prevents a panic that would occur when:
+                //
+                // - the local executor immediately polls the future when a new
+                //   task is spawned, and
+                // - `AsyncCtx::with_ctx()` is called before the first `.await`
+                //   point is reached
+                //
+                // In that case, `with_ctx()` would panic because `State` is
+                // already mutably borrowed in this `NeovimCtx`.
+                //
+                // Yielding guarantees that by the time `with_ctx()` is called,
+                // the synchronous code in which the `AsyncCtx` was created
+                // will have already finished running.
+                futures_lite::future::yield_now().await;
+
                 if let Err(payload) =
                     panic::AssertUnwindSafe(fun(&mut ctx)).catch_unwind().await
                 {
