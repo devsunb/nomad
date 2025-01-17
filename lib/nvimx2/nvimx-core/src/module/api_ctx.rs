@@ -1,5 +1,4 @@
 use core::any::TypeId;
-use core::marker::PhantomData;
 
 use crate::NeovimCtx;
 use crate::backend::{Api, ApiValue, Backend, Key, MapAccess, Value};
@@ -28,7 +27,6 @@ where
         completions_builder: &mut command_completions_builder,
         config_builder: &mut config_builder,
         namespace: &mut namespace,
-        module: PhantomData,
         state: state.as_mut(),
     };
     Module::api(plugin, &mut api_ctx);
@@ -49,18 +47,13 @@ where
 }
 
 /// TODO: docs.
-pub struct ApiCtx<'a, M, B>
-where
-    M: Module<B>,
-    B: Backend,
-{
+pub struct ApiCtx<'a, B: Backend> {
     plugin_id: TypeId,
     command_builder: &'a mut CommandBuilder<B>,
     completions_builder: &'a mut CommandCompletionsBuilder,
     config_builder: &'a mut ConfigBuilder<B>,
     module_api: B::Api,
     namespace: &'a mut Namespace,
-    module: PhantomData<M>,
     state: StateMut<'a, B>,
 }
 
@@ -77,11 +70,7 @@ struct ConfigBuilder<B: Backend> {
     submodules: OrderedMap<Name, Self>,
 }
 
-impl<M, B> ApiCtx<'_, M, B>
-where
-    M: Module<B>,
-    B: Backend,
-{
+impl<B: Backend> ApiCtx<'_, B> {
     /// TODO: docs.
     #[track_caller]
     #[inline]
@@ -188,7 +177,6 @@ where
             completions_builder: self.completions_builder.add_module::<S, _>(),
             config_builder: self.config_builder.add_module(sub),
             namespace: self.namespace,
-            module: PhantomData,
             plugin_id: self.plugin_id,
             state: self.state.as_mut(),
         };

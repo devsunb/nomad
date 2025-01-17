@@ -22,7 +22,7 @@ impl<B: Backend> Module<B> for Mad {
 
     type Config = ();
 
-    fn api(&self, ctx: &mut ApiCtx<Self, B>) {
+    fn api(&self, ctx: &mut ApiCtx<B>) {
         ctx.with_command(auth::Login::new())
             .with_command(auth::Logout::new())
             .with_command(version::EmitVersion::new())
