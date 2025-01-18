@@ -15,7 +15,7 @@ pub trait Function<B: Backend>: 'static {
     type Args<'args>: Deserialize<'args>;
 
     /// TODO: docs.
-    type Return: Serialize + 'static;
+    type Return: Serialize;
 
     /// TODO: docs.
     fn call<'this, 'args>(
