@@ -36,9 +36,4 @@ pub trait Plugin<B: Backend>: Module<B> {
 
         ctx.emit_error(message);
     }
-
-    /// TODO: docs.
-    fn tracing_subscriber(&self) -> Option<Box<dyn FnMut() + 'static>> {
-        todo!()
-    }
 }
