@@ -526,6 +526,7 @@ name = "collab2"
 version = "0.1.0-dev"
 dependencies = [
  "nvimx2",
+ "serde",
 ]
 
 [[package]]
@@ -1173,7 +1174,7 @@ name = "mad"
 version = "0.1.0-dev"
 dependencies = [
  "auth",
- "collab",
+ "collab2",
  "nvimx2",
  "version",
 ]

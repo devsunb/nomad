@@ -26,8 +26,8 @@ impl<B: Backend> Module<B> for Mad {
         ctx.with_command(auth::Login::new())
             .with_command(auth::Logout::new())
             .with_command(version::EmitVersion::new())
-            .with_constant(version::VERSION);
-        // .with_module(collab::Collab::new());
+            .with_constant(version::VERSION)
+            .with_module(collab2::Collab::default());
     }
 
     fn on_new_config(&self, _: (), _: &mut NeovimCtx<B>) {}

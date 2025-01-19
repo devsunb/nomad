@@ -47,7 +47,6 @@ nvimx-ui = { path = "./lib/nvimx/nvimx-ui" }
 
 auth = { path = "./crates/auth" }
 clipboard = { path = "./crates/clipboard" }
-collab = { path = "./crates/collab" }
 collab2 = { path = "./crates/collab2" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
@@ -88,6 +87,6 @@ neovim-nightly = ["nvimx2/neovim-nightly"]
 
 [dependencies]
 auth = { workspace = true }
-collab = { workspace = true }
+collab2 = { workspace = true }
 nvimx2 = { workspace = true, features = ["neovim-0-10"] }
 version = { workspace = true }
