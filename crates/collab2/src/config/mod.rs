@@ -2,7 +2,7 @@ mod server_socket;
 
 pub(crate) use server_socket::ServerSocket;
 
-#[derive(Default, serde::Deserialize)]
+#[derive(Debug, Default, serde::Deserialize)]
 #[serde(default)]
 #[serde(deny_unknown_fields)]
 pub struct Config {

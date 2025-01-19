@@ -1,3 +1,4 @@
+use core::fmt;
 use core::ops::Deref;
 use std::rc::Rc;
 
@@ -12,6 +13,13 @@ impl Default for ServerSocket {
     #[inline]
     fn default() -> Self {
         Self { inner: "collab.nomad.foo:64420".to_owned().into() }
+    }
+}
+
+impl fmt::Debug for ServerSocket {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("ServerSocket").field(&self.inner).finish()
     }
 }
 
