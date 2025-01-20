@@ -1,5 +1,13 @@
 //! TODO: docs.
 
+#![feature(precise_capturing_in_traits)]
+
+mod emit_version;
 mod version;
 
-pub use version::Version;
+mod generated {
+    include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+}
+
+pub use emit_version::EmitVersion;
+pub use version::{VERSION, Version};

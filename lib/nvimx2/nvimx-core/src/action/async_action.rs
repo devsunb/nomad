@@ -1,0 +1,45 @@
+use crate::action::Action;
+use crate::backend::Backend;
+use crate::notify::{MaybeResult, Name};
+use crate::{AsyncCtx, NeovimCtx};
+
+/// TODO: docs.
+pub trait AsyncAction<B: Backend>: 'static {
+    /// TODO: docs.
+    const NAME: Name;
+
+    /// TODO: docs.
+    type Args;
+
+    /// TODO: docs.
+    fn call<'this>(
+        &'this mut self,
+        args: Self::Args,
+        ctx: &mut AsyncCtx<B>,
+    ) -> impl Future<Output = impl MaybeResult<()> + 'this>;
+}
+
+impl<T, B> Action<B> for T
+where
+    T: AsyncAction<B> + Clone,
+    B: Backend,
+{
+    const NAME: Name = T::NAME;
+
+    type Args<'args> = T::Args;
+    type Return = ();
+
+    #[inline]
+    fn call<'s: 's, 'a: 'a>(
+        &mut self,
+        args: Self::Args<'_>,
+        ctx: &mut NeovimCtx<B>,
+    ) {
+        let mut this = self.clone();
+        ctx.spawn_local(async move |ctx| {
+            if let Err(err) = this.call(args, ctx).await.into_result() {
+                ctx.emit_error(err);
+            }
+        });
+    }
+}

@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use futures_util::{ready, Stream, StreamExt};
+use futures_util::{Stream, StreamExt, ready};
 use fxhash::FxHashMap;
 use nvimx_common::oxi::{
     Dictionary as NvimDictionary,
@@ -20,8 +20,8 @@ use nvimx_diagnostics::{
 };
 use smol_str::SmolStr;
 
-use crate::module_name::ModuleNameStr;
 use crate::Module;
+use crate::module_name::ModuleNameStr;
 
 /// TODO: docs.
 pub struct ConfigReceiver<M> {
@@ -104,7 +104,7 @@ impl Setup {
         let config = match config.kind() {
             NvimObjectKind::Dictionary => {
                 // SAFETY: the object's kind is a dictionary.
-                unsafe { config.into_dict_unchecked() }
+                unsafe { config.into_dictionary_unchecked() }
             },
             // An empty table is ok, but it could be mistaken for an array, so
             // let's check for that.
@@ -145,11 +145,7 @@ impl Setup {
             config_sender.send(module_config);
         }
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            Err(errors)
-        }
+        if errors.is_empty() { Ok(()) } else { Err(errors) }
     }
 }
 

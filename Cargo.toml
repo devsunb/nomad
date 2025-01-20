@@ -1,10 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "lib/*", "xtask"]
+members = ["crates/*", "lib/*", "lib/nvimx2/*", "xtask"]
+exclude = ["lib/nvimx2/src"]
 
 [workspace.package]
-version = "0.1.0"
-edition = "2021"
+version = "0.1.0-dev"
+edition = "2024"
 authors = ["Nomad <hello@nomad.foo>"]
 license = "MIT"
 publish = false
@@ -16,7 +17,8 @@ compact_str = "0.8"
 eerie = { git = "ssh://git@github.com/nomad/eerie.git" }
 flume = { version = "0.11", features = ["async"] }
 futures = "0.3"
-futures-util = "0.3"
+futures-lite = { version = "2.6", default-features = false }
+futures-util = { version = "0.3", default-features = false }
 fxhash = "0.2"
 nohash = "0.2"
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
@@ -26,10 +28,12 @@ quickcheck_macros = "1"
 serde = "1.0"
 smallvec = "1.13"
 smol_str = "0.3"
+strsim = "0.11"
 thiserror = "2.0"
 tracing = "0.1"
 
 nvimx = { path = "./lib/nvimx" }
+nvimx2 = { path = "./lib/nvimx2" }
 nvimx-common = { path = "./lib/nvimx/nvimx-common" }
 nvimx-ctx = { path = "./lib/nvimx/nvimx-ctx" }
 nvimx-diagnostics = { path = "./lib/nvimx/nvimx-diagnostics" }
@@ -39,12 +43,11 @@ nvimx-executor = { path = "./lib/nvimx/nvimx-executor" }
 nvimx-fs = { path = "./lib/nvimx/nvimx-fs" }
 nvimx-macros = { path = "./lib/nvimx/nvimx-macros" }
 nvimx-plugin = { path = "./lib/nvimx/nvimx-plugin" }
-nvimx-tests = { path = "./lib/nvimx/nvimx-tests" }
 nvimx-ui = { path = "./lib/nvimx/nvimx-ui" }
 
 auth = { path = "./crates/auth" }
 clipboard = { path = "./crates/clipboard" }
-collab = { path = "./crates/collab" }
+collab2 = { path = "./crates/collab2" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 version = { path = "./crates/version" }
@@ -71,7 +74,7 @@ broken_intra_doc_links = "deny"
 private_intra_doc_links = "deny"
 
 [package]
-name = "nomad-neovim"
+name = "mad"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -80,11 +83,10 @@ authors.workspace = true
 crate-type = ["cdylib"]
 
 [features]
-neovim-nightly = ["nvimx/neovim-nightly"]
+neovim-nightly = ["nvimx2/neovim-nightly"]
 
 [dependencies]
 auth = { workspace = true }
-collab = { workspace = true }
-nomad = { workspace = true }
-nvimx = { workspace = true }
+collab2 = { workspace = true }
+nvimx2 = { workspace = true, features = ["neovim-0-10"] }
 version = { workspace = true }

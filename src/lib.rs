@@ -1,7 +1,34 @@
-#[nvimx::oxi::plugin(nvim_oxi = nvimx::oxi)]
-fn nomad() -> nvimx::plugin::PluginCtx<nomad::Nomad> {
-    nvimx::plugin::PluginCtx::init(nomad::Nomad)
-        .with_module::<auth::Auth>()
-        .with_module::<collab::Collab>()
-        .with_module::<version::Version>()
+use nvimx2::NeovimCtx;
+use nvimx2::backend::Backend;
+use nvimx2::module::{ApiCtx, Empty, Module};
+use nvimx2::neovim::{self, Neovim};
+use nvimx2::notify::Name;
+use nvimx2::plugin::Plugin;
+
+#[neovim::plugin]
+fn mad() -> Mad {
+    Mad
+}
+
+/// TODO: docs.
+struct Mad;
+
+impl Plugin<Neovim> for Mad {
+    const COMMAND_NAME: Name = "Mad";
+}
+
+impl<B: Backend> Module<B> for Mad {
+    const NAME: Name = "mad";
+
+    type Config = Empty;
+
+    fn api(&self, ctx: &mut ApiCtx<B>) {
+        ctx.with_command(auth::Login::new())
+            .with_command(auth::Logout::new())
+            .with_command(version::EmitVersion::new())
+            .with_constant(version::VERSION)
+            .with_module(collab2::Collab::default());
+    }
+
+    fn on_new_config(&self, _: Self::Config, _: &mut NeovimCtx<B>) {}
 }
