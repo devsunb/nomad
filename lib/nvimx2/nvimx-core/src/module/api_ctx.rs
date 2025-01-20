@@ -66,7 +66,10 @@ type ConfigHandler<B> = Box<
 
 struct ConfigBuilder<B: Backend> {
     handler: ConfigHandler<B>,
+    /// The module's name.
     module_name: Name,
+    /// Whether the module's `Config` type is `()`.
+    is_config_unit: bool,
     submodules: OrderedMap<Name, Self>,
 }
 
@@ -196,6 +199,7 @@ impl<B: Backend> ConfigBuilder<B> {
         mut self,
         state: StateHandle<B>,
     ) -> impl FnMut(ApiValue<B>) -> Option<ApiValue<B>> {
+        self.remove_empty_modules();
         let mut namespace = notify::Namespace::new(P::NAME);
         namespace.push(P::CONFIG_FN_NAME);
         move |config| {
@@ -280,7 +284,43 @@ impl<B: Backend> ConfigBuilder<B> {
                     })
             }),
             module_name: M::NAME,
+            is_config_unit: M::Config::is_unit(),
             submodules: Default::default(),
         }
+    }
+
+    /// Recursively removes the modules that shouldn't appear in the config.
+    #[inline]
+    fn remove_empty_modules(&mut self) {
+        let mut idx = 0;
+        loop {
+            let Some((_, builder)) = self.submodules.get_index_mut(idx) else {
+                break;
+            };
+            builder.remove_empty_modules();
+            if builder.is_config_unit && builder.submodules.is_empty() {
+                self.submodules.remove_index(idx);
+            } else {
+                idx += 1;
+            }
+        }
+    }
+}
+
+trait IsUnit {
+    fn is_unit() -> bool;
+}
+
+impl<T> IsUnit for T {
+    #[inline]
+    default fn is_unit() -> bool {
+        false
+    }
+}
+
+impl IsUnit for () {
+    #[inline]
+    fn is_unit() -> bool {
+        true
     }
 }

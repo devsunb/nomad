@@ -1,5 +1,5 @@
 use nvimx2::backend::Backend;
-use nvimx2::module::{ApiCtx, Empty, Module};
+use nvimx2::module::{ApiCtx, Module};
 use nvimx2::notify::Name;
 use nvimx2::{NeovimCtx, Shared};
 
@@ -34,7 +34,7 @@ impl Auth {
 impl<B: Backend> Module<B> for Auth {
     const NAME: Name = "auth";
 
-    type Config = Empty;
+    type Config = ();
 
     fn api(&self, ctx: &mut ApiCtx<B>) {
         ctx.with_function(self.login()).with_function(self.logout());
