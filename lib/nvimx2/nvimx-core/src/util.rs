@@ -11,6 +11,14 @@ impl<K: Ord, V> OrderedMap<K, V> {
     }
 
     #[inline]
+    pub(crate) fn get_index_mut(
+        &mut self,
+        idx: usize,
+    ) -> Option<(&K, &mut V)> {
+        self.inner.get_mut(idx).map(|(k, v)| (&*k, v))
+    }
+
+    #[inline]
     pub(crate) fn get_key_value_mut<Q>(
         &mut self,
         key: &Q,
@@ -47,8 +55,18 @@ impl<K: Ord, V> OrderedMap<K, V> {
     }
 
     #[inline]
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    #[inline]
     pub(crate) fn keys(&self) -> impl ExactSizeIterator<Item = &K> + '_ {
         self.inner.iter().map(|(k, _)| k)
+    }
+
+    #[inline]
+    pub(crate) fn remove_index(&mut self, idx: usize) -> Option<(K, V)> {
+        (idx < self.len()).then(|| self.inner.remove(idx))
     }
 
     #[inline]

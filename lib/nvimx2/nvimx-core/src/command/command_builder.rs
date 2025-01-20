@@ -77,6 +77,7 @@ impl<B: Backend> CommandBuilder<B> {
         mut self,
         state: StateHandle<B>,
     ) -> impl FnMut(CommandArgs) {
+        self.remove_empty_modules();
         move |args: CommandArgs| {
             state.with_mut(|state| {
                 let mut namespace = Namespace::new(self.module_name);
@@ -185,6 +186,24 @@ impl<B: Backend> CommandBuilder<B> {
                 .push_comma_separated(submodules, notify::SpanKind::Expected);
         }
     }
+
+    /// Recursively removes the modules that don't have any commands in their
+    /// subtree.
+    #[inline]
+    fn remove_empty_modules(&mut self) {
+        let mut idx = 0;
+        loop {
+            let Some((_, builder)) = self.submodules.get_index_mut(idx) else {
+                break;
+            };
+            builder.remove_empty_modules();
+            if builder.is_empty() {
+                self.submodules.remove_index(idx);
+            } else {
+                idx += 1;
+            }
+        }
+    }
 }
 
 impl CommandCompletionsBuilder {
@@ -216,6 +235,7 @@ impl CommandCompletionsBuilder {
         mut self,
     ) -> impl FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion> + 'static
     {
+        self.remove_empty_modules();
         move |args: CommandArgs, cursor: ByteOffset| {
             self.complete(args, cursor)
         }
@@ -263,6 +283,29 @@ impl CommandCompletionsBuilder {
             submodule.complete(args, offset)
         } else {
             Vec::new()
+        }
+    }
+
+    #[inline]
+    fn is_empty(&self) -> bool {
+        self.handlers.is_empty() && self.submodules.is_empty()
+    }
+
+    /// Recursively removes the modules that don't have any commands in their
+    /// subtree.
+    #[inline]
+    fn remove_empty_modules(&mut self) {
+        let mut idx = 0;
+        loop {
+            let Some((_, builder)) = self.submodules.get_index_mut(idx) else {
+                break;
+            };
+            builder.remove_empty_modules();
+            if builder.is_empty() {
+                self.submodules.remove_index(idx);
+            } else {
+                idx += 1;
+            }
         }
     }
 }
