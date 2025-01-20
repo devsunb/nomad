@@ -1,3 +1,4 @@
+use auth::AuthInfos;
 use nvimx2::action::AsyncAction;
 use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
@@ -10,6 +11,7 @@ use crate::config::Config;
 /// The [`Action`] used to start a new collaborative editing session.
 #[derive(Clone)]
 pub struct Start {
+    _auth_infos: Shared<Option<AuthInfos>>,
     _config: Shared<Config>,
 }
 
@@ -29,6 +31,9 @@ impl<B: Backend> ToCompletionFn<B> for Start {
 
 impl From<&Collab> for Start {
     fn from(collab: &Collab) -> Self {
-        Self { _config: collab.config.clone() }
+        Self {
+            _auth_infos: collab.auth_infos.clone(),
+            _config: collab.config.clone(),
+        }
     }
 }

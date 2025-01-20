@@ -1,3 +1,4 @@
+use auth::AuthInfos;
 use nvimx2::backend::Backend;
 use nvimx2::module::{ApiCtx, Module};
 use nvimx2::notify::Name;
@@ -7,8 +8,8 @@ use crate::config::Config;
 use crate::start::Start;
 
 /// TODO: docs.
-#[derive(Default)]
 pub struct Collab {
+    pub(crate) auth_infos: Shared<Option<AuthInfos>>,
     pub(crate) config: Shared<Config>,
 }
 
@@ -30,5 +31,11 @@ impl<B: Backend> Module<B> for Collab {
 
     fn on_new_config(&self, new_config: Self::Config, _: &mut NeovimCtx<B>) {
         self.config.set(new_config);
+    }
+}
+
+impl From<&auth::Auth> for Collab {
+    fn from(auth: &auth::Auth) -> Self {
+        Self { auth_infos: auth.infos().clone(), config: Default::default() }
     }
 }

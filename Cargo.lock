@@ -526,6 +526,7 @@ dependencies = [
 name = "collab2"
 version = "0.1.0-dev"
 dependencies = [
+ "auth",
  "nvimx2",
  "serde",
 ]

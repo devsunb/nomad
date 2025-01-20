@@ -24,7 +24,7 @@ impl<B: Backend> Module<B> for Mad {
 
     fn api(&self, ctx: &mut ApiCtx<B>) {
         let auth = auth::Auth::default();
-        let collab = collab2::Collab::default();
+        let collab = collab2::Collab::from(&auth);
 
         ctx.with_command(auth.login())
             .with_command(auth.logout())
