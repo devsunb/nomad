@@ -2,6 +2,7 @@
 
 pub mod api;
 mod background_executor;
+mod buffer;
 mod convert;
 mod local_executor;
 mod neovim;
@@ -15,6 +16,7 @@ pub mod executor {
     pub use crate::background_executor::NeovimBackgroundExecutor;
     pub use crate::local_executor::NeovimLocalExecutor;
 }
+pub use buffer::NeovimBuffer;
 pub use neovim::Neovim;
 #[doc(hidden)]
 pub use nvim_oxi as oxi;
