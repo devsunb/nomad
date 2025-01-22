@@ -312,10 +312,7 @@ impl CommandCompletionsBuilder {
 
 impl<B: Backend> notify::Error for MissingCommandError<'_, B> {
     #[inline]
-    fn to_message(
-        &self,
-        _: &notify::Namespace,
-    ) -> (notify::Level, notify::Message) {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
         let Self(handlers) = self;
         let mut message = notify::Message::new();
         let missing = match (
@@ -338,10 +335,7 @@ impl<B: Backend> notify::Error for MissingCommandError<'_, B> {
 
 impl<B: Backend> notify::Error for InvalidCommandError<'_, B> {
     #[inline]
-    fn to_message(
-        &self,
-        _: &notify::Namespace,
-    ) -> (notify::Level, notify::Message) {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
         let Self(handlers, arg) = self;
         let mut message = notify::Message::new();
         let invalid = match (

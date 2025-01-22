@@ -118,7 +118,7 @@ pub trait Backend: 'static + Sized {
     where
         Err: notify::Error,
     {
-        let (level, message) = err.to_message(namespace);
+        let (level, message) = err.to_message();
 
         let notification = notify::Notification {
             level,

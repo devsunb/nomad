@@ -99,7 +99,7 @@ impl<B: Backend> ApiCtx<'_, B> {
         let value = match self.state.serialize(&value).into_result() {
             Ok(value) => value,
             Err(err) => {
-                let (_, msg) = err.to_message(self.namespace);
+                let (_, msg) = err.to_message();
                 panic!(
                     "couldn't serialize {:?}: {:?}",
                     Const::NAME,

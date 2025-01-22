@@ -92,10 +92,7 @@ impl Path<'_> {
 
 impl notify::Error for NeovimSerializeError {
     #[inline]
-    fn to_message(
-        &self,
-        _: &notify::Namespace,
-    ) -> (notify::Level, notify::Message) {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
         let mut message = notify::Message::new();
         message
             .push_str("couldn't serialize value")
@@ -109,10 +106,7 @@ impl notify::Error for NeovimSerializeError {
 impl notify::Error for NeovimDeserializeError {
     #[allow(clippy::too_many_lines)]
     #[inline]
-    fn to_message(
-        &self,
-        _: &notify::Namespace,
-    ) -> (notify::Level, notify::Message) {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
         let mut message = notify::Message::new();
 
         message

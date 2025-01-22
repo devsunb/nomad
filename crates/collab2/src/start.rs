@@ -2,7 +2,7 @@ use auth::AuthInfos;
 use nvimx2::action::AsyncAction;
 use nvimx2::backend::Backend;
 use nvimx2::command::ToCompletionFn;
-use nvimx2::notify::{self, Error, Name};
+use nvimx2::notify::{self, Name};
 use nvimx2::{AsyncCtx, Shared};
 
 use crate::Collab;
@@ -51,11 +51,8 @@ impl From<&Collab> for Start {
     }
 }
 
-impl Error for StartError {
-    fn to_message(
-        &self,
-        _: &notify::Namespace,
-    ) -> (notify::Level, notify::Message) {
+impl notify::Error for StartError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
         todo!();
     }
 }
