@@ -1,16 +1,17 @@
 use std::borrow::Cow;
 
-use crate::backend::{Backend, Buffer};
+use crate::backend::{Backend, Buffer, BufferId};
 
 /// TODO: docs.
 pub struct BufferCtx<'a, B: Backend> {
-    inner: B::Buffer<'a>,
+    inner: B::Buffer,
+    _non_static: core::marker::PhantomData<&'a ()>,
 }
 
-impl<'a, B: Backend> BufferCtx<'a, B> {
+impl<B: Backend> BufferCtx<'_, B> {
     /// TODO: docs.
     #[inline]
-    pub fn id(&self) -> <B::Buffer<'a> as Buffer<B>>::Id {
+    pub fn id(&self) -> BufferId<B> {
         self.inner.id()
     }
 
@@ -21,7 +22,7 @@ impl<'a, B: Backend> BufferCtx<'a, B> {
     }
 
     #[inline]
-    pub(crate) fn new(inner: B::Buffer<'a>) -> Self {
-        Self { inner }
+    pub(crate) fn new(inner: B::Buffer) -> Self {
+        Self { inner, _non_static: core::marker::PhantomData }
     }
 }

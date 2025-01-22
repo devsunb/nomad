@@ -23,7 +23,7 @@ pub trait Backend: 'static + Sized {
     type Api: Api<Self>;
 
     /// TODO: docs.
-    type Buffer<'this>: Buffer<Self>;
+    type Buffer: Buffer<Self>;
 
     /// TODO: docs.
     type LocalExecutor: LocalExecutor;
@@ -47,7 +47,7 @@ pub trait Backend: 'static + Sized {
     fn init() -> Self;
 
     /// TODO: docs.
-    fn current_buffer(&mut self) -> Option<Self::Buffer<'_>>;
+    fn current_buffer(&mut self) -> Option<Self::Buffer>;
 
     /// TODO: docs.
     fn emitter(&mut self) -> Self::Emitter<'_>;

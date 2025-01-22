@@ -15,7 +15,7 @@ pub struct Neovim {
 
 impl Backend for Neovim {
     type Api = api::NeovimApi;
-    type Buffer<'this> = NeovimBuffer;
+    type Buffer = NeovimBuffer;
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
@@ -37,7 +37,7 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
+    fn current_buffer(&mut self) -> Option<Self::Buffer> {
         Some(NeovimBuffer::current())
     }
 
