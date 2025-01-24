@@ -17,19 +17,29 @@ pub trait CollabBackend: Backend {
 #[cfg(feature = "neovim")]
 mod neovim {
     use mlua::{Function, Table};
+    use nvimx2::fs;
     use nvimx2::neovim::{Neovim, NeovimBuffer, mlua};
 
     use super::*;
 
+    pub enum NeovimFindProjectRootError {
+        LspRootDirNotAbsolute(fs::AbsPathNotAbsoluteError),
+    }
+
     impl CollabBackend for Neovim {
-        type FindProjectRootError = core::convert::Infallible;
+        type FindProjectRootError = NeovimFindProjectRootError;
 
         async fn project_root(
             buffer: NeovimBuffer,
             _ctx: &mut AsyncCtx<'_, Self>,
         ) -> Result<AbsPathBuf, Self::FindProjectRootError> {
-            let _root = lsp_rootdir(buffer);
-            todo!()
+            if let Some(root) = lsp_rootdir(buffer) {
+                return root.as_str().try_into().map_err(
+                    NeovimFindProjectRootError::LspRootDirNotAbsolute,
+                );
+            }
+
+            todo!();
         }
     }
 
@@ -59,5 +69,11 @@ mod neovim {
             .ok()?
             .get::<String>("root_dir")
             .ok()
+    }
+
+    impl notify::Error for NeovimFindProjectRootError {
+        fn to_message(&self) -> (notify::Level, notify::Message) {
+            todo!()
+        }
     }
 }
