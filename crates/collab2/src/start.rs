@@ -18,7 +18,7 @@ pub enum StartError<B: CollabBackend> {
     InvalidBufferPath(String),
     NoBufferFocused,
     UserNotLoggedIn,
-    FindProjectRoot(B::FindProjectRootError),
+    SearchProjectRoot(B::SearchProjectRootError),
 }
 
 impl<B: CollabBackend> AsyncAction<B> for Start {
@@ -42,9 +42,9 @@ impl<B: CollabBackend> AsyncAction<B> for Start {
                 .ok_or(StartError::NoBufferFocused)
         })?;
 
-        let _project_root = B::project_root(buffer_id, ctx)
+        let _project_root = B::search_project_root(buffer_id, ctx)
             .await
-            .map_err(StartError::FindProjectRoot)?;
+            .map_err(StartError::SearchProjectRoot)?;
 
         Ok(())
     }
@@ -69,7 +69,7 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
             StartError::InvalidBufferPath(_path) => todo!(),
             StartError::NoBufferFocused => todo!(),
             StartError::UserNotLoggedIn => todo!(),
-            StartError::FindProjectRoot(err) => err.to_message(),
+            StartError::SearchProjectRoot(err) => err.to_message(),
         }
     }
 }
