@@ -306,9 +306,8 @@ mod root_markers {
 
                     marker_res = check_marker_matches.select_next_some() => {
                         match marker_res {
-                            Ok(true) => return Ok(true),
                             Ok(false) => continue,
-                            Err(err) => return Err(err),
+                            true_or_err => return true_or_err,
                         }
                     },
 
