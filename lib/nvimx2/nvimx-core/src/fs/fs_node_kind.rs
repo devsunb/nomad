@@ -13,7 +13,7 @@ pub enum FsNodeKind {
 
 impl FsNodeKind {
     /// TODO: docs.
-    pub fn is_directory(&self) -> bool {
+    pub fn is_dir(&self) -> bool {
         matches!(self, Self::Directory)
     }
 

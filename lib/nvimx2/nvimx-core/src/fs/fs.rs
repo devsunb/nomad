@@ -39,4 +39,36 @@ pub trait Fs {
         &mut self,
         dir_path: P,
     ) -> impl Future<Output = Result<Self::ReadDir, Self::ReadDirError>>;
+
+    /// TODO: docs.
+    fn exists<P: AsRef<AbsPath>>(
+        &mut self,
+        path: P,
+    ) -> impl Future<Output = Result<bool, Self::NodeAtPathError>> {
+        async move { self.node_at_path(path).await.map(|opt| opt.is_some()) }
+    }
+
+    /// TODO: docs.
+    fn is_dir<P: AsRef<AbsPath>>(
+        &mut self,
+        path: P,
+    ) -> impl Future<Output = Result<bool, Self::NodeAtPathError>> {
+        async move {
+            self.node_at_path(path).await.map(|maybe_node| {
+                maybe_node.map(|node| node.is_dir()).unwrap_or(false)
+            })
+        }
+    }
+
+    /// TODO: docs.
+    fn is_file<P: AsRef<AbsPath>>(
+        &mut self,
+        path: P,
+    ) -> impl Future<Output = Result<bool, Self::NodeAtPathError>> {
+        async move {
+            self.node_at_path(path).await.map(|maybe_node| {
+                maybe_node.map(|node| node.is_dir()).unwrap_or(false)
+            })
+        }
+    }
 }

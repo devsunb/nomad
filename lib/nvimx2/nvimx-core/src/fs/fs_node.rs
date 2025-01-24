@@ -19,6 +19,19 @@ where
     Path: AsRef<AbsPath>,
 {
     /// TODO: docs.
+    #[inline]
+    pub fn is_dir(&self) -> bool {
+        self.kind().is_dir()
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn is_file(&self) -> bool {
+        self.kind().is_file()
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn kind(&self) -> FsNodeKind {
         match self {
             Self::File(_) => FsNodeKind::File,

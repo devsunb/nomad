@@ -26,7 +26,7 @@ pub trait DirEntry {
     fn is_directory(
         &self,
     ) -> impl Future<Output = Result<bool, Self::NodeKindError>> {
-        async { self.node_kind().await.map(|k| k.is_directory()) }
+        async { self.node_kind().await.map(|k| k.is_dir()) }
     }
 
     /// TODO: docs.
