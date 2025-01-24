@@ -37,6 +37,7 @@ mod neovim {
     pub enum NeovimFindProjectRootError {
         LspRootDirNotAbsolute(fs::AbsPathNotAbsoluteError),
         CouldntFindRoot,
+        HomeDir(NeovimHomeDirError),
         MarkedRoot(root_markers::FindRootError<NeovimFs>),
         IsParentDir(<NeovimFs as Fs>::NodeAtPathError),
     }
@@ -60,9 +61,12 @@ mod neovim {
 
             let buffer_path: AbsPathBuf = todo!();
 
-            let home_dir: AbsPathBuf = todo!();
-
             let mut fs = ctx.fs();
+
+            let home_dir = fs
+                .home_dir()
+                .await
+                .map_err(NeovimFindProjectRootError::HomeDir)?;
 
             let args = root_markers::FindRootArgs {
                 marker: root_markers::GitDirectory,
