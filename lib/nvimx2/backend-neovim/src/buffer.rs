@@ -6,24 +6,39 @@ use nvimx_core::backend::Buffer;
 use crate::Neovim;
 
 /// TODO: docs.
-#[derive(Clone, PartialEq, Eq)]
-pub struct NeovimBuffer(crate::oxi::api::Buffer);
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct NeovimBuffer(crate::oxi::BufHandle);
 
 impl NeovimBuffer {
     #[inline]
     pub(crate) fn current() -> Self {
-        Self(crate::oxi::api::Buffer::current())
+        Self::new(crate::oxi::api::Buffer::current())
     }
 
     #[inline]
     pub(crate) fn exists(&self) -> bool {
-        self.0.is_valid()
+        self.inner().is_valid()
     }
 
     #[inline]
     pub(crate) fn get_name(&self) -> PathBuf {
         debug_assert!(self.exists());
-        self.0.get_name().expect("buffer exists")
+        self.inner().get_name().expect("buffer exists")
+    }
+
+    #[inline]
+    fn handle(&self) -> crate::oxi::BufHandle {
+        self.0
+    }
+
+    #[inline]
+    fn inner(&self) -> crate::oxi::api::Buffer {
+        self.handle().into()
+    }
+
+    #[inline]
+    fn new(inner: crate::oxi::api::Buffer) -> Self {
+        Self(inner.handle())
     }
 }
 
@@ -32,7 +47,7 @@ impl Buffer<Neovim> for NeovimBuffer {
 
     #[inline]
     fn id(&self) -> Self::Id {
-        self.clone()
+        *self
     }
 
     #[inline]
@@ -48,6 +63,6 @@ impl crate::oxi::mlua::IntoLua for NeovimBuffer {
         self,
         lua: &crate::oxi::mlua::Lua,
     ) -> crate::oxi::mlua::Result<crate::oxi::mlua::Value> {
-        self.0.handle().into_lua(lua)
+        self.handle().into_lua(lua)
     }
 }
