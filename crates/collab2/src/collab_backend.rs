@@ -49,15 +49,13 @@ mod neovim {
 
             let mut fs = ctx.fs();
 
-            if let Some(res) = root_markers::find_root(
-                &buffer_path,
-                Some(&home_dir),
-                root_markers::GitDirectory,
-                &fs,
-            )
-            .await
-            .transpose()
-            {
+            let args = root_markers::FindRootArgs {
+                marker: root_markers::GitDirectory,
+                start_from: &buffer_path,
+                stop_at: Some(&home_dir),
+            };
+
+            if let Some(res) = args.find(&mut fs).await.transpose() {
                 return res.map_err(NeovimFindProjectRootError::MarkedRoot);
             }
 
@@ -112,18 +110,33 @@ mod neovim {
 mod root_markers {
     use nvimx2::fs::{self, DirEntry};
 
-    ///
-    pub(super) async fn find_root<Rm, Fs>(
-        start_from: &fs::AbsPath,
-        stop_at: Option<&fs::AbsPath>,
-        marker: Rm,
-        fs: &Fs,
-    ) -> Result<Option<fs::AbsPathBuf>, FindRootError<Fs>>
-    where
-        Rm: RootMarker<Fs>,
-        Fs: fs::Fs,
-    {
-        todo!();
+    pub(super) struct FindRootArgs<'a, M> {
+        /// The marker used to determine if a directory is the root.
+        pub(super) marker: M,
+
+        /// The path to the first directory to search for markers in.
+        ///
+        /// If this points to a file, the search will start from its parent.
+        pub(super) start_from: &'a fs::AbsPath,
+
+        /// The path to the last directory to search for markers in, if any.
+        ///
+        /// If set and no root marker is found within it, the search is cut
+        /// short instead of continuing with its parent.
+        pub(super) stop_at: Option<&'a fs::AbsPath>,
+    }
+
+    impl<M> FindRootArgs<'_, M> {
+        pub(super) async fn find<Fs>(
+            self,
+            fs: &mut Fs,
+        ) -> Result<Option<fs::AbsPathBuf>, FindRootError<Fs>>
+        where
+            Fs: fs::Fs,
+            M: RootMarker<Fs>,
+        {
+            todo!();
+        }
     }
 
     pub(super) trait RootMarker<Fs: fs::Fs> {
@@ -140,7 +153,6 @@ mod root_markers {
     impl<Fs: fs::Fs> RootMarker<Fs> for GitDirectory {
         type Error = DirEntryError<Fs>;
 
-        #[inline]
         async fn matches(
             &self,
             dir_entry: &Fs::DirEntry,
