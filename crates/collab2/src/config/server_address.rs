@@ -5,23 +5,23 @@ use std::rc::Rc;
 use serde::de::{Deserialize, Deserializer};
 
 #[derive(Clone)]
-pub(crate) struct ServerSocket {
+pub(crate) struct ServerAddress {
     inner: Rc<str>,
 }
 
-impl Default for ServerSocket {
+impl Default for ServerAddress {
     fn default() -> Self {
         Self { inner: "collab.nomad.foo:64420".to_owned().into() }
     }
 }
 
-impl fmt::Debug for ServerSocket {
+impl fmt::Debug for ServerAddress {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("ServerSocket").field(&self.inner).finish()
+        f.debug_tuple("ServerAddress").field(&self.inner).finish()
     }
 }
 
-impl Deref for ServerSocket {
+impl Deref for ServerAddress {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -29,7 +29,7 @@ impl Deref for ServerSocket {
     }
 }
 
-impl<'de> Deserialize<'de> for ServerSocket {
+impl<'de> Deserialize<'de> for ServerAddress {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
