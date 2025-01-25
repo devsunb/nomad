@@ -249,9 +249,13 @@ mod neovim {
 
             match &self.inner {
                 BufNameNotAbsolutePath(buf_name) => {
-                    msg.push_str("buffer name ")
-                        .push_invalid(buf_name)
-                        .push_str(" is not an absolute path");
+                    if buf_name.is_empty() {
+                        msg.push_str("the current buffer's name is empty");
+                    } else {
+                        msg.push_str("buffer name ")
+                            .push_invalid(buf_name)
+                            .push_str(" is not an absolute path");
+                    }
                 },
                 Lsp(lsp_root) => {
                     msg.push_str("LSP root at ")
