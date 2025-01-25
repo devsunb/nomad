@@ -62,7 +62,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start {
         let start_args = StartArgs {
             _auth_infos: &auth_infos,
             _project_root: &project_root,
-            _server_address: &self.config.with(|c| c.server_address.clone()),
+            server_address: &self.config.with(|c| c.server_address.clone()),
         };
 
         let _start_infos = B::start_session(start_args, ctx)

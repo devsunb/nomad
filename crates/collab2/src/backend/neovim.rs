@@ -1,6 +1,8 @@
 use core::fmt;
+use std::io;
 use std::path::PathBuf;
 
+use async_net::TcpStream;
 use collab_server::message;
 use mlua::{Function, Table};
 use nvimx2::fs::{self, AbsPath};
@@ -11,6 +13,10 @@ use crate::backend::*;
 
 pub struct NeovimSearchProjectRootError {
     inner: default_search_project_root::Error<Neovim>,
+}
+
+pub enum NeovimStartSessionError {
+    TcpConnect(io::Error),
 }
 
 pub enum NeovimHomeDirError {
@@ -33,7 +39,7 @@ impl CollabBackend for Neovim {
     >;
     type ServerTxError = core::convert::Infallible;
     type ServerRxError = core::convert::Infallible;
-    type StartSessionError = core::convert::Infallible;
+    type StartSessionError = NeovimStartSessionError;
 
     async fn confirm_start(
         project_root: &fs::AbsPath,
@@ -73,9 +79,13 @@ impl CollabBackend for Neovim {
     }
 
     async fn start_session(
-        _args: StartArgs<'_>,
+        args: StartArgs<'_>,
         _: &mut AsyncCtx<'_, Self>,
     ) -> Result<StartInfos<Self>, Self::StartSessionError> {
+        let _tcp_stream = TcpStream::connect(&**args.server_address)
+            .await
+            .map_err(NeovimStartSessionError::TcpConnect)?;
+
         todo!()
     }
 }
@@ -171,6 +181,12 @@ impl notify::Error for NeovimSearchProjectRootError {
         }
 
         (notify::Level::Error, msg)
+    }
+}
+
+impl notify::Error for NeovimStartSessionError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        todo!();
     }
 }
 

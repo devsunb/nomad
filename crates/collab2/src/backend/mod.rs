@@ -85,7 +85,7 @@ pub trait CollabFs: fs::Fs {
 /// TODO: docs.
 pub struct StartArgs<'a> {
     /// TODO: docs.
-    pub(crate) _server_address: &'a config::ServerAddress,
+    pub(crate) server_address: &'a config::ServerAddress,
 
     /// TODO: docs.
     pub(crate) _auth_infos: &'a auth::AuthInfos,
