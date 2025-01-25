@@ -242,10 +242,15 @@ mod neovim {
 
 #[cfg(feature = "neovim")]
 mod root_markers {
+    use core::error::Error;
+    use core::fmt;
+    use std::borrow::Cow;
+
     use futures_util::stream::{self, StreamExt};
     use futures_util::{pin_mut, select};
     use nvimx2::fs::{self, DirEntry};
     use nvimx2::notify;
+    use smol_str::ToSmolStr;
 
     pub struct FindRootArgs<'a, M> {
         /// The marker used to determine if a directory is the root.
@@ -276,7 +281,7 @@ mod root_markers {
 
     pub struct FindRootError<Fs: fs::Fs, M: RootMarker<Fs>> {
         /// TODO: docs.
-        pub dir_path: fs::AbsPathBuf,
+        pub path: fs::AbsPathBuf,
 
         /// TODO: docs.
         pub kind: FindRootErrorKind<Fs, M>,
@@ -322,7 +327,7 @@ mod root_markers {
                     maybe_node.ok_or(FindRootErrorKind::StartPathNotFound)
                 })
                 .map_err(|kind| FindRootError {
-                    dir_path: self.start_from.to_owned(),
+                    path: self.start_from.to_owned(),
                     kind,
                 })?
                 .kind();
@@ -363,7 +368,7 @@ mod root_markers {
                 .read_dir(dir_path)
                 .await
                 .map_err(|err| FindRootError {
-                    dir_path: dir_path.to_owned(),
+                    path: dir_path.to_owned(),
                     kind: FindRootErrorKind::ReadDir(err),
                 })?
                 .fuse();
@@ -377,7 +382,7 @@ mod root_markers {
                     read_res = read_dir.select_next_some() => {
                         let dir_entry =
                             read_res.map_err(|err| FindRootError {
-                                dir_path: dir_path.to_owned(),
+                                path: dir_path.to_owned(),
                                 kind: FindRootErrorKind::DirEntry(
                                     DirEntryError::Access(err),
                                 ),
@@ -392,7 +397,7 @@ mod root_markers {
                                         .ok()
                                         .map(|name| name.into_owned());
                                     Err(FindRootError {
-                                        dir_path: dir_path.to_owned(),
+                                        path: dir_path.to_owned(),
                                         kind: FindRootErrorKind::Marker {
                                             dir_entry_name,
                                             err
@@ -438,10 +443,64 @@ mod root_markers {
     where
         Fs: fs::Fs,
         M: RootMarker<Fs>,
-        M::Error: notify::Error,
+        M::Error: Error,
     {
         fn to_message(&self) -> (notify::Level, notify::Message) {
-            todo!();
+            let mut message = notify::Message::new();
+
+            let mut path = Cow::Borrowed(&*self.path);
+
+            let err: &dyn fmt::Display = match &self.kind {
+                FindRootErrorKind::DirEntry(err) => {
+                    message.push_str("couldn't read file or directory under ");
+                    err
+                },
+                FindRootErrorKind::Marker { dir_entry_name, err } => {
+                    message.push_str(
+                        "couldn't match markers with file or directory ",
+                    );
+                    if let Some(entry_name) = dir_entry_name {
+                        message.push_str("at ");
+                        let mut new_path = self.path.to_owned();
+                        new_path.push(entry_name);
+                        path = Cow::Owned(new_path);
+                    } else {
+                        message.push_str("under ");
+                    }
+                    err
+                },
+                FindRootErrorKind::NodeAtStartPath(err) => {
+                    message.push_str("couldn't read file or directory at ");
+                    err
+                },
+                FindRootErrorKind::ReadDir(err) => {
+                    message.push_str("couldn't read directory at ");
+                    err
+                },
+                FindRootErrorKind::StartPathNotFound => {
+                    message
+                        .push_str("no file or directory found at ")
+                        .push_info(path.to_smolstr());
+                    return (notify::Level::Error, message);
+                },
+            };
+
+            message
+                .push_info(path.to_smolstr())
+                .push_str(": ")
+                .push_str(err.to_smolstr());
+
+            (notify::Level::Error, message)
+        }
+    }
+
+    impl<Fs: fs::Fs> fmt::Display for DirEntryError<Fs> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                DirEntryError::Access(err) => err.fmt(f),
+                DirEntryError::Name(err) => err.fmt(f),
+                DirEntryError::NodeKind(err) => err.fmt(f),
+            }
         }
     }
 }
