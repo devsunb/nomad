@@ -314,13 +314,19 @@ impl notify::Error for NeovimHomeDirError {
 
 impl notify::Error for NeovimServerTxError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        todo!();
+        let mut msg = notify::Message::new();
+        msg.push_str("couldn't send message to the server: ")
+            .push_str(self.inner.to_string());
+        (notify::Level::Error, msg)
     }
 }
 
 impl notify::Error for NeovimServerRxError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        todo!();
+        let mut msg = notify::Message::new();
+        msg.push_str("couldn't receive message from the server: ")
+            .push_str(self.inner.to_string());
+        (notify::Level::Error, msg)
     }
 }
 
