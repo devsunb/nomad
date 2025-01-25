@@ -1,9 +1,11 @@
-use nvimx2::backend::{Backend, BufferId};
-use nvimx2::fs::{self, AbsPathBuf};
+use nvimx2::backend::{Backend, Buffer, BufferId};
+use nvimx2::fs::{self, AbsPathBuf, Fs};
 use nvimx2::{AsyncCtx, notify};
 
 /// TODO: docs.
-pub trait CollabBackend: Backend<Fs: WithHomeDirFs> {
+pub trait CollabBackend:
+    Backend<Buffer: CollabBuffer<Self>, Fs: CollabFs>
+{
     /// TODO: docs.
     type SearchProjectRootError: notify::Error;
 
@@ -16,9 +18,21 @@ pub trait CollabBackend: Backend<Fs: WithHomeDirFs> {
 }
 
 /// TODO: docs.
-pub trait WithHomeDirFs: fs::Fs {
+pub trait CollabBuffer<B: CollabBackend>: Buffer<B> {
     /// TODO: docs.
-    type HomeDirError: notify::Error;
+    type LspRootError;
+
+    /// TODO: docs.
+    fn lsp_root(
+        buffer_id: BufferId<B>,
+        ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
+}
+
+/// TODO: docs.
+pub trait CollabFs: fs::Fs {
+    /// TODO: docs.
+    type HomeDirError;
 
     /// TODO: docs.
     fn home_dir(
@@ -27,25 +41,94 @@ pub trait WithHomeDirFs: fs::Fs {
 }
 
 #[cfg(feature = "neovim")]
-mod neovim {
-    use mlua::{Function, Table};
-    use nvimx2::backend::Buffer;
-    use nvimx2::fs::{self, Fs};
-    use nvimx2::neovim::{Neovim, NeovimBuffer, NeovimFs, mlua};
-
+mod default_search_project_root {
     use super::*;
 
     const MARKERS: Markers = root_markers::GitDirectory;
 
-    pub type Markers = root_markers::GitDirectory;
+    pub(super) type Markers = root_markers::GitDirectory;
 
-    pub enum NeovimSearchProjectRootError {
-        LspRootDirNotAbsolute(fs::AbsPathNotAbsoluteError),
-        CouldntFindRoot,
-        HomeDir(NeovimHomeDirError),
+    pub(super) async fn search<B>(
+        buffer_id: BufferId<B>,
+        ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<AbsPathBuf, Error<B>>
+    where
+        B: CollabBackend,
+    {
+        if let Some(lsp_res) =
+            B::Buffer::lsp_root(buffer_id.clone(), ctx).transpose()
+        {
+            return lsp_res.map_err(Error::Lsp);
+        }
+
+        let buffer_name = ctx.with_ctx(|ctx| {
+            ctx.buffer(buffer_id)
+                .ok_or(Error::NoBuffer)
+                .map(|buf| buf.name().into_owned())
+        })?;
+
+        let buffer_path = buffer_name
+            .parse::<AbsPathBuf>()
+            .map_err(|_| Error::InvalidBufferPath(buffer_name))?;
+
+        let mut fs = ctx.fs();
+
+        let home_dir = fs.home_dir().await.map_err(Error::HomeDir)?;
+
+        let args = root_markers::FindRootArgs {
+            marker: MARKERS,
+            start_from: &buffer_path,
+            stop_at: Some(&home_dir),
+        };
+
+        if let Some(res) = args.find(&mut fs).await.transpose() {
+            return res.map_err(Error::MarkedRoot);
+        }
+
+        let buffer_parent =
+            buffer_path.parent().ok_or(Error::CouldntFindRoot)?;
+
+        fs.exists(buffer_parent)
+            .await
+            .map_err(|_| Error::ParentDoesntExist(buffer_parent.to_owned()))?
+            .then(|| buffer_parent.to_owned())
+            .ok_or(Error::CouldntFindRoot)
+    }
+
+    pub(crate) enum Error<B: CollabBackend> {
+        /// TODO: docs.
         InvalidBufferPath(String),
-        MarkedRoot(root_markers::FindRootError<NeovimFs, Markers>),
-        IsParentDir(<NeovimFs as Fs>::NodeAtPathError),
+
+        /// TODO: docs.
+        Lsp(<B::Buffer as CollabBuffer<B>>::LspRootError),
+
+        /// TODO: docs.
+        MarkedRoot(root_markers::FindRootError<B::Fs, Markers>),
+
+        /// TODO: docs.
+        HomeDir(<B::Fs as CollabFs>::HomeDirError),
+
+        /// TODO: docs.
+        NoBuffer,
+
+        /// TODO: docs.
+        CouldntFindRoot,
+
+        /// TODO: docs.
+        ParentDoesntExist(fs::AbsPathBuf),
+    }
+}
+
+#[cfg(feature = "neovim")]
+mod neovim {
+    use mlua::{Function, Table};
+    use nvimx2::fs;
+    use nvimx2::neovim::{Neovim, NeovimBuffer, NeovimFs, mlua};
+
+    use super::*;
+
+    pub struct NeovimSearchProjectRootError {
+        inner: default_search_project_root::Error<Neovim>,
     }
 
     pub enum NeovimHomeDirError {
@@ -60,49 +143,52 @@ mod neovim {
             buffer: NeovimBuffer,
             ctx: &mut AsyncCtx<'_, Self>,
         ) -> Result<AbsPathBuf, Self::SearchProjectRootError> {
-            if let Some(lsp_root) = lsp_root(buffer) {
-                return lsp_root.as_str().try_into().map_err(
-                    NeovimSearchProjectRootError::LspRootDirNotAbsolute,
-                );
-            }
-
-            let buffer_path =
-                buffer.name().parse::<AbsPathBuf>().map_err(|_| {
-                    NeovimSearchProjectRootError::InvalidBufferPath(
-                        buffer.name().into_owned(),
-                    )
-                })?;
-
-            let mut fs = ctx.fs();
-
-            let home_dir = fs
-                .home_dir()
+            default_search_project_root::search(buffer, ctx)
                 .await
-                .map_err(NeovimSearchProjectRootError::HomeDir)?;
-
-            let args = root_markers::FindRootArgs {
-                marker: MARKERS,
-                start_from: &buffer_path,
-                stop_at: Some(&home_dir),
-            };
-
-            if let Some(res) = args.find(&mut fs).await.transpose() {
-                return res.map_err(NeovimSearchProjectRootError::MarkedRoot);
-            }
-
-            let buffer_parent = buffer_path
-                .parent()
-                .ok_or(NeovimSearchProjectRootError::CouldntFindRoot)?;
-
-            fs.is_dir(buffer_parent)
-                .await
-                .map_err(NeovimSearchProjectRootError::IsParentDir)?
-                .then(|| buffer_parent.to_owned())
-                .ok_or(NeovimSearchProjectRootError::CouldntFindRoot)
+                .map_err(|inner| NeovimSearchProjectRootError { inner })
         }
     }
 
-    impl WithHomeDirFs for NeovimFs {
+    impl CollabBuffer<Neovim> for NeovimBuffer {
+        type LspRootError = fs::AbsPathNotAbsoluteError;
+
+        fn lsp_root(
+            buffer: NeovimBuffer,
+            _: &mut AsyncCtx<'_, Neovim>,
+        ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
+            /// Returns the root directory of the first language server
+            /// attached to the given buffer, if any.
+            fn inner(buffer: NeovimBuffer) -> Option<String> {
+                let lua = mlua::lua();
+
+                let get_clients = lua
+                    .globals()
+                    .get::<Table>("vim")
+                    .ok()?
+                    .get::<Table>("lsp")
+                    .ok()?
+                    .get::<Function>("get_clients")
+                    .ok()?;
+
+                let opts = lua.create_table().ok()?;
+                opts.set("bufnr", buffer).ok()?;
+
+                get_clients
+                    .call::<Table>(opts)
+                    .ok()?
+                    .get::<Table>(1)
+                    .ok()?
+                    .get::<Table>("config")
+                    .ok()?
+                    .get::<String>("root_dir")
+                    .ok()
+            }
+
+            inner(buffer).map(|root_dir| root_dir.parse()).transpose()
+        }
+    }
+
+    impl CollabFs for NeovimFs {
         type HomeDirError = NeovimHomeDirError;
 
         async fn home_dir(
@@ -117,41 +203,7 @@ mod neovim {
         }
     }
 
-    /// Returns the root directory of the first language server attached to the
-    /// given buffer, if any.
-    fn lsp_root(buffer: NeovimBuffer) -> Option<String> {
-        let lua = mlua::lua();
-
-        let get_clients = lua
-            .globals()
-            .get::<Table>("vim")
-            .ok()?
-            .get::<Table>("lsp")
-            .ok()?
-            .get::<Function>("get_clients")
-            .ok()?;
-
-        let opts = lua.create_table().ok()?;
-        opts.set("bufnr", buffer).ok()?;
-
-        get_clients
-            .call::<Table>(opts)
-            .ok()?
-            .get::<Table>(1)
-            .ok()?
-            .get::<Table>("config")
-            .ok()?
-            .get::<String>("root_dir")
-            .ok()
-    }
-
     impl notify::Error for NeovimSearchProjectRootError {
-        fn to_message(&self) -> (notify::Level, notify::Message) {
-            todo!()
-        }
-    }
-
-    impl notify::Error for NeovimHomeDirError {
         fn to_message(&self) -> (notify::Level, notify::Message) {
             todo!()
         }
