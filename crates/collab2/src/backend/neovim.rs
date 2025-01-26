@@ -124,10 +124,12 @@ impl CollabBackend for Neovim {
             .map_err(NeovimStartSessionError::TcpConnect)?
             .split();
 
-        let knock = collab_server::Knock {
+        let knock = collab_server::Knock::<nomad::NomadAuthenticateInfos> {
             auth_infos: args.auth_infos.clone().into(),
             session_intent: SessionIntent::StartNew,
         };
+
+        let github_handle = knock.auth_infos.github_handle.clone();
 
         let welcome =
             client::Knocker::<_, _, nomad::NomadConfig>::new(reader, writer)
@@ -136,9 +138,11 @@ impl CollabBackend for Neovim {
                 .map_err(NeovimStartSessionError::Knock)?;
 
         Ok(StartInfos {
-            peer_id: welcome.peer_id,
+            local_peer: Peer::new(welcome.peer_id, github_handle),
+            remote_peers: welcome.other_peers,
             server_tx: NeovimServerTx { inner: welcome.tx },
             server_rx: NeovimServerRx { inner: welcome.rx },
+            session_id: welcome.session_id,
         })
     }
 }
