@@ -7,7 +7,7 @@ use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select};
 use nvimx2::{AsyncCtx, notify};
 
 use crate::CollabBackend;
-use crate::leave::LeaveSession;
+use crate::leave::StopSession;
 use crate::sessions::{Active, SessionGuard};
 
 pub(crate) struct Session<B: CollabBackend> {
@@ -32,7 +32,7 @@ pub(crate) struct NewSessionArgs<B: CollabBackend> {
     pub(crate) _replica: Replica,
 
     /// TODO: docs.
-    pub(crate) leave_rx: Receiver<LeaveSession>,
+    pub(crate) stop_rx: Receiver<StopSession>,
 
     /// TODO: docs.
     pub(crate) session_guard: SessionGuard<Active>,
@@ -62,7 +62,7 @@ impl<B: CollabBackend> Session<B> {
         _ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), RunSessionError<B>> {
         let NewSessionArgs {
-            leave_rx,
+            stop_rx,
             server_rx,
             server_tx,
             session_guard: _guard,
@@ -86,7 +86,7 @@ impl<B: CollabBackend> Session<B> {
                         .map_err(RunSessionError::Tx)?;
                 },
 
-                _ = leave_rx.recv_async() => {
+                _ = stop_rx.recv_async() => {
                     return Ok(());
                 },
             }

@@ -15,16 +15,16 @@ use crate::yank::{NoActiveSessionError, SessionSelector};
 /// TODO: docs.
 #[derive(Clone)]
 pub struct Leave {
-    channels: LeaveChannels,
+    channels: StopChannels,
     session_selector: SessionSelector,
 }
 
 #[derive(Clone, Default)]
-pub(crate) struct LeaveChannels {
-    inner: Shared<FxHashMap<SessionId, Sender<LeaveSession>>>,
+pub(crate) struct StopChannels {
+    inner: Shared<FxHashMap<SessionId, Sender<StopSession>>>,
 }
 
-pub(crate) struct LeaveSession;
+pub(crate) struct StopSession;
 
 impl<B: CollabBackend> AsyncAction<B> for Leave {
     const NAME: Name = "leave";
@@ -38,7 +38,7 @@ impl<B: CollabBackend> AsyncAction<B> for Leave {
     ) -> Result<(), NoActiveSessionError<B>> {
         if let Some((_, id)) = self.session_selector.select(ctx).await? {
             if let Some(sender) = self.channels.take(id) {
-                let _ = sender.send_async(LeaveSession).await;
+                let _ = sender.send_async(StopSession).await;
             }
         }
 
@@ -46,12 +46,12 @@ impl<B: CollabBackend> AsyncAction<B> for Leave {
     }
 }
 
-impl LeaveChannels {
+impl StopChannels {
     #[track_caller]
     pub(crate) fn insert(
         &self,
         session_id: SessionId,
-    ) -> Receiver<LeaveSession> {
+    ) -> Receiver<StopSession> {
         let (tx, rx) = flume::bounded(1);
         self.inner.with_mut(move |inner| match inner.entry(session_id) {
             Entry::Vacant(vacant) => {
@@ -64,7 +64,7 @@ impl LeaveChannels {
         rx
     }
 
-    fn take(&self, session_id: SessionId) -> Option<Sender<LeaveSession>> {
+    fn take(&self, session_id: SessionId) -> Option<Sender<StopSession>> {
         self.inner.with_mut(|inner| inner.remove(&session_id))
     }
 }
@@ -72,7 +72,7 @@ impl LeaveChannels {
 impl<B: CollabBackend> From<&Collab<B>> for Leave {
     fn from(collab: &Collab<B>) -> Self {
         Self {
-            channels: collab.leave_channels.clone(),
+            channels: collab.stop_channels.clone(),
             session_selector: SessionSelector::new(collab.sessions.clone()),
         }
     }
