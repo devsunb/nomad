@@ -51,8 +51,8 @@ pub trait CollabBackend:
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = bool>;
 
-    /// Pastes the given [`SessionId`] to the user's clipboard.
-    fn paste_session_id(
+    /// Copies the given [`SessionId`] to the user's clipboard.
+    fn copy_session_id(
         session_id: SessionId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<(), Self::PasteSessionIdError>>;
@@ -69,6 +69,14 @@ pub trait CollabBackend:
         buffer_id: BufferId<Self>,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<AbsPathBuf, Self::SearchProjectRootError>>;
+
+    /// Prompts the user to select one of the given `(project_root,
+    /// session_id)` pairs.
+    fn select_session<'pairs>(
+        sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
+        action: ActionForSelectedSession,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<Output = Option<&'pairs (fs::AbsPathBuf, SessionId)>>;
 
     /// TODO: docs.
     fn start_session(
@@ -102,6 +110,12 @@ pub trait CollabFs: fs::Fs {
     fn home_dir(
         &mut self,
     ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
+}
+
+/// TODO: docs
+pub enum ActionForSelectedSession {
+    /// TODO: docs
+    CopySessionId,
 }
 
 /// TODO: docs.

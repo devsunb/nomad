@@ -102,7 +102,7 @@ impl CollabBackend for Neovim {
         }
     }
 
-    async fn paste_session_id(
+    async fn copy_session_id(
         _session_id: SessionId,
         _ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<(), Self::PasteSessionIdError> {
@@ -123,6 +123,14 @@ impl CollabBackend for Neovim {
         default_search_project_root::search(buffer, ctx)
             .await
             .map_err(|inner| NeovimSearchProjectRootError { inner })
+    }
+
+    async fn select_session<'pairs>(
+        _sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
+        _action: ActionForSelectedSession,
+        _ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Option<&'pairs (fs::AbsPathBuf, SessionId)> {
+        todo!()
     }
 
     async fn start_session(

@@ -6,7 +6,7 @@ use nvimx2::notify::Name;
 use nvimx2::{AsyncCtx, notify};
 use smallvec::SmallVec;
 
-use crate::backend::CollabBackend;
+use crate::backend::{ActionForSelectedSession, CollabBackend};
 use crate::collab::Collab;
 use crate::sessions::{SessionState, Sessions};
 
@@ -25,7 +25,7 @@ impl<B: CollabBackend> AsyncAction<B> for Yank {
     async fn call(
         &mut self,
         _: Self::Args,
-        _ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), YankError<B>> {
         let active_sessions = self
             .sessions
@@ -36,11 +36,24 @@ impl<B: CollabBackend> AsyncAction<B> for Yank {
             })
             .collect::<SmallVec<[_; 1]>>();
 
-        if active_sessions.is_empty() {
-            return Err(YankError::no_active_session());
-        }
+        let session_id = match &*active_sessions {
+            [] => return Err(YankError::no_active_session()),
+            [(_, id)] => *id,
+            sessions => match B::select_session(
+                sessions,
+                ActionForSelectedSession::CopySessionId,
+                ctx,
+            )
+            .await
+            {
+                Some(&(_, id)) => id,
+                None => return Ok(()),
+            },
+        };
 
-        todo!();
+        B::copy_session_id(session_id, ctx)
+            .await
+            .map_err(YankError::PasteSessionId)
     }
 }
 
