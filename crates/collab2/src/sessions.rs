@@ -80,6 +80,24 @@ impl SessionsInner {
         self.sessions.push((root, state));
         Ok(())
     }
+
+    #[track_caller]
+    fn remove(&mut self, root: &fs::AbsPath) {
+        let Some(session_idx) = self
+            .sessions
+            .iter()
+            .position(|(existing_root, _)| &**existing_root == root)
+        else {
+            panic!("no session at {root:?}");
+        };
+        self.sessions.swap_remove(session_idx);
+    }
+}
+
+impl Drop for SessionGuard {
+    fn drop(&mut self) {
+        self.sessions.inner.with_mut(|inner| inner.remove(&self.root));
+    }
 }
 
 impl notify::Error for OverlappingSessionError {
