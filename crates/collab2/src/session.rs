@@ -1,18 +1,17 @@
 use core::marker::PhantomData;
 
-use collab_server::SessionId;
 use collab_server::message::{Peer, Peers};
 use eerie::Replica;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select};
 use nvimx2::{AsyncCtx, notify};
 
 use crate::CollabBackend;
-use crate::sessions::SessionGuard;
+use crate::sessions::{Active, SessionGuard};
 
 pub(crate) struct Session<B: CollabBackend> {
     server_rx: B::ServerRx,
     server_tx: B::ServerTx,
-    session_guard: SessionGuard,
+    session_guard: SessionGuard<Active>,
 }
 
 pub(crate) struct NewSessionArgs<B: CollabBackend> {
@@ -33,10 +32,7 @@ pub(crate) struct NewSessionArgs<B: CollabBackend> {
     pub(crate) _replica: Replica,
 
     /// TODO: docs.
-    pub(crate) session_guard: SessionGuard,
-
-    /// The ID of the session.
-    pub(crate) session_id: SessionId,
+    pub(crate) session_guard: SessionGuard<Active>,
 
     /// TODO: docs..
     pub(crate) server_tx: B::ServerTx,
@@ -55,7 +51,6 @@ pub(crate) struct RxExhaustedError<B>(PhantomData<B>);
 
 impl<B: CollabBackend> Session<B> {
     pub(crate) fn new(args: NewSessionArgs<B>) -> Self {
-        args.session_guard.set_to_active(args.session_id);
         Self {
             server_tx: args.server_tx,
             server_rx: args.server_rx,

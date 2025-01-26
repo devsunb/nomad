@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use collab_server::SessionId;
 use nvimx2::{Shared, fs, notify};
 use smallvec::SmallVec;
@@ -11,9 +13,9 @@ pub(crate) struct Sessions {
 
 /// A guard making sure no new session is started whose root would overlap
 /// (i.e. be either an ancestor or a descendant of) its [`root`](Self::root).
-pub(crate) struct SessionGuard {
-    root: fs::AbsPathBuf,
-    sessions: Sessions,
+pub(crate) struct SessionGuard<State> {
+    inner: SessionsGuardInner,
+    _state: PhantomData<State>,
 }
 
 /// TODO: docs.
@@ -23,6 +25,20 @@ pub(crate) enum SessionState {
     Starting,
 }
 
+pub(crate) struct Active;
+
+pub(crate) struct Starting;
+
+#[derive(Default)]
+struct SessionsInner {
+    sessions: SmallVec<[(fs::AbsPathBuf, SessionState); 2]>,
+}
+
+struct SessionsGuardInner {
+    root: fs::AbsPathBuf,
+    sessions: Sessions,
+}
+
 /// TODO: docs.
 pub struct OverlappingSessionError {
     pub(crate) existing_root: fs::AbsPathBuf,
@@ -30,44 +46,47 @@ pub struct OverlappingSessionError {
     pub(crate) new_root: fs::AbsPathBuf,
 }
 
-#[derive(Default)]
-struct SessionsInner {
-    sessions: SmallVec<[(fs::AbsPathBuf, SessionState); 2]>,
-}
-
 impl Sessions {
     pub(crate) fn start_guard(
         &self,
         root: fs::AbsPathBuf,
-    ) -> Result<SessionGuard, OverlappingSessionError> {
-        self.insert(root, SessionState::Starting)
+    ) -> Result<SessionGuard<Starting>, OverlappingSessionError> {
+        self.insert(root.clone(), SessionState::Starting)?;
+        Ok(SessionGuard {
+            inner: SessionsGuardInner { root, sessions: self.clone() },
+            _state: PhantomData,
+        })
     }
 
     fn insert(
         &self,
         root: fs::AbsPathBuf,
         session_state: SessionState,
-    ) -> Result<SessionGuard, OverlappingSessionError> {
-        self.inner
-            .with_mut(|inner| inner.insert(root.clone(), session_state))
-            .map(|()| SessionGuard { root, sessions: self.clone() })
+    ) -> Result<(), OverlappingSessionError> {
+        self.inner.with_mut(|inner| inner.insert(root, session_state))
     }
 }
 
-impl SessionGuard {
+impl<State> SessionGuard<State> {
     pub(crate) fn root(&self) -> &fs::AbsPath {
-        &self.root
+        &self.inner.root
     }
 
-    pub(crate) fn set_to_active(&self, session_id: SessionId) {
+    fn with_state<R>(&self, fun: impl FnOnce(&mut SessionState) -> R) -> R {
+        self.inner
+            .sessions
+            .inner
+            .with_mut(|inner| fun(inner.state_mut(self.root())))
+    }
+}
+
+impl SessionGuard<Starting> {
+    pub(crate) fn into_active(
+        self,
+        session_id: SessionId,
+    ) -> SessionGuard<Active> {
         self.with_state(|state| *state = SessionState::Active(session_id));
-    }
-
-    pub(crate) fn with_state<R>(
-        &self,
-        fun: impl FnOnce(&mut SessionState) -> R,
-    ) -> R {
-        self.sessions.inner.with_mut(|inner| fun(inner.state_mut(&self.root)))
+        SessionGuard { inner: self.inner, _state: PhantomData }
     }
 }
 
@@ -113,7 +132,7 @@ impl SessionsInner {
     }
 }
 
-impl Drop for SessionGuard {
+impl Drop for SessionsGuardInner {
     fn drop(&mut self) {
         self.sessions.inner.with_mut(|inner| inner.remove(&self.root));
     }

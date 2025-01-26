@@ -50,14 +50,14 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             return Ok(());
         }
 
-        let session_guard = self
+        let guard = self
             .sessions
             .start_guard(project_root)
             .map_err(StartError::OverlappingSession)?;
 
         let start_args = StartArgs {
             auth_infos: &auth_infos,
-            project_root: session_guard.root(),
+            project_root: guard.root(),
             server_address: &self.config.with(|c| c.server_address.clone()),
         };
 
@@ -65,7 +65,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .await
             .map_err(StartError::StartSession)?;
 
-        let replica = B::read_replica(session_guard.root(), ctx)
+        let replica = B::read_replica(guard.root(), ctx)
             .await
             .map_err(StartError::ReadReplica)?;
 
@@ -76,8 +76,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             _replica: replica,
             server_rx: start_infos.server_rx,
             server_tx: start_infos.server_tx,
-            session_guard,
-            session_id: start_infos.session_id,
+            session_guard: guard.into_active(start_infos.session_id),
         });
 
         self.session_tx
