@@ -6,6 +6,7 @@ mod backend;
 mod collab;
 mod config;
 mod session;
+mod sessions;
 mod start;
 
 pub use backend::CollabBackend;

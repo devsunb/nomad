@@ -25,6 +25,7 @@ eerie = { workspace = true }
 futures-util = { workspace = true }
 nvimx2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+smallvec = { workspace = true }
 
 async-net = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }

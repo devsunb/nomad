@@ -7,31 +7,19 @@ use nvimx2::command::ToCompletionFn;
 use nvimx2::notify::{self, Name};
 use nvimx2::{AsyncCtx, Shared};
 
-use crate::Collab;
 use crate::backend::{CollabBackend, StartArgs};
+use crate::collab::Collab;
 use crate::config::Config;
 use crate::session::{NewSessionArgs, Session};
+use crate::sessions::{OverlappingSessionError, Sessions};
 
 /// The `Action` used to start a new collaborative editing session.
 pub struct Start<B: CollabBackend> {
     auth_infos: Shared<Option<AuthInfos>>,
     config: Shared<Config>,
+    sessions: Sessions,
     session_tx: Sender<Session<B>>,
 }
-
-/// The type of error that can occur when [`Start`]ing a new session fails.
-pub enum StartError<B: CollabBackend> {
-    NoBufferFocused(NoBufferFocusedError<B>),
-    ReadReplica(B::ReadReplicaError),
-    SearchProjectRoot(B::SearchProjectRootError),
-    SessionRxDropped(SessionRxDroppedError<B>),
-    StartSession(B::StartSessionError),
-    UserNotLoggedIn(UserNotLoggedInError<B>),
-}
-
-pub struct NoBufferFocusedError<B>(PhantomData<B>);
-pub struct SessionRxDroppedError<B>(PhantomData<B>);
-pub struct UserNotLoggedInError<B>(PhantomData<B>);
 
 impl<B: CollabBackend> AsyncAction<B> for Start<B> {
     const NAME: Name = "start";
@@ -62,6 +50,11 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             return Ok(());
         }
 
+        let session_guard = self
+            .sessions
+            .start_guard(project_root.clone())
+            .map_err(StartError::OverlappingSession)?;
+
         let start_args = StartArgs {
             auth_infos: &auth_infos,
             project_root: &project_root,
@@ -84,7 +77,8 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             _replica: replica,
             server_rx: start_infos.server_rx,
             server_tx: start_infos.server_tx,
-            _session_id: start_infos.session_id,
+            session_guard,
+            session_id: start_infos.session_id,
         });
 
         self.session_tx
@@ -94,11 +88,29 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
     }
 }
 
+/// The type of error that can occur when [`Start`]ing a new session fails.
+pub enum StartError<B: CollabBackend> {
+    NoBufferFocused(NoBufferFocusedError<B>),
+    OverlappingSession(OverlappingSessionError),
+    ReadReplica(B::ReadReplicaError),
+    SearchProjectRoot(B::SearchProjectRootError),
+    SessionRxDropped(SessionRxDroppedError<B>),
+    StartSession(B::StartSessionError),
+    UserNotLoggedIn(UserNotLoggedInError<B>),
+}
+
+pub struct NoBufferFocusedError<B>(PhantomData<B>);
+
+pub struct SessionRxDroppedError<B>(PhantomData<B>);
+
+pub struct UserNotLoggedInError<B>(PhantomData<B>);
+
 impl<B: CollabBackend> Clone for Start<B> {
     fn clone(&self) -> Self {
         Self {
             auth_infos: self.auth_infos.clone(),
             config: self.config.clone(),
+            sessions: self.sessions.clone(),
             session_tx: self.session_tx.clone(),
         }
     }
@@ -113,6 +125,7 @@ impl<B: CollabBackend> From<&Collab<B>> for Start<B> {
         Self {
             auth_infos: collab.auth_infos.clone(),
             config: collab.config.clone(),
+            sessions: collab.sessions.clone(),
             session_tx: collab.session_tx.clone(),
         }
     }
@@ -136,6 +149,7 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
             StartError::NoBufferFocused(err) => err.to_message(),
+            StartError::OverlappingSession(err) => err.to_message(),
             StartError::ReadReplica(err) => err.to_message(),
             StartError::SearchProjectRoot(err) => err.to_message(),
             StartError::SessionRxDropped(err) => err.to_message(),

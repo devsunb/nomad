@@ -547,6 +547,7 @@ dependencies = [
  "nvimx2",
  "pin-project-lite",
  "serde",
+ "smallvec",
  "smol_str",
 ]
 

@@ -8,10 +8,12 @@ use nvimx2::fs::AbsPathBuf;
 use nvimx2::{AsyncCtx, notify};
 
 use crate::CollabBackend;
+use crate::sessions::SessionGuard;
 
 pub(crate) struct Session<B: CollabBackend> {
-    server_tx: B::ServerTx,
     server_rx: B::ServerRx,
+    server_tx: B::ServerTx,
+    session_guard: SessionGuard,
 }
 
 pub(crate) struct NewSessionArgs<B: CollabBackend> {
@@ -37,8 +39,11 @@ pub(crate) struct NewSessionArgs<B: CollabBackend> {
     /// contents of the [`project_root`](Self::project_root).
     pub(crate) _replica: Replica,
 
+    /// TODO: docs.
+    pub(crate) session_guard: SessionGuard,
+
     /// The ID of the session.
-    pub(crate) _session_id: SessionId,
+    pub(crate) session_id: SessionId,
 
     /// TODO: docs..
     pub(crate) server_tx: B::ServerTx,
@@ -57,14 +62,19 @@ pub(crate) struct RxExhaustedError<B>(PhantomData<B>);
 
 impl<B: CollabBackend> Session<B> {
     pub(crate) fn new(args: NewSessionArgs<B>) -> Self {
-        Self { server_tx: args.server_tx, server_rx: args.server_rx }
+        args.session_guard.set_to_active(args.session_id);
+        Self {
+            server_tx: args.server_tx,
+            server_rx: args.server_rx,
+            session_guard: args.session_guard,
+        }
     }
 
     pub(crate) async fn run(
         self,
         _ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), RunSessionError<B>> {
-        let Self { server_rx, server_tx, .. } = self;
+        let Self { session_guard: _guard, server_rx, server_tx, .. } = self;
         pin_mut!(server_rx);
         pin_mut!(server_tx);
 
