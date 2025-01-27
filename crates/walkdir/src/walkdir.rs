@@ -1,6 +1,7 @@
 use nvimx2::fs;
 
-use crate::{Accumulator, Filter};
+use crate::accumulate::{self, AccumulateError, Accumulator};
+use crate::filter::{Filter, Filtered};
 
 /// TODO: docs.
 pub trait WalkDir<Fs: fs::Fs>: Sized {
@@ -8,14 +9,13 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
     #[inline]
     fn accumulate<A>(
         &self,
-        _acc: &mut A,
+        acc: &mut A,
+        fs: &mut Fs,
     ) -> impl Future<Output = Result<Fs::Timestamp, AccumulateError<A, Self, Fs>>>
     where
         A: Accumulator<Fs>,
     {
-        async move {
-            todo!();
-        }
+        async move { accumulate::accumulate(self, acc, fs).await }
     }
 
     /// TODO: docs.
@@ -24,27 +24,6 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
     where
         F: Filter,
     {
-        Filtered { _filter: filter, _inner: self }
+        Filtered::new(filter, self)
     }
-}
-
-/// TODO: docs.
-pub struct Filtered<F, W> {
-    _filter: F,
-    _inner: W,
-}
-
-/// TODO: docs.
-pub enum AccumulateError<A, W, Fs> {
-    _Acc(A),
-    _Walk(W),
-    _Fs(Fs),
-}
-
-impl<F, W, Fs> WalkDir<Fs> for Filtered<F, W>
-where
-    F: Filter,
-    W: WalkDir<Fs>,
-    Fs: fs::Fs,
-{
 }
