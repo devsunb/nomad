@@ -1,5 +1,7 @@
 //! TODO: docs.
 
+mod filter;
 mod walkdir;
 
-pub use walkdir::WalkDir;
+pub use filter::Filter;
+pub use walkdir::{Filtered, WalkDir};
