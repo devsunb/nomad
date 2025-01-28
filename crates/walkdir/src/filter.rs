@@ -99,6 +99,25 @@ where
     }
 }
 
+impl<F, W> Filter<W> for Option<F>
+where
+    F: Filter<W>,
+    W: WalkDir,
+{
+    type Error = F::Error;
+
+    async fn should_filter(
+        &self,
+        dir_path: &fs::AbsPath,
+        dir_entry: &<W as WalkDir>::DirEntry,
+    ) -> Result<bool, Self::Error> {
+        match self {
+            Some(filter) => filter.should_filter(dir_path, dir_entry).await,
+            None => Ok(false),
+        }
+    }
+}
+
 impl<F, E, W> Filter<W> for F
 where
     F: AsyncFn(&fs::AbsPath, &W::DirEntry) -> Result<bool, E>,
