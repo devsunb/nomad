@@ -3,7 +3,16 @@ use nvimx2::fs;
 use crate::WalkDir;
 
 /// TODO: docs.
-pub trait Filter {}
+pub trait Filter<W: WalkDir> {
+    type Error;
+
+    /// TODO: docs.
+    fn should_filter(
+        &self,
+        dir_path: &fs::AbsPath,
+        dir_entry: &W::DirEntry,
+    ) -> impl Future<Output = Result<bool, Self::Error>>;
+}
 
 /// TODO: docs.
 pub struct Filtered<F, W> {
@@ -19,11 +28,10 @@ impl<F, W> Filtered<F, W> {
     }
 }
 
-impl<F, W, Fs> WalkDir<Fs> for Filtered<F, W>
+impl<F, W> WalkDir for Filtered<F, W>
 where
-    F: Filter,
-    W: WalkDir<Fs>,
-    Fs: fs::Fs,
+    F: Filter<W>,
+    W: WalkDir,
 {
     type DirEntry = W::DirEntry;
     type ReadDir = W::ReadDir;

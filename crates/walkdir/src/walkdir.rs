@@ -5,7 +5,7 @@ use crate::accumulate::{self, AccumulateError, Accumulator};
 use crate::filter::{Filter, Filtered};
 
 /// TODO: docs.
-pub trait WalkDir<Fs: fs::Fs>: Sized {
+pub trait WalkDir: Sized {
     /// TODO: docs.
     type DirEntry: fs::DirEntry;
 
@@ -26,13 +26,14 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
 
     /// TODO: docs.
     #[inline]
-    fn accumulate<A>(
+    fn accumulate<A, Fs>(
         &self,
         acc: &mut A,
         fs: &mut Fs,
     ) -> impl Future<Output = Result<Fs::Timestamp, AccumulateError<A, Self, Fs>>>
     where
         A: Accumulator<Fs>,
+        Fs: fs::Fs,
     {
         async move { accumulate::accumulate(self, acc, fs).await }
     }
@@ -41,7 +42,7 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
     #[inline]
     fn filter<F>(self, filter: F) -> Filtered<F, Self>
     where
-        F: Filter,
+        F: Filter<Self>,
     {
         Filtered::new(filter, self)
     }
