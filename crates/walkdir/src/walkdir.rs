@@ -1,4 +1,5 @@
-use futures_util::future::LocalBoxFuture;
+use core::pin::Pin;
+
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select};
 use nvimx2::fs::{self, DirEntry};
@@ -52,12 +53,13 @@ pub trait WalkDir: Sized {
     }
 
     /// TODO: docs.
+    #[allow(clippy::too_many_lines)]
     #[inline]
     fn for_each<'a, H>(
         &'a self,
         dir_path: fs::AbsPathBuf,
         handler: H,
-    ) -> LocalBoxFuture<'a, Result<(), WalkError<Self>>>
+    ) -> Pin<Box<dyn Future<Output = Result<(), WalkError<Self>>> + 'a>>
     where
         H: AsyncFn(&fs::AbsPath, &Self::DirEntry) + Clone + 'a,
     {
@@ -99,14 +101,20 @@ pub trait WalkDir: Sized {
                         read_children.push(async move {
                             let entry_kind = match entry.node_kind().await {
                                 Ok(kind) => kind,
-                                Err(_err) => todo!(),
+                                Err(err) => return Err(WalkError {
+                                    dir_path,
+                                    kind: WalkErrorKind::DirEntryNodeKind(err),
+                                }),
                             };
                             if !entry_kind.is_dir() {
                                 return Ok(());
                             }
                             let entry_name = match entry.name().await {
                                 Ok(name) => name,
-                                Err(_err) => todo!(),
+                                Err(err) => return Err(WalkError {
+                                    dir_path,
+                                    kind: WalkErrorKind::DirEntryName(err),
+                                }),
                             };
                             dir_path.push(entry_name);
                             self.for_each(dir_path, handler).await
@@ -198,6 +206,12 @@ pub struct WalkError<W: WalkDir> {
 pub enum WalkErrorKind<W: WalkDir> {
     /// TODO: docs.
     DirEntry(W::DirEntryError),
+
+    /// TODO: docs.
+    DirEntryName(<W::DirEntry as DirEntry>::NameError),
+
+    /// TODO: docs.
+    DirEntryNodeKind(<W::DirEntry as DirEntry>::NodeKindError),
 
     /// TODO: docs.
     ReadDir(W::ReadDirError),
