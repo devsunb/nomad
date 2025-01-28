@@ -1,9 +1,12 @@
+use futures_util::select;
+use futures_util::stream::{self, FuturesUnordered, Stream, StreamExt};
 use nvimx2::fs;
 
 use crate::WalkDir;
 
 /// TODO: docs.
 pub trait Filter<W: WalkDir> {
+    /// TODO: docs.
     type Error;
 
     /// TODO: docs.
@@ -16,15 +19,28 @@ pub trait Filter<W: WalkDir> {
 
 /// TODO: docs.
 pub struct Filtered<F, W> {
-    _filter: F,
-    _walker: W,
+    filter: F,
+    walker: W,
+}
+
+/// TODO: docs.
+pub enum FilteredDirEntryError<F, W>
+where
+    F: Filter<W>,
+    W: WalkDir,
+{
+    /// TODO: docs.
+    Filter(F::Error),
+
+    /// TODO: docs.
+    Walker(W::DirEntryError),
 }
 
 impl<F, W> Filtered<F, W> {
     /// TODO: docs.
     #[inline]
     pub(crate) fn new(filter: F, walker: W) -> Self {
-        Self { _filter: filter, _walker: walker }
+        Self { filter, walker }
     }
 }
 
@@ -34,14 +50,51 @@ where
     W: WalkDir,
 {
     type DirEntry = W::DirEntry;
-    type ReadDir = W::ReadDir;
-    type DirEntryError = W::DirEntryError;
+    type DirEntryError = FilteredDirEntryError<F, W>;
     type ReadDirError = W::ReadDirError;
 
     async fn read_dir(
         &self,
-        _path: &fs::AbsPath,
-    ) -> Result<Self::ReadDir, Self::ReadDirError> {
-        todo!()
+        dir_path: &fs::AbsPath,
+    ) -> Result<
+        impl Stream<Item = Result<Self::DirEntry, Self::DirEntryError>>,
+        Self::ReadDirError,
+    > {
+        let entries = self.walker.read_dir(dir_path).await?.fuse();
+        let filters = FuturesUnordered::new();
+        Ok(stream::unfold(
+            (Box::pin(entries), filters),
+            move |(mut entries, mut filters)| async move {
+                let item = loop {
+                    select! {
+                        entry_res = entries.select_next_some() => {
+                            let entry = match entry_res {
+                                Ok(entry) => entry,
+                                Err(err) => {
+                                    break Err(FilteredDirEntryError::Walker(
+                                        err,
+                                    ));
+                                },
+                            };
+                            filters.push(async move {
+                                self.filter
+                                    .should_filter(dir_path, &entry)
+                                    .await
+                                    .map(|filtr| (entry, filtr))
+                            });
+                        },
+                        res = filters.select_next_some() => match res {
+                            Ok((entry, false)) => break Ok(entry),
+                            Err(err) => {
+                                break Err(FilteredDirEntryError::Filter(err));
+                            },
+                            Ok((_, true)) => (),
+                        },
+                        complete => return None,
+                    }
+                };
+                Some((item, (entries, filters)))
+            },
+        ))
     }
 }

@@ -43,7 +43,7 @@ pub(crate) async fn accumulate<A, W, Fs>(
 ) -> Result<Fs::Timestamp, AccumulateError<A, W, Fs>>
 where
     A: Accumulator<Fs>,
-    W: WalkDir<Fs>,
+    W: WalkDir,
     Fs: fs::Fs,
 {
     todo!();

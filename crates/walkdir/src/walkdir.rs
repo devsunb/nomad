@@ -1,4 +1,4 @@
-use futures_lite::Stream;
+use futures_util::Stream;
 use nvimx2::fs;
 
 use crate::accumulate::{self, AccumulateError, Accumulator};
@@ -10,9 +10,6 @@ pub trait WalkDir: Sized {
     type DirEntry: fs::DirEntry;
 
     /// TODO: docs.
-    type ReadDir: Stream<Item = Result<Self::DirEntry, Self::DirEntryError>>;
-
-    /// TODO: docs.
     type DirEntryError;
 
     /// TODO: docs.
@@ -21,8 +18,13 @@ pub trait WalkDir: Sized {
     /// TODO: docs.
     fn read_dir(
         &self,
-        path: &fs::AbsPath,
-    ) -> impl Future<Output = Result<Self::ReadDir, Self::ReadDirError>>;
+        dir_path: &fs::AbsPath,
+    ) -> impl Future<
+        Output = Result<
+            impl Stream<Item = Result<Self::DirEntry, Self::DirEntryError>>,
+            Self::ReadDirError,
+        >,
+    >;
 
     /// TODO: docs.
     #[inline]
@@ -48,16 +50,15 @@ pub trait WalkDir: Sized {
     }
 }
 
-impl<Fs: fs::Fs> WalkDir<Self> for Fs {
+impl<Fs: fs::Fs> WalkDir for Fs {
     type DirEntry = <Self as fs::Fs>::DirEntry;
-    type ReadDir = <Self as fs::Fs>::ReadDir;
     type DirEntryError = <Self as fs::Fs>::DirEntryError;
     type ReadDirError = <Self as fs::Fs>::ReadDirError;
 
     async fn read_dir(
         &self,
-        _path: &fs::AbsPath,
-    ) -> Result<Self::ReadDir, Self::ReadDirError> {
+        _dir_path: &fs::AbsPath,
+    ) -> Result<<Self as fs::Fs>::ReadDir, Self::ReadDirError> {
         todo!()
     }
 }
