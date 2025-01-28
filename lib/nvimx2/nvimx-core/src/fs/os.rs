@@ -109,7 +109,7 @@ impl Fs for OsFs {
 
     #[inline]
     async fn read_dir<P: AsRef<AbsPath>>(
-        &mut self,
+        &self,
         dir_path: P,
     ) -> Result<Self::ReadDir, Self::ReadDirError> {
         async_fs::read_dir(dir_path.as_ref())

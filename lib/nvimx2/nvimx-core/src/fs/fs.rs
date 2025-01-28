@@ -48,7 +48,7 @@ pub trait Fs: Sized + 'static {
 
     /// TODO: docs.
     fn read_dir<P: AsRef<AbsPath>>(
-        &mut self,
+        &self,
         dir_path: P,
     ) -> impl Future<Output = Result<Self::ReadDir, Self::ReadDirError>>;
 

@@ -57,8 +57,8 @@ impl<Fs: fs::Fs> WalkDir for Fs {
 
     async fn read_dir(
         &self,
-        _dir_path: &fs::AbsPath,
+        dir_path: &fs::AbsPath,
     ) -> Result<<Self as fs::Fs>::ReadDir, Self::ReadDirError> {
-        todo!()
+        fs::Fs::read_dir(self, dir_path).await
     }
 }
