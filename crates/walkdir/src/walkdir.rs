@@ -42,18 +42,18 @@ pub trait WalkDir: Sized {
     #[inline]
     fn for_each<'a, H>(
         &'a self,
-        dir_path: fs::AbsPathBuf,
+        dir_path: &'a fs::AbsPath,
         handler: H,
     ) -> Pin<Box<dyn Future<Output = Result<(), WalkError<Self>>> + 'a>>
     where
-        H: AsyncFn(&fs::AbsPath, DirEntry<Self>) + Clone + 'a,
+        H: AsyncFn(DirEntry<Self>) + Clone + 'a,
     {
         Box::pin(async move {
-            let entries = match self.read_dir(&dir_path).await {
+            let entries = match self.read_dir(dir_path).await {
                 Ok(entries) => entries.fuse(),
                 Err(err) => {
                     return Err(WalkError {
-                        dir_path: dir_path.clone(),
+                        dir_path: dir_path.to_owned(),
                         kind: WalkErrorKind::ReadDir(err),
                     });
                 },
@@ -66,23 +66,24 @@ pub trait WalkDir: Sized {
                 select! {
                     res = entries.select_next_some() => {
                         let entry = res.map_err(|err| WalkError {
-                            dir_path: dir_path.clone(),
+                            dir_path: dir_path.to_owned(),
                             kind: WalkErrorKind::DirEntry(err),
                         })?;
-                        create_entries.push(DirEntry::new(entry));
+                        create_entries.push(DirEntry::new(dir_path, entry));
                     },
                     res = create_entries.select_next_some() => {
                         let entry = res.map_err(|kind| WalkError {
-                            dir_path: dir_path.clone(),
+                            dir_path: dir_path.to_owned(),
                             kind,
                         })?;
                         if entry.node_kind().is_dir() {
-                            let mut dir_path = dir_path.clone();
-                            dir_path.push(entry.name());
+                            let dir_path = entry.path();
                             let handler = handler.clone();
-                            read_children.push(self.for_each(dir_path, handler));
+                            read_children.push(async move {
+                                self.for_each(&dir_path, handler).await
+                            });
                         }
-                        handle_entries.push(handler(&dir_path, entry));
+                        handle_entries.push(handler(entry));
                     },
                     () = handle_entries.select_next_some() => (),
                     res = read_children.select_next_some() => res?,
@@ -93,33 +94,28 @@ pub trait WalkDir: Sized {
 
     /// TODO: docs.
     #[inline]
-    fn paths(
-        &self,
-        dir_path: fs::AbsPathBuf,
-    ) -> impl Stream<Item = Result<fs::AbsPathBuf, WalkError<Self>>> {
-        self.to_stream(dir_path, async |parent_path, entry| {
-            let mut path = parent_path.to_owned();
-            path.push(entry.name());
-            path
-        })
+    fn paths<'a>(
+        &'a self,
+        dir_path: &'a fs::AbsPath,
+    ) -> impl Stream<Item = Result<fs::AbsPathBuf, WalkError<Self>>> + 'a {
+        self.to_stream(dir_path, async |entry| entry.path())
     }
 
     /// TODO: docs.
     #[inline]
     fn to_stream<'a, H, T>(
         &'a self,
-        dir_path: fs::AbsPathBuf,
+        dir_path: &'a fs::AbsPath,
         handler: H,
     ) -> impl Stream<Item = Result<T, WalkError<Self>>> + 'a
     where
-        H: AsyncFn(&fs::AbsPath, DirEntry<Self>) -> T + Clone + 'a,
+        H: AsyncFn(DirEntry<Self>) -> T + Clone + 'a,
         T: 'a,
     {
         let (tx, rx) = flume::unbounded();
         let for_each = self
-            .for_each(dir_path, async move |path, entry| {
-                let payload = handler(path, entry).await;
-                let _ = tx.send(payload);
+            .for_each(dir_path, async move |entry| {
+                let _ = tx.send(handler(entry).await);
             })
             .boxed_local()
             .fuse();

@@ -6,13 +6,14 @@ use nvimx2::fs::{self, FsNodeKind, FsNodeName, FsNodeNameBuf};
 use crate::{WalkDir, WalkErrorKind};
 
 /// TODO: docs.
-pub struct DirEntry<W: WalkDir> {
+pub struct DirEntry<'a, W: WalkDir> {
     inner: W::DirEntry,
     name: FsNodeNameBuf,
     node_kind: FsNodeKind,
+    parent_path: &'a fs::AbsPath,
 }
 
-impl<W: WalkDir> DirEntry<W> {
+impl<'a, W: WalkDir> DirEntry<'a, W> {
     /// TODO: docs.
     pub fn inner(&self) -> &W::DirEntry {
         &self.inner
@@ -41,7 +42,20 @@ impl<W: WalkDir> DirEntry<W> {
     }
 
     /// TODO: docs.
+    pub fn parent_path(&self) -> &'a fs::AbsPath {
+        self.parent_path
+    }
+
+    /// TODO: docs.
+    pub fn path(&self) -> fs::AbsPathBuf {
+        let mut path = self.parent_path.to_owned();
+        path.push(self.name());
+        path
+    }
+
+    /// TODO: docs.
     pub(crate) async fn new(
+        parent_path: &'a fs::AbsPath,
         inner: W::DirEntry,
     ) -> Result<Self, WalkErrorKind<W>> {
         use fs::DirEntry;
@@ -54,11 +68,11 @@ impl<W: WalkDir> DirEntry<W> {
             .await
             .map(Cow::into_owned)
             .map_err(WalkErrorKind::DirEntryName)?;
-        Ok(Self { inner, name, node_kind })
+        Ok(Self { inner, name, node_kind, parent_path })
     }
 }
 
-impl<W: WalkDir> fs::DirEntry for DirEntry<W> {
+impl<W: WalkDir> fs::DirEntry for DirEntry<'_, W> {
     type NameError = Infallible;
     type NodeKindError = Infallible;
 
