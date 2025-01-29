@@ -27,6 +27,11 @@ impl<T> Shared<T> {
         self.inner.get()
     }
 
+    /// TODO: docs
+    pub fn into_inner(self) -> Option<T> {
+        Rc::into_inner(self.inner).map(|cell| cell.value.into_inner())
+    }
+
     /// Constructs a new `Shared<T>`.
     pub fn new(value: T) -> Self {
         Self { inner: Rc::new(WithCell::new(value)) }
