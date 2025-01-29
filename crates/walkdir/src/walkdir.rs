@@ -87,6 +87,7 @@ pub trait WalkDir: Sized {
                     },
                     () = handle_entries.select_next_some() => (),
                     res = read_children.select_next_some() => res?,
+                    complete => return Ok(()),
                 }
             }
         })
