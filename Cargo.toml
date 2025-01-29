@@ -51,6 +51,7 @@ collab2 = { path = "./crates/collab2" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 version = { path = "./crates/version" }
+walkdir = { path = "./crates/walkdir" }
 
 [workspace.lints.clippy]
 bool_to_int_with_if = "deny"

@@ -20,6 +20,7 @@ neovim = [
 [dependencies]
 auth = { workspace = true }
 collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client", "nomad"] }
+concurrent-queue = "2.5"
 eerie = { workspace = true }
 flume = { workspace = true, features = ["async"] }
 futures-util = { workspace = true }
@@ -27,6 +28,7 @@ fxhash = { workspace = true }
 nvimx2 = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true }
+walkdir = { workspace = true }
 
 async-net = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }

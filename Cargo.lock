@@ -540,6 +540,7 @@ dependencies = [
  "async-net",
  "auth",
  "collab-server",
+ "concurrent-queue",
  "eerie",
  "flume",
  "futures-util",
@@ -550,6 +551,7 @@ dependencies = [
  "serde",
  "smallvec",
  "smol_str",
+ "walkdir",
 ]
 
 [[package]]

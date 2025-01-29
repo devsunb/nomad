@@ -153,21 +153,64 @@ pub struct StartInfos<B: CollabBackend> {
 
 #[cfg(feature = "neovim")]
 mod default_read_replica {
+    use std::sync::Arc;
+
+    use concurrent_queue::{ConcurrentQueue, PushError};
+    use eerie::ReplicaBuilder;
+    use fs::{DirEntry, FsNodeKind};
+    use walkdir::{WalkDir, WalkError};
+
     use super::*;
 
     pub(super) async fn read_replica<B>(
-        _peer_id: PeerId,
-        _project_root: &fs::AbsPath,
-        _ctx: &mut AsyncCtx<'_, B>,
+        peer_id: PeerId,
+        project_root: fs::AbsPathBuf,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Replica, Error<B>>
     where
         B: CollabBackend,
+        B::Fs: Send,
+        WalkError<B::Fs>: Send,
     {
-        todo!();
+        let fs = ctx.fs();
+        let res = async move {
+            let op_queue = Arc::new(ConcurrentQueue::unbounded());
+            let op_queue2 = Arc::clone(&op_queue);
+            let handler = async move |entry: walkdir::DirEntry<'_, _>| {
+                let op = match entry.node_kind() {
+                    FsNodeKind::File => {
+                        let meta = entry.metadata().await.expect("");
+                        Op::PushFile(entry.path(), meta.len())
+                    },
+                    FsNodeKind::Directory => Op::PushDirectory(entry.path()),
+                    FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
+                };
+                match op_queue2.push(op) {
+                    Ok(()) => (),
+                    Err(PushError::Full(_)) => unreachable!("unbounded"),
+                    Err(PushError::Closed(_)) => unreachable!("never closed"),
+                }
+            };
+            fs.for_each(&project_root, handler).await?;
+            let mut builder = ReplicaBuilder::new(peer_id);
+            while let Ok(op) = op_queue.pop() {
+                let _ = match op {
+                    Op::PushFile(path, len) => builder.push_file(path, len),
+                    Op::PushDirectory(path) => builder.push_directory(path),
+                };
+            }
+            Ok(builder)
+        };
+        res.await.map(ReplicaBuilder::build).map_err(Error::Walk)
     }
 
     pub(super) enum Error<B: CollabBackend> {
-        Todo(B),
+        Walk(WalkError<B::Fs>),
+    }
+
+    enum Op {
+        PushFile(AbsPathBuf, u64),
+        PushDirectory(AbsPathBuf),
     }
 }
 
