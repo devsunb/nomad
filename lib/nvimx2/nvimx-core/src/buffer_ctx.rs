@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use crate::ByteOffset;
 use crate::backend::{Backend, Buffer, BufferId};
 
 /// TODO: docs.
@@ -8,6 +9,12 @@ pub struct BufferCtx<'a, B: Backend> {
 }
 
 impl<'a, B: Backend> BufferCtx<'a, B> {
+    /// TODO: docs.
+    #[inline]
+    pub fn byte_len(&self) -> ByteOffset {
+        self.inner.byte_len()
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn id(&self) -> BufferId<B> {
