@@ -219,9 +219,11 @@ name = "backend-test"
 version = "0.1.0-dev"
 dependencies = [
  "crop",
+ "fxhash",
  "indexmap",
  "nvimx-core",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

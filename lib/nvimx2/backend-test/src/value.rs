@@ -101,6 +101,20 @@ impl MapAccess<TestBackend> for (&mut TestMap, Option<usize>) {
     }
 }
 
+impl From<serde_json::Value> for TestValue {
+    fn from(_value: serde_json::Value) -> Self {
+        todo!();
+    }
+}
+
+impl TryFrom<TestValue> for serde_json::Value {
+    type Error = serde_json::Error;
+
+    fn try_from(_value: TestValue) -> Result<Self, Self::Error> {
+        todo!();
+    }
+}
+
 impl notify::Error for TestMapAccessError {
     #[inline]
     fn to_message(&self) -> (notify::Level, notify::Message) {
