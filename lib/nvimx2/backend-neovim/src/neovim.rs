@@ -22,6 +22,18 @@ pub struct Neovim {
     background_executor: executor::NeovimBackgroundExecutor,
 }
 
+impl Neovim {
+    /// TODO: docs.
+    #[inline]
+    pub fn init() -> Self {
+        Self {
+            emitter: notify::NeovimEmitter::default(),
+            local_executor: executor::NeovimLocalExecutor::init(),
+            background_executor: executor::NeovimBackgroundExecutor::init(),
+        }
+    }
+}
+
 impl Backend for Neovim {
     type Api = api::NeovimApi;
     type Buffer<'a> = NeovimBuffer;
@@ -32,15 +44,6 @@ impl Backend for Neovim {
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
     type SerializeError = serde::NeovimSerializeError;
     type DeserializeError = serde::NeovimDeserializeError;
-
-    #[inline]
-    fn init() -> Self {
-        Self {
-            emitter: notify::NeovimEmitter::default(),
-            local_executor: executor::NeovimLocalExecutor::init(),
-            background_executor: executor::NeovimBackgroundExecutor::init(),
-        }
-    }
 
     #[inline]
     fn api<M: Module<Self>>(&mut self) -> Self::Api {

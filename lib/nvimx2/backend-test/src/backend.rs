@@ -46,10 +46,6 @@ impl Backend for TestBackend {
         Default::default()
     }
 
-    fn init() -> Self {
-        todo!()
-    }
-
     fn buffer(&mut self, id: BufferId<Self>) -> Option<Self::Buffer<'_>> {
         self.buffers.get_mut(&id)
     }

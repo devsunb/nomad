@@ -52,9 +52,6 @@ pub trait Backend: 'static + Sized {
     fn api<M: Module<Self>>(&mut self) -> Self::Api;
 
     /// TODO: docs.
-    fn init() -> Self;
-
-    /// TODO: docs.
     fn buffer(&mut self, id: BufferId<Self>) -> Option<Self::Buffer<'_>>;
 
     /// TODO: docs.
