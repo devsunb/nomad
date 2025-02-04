@@ -1,7 +1,7 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use syn::parse::{Parse, ParseStream};
-use syn::{Expr, Ident, parse_macro_input, token};
+use syn::{Expr, Ident, Token, braced, parse_macro_input, token};
 
 pub(crate) fn fs(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let root = parse_macro_input!(input as Directory);
@@ -32,8 +32,23 @@ impl Parse for FsNode {
 }
 
 impl Parse for Directory {
-    fn parse(_input: ParseStream) -> syn::Result<Self> {
-        todo!()
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let content;
+        braced!(content in input);
+
+        let mut children = Vec::new();
+
+        while !content.is_empty() {
+            let child_name = content.parse::<Expr>()?;
+            content.parse::<Token![:]>()?;
+            let child = content.parse::<FsNode>()?;
+            children.push((child_name, child));
+            if !content.is_empty() {
+                content.parse::<Token![,]>()?;
+            }
+        }
+
+        Ok(Self { children })
     }
 }
 
@@ -70,7 +85,8 @@ impl ToTokens for Directory {
 
 impl ToTokens for File {
     fn to_tokens(&self, tokens: &mut TokenStream) {
-        quote! { ::nvimx2::tests::fs::TestFile::new(#self.contents) }
+        let contents = &self.contents;
+        quote! { ::nvimx2::tests::fs::TestFile::new(#contents) }
             .to_tokens(tokens);
     }
 }
