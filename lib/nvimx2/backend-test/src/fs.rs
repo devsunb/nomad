@@ -29,6 +29,7 @@ pub struct TestFs {
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TestTimestamp(u64);
 
+#[derive(PartialEq)]
 pub enum TestFsNode {
     File(TestFile),
     Directory(TestDirectory),
@@ -321,6 +322,30 @@ impl Fs for TestFs {
                 .rx()
         });
         Ok(TestWatcher { inner: rx, fs: self.clone(), path })
+    }
+}
+
+impl From<TestDirectory> for TestFsNode {
+    fn from(dir: TestDirectory) -> Self {
+        Self::Directory(dir)
+    }
+}
+
+impl From<TestFile> for TestFsNode {
+    fn from(file: TestFile) -> Self {
+        Self::File(file)
+    }
+}
+
+impl PartialEq for TestFile {
+    fn eq(&self, other: &Self) -> bool {
+        self.contents == other.contents
+    }
+}
+
+impl PartialEq for TestDirectory {
+    fn eq(&self, other: &Self) -> bool {
+        self.children == other.children
     }
 }
 
