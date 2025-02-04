@@ -199,7 +199,7 @@ impl TestDirectory {
         &mut self,
         name: impl AsRef<FsNodeName>,
         child: impl Into<TestFsNode>,
-    ) {
+    ) -> &mut Self {
         let name = name.as_ref();
         match self.children.entry(name.to_owned()) {
             indexmap::map::Entry::Occupied(_) => {
@@ -209,6 +209,7 @@ impl TestDirectory {
                 entry.insert(child.into());
             },
         }
+        self
     }
 
     fn child_at_path(&self, path: &AbsPath) -> Option<&TestFsNode> {

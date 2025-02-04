@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "lib/*", "lib/nvimx2/*", "xtask"]
+members = ["crates/*", "lib/*", "lib/nvimx2/*", "lib/nvimx2/*/macros", "xtask"]
 exclude = ["lib/nvimx2/src"]
 
 [workspace.package]
