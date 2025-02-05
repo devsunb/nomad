@@ -28,16 +28,18 @@ impl FsNodeKind {
     }
 }
 
-impl From<std::fs::FileType> for FsNodeKind {
-    fn from(file_type: std::fs::FileType) -> Self {
-        if file_type.is_file() {
+impl TryFrom<std::fs::FileType> for FsNodeKind {
+    type Error = std::fs::FileType;
+
+    fn try_from(file_type: std::fs::FileType) -> Result<Self, Self::Error> {
+        Ok(if file_type.is_file() {
             Self::File
         } else if file_type.is_dir() {
             Self::Directory
         } else if file_type.is_symlink() {
             Self::Symlink
         } else {
-            unreachable!("unknown file type {file_type:?}")
-        }
+            return Err(file_type);
+        })
     }
 }

@@ -1,23 +1,18 @@
-use crate::fs::{self, AbsPath, FsNodeKind};
+use crate::fs::{self, FsNodeKind};
 
 /// TODO: docs.
-pub enum FsNode<Fs, Path>
-where
-    Fs: fs::Fs,
-    Path: AsRef<AbsPath>,
-{
+pub enum FsNode<Fs: fs::Fs> {
     /// TODO: docs.
-    File(Fs::File<Path>),
+    File(Fs::File),
 
     /// TODO: docs.
-    Directory(Fs::Directory<Path>),
+    Directory(Fs::Directory),
+
+    /// TODO: docs.
+    Symlink(Fs::Symlink),
 }
 
-impl<Fs, Path> FsNode<Fs, Path>
-where
-    Fs: fs::Fs,
-    Path: AsRef<AbsPath>,
-{
+impl<Fs: fs::Fs> FsNode<Fs> {
     /// TODO: docs.
     #[inline]
     pub fn is_dir(&self) -> bool {
@@ -36,6 +31,7 @@ where
         match self {
             Self::File(_) => FsNodeKind::File,
             Self::Directory(_) => FsNodeKind::Directory,
+            Self::Symlink(_) => FsNodeKind::Symlink,
         }
     }
 }

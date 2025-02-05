@@ -19,6 +19,6 @@ pub use eerie::fs::{
     FsNodeNameBuf,
     InvalidFsNodeNameError,
 };
-pub use fs::{Fs, FsEvent, FsEventKind};
+pub use fs::{Fs, FsEvent, FsEventKind, Symlink};
 pub use fs_node::FsNode;
 pub use fs_node_kind::FsNodeKind;

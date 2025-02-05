@@ -18,6 +18,7 @@ use nvimx_core::fs::{
     FsNodeKind,
     FsNodeName,
     FsNodeNameBuf,
+    Symlink,
 };
 
 /// TODO: docs.
@@ -58,6 +59,8 @@ pub struct TestFileHandle {
     fs: TestFs,
     path: AbsPathBuf,
 }
+
+pub enum TestSymlinkHandle {}
 
 pin_project_lite::pin_project! {
     pub struct TestReadDir {
@@ -273,8 +276,9 @@ impl TestWatchChannel {
 impl Fs for TestFs {
     type Timestamp = TestTimestamp;
     type DirEntry = TestDirEntry;
-    type Directory<Path> = TestDirectoryHandle;
-    type File<Path> = TestFileHandle;
+    type Directory = TestDirectoryHandle;
+    type File = TestFileHandle;
+    type Symlink = TestSymlinkHandle;
     type ReadDir = TestReadDir;
     type Watcher = TestWatcher;
     type DirEntryError = TestReadDirNextError;
@@ -285,7 +289,7 @@ impl Fs for TestFs {
     async fn node_at_path<P: AsRef<AbsPath>>(
         &self,
         path: P,
-    ) -> Result<Option<FsNode<Self, P>>, Self::NodeAtPathError> {
+    ) -> Result<Option<FsNode<Self>>, Self::NodeAtPathError> {
         let path = path.as_ref();
         let Some(kind) = self.with_inner(|inner| {
             inner.node_at_path(path).map(TestFsNode::kind)
@@ -301,7 +305,7 @@ impl Fs for TestFs {
                 fs: self.clone(),
                 path: path.to_owned(),
             }),
-            FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
+            FsNodeKind::Symlink => unreachable!(),
         };
         Ok(Some(node))
     }
@@ -380,10 +384,13 @@ impl DirEntry for TestDirEntry {
             .ok_or(TestDirEntryDoesNotExistError)
     }
 
-    async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {
+    async fn node_kind(
+        &self,
+    ) -> Result<Option<FsNodeKind>, Self::NodeKindError> {
         self.exists()
             .then_some(self.kind())
             .ok_or(TestDirEntryDoesNotExistError)
+            .map(Some)
     }
 }
 
@@ -421,7 +428,7 @@ impl Stream for TestReadDir {
                     path: child_path,
                 })
             },
-            FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
+            FsNodeKind::Symlink => unreachable!(),
         };
         Poll::Ready(Some(Ok(entry)))
     }
@@ -438,6 +445,22 @@ impl Stream for TestWatcher {
             .inner
             .poll_next(ctx)
             .map(|maybe_item| maybe_item.map(Ok))
+    }
+}
+
+impl Symlink<TestFs> for TestSymlinkHandle {
+    type FollowError = Infallible;
+
+    async fn follow(
+        &self,
+    ) -> Result<Option<FsNode<TestFs>>, Self::FollowError> {
+        unreachable!()
+    }
+
+    async fn follow_recursively(
+        &self,
+    ) -> Result<Option<FsNode<TestFs>>, Self::FollowError> {
+        unreachable!()
     }
 }
 

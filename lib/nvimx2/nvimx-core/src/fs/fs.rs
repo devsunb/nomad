@@ -14,10 +14,13 @@ pub trait Fs: Sized + 'static {
     type DirEntry: DirEntry;
 
     /// TODO: docs.
-    type Directory<Path>;
+    type Directory;
 
     /// TODO: docs.
-    type File<Path>;
+    type File;
+
+    /// TODO: docs.
+    type Symlink: Symlink<Self>;
 
     /// TODO: docs.
     type ReadDir: Stream<Item = Result<Self::DirEntry, Self::DirEntryError>>;
@@ -41,7 +44,7 @@ pub trait Fs: Sized + 'static {
     fn node_at_path<P: AsRef<AbsPath>>(
         &self,
         path: P,
-    ) -> impl Future<Output = Result<Option<FsNode<Self, P>>, Self::NodeAtPathError>>;
+    ) -> impl Future<Output = Result<Option<FsNode<Self>>, Self::NodeAtPathError>>;
 
     /// TODO: docs.
     fn now(&self) -> Self::Timestamp;
@@ -89,6 +92,22 @@ pub trait Fs: Sized + 'static {
             })
         }
     }
+}
+
+/// TODO: docs.
+pub trait Symlink<Fs: self::Fs> {
+    /// TODO: docs.
+    type FollowError: Error;
+
+    /// TODO: docs.
+    fn follow(
+        &self,
+    ) -> impl Future<Output = Result<Option<FsNode<Fs>>, Self::FollowError>>;
+
+    /// TODO: docs.
+    fn follow_recursively(
+        &self,
+    ) -> impl Future<Output = Result<Option<FsNode<Fs>>, Self::FollowError>>;
 }
 
 /// TODO: docs.

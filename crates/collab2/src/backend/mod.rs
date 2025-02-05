@@ -177,13 +177,14 @@ mod default_read_replica {
             let op_queue = Arc::new(ConcurrentQueue::unbounded());
             let op_queue2 = Arc::clone(&op_queue);
             let handler = async move |entry: walkdir::DirEntry<'_, _>| {
-                let op = match entry.node_kind() {
+                let Some(node_kind) = entry.node_kind() else { return Ok(()) };
+                let op = match node_kind {
                     FsNodeKind::File => {
                         let meta = entry.metadata().await?;
                         PushNode::File(entry.path(), meta.len())
                     },
                     FsNodeKind::Directory => PushNode::Directory(entry.path()),
-                    FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
+                    FsNodeKind::Symlink => return Ok(()),
                 };
                 match op_queue2.push(op) {
                     Ok(()) => Ok(()),
@@ -297,7 +298,7 @@ mod root_markers {
 
     use futures_util::stream::{self, StreamExt};
     use futures_util::{pin_mut, select};
-    use nvimx2::fs::{self, DirEntry};
+    use nvimx2::fs::{self, DirEntry, Symlink};
     use nvimx2::notify;
     use smol_str::ToSmolStr;
 
@@ -338,10 +339,12 @@ mod root_markers {
 
     pub enum FindRootErrorKind<Fs: fs::Fs, M: RootMarker<Fs>> {
         DirEntry(DirEntryError<Fs>),
+        FollowSymlink(<Fs::Symlink as fs::Symlink<Fs>>::FollowError),
         Marker { dir_entry_name: Option<fs::FsNodeNameBuf>, err: M::Error },
         NodeAtStartPath(Fs::NodeAtPathError),
         ReadDir(Fs::ReadDirError),
         StartPathNotFound,
+        StartsAtDanglingSymlink,
     }
 
     pub enum DirEntryError<Fs: fs::Fs> {
@@ -359,7 +362,7 @@ mod root_markers {
             Fs: fs::Fs,
             M: RootMarker<Fs>,
         {
-            let node_kind = fs
+            let mut node = fs
                 .node_at_path(self.start_from)
                 .await
                 .map_err(FindRootErrorKind::NodeAtStartPath)
@@ -369,16 +372,36 @@ mod root_markers {
                 .map_err(|kind| FindRootError {
                     path: self.start_from.to_owned(),
                     kind,
-                })?
-                .kind();
+                })?;
 
-            let mut dir = match node_kind {
-                fs::FsNodeKind::Directory => self.start_from,
-                fs::FsNodeKind::File => self
-                    .start_from
+            let is_starting_at_dir = loop {
+                match node {
+                    fs::FsNode::Directory(_) => break true,
+                    fs::FsNode::File(_) => break false,
+                    fs::FsNode::Symlink(symlink) => {
+                        node = symlink
+                            .follow_recursively()
+                            .await
+                            .map_err(FindRootErrorKind::FollowSymlink)
+                            .and_then(|maybe_target| {
+                                maybe_target.ok_or(
+                                    FindRootErrorKind::StartsAtDanglingSymlink,
+                                )
+                            })
+                            .map_err(|kind| FindRootError {
+                                path: self.start_from.to_owned(),
+                                kind,
+                            })?;
+                    },
+                }
+            };
+
+            let mut dir = if is_starting_at_dir {
+                self.start_from
+            } else {
+                self.start_from
                     .parent()
-                    .expect("path is of file, so it must have a parent"),
-                fs::FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
+                    .expect("path is of file, so it must have a parent")
             }
             .to_owned();
 
@@ -495,6 +518,10 @@ mod root_markers {
                     message.push_str("couldn't read file or directory under ");
                     err
                 },
+                FindRootErrorKind::FollowSymlink(err) => {
+                    message.push_str("couldn't follow symlink at ");
+                    err
+                },
                 FindRootErrorKind::Marker { dir_entry_name, err } => {
                     message.push_str(
                         "couldn't match markers with file or directory ",
@@ -516,6 +543,12 @@ mod root_markers {
                 FindRootErrorKind::ReadDir(err) => {
                     message.push_str("couldn't read directory at ");
                     err
+                },
+                FindRootErrorKind::StartsAtDanglingSymlink => {
+                    message
+                        .push_str("no file or directory found at ")
+                        .push_info(path.to_smolstr());
+                    return (notify::Level::Error, message);
                 },
                 FindRootErrorKind::StartPathNotFound => {
                     message

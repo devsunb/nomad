@@ -79,7 +79,7 @@ pub trait WalkDir: Sized {
                             dir_path: dir_path.to_owned(),
                             kind: Either::Left(kind),
                         })?;
-                        if entry.node_kind().is_dir() {
+                        if entry.node_kind().is_some_and(|kind| kind.is_dir()) {
                             let dir_path = entry.path();
                             let handler = handler.clone();
                             read_children.push(async move {

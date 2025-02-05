@@ -13,6 +13,7 @@ use futures_lite::{Stream, ready};
 
 use crate::fs::{
     AbsPath,
+    AbsPathBuf,
     DirEntry,
     Fs,
     FsEvent,
@@ -20,11 +21,12 @@ use crate::fs::{
     FsNodeKind,
     FsNodeName,
     InvalidFsNodeNameError,
+    Symlink,
 };
 
 /// TODO: docs.
 #[derive(Debug, Default, Copy, Clone)]
-pub struct OsFs {}
+pub struct OsFs;
 
 /// TODO: docs.
 pub struct OsDirEntry {
@@ -32,15 +34,19 @@ pub struct OsDirEntry {
 }
 
 /// TODO: docs.
-pub struct OsDirectory<Path> {
+pub struct OsDirectory {
     _metadata: async_fs::Metadata,
-    _path: Path,
 }
 
 /// TODO: docs.
-pub struct OsFile<Path> {
+pub struct OsFile {
     _metadata: async_fs::Metadata,
-    _path: Path,
+}
+
+/// TODO: docs.
+pub struct OsSymlink {
+    _metadata: async_fs::Metadata,
+    path: AbsPathBuf,
 }
 
 pin_project_lite::pin_project! {
@@ -66,8 +72,9 @@ pub enum OsNameError {
 impl Fs for OsFs {
     type DirEntry = OsDirEntry;
     type DirEntryError = io::Error;
-    type Directory<Path> = OsDirectory<Path>;
-    type File<Path> = OsFile<Path>;
+    type Directory = OsDirectory;
+    type File = OsFile;
+    type Symlink = OsSymlink;
     type NodeAtPathError = io::Error;
     type ReadDir = OsReadDir;
     type ReadDirError = io::Error;
@@ -79,21 +86,25 @@ impl Fs for OsFs {
     async fn node_at_path<P: AsRef<AbsPath>>(
         &self,
         path: P,
-    ) -> Result<Option<FsNode<Self, P>>, Self::NodeAtPathError> {
-        let metadata = match async_fs::metadata(path.as_ref()).await {
+    ) -> Result<Option<FsNode<Self>>, Self::NodeAtPathError> {
+        let path = path.as_ref();
+        let metadata = match async_fs::symlink_metadata(path).await {
             Ok(metadata) => metadata,
             Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(e),
         };
-        Ok(Some(match metadata.file_type().into() {
-            FsNodeKind::File => {
-                FsNode::File(OsFile { _metadata: metadata, _path: path })
+        let Ok(file_type) = metadata.file_type().try_into() else {
+            return Ok(None);
+        };
+        Ok(Some(match file_type {
+            FsNodeKind::File => FsNode::File(OsFile { _metadata: metadata }),
+            FsNodeKind::Directory => {
+                FsNode::Directory(OsDirectory { _metadata: metadata })
             },
-            FsNodeKind::Directory => FsNode::Directory(OsDirectory {
+            FsNodeKind::Symlink => FsNode::Symlink(OsSymlink {
                 _metadata: metadata,
-                _path: path,
+                path: path.to_owned(),
             }),
-            FsNodeKind::Symlink => todo!("can't handle symlinks yet"),
         }))
     }
 
@@ -160,7 +171,31 @@ impl DirEntry for OsDirEntry {
     }
 
     #[inline]
-    async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {
-        self.inner.file_type().await.map(Into::into)
+    async fn node_kind(
+        &self,
+    ) -> Result<Option<FsNodeKind>, Self::NodeKindError> {
+        self.inner.file_type().await.map(|file_type| file_type.try_into().ok())
+    }
+}
+
+impl Symlink<OsFs> for OsSymlink {
+    type FollowError = io::Error;
+
+    #[inline]
+    async fn follow(&self) -> Result<Option<FsNode<OsFs>>, Self::FollowError> {
+        let target_path = async_fs::read_link(&*self.path).await?;
+        let path = <&AbsPath>::try_from(&*target_path)
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
+        OsFs.node_at_path(path).await
+    }
+
+    #[inline]
+    async fn follow_recursively(
+        &self,
+    ) -> Result<Option<FsNode<OsFs>>, Self::FollowError> {
+        let target_path = async_fs::canonicalize(&*self.path).await?;
+        let path = <&AbsPath>::try_from(&*target_path)
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
+        OsFs.node_at_path(path).await
     }
 }

@@ -29,19 +29,27 @@ pub trait DirEntry {
     /// TODO: docs.
     fn node_kind(
         &self,
-    ) -> impl Future<Output = Result<FsNodeKind, Self::NodeKindError>>;
+    ) -> impl Future<Output = Result<Option<FsNodeKind>, Self::NodeKindError>>;
 
     /// TODO: docs.
     fn is_directory(
         &self,
     ) -> impl Future<Output = Result<bool, Self::NodeKindError>> {
-        async { self.node_kind().await.map(|k| k.is_dir()) }
+        async {
+            self.node_kind().await.map(|maybe_kind| {
+                maybe_kind.map_or(false, |kind| kind.is_dir())
+            })
+        }
     }
 
     /// TODO: docs.
     fn is_file(
         &self,
     ) -> impl Future<Output = Result<bool, Self::NodeKindError>> {
-        async { self.node_kind().await.map(|k| k.is_file()) }
+        async {
+            self.node_kind().await.map(|maybe_kind| {
+                maybe_kind.map_or(false, |kind| kind.is_file())
+            })
+        }
     }
 }

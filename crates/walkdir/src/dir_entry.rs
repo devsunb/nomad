@@ -10,7 +10,7 @@ use crate::{WalkDir, WalkErrorKind};
 pub struct DirEntry<'a, W: WalkDir> {
     inner: W::DirEntry,
     name: FsNodeNameBuf,
-    node_kind: FsNodeKind,
+    node_kind: Option<FsNodeKind>,
     parent_path: &'a fs::AbsPath,
 }
 
@@ -38,7 +38,7 @@ impl<'a, W: WalkDir> DirEntry<'a, W> {
 
     /// TODO: docs.
     #[allow(clippy::same_name_method)]
-    pub fn node_kind(&self) -> FsNodeKind {
+    pub fn node_kind(&self) -> Option<FsNodeKind> {
         self.node_kind
     }
 
@@ -86,7 +86,9 @@ impl<W: WalkDir> fs::DirEntry for DirEntry<'_, W> {
         Ok(Cow::Borrowed(&self.name))
     }
 
-    async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {
+    async fn node_kind(
+        &self,
+    ) -> Result<Option<FsNodeKind>, Self::NodeKindError> {
         Ok(self.node_kind)
     }
 }
