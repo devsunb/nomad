@@ -1,5 +1,3 @@
-use smallvec::SmallVec;
-
 use crate::fs::{self, AbsPathBuf};
 
 /// TODO: docs.
@@ -31,6 +29,9 @@ pub enum FsEventKind {
     DeletedFile,
 
     /// TODO: docs.
+    ModifiedFile,
+
+    /// TODO: docs.
     RenamedNode(AbsPathBuf),
 }
 
@@ -50,51 +51,61 @@ where
 }
 
 #[cfg(feature = "os-fs")]
-impl FsEvent<fs::os::OsFs> {
-    pub(crate) fn from_notify(
-        event: notify::Event,
-        timestamp: <fs::os::OsFs as fs::Fs>::Timestamp,
-    ) -> SmallVec<[Self; 1]> {
-        let mut events = SmallVec::new();
+mod os_fs {
+    use notify::EventKind;
+    use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
+    use smallvec::SmallVec;
 
-        let mut paths = event
-            .paths
-            .into_iter()
-            .filter_map(|path| AbsPathBuf::try_from(path).ok());
+    use super::*;
 
-        let kind = match event.kind {
-            notify::EventKind::Create(create_kind) => match create_kind {
-                notify::event::CreateKind::File => FsEventKind::CreatedFile,
-                notify::event::CreateKind::Folder => FsEventKind::CreatedDir,
+    impl FsEvent<fs::os::OsFs> {
+        pub(crate) fn from_notify(
+            event: notify::Event,
+            timestamp: <fs::os::OsFs as fs::Fs>::Timestamp,
+        ) -> SmallVec<[Self; 1]> {
+            let mut events = SmallVec::new();
+
+            let mut paths = event
+                .paths
+                .into_iter()
+                .filter_map(|path| AbsPathBuf::try_from(path).ok());
+
+            let kind = match event.kind {
+                EventKind::Create(kind) => match kind {
+                    CreateKind::File => FsEventKind::CreatedFile,
+                    CreateKind::Folder => FsEventKind::CreatedDir,
+                    _ => return events,
+                },
+                EventKind::Modify(kind) => match kind {
+                    ModifyKind::Data(_) => FsEventKind::ModifiedFile,
+                    ModifyKind::Name(RenameMode::Both) => {
+                        let Some(from) = paths.next() else { return events };
+                        let Some(to) = paths.next() else { return events };
+                        let event = Self {
+                            kind: FsEventKind::RenamedNode(to),
+                            path: from,
+                            timestamp,
+                        };
+                        events.push(event);
+                        return events;
+                    },
+                    _ => return events,
+                },
+                EventKind::Remove(kind) => match kind {
+                    RemoveKind::File => FsEventKind::DeletedFile,
+                    RemoveKind::Folder => FsEventKind::DeletedDir,
+                    _ => return events,
+                },
                 _ => return events,
-            },
-            notify::EventKind::Modify(notify::event::ModifyKind::Name(
-                notify::event::RenameMode::Both,
-            )) => {
-                let Some(from) = paths.next() else { return events };
-                let Some(to) = paths.next() else { return events };
-                let event = Self {
-                    kind: FsEventKind::RenamedNode(to),
-                    path: from,
-                    timestamp,
-                };
-                events.push(event);
-                return events;
-            },
-            notify::EventKind::Remove(remove_kind) => match remove_kind {
-                notify::event::RemoveKind::File => FsEventKind::DeletedFile,
-                notify::event::RemoveKind::Folder => FsEventKind::DeletedDir,
-                _ => return events,
-            },
-            _ => return events,
-        };
+            };
 
-        events.extend(paths.map(|path| Self {
-            kind: kind.clone(),
-            path,
-            timestamp,
-        }));
+            events.extend(paths.map(|path| Self {
+                kind: kind.clone(),
+                path,
+                timestamp,
+            }));
 
-        events
+            events
+        }
     }
 }
