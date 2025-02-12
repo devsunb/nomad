@@ -9,6 +9,7 @@ publish.workspace = true
 [features]
 neovim = [
   "dep:async-net",
+  "dep:clipboard",
   "dep:home",
   "dep:pin-project-lite",
   "futures-util/async-await-macro",
@@ -31,6 +32,7 @@ smol_str = { workspace = true }
 walkdir = { workspace = true }
 
 async-net = { workspace = true, optional = true }
+clipboard = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }
 pin-project-lite = { workspace = true, optional = true }
 

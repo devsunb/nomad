@@ -17,7 +17,10 @@ use smol_str::ToSmolStr;
 
 use crate::backend::*;
 
-pub struct NeovimCopySessionIdError {}
+pub struct NeovimCopySessionIdError {
+    inner: clipboard::ClipboardError,
+    session_id: SessionId,
+}
 
 pub struct NeovimReadReplicaError {
     inner: default_read_replica::Error<Neovim>,
@@ -106,10 +109,11 @@ impl CollabBackend for Neovim {
     }
 
     async fn copy_session_id(
-        _session_id: SessionId,
-        _ctx: &mut AsyncCtx<'_, Self>,
+        session_id: SessionId,
+        _: &mut AsyncCtx<'_, Self>,
     ) -> Result<(), Self::CopySessionIdError> {
-        todo!();
+        clipboard::set(session_id)
+            .map_err(|inner| NeovimCopySessionIdError { inner, session_id })
     }
 
     async fn read_replica(
@@ -331,7 +335,12 @@ fn get_lua_value<T: mlua::FromLua>(namespace: &[&str]) -> Option<T> {
 
 impl notify::Error for NeovimCopySessionIdError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        todo!();
+        let mut msg = notify::Message::new();
+        msg.push_str("couldn't copy ")
+            .push_info(self.session_id.to_smolstr())
+            .push_str(" to clipboard: ")
+            .push_str(self.inner.to_smolstr());
+        (notify::Level::Error, msg)
     }
 }
 

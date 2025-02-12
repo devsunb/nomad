@@ -585,6 +585,7 @@ version = "0.1.0-dev"
 dependencies = [
  "async-net",
  "auth",
+ "clipboard",
  "collab-server",
  "concurrent-queue",
  "eerie",
