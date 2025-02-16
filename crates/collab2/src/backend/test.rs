@@ -27,7 +27,7 @@ pub struct CollabTestBackend<T> {
     clipboard: Option<SessionId>,
 }
 
-impl<T: Backend> CollabTestBackend<T> {
+impl<T> CollabTestBackend<T> {
     pub fn new(inner: T) -> Self {
         Self { inner, clipboard: None }
     }
@@ -136,5 +136,11 @@ impl CollabFs for nvimx2::tests::fs::TestFs {
         &mut self,
     ) -> Result<fs::AbsPathBuf, Self::HomeDirError> {
         todo!()
+    }
+}
+
+impl<T: Default> Default for CollabTestBackend<T> {
+    fn default() -> Self {
+        Self::new(T::default())
     }
 }

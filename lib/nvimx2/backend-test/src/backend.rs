@@ -89,3 +89,9 @@ impl Backend for TestBackend {
         crate::serde::deserialize(value)
     }
 }
+
+impl Default for TestBackend {
+    fn default() -> Self {
+        Self::new(TestFs::default())
+    }
+}

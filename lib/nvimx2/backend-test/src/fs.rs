@@ -23,7 +23,7 @@ use nvimx_core::fs::{
 };
 
 /// TODO: docs.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct TestFs {
     inner: Arc<Mutex<TestFsInner>>,
 }
@@ -98,13 +98,7 @@ struct TestWatchChannel {
 
 impl TestFs {
     pub fn new(root: TestDirectory) -> Self {
-        Self {
-            inner: Arc::new(Mutex::new(TestFsInner {
-                root: TestFsNode::Directory(root),
-                timestamp: TestTimestamp(0),
-                watchers: FxHashMap::default(),
-            })),
-        }
+        Self { inner: Arc::new(Mutex::new(TestFsInner::new(root))) }
     }
 
     #[allow(clippy::unwrap_used)]
@@ -182,6 +176,14 @@ impl TestFsInner {
 
     fn file_at_path(&mut self, path: &AbsPath) -> Option<&mut TestFile> {
         self.root().file_at_path(path)
+    }
+
+    fn new(root: TestDirectory) -> Self {
+        Self {
+            root: TestFsNode::Directory(root),
+            timestamp: TestTimestamp(0),
+            watchers: FxHashMap::default(),
+        }
     }
 
     fn node_at_path(&mut self, path: &AbsPath) -> Option<&mut TestFsNode> {
@@ -479,6 +481,12 @@ impl Symlink<TestFs> for TestSymlinkHandle {
         &self,
     ) -> Result<Option<FsNode<TestFs>>, Self::FollowError> {
         unreachable!()
+    }
+}
+
+impl Default for TestFsInner {
+    fn default() -> Self {
+        Self::new(TestDirectory::default())
     }
 }
 
