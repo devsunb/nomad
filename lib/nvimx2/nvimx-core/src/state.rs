@@ -1,4 +1,4 @@
-use core::any::{self, Any, TypeId};
+use core::any::{self, Any};
 use core::cell::Cell;
 use core::ops::{Deref, DerefMut};
 use std::backtrace::Backtrace;
@@ -8,15 +8,15 @@ use std::panic;
 use fxhash::FxHashMap;
 
 use crate::backend::Backend;
-use crate::module::Module;
+use crate::module::{Module, ModuleId};
 use crate::notify::Namespace;
-use crate::plugin::{PanicInfo, PanicLocation, Plugin};
+use crate::plugin::{PanicInfo, PanicLocation, Plugin, PluginId};
 use crate::{NeovimCtx, Shared};
 
 /// TODO: docs.
 pub(crate) struct State<B: Backend> {
     backend: B,
-    modules: FxHashMap<TypeId, ModuleState<B>>,
+    modules: FxHashMap<ModuleId, ModuleState<B>>,
     panic_hook: PanicHook,
 }
 
@@ -29,6 +29,14 @@ pub(crate) struct StateHandle<B: Backend> {
 pub(crate) struct StateMut<'a, B: Backend> {
     state: &'a mut State<B>,
     handle: &'a StateHandle<B>,
+}
+
+/// A trait implemented by types that can be passed to
+/// [`StateMut::with_ctx()`].
+pub(crate) trait StateMutWithCtxArgs<B: Backend>: Sized {
+    type Output;
+
+    fn call(self, ctx: &mut StateMut<'_, B>) -> Self::Output;
 }
 
 struct ModuleState<B: Backend> {
@@ -49,7 +57,7 @@ impl<B: Backend> State<B> {
     where
         M: Module<B>,
     {
-        match self.modules.entry(TypeId::of::<M>()) {
+        match self.modules.entry(ModuleId::of::<M>()) {
             Entry::Vacant(entry) => {
                 let module = Box::leak(Box::new(module));
                 entry.insert(ModuleState { module, panic_handler: None });
@@ -68,7 +76,7 @@ impl<B: Backend> State<B> {
     where
         P: Plugin<B>,
     {
-        match self.modules.entry(TypeId::of::<P>()) {
+        match self.modules.entry(ModuleId::of::<P>()) {
             Entry::Vacant(entry) => {
                 let plugin = Box::leak(Box::new(plugin));
                 entry.insert(ModuleState {
@@ -89,7 +97,7 @@ impl<B: Backend> State<B> {
     where
         M: Module<B>,
     {
-        self.modules.get(&TypeId::of::<M>()).map(|module_state| {
+        self.modules.get(&ModuleId::of::<M>()).map(|module_state| {
             // SAFETY: the TypeId matched.
             unsafe { downcast_ref_unchecked(module_state.module) }
         })
@@ -136,7 +144,7 @@ impl<B: Backend> StateMut<'_, B> {
     pub(crate) fn handle_panic(
         &mut self,
         namespace: &Namespace,
-        plugin_id: TypeId,
+        plugin_id: ModuleId,
         payload: Box<dyn Any + Send>,
     ) {
         let handler = self
@@ -146,31 +154,19 @@ impl<B: Backend> StateMut<'_, B> {
             .panic_handler
             .expect("TypeId is of a Module, not a Plugin");
         let info = self.panic_hook.to_info(payload);
-        #[allow(deprecated)]
-        let mut ctx = NeovimCtx::new(namespace, plugin_id, self.as_mut());
-        handler.handle_panic(info, &mut ctx);
+        todo!();
+        // #[allow(deprecated)]
+        // let mut ctx = NeovimCtx::new(namespace, plugin_id, self.as_mut());
+        // handler.handle_panic(info, &mut ctx);
     }
 
     #[track_caller]
     #[inline]
-    pub(crate) fn with_ctx<F, R>(
+    pub(crate) fn with_ctx<A: StateMutWithCtxArgs<B>>(
         &mut self,
-        namespace: &Namespace,
-        plugin_id: TypeId,
-        fun: F,
-    ) -> Option<R>
-    where
-        F: FnOnce(&mut NeovimCtx<B>) -> R,
-    {
-        #[allow(deprecated)]
-        let mut ctx = NeovimCtx::new(namespace, plugin_id, self.as_mut());
-        match panic::catch_unwind(panic::AssertUnwindSafe(|| fun(&mut ctx))) {
-            Ok(ret) => Some(ret),
-            Err(payload) => {
-                self.handle_panic(namespace, plugin_id, payload);
-                None
-            },
-        }
+        args: A,
+    ) -> A::Output {
+        args.call(self)
     }
 }
 
@@ -245,6 +241,59 @@ impl<B: Backend> DerefMut for StateMut<'_, B> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.state
+    }
+}
+
+impl<F, R, B> StateMutWithCtxArgs<B> for (PluginId, &Namespace, F)
+where
+    F: FnOnce(&mut NeovimCtx<B>) -> R,
+    B: Backend,
+{
+    type Output = Option<R>;
+
+    #[inline]
+    fn call(self, state: &mut StateMut<'_, B>) -> Self::Output {
+        let (plugin_id, namespace, callback) = self;
+        #[allow(deprecated)]
+        let mut ctx = NeovimCtx::new(namespace, state.as_mut());
+        match panic::catch_unwind(panic::AssertUnwindSafe(|| {
+            callback(&mut ctx)
+        })) {
+            Ok(ret) => Some(ret),
+            Err(payload) => {
+                state.handle_panic(namespace, plugin_id, payload);
+                None
+            },
+        }
+    }
+}
+
+impl<F, R, B> StateMutWithCtxArgs<B> for (&Namespace, F)
+where
+    F: FnOnce(&mut NeovimCtx<B>) -> R,
+    B: Backend,
+{
+    type Output = R;
+
+    #[inline]
+    fn call(self, state: &mut StateMut<'_, B>) -> Self::Output {
+        let (namespace, callback) = self;
+        #[allow(deprecated)]
+        callback(&mut NeovimCtx::new(namespace, state.as_mut()))
+    }
+}
+
+impl<F, R, B> StateMutWithCtxArgs<B> for F
+where
+    F: FnOnce(&mut NeovimCtx<B>) -> R,
+    B: Backend,
+{
+    type Output = R;
+
+    #[inline]
+    fn call(self, state: &mut StateMut<'_, B>) -> Self::Output {
+        #[allow(deprecated)]
+        self(&mut NeovimCtx::new(&Namespace::default(), state.as_mut()))
     }
 }
 

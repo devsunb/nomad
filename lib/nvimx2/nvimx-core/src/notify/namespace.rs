@@ -3,7 +3,7 @@ use smallvec::{SmallVec, smallvec};
 use crate::notify::Name;
 
 /// TODO: docs.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Namespace {
     names: SmallVec<[Name; 2]>,
 }

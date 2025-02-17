@@ -1,4 +1,3 @@
-use core::any::TypeId;
 use core::panic;
 
 use futures_lite::FutureExt;
@@ -19,7 +18,6 @@ use crate::{AsyncCtx, BufferCtx};
 /// TODO: docs.
 pub struct NeovimCtx<'a, B: Backend> {
     namespace: &'a Namespace,
-    plugin_id: TypeId,
     state: StateMut<'a, B>,
 }
 
@@ -102,11 +100,8 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     where
         Fun: AsyncFnOnce(&mut AsyncCtx<B>) + 'static,
     {
-        let mut ctx = AsyncCtx::new(
-            self.namespace.clone(),
-            self.plugin_id,
-            self.state.handle(),
-        );
+        let mut ctx =
+            AsyncCtx::new(self.namespace.clone(), self.state.handle());
 
         self.local_executor()
             .spawn(async move {
@@ -125,16 +120,13 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
                 // will have already finished running.
                 futures_lite::future::yield_now().await;
 
-                if let Err(payload) =
+                if let Err(_payload) =
                     panic::AssertUnwindSafe(fun(&mut ctx)).catch_unwind().await
                 {
-                    ctx.state().with_mut(|mut state| {
-                        state.handle_panic(
-                            ctx.namespace(),
-                            ctx.plugin_id(),
-                            payload,
-                        );
-                    })
+                    todo!();
+                    // ctx.state().with_mut(|mut state| {
+                    //     state.handle_panic(ctx.namespace(), payload);
+                    // })
                 }
             })
             .detach();
@@ -180,10 +172,9 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     #[deprecated(note = "use `StateMut::with_ctx()` instead")]
     #[inline]
     pub(crate) fn new(
-        namespace: &'a Namespace,
-        plugin_id: TypeId,
-        state: StateMut<'a, B>,
+        _namespace: &'a Namespace,
+        _state: StateMut<'a, B>,
     ) -> Self {
-        Self { namespace, plugin_id, state }
+        todo!();
     }
 }

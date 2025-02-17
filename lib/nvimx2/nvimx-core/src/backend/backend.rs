@@ -16,6 +16,7 @@ use crate::backend::{
 };
 use crate::notify::{self, Emitter, MaybeResult};
 use crate::plugin::Plugin;
+use crate::state::StateHandle;
 use crate::{AsyncCtx, NeovimCtx, fs};
 
 /// TODO: docs.
@@ -178,8 +179,8 @@ pub trait Backend: 'static + Sized {
             // the Neovim executor because that would block the entire event loop.
             // So we may only be able to define this on the `TestBackend`.
             //
-            // Actually, we can still define it, but we can't make it blocking, we
-            // have to make it async.
+            // Actually, we can still define it, but we can't make it blocking,
+            // we have to make it async.
             //
             // let executor = self.local_executor().clone();
             // executor.block_on()
@@ -192,11 +193,7 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     #[inline]
-    fn with_ctx<R>(self, _fun: impl FnOnce(&mut NeovimCtx<Self>) -> R) -> R {
-        // The Namespace can be omitted, it'll just be empty.
-        // The plugin_id can be omitted, panics will just be propagated instead
-        // of being caught.
-        // StateHandle::new(self).with_mut(|s| s.with_ctx(|ctx| fun(ctx)))
-        todo!();
+    fn with_ctx<R>(self, fun: impl FnOnce(&mut NeovimCtx<Self>) -> R) -> R {
+        StateHandle::new(self).with_mut(|mut s| s.with_ctx(fun))
     }
 }
