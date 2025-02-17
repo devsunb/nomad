@@ -19,7 +19,7 @@ pub(crate) struct SessionGuard<State> {
 }
 
 /// TODO: docs.
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub(crate) enum SessionState {
     Active(SessionId),
     Starting,
@@ -40,6 +40,7 @@ struct SessionsGuardInner {
 }
 
 /// TODO: docs.
+#[derive(Debug)]
 pub struct OverlappingSessionError {
     pub(crate) existing_root: fs::AbsPathBuf,
     pub(crate) existing_state: SessionState,

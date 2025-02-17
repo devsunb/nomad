@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+use core::fmt;
 use core::marker::PhantomData;
 
 use auth::AuthInfos;
@@ -93,19 +94,27 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
 }
 
 /// The type of error that can occur when [`Start`]ing a new session fails.
+#[derive(derive_more::Debug)]
+#[debug(bound(B: CollabBackend))]
 pub enum StartError<B: CollabBackend> {
     /// TODO: docs.
     NoBufferFocused(NoBufferFocusedError<B>),
+
     /// TODO: docs.
     OverlappingSession(OverlappingSessionError),
+
     /// TODO: docs.
     ReadReplica(B::ReadReplicaError),
+
     /// TODO: docs.
     SearchProjectRoot(B::SearchProjectRootError),
+
     /// TODO: docs.
     SessionRxDropped(SessionRxDroppedError<B>),
+
     /// TODO: docs.
     StartSession(B::StartSessionError),
+
     /// TODO: docs.
     UserNotLoggedIn(UserNotLoggedInError<B>),
 }
@@ -148,15 +157,18 @@ impl<B: CollabBackend> ToCompletionFn<B> for Start<B> {
 }
 
 impl<B: CollabBackend> StartError<B> {
-    fn no_buffer_focused() -> Self {
+    /// Creates a new [`StartError::NoBufferFocused`] variant.
+    pub fn no_buffer_focused() -> Self {
         Self::NoBufferFocused(NoBufferFocusedError(PhantomData))
     }
 
-    fn session_rx_dropped() -> Self {
+    /// Creates a new [`StartError::SessionRxDropped`] variant.
+    pub fn session_rx_dropped() -> Self {
         Self::SessionRxDropped(SessionRxDroppedError(PhantomData))
     }
 
-    fn user_not_logged_in() -> Self {
+    /// Creates a new [`StartError::UserNotLoggedIn`] variant.
+    pub fn user_not_logged_in() -> Self {
         Self::UserNotLoggedIn(UserNotLoggedInError(PhantomData))
     }
 }
@@ -172,6 +184,24 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
             StartError::StartSession(err) => err.to_message(),
             StartError::UserNotLoggedIn(err) => err.to_message(),
         }
+    }
+}
+
+impl<B> fmt::Debug for NoBufferFocusedError<B> {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl<B> fmt::Debug for SessionRxDroppedError<B> {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
+    }
+}
+
+impl<B> fmt::Debug for UserNotLoggedInError<B> {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Ok(())
     }
 }
 

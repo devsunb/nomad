@@ -17,11 +17,13 @@ use smol_str::ToSmolStr;
 
 use crate::backend::*;
 
+#[derive(Debug)]
 pub struct NeovimCopySessionIdError {
     inner: clipboard::ClipboardError,
     session_id: SessionId,
 }
 
+#[derive(Debug)]
 pub struct NeovimReadReplicaError {
     inner: default_read_replica::Error<Neovim>,
 }
@@ -40,23 +42,28 @@ pin_project_lite::pin_project! {
     }
 }
 
+#[derive(Debug)]
 pub struct NeovimServerTxError {
     inner: io::Error,
 }
 
+#[derive(Debug)]
 pub struct NeovimServerRxError {
     inner: client::ClientRxError,
 }
 
+#[derive(Debug)]
 pub struct NeovimSearchProjectRootError {
     inner: default_search_project_root::Error<Neovim>,
 }
 
+#[derive(Debug)]
 pub enum NeovimStartSessionError {
     Knock(client::KnockError<nomad::NomadAuthenticator>),
     TcpConnect(io::Error),
 }
 
+#[derive(Debug)]
 pub enum NeovimHomeDirError {
     CouldntFindHome,
     InvalidHomeDir(PathBuf, fs::AbsPathFromPathError),
@@ -493,13 +500,13 @@ impl notify::Error for NeovimServerRxError {
 impl fmt::Display for TildePath<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Some(home_dir) = self.home_dir else {
-            return self.path.fmt(f);
+            return fmt::Display::fmt(&self.path, f);
         };
 
         if self.path.starts_with(home_dir) && self.path != home_dir {
             write!(f, "~{}", &self.path[home_dir.len()..])
         } else {
-            self.path.fmt(f)
+            fmt::Display::fmt(&self.path, f)
         }
     }
 }

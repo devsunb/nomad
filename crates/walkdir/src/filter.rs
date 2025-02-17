@@ -1,3 +1,6 @@
+use core::error::Error;
+use core::fmt;
+
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select};
 use nvimx2::fs;
@@ -7,7 +10,7 @@ use crate::WalkDir;
 /// TODO: docs.
 pub trait Filter<W: WalkDir> {
     /// TODO: docs.
-    type Error;
+    type Error: Error;
 
     /// TODO: docs.
     fn should_filter(
@@ -39,6 +42,7 @@ pub struct And<F1, F2> {
 }
 
 /// TODO: docs.
+#[derive(Debug)]
 pub enum Either<L, R> {
     /// TODO: docs.
     Left(L),
@@ -146,6 +150,7 @@ impl<F, E, W> Filter<W> for F
 where
     F: AsyncFn(&fs::AbsPath, &W::DirEntry) -> Result<bool, E>,
     W: WalkDir,
+    E: Error,
 {
     type Error = E;
 
@@ -186,4 +191,60 @@ where
             }
         }
     }
+}
+
+impl<L, R> fmt::Display for Either<L, R>
+where
+    L: fmt::Display,
+    R: fmt::Display,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Either::Left(left) => left.fmt(f),
+            Either::Right(right) => right.fmt(f),
+        }
+    }
+}
+
+impl<L, R> Error for Either<L, R>
+where
+    L: Error,
+    R: Error,
+{
+}
+
+impl<F, W> fmt::Debug for FilteredDirEntryError<F, W>
+where
+    F: Filter<W>,
+    W: WalkDir,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FilteredDirEntryError::Filter(err) => err.fmt(f),
+            FilteredDirEntryError::Walker(err) => err.fmt(f),
+        }
+    }
+}
+
+impl<F, W> fmt::Display for FilteredDirEntryError<F, W>
+where
+    F: Filter<W>,
+    W: WalkDir,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FilteredDirEntryError::Filter(err) => err.fmt(f),
+            FilteredDirEntryError::Walker(err) => err.fmt(f),
+        }
+    }
+}
+
+impl<F, W> Error for FilteredDirEntryError<F, W>
+where
+    F: Filter<W>,
+    W: WalkDir,
+{
 }

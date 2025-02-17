@@ -1,4 +1,5 @@
 use core::convert::Infallible;
+use core::error::Error;
 use core::pin::Pin;
 
 use futures_util::stream::{self, Stream, StreamExt};
@@ -17,10 +18,10 @@ pub trait WalkDir: Sized {
     type DirEntry: fs::DirEntry<Self::Fs>;
 
     /// TODO: docs.
-    type DirEntryError;
+    type DirEntryError: Error;
 
     /// TODO: docs.
-    type ReadDirError;
+    type ReadDirError: Error;
 
     /// TODO: docs.
     fn read_dir(
@@ -174,6 +175,7 @@ pub type ForEachError<W, E> = WalkError<Either<WalkErrorKind<W>, E>>;
 pub type PathsError<W> = WalkError<WalkErrorKind<W>>;
 
 /// TODO: docs.
+#[derive(Debug)]
 pub struct WalkError<K> {
     /// TODO: docs.
     pub dir_path: fs::AbsPathBuf,
@@ -183,6 +185,8 @@ pub struct WalkError<K> {
 }
 
 /// TODO: docs.
+#[derive(derive_more::Debug)]
+#[debug(bound(W: WalkDir))]
 pub enum WalkErrorKind<W: WalkDir> {
     /// TODO: docs.
     DirEntry(W::DirEntryError),

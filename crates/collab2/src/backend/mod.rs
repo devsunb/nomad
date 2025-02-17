@@ -5,6 +5,8 @@ mod neovim;
 #[cfg(feature = "test")]
 pub mod test;
 
+use core::fmt::Debug;
+
 use collab_server::SessionId;
 use collab_server::message::{Message, Peer, Peers};
 use eerie::{PeerId, Replica};
@@ -25,15 +27,15 @@ pub trait CollabBackend:
 {
     /// The type of error returned by
     /// [`copy_session_id`](CollabBackend::copy_session_id).
-    type CopySessionIdError: notify::Error;
+    type CopySessionIdError: Debug + notify::Error;
 
     /// The type of error returned by
     /// [`read_replica`](CollabBackend::read_replica).
-    type ReadReplicaError: notify::Error;
+    type ReadReplicaError: Debug + notify::Error;
 
     /// The type of error returned by
     /// [`search_project_root`](CollabBackend::search_project_root).
-    type SearchProjectRootError: notify::Error;
+    type SearchProjectRootError: Debug + notify::Error;
 
     /// TODO: docs.
     type ServerTx: Sink<Message, Error = Self::ServerTxError>;
@@ -42,17 +44,17 @@ pub trait CollabBackend:
     type ServerRx: Stream<Item = Result<Message, Self::ServerRxError>>;
 
     /// TODO: docs.
-    type ServerTxError: notify::Error;
+    type ServerTxError: Debug + notify::Error;
 
     /// TODO: docs.
-    type ServerRxError: notify::Error;
+    type ServerRxError: Debug + notify::Error;
 
     /// The type of error returned by
     /// [`start_session`](CollabBackend::start_session).
-    type StartSessionError: notify::Error;
+    type StartSessionError: Debug + notify::Error;
 
     /// The type of error returned by [`lsp_root`](CollabBuffer::lsp_root).
-    type BufferLspRootError;
+    type BufferLspRootError: Debug;
 
     /// Asks the user to confirm starting a new collaborative editing session
     /// rooted at the given path.
@@ -100,7 +102,7 @@ pub trait CollabBackend:
 /// actions in this crate.
 pub trait CollabBuffer: Buffer {
     /// The type of error returned by [`lsp_root`](CollabBuffer::lsp_root).
-    type LspRootError;
+    type LspRootError: Debug;
 
     /// Returns the path to the root of the workspace containing the buffer
     /// with the given ID, or `None` if there's no language server attached to
@@ -230,6 +232,8 @@ mod default_read_replica {
         Ok(builder.build())
     }
 
+    #[derive(derive_more::Debug)]
+    #[debug(bound(B: CollabBackend))]
     pub(super) enum Error<B: CollabBackend> {
         Walk(WalkError<Either<WalkErrorKind<B::Fs>, <<B::Fs as fs::Fs>::DirEntry as fs::DirEntry<B::Fs>>::MetadataError>>),
     }
@@ -291,6 +295,8 @@ mod default_search_project_root {
             .ok_or(Error::CouldntFindRoot(buffer_path))
     }
 
+    #[derive(derive_more::Debug)]
+    #[debug(bound(B: CollabBackend))]
     pub(super) enum Error<B: CollabBackend> {
         BufNameNotAbsolutePath(String),
         CouldntFindRoot(fs::AbsPathBuf),
@@ -303,6 +309,7 @@ mod default_search_project_root {
 
 #[cfg(any(feature = "neovim", feature = "test"))]
 mod root_markers {
+    use core::error::Error;
     use core::fmt;
     use std::borrow::Cow;
 
@@ -331,7 +338,7 @@ mod root_markers {
     pub struct GitDirectory;
 
     pub trait RootMarker<Fs: fs::Fs> {
-        type Error;
+        type Error: Error;
 
         fn matches(
             &self,
@@ -339,6 +346,8 @@ mod root_markers {
         ) -> impl Future<Output = Result<bool, Self::Error>>;
     }
 
+    #[derive(derive_more::Debug)]
+    #[debug(bounds(Fs: fs::Fs, M: RootMarker<Fs>))]
     pub struct FindRootError<Fs: fs::Fs, M: RootMarker<Fs>> {
         /// The path to the file or directory at which the error occurred.
         pub path: fs::AbsPathBuf,
@@ -347,6 +356,8 @@ mod root_markers {
         pub kind: FindRootErrorKind<Fs, M>,
     }
 
+    #[derive(derive_more::Debug)]
+    #[debug(bounds(Fs: fs::Fs, M: RootMarker<Fs>))]
     pub enum FindRootErrorKind<Fs: fs::Fs, M: RootMarker<Fs>> {
         DirEntry(DirEntryError<Fs>),
         FollowSymlink(<Fs::Symlink as fs::Symlink<Fs>>::FollowError),
@@ -357,6 +368,8 @@ mod root_markers {
         StartsAtDanglingSymlink,
     }
 
+    #[derive(derive_more::Debug)]
+    #[debug(bound(Fs: fs::Fs))]
     pub enum DirEntryError<Fs: fs::Fs> {
         Access(Fs::DirEntryError),
         Name(<Fs::DirEntry as fs::DirEntry<Fs>>::NameError),
@@ -586,4 +599,6 @@ mod root_markers {
             }
         }
     }
+
+    impl<Fs: fs::Fs> Error for DirEntryError<Fs> {}
 }

@@ -1,3 +1,5 @@
+use core::fmt::Debug;
+
 use serde::Serialize;
 use serde::de::Deserialize;
 
@@ -25,7 +27,7 @@ pub trait Backend: 'static + Sized {
     type Buffer<'a>: Buffer<Id = Self::BufferId>;
 
     /// TODO: docs.
-    type BufferId: Clone;
+    type BufferId: Clone + Debug;
 
     /// TODO: docs.
     type LocalExecutor: LocalExecutor;
