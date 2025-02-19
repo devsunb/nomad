@@ -7,8 +7,8 @@ use crate::backend::{
     BackgroundExecutor,
     BufferId,
     LocalExecutor,
-    Task,
     TaskBackground,
+    TaskLocal,
 };
 use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
@@ -83,53 +83,60 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     }
 
     /// TODO: docs.
+    #[must_use = "task handles do nothing unless awaited or detached"]
     #[inline]
-    pub fn spawn_background<Fut>(&mut self, fut: Fut)
+    pub fn spawn_background<Fut>(
+        &mut self,
+        fut: Fut,
+    ) -> TaskBackground<Fut::Output, B>
     where
         Fut: Future<Output = ()> + Send + 'static,
     {
-        TaskBackground::<(), B>::new(
-            self.backend_mut().background_executor().spawn(fut),
-        )
-        .detach();
+        let task = self.backend_mut().background_executor().spawn(fut);
+        TaskBackground::<(), B>::new(task)
     }
 
     /// TODO: docs.
+    #[must_use = "task handles do nothing unless awaited or detached"]
     #[inline]
-    pub fn spawn_local<Fun>(&mut self, fun: Fun)
+    pub fn spawn_local<Out>(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> Out + 'static,
+    ) -> TaskLocal<Out, B>
     where
-        Fun: AsyncFnOnce(&mut AsyncCtx<B>) + 'static,
+        Out: 'static,
     {
         let mut ctx =
             AsyncCtx::new(self.namespace.clone(), self.state.handle());
 
-        self.local_executor()
-            .spawn(async move {
-                // Yielding prevents a panic that would occur when:
-                //
-                // - the local executor immediately polls the future when a new
-                //   task is spawned, and
-                // - `AsyncCtx::with_ctx()` is called before the first `.await`
-                //   point is reached
-                //
-                // In that case, `with_ctx()` would panic because `State` is
-                // already mutably borrowed in this `NeovimCtx`.
-                //
-                // Yielding guarantees that by the time `with_ctx()` is called,
-                // the synchronous code in which the `AsyncCtx` was created
-                // will have already finished running.
-                futures_lite::future::yield_now().await;
+        let task = self.local_executor().spawn(async move {
+            // Yielding prevents a panic that would occur when:
+            //
+            // - the local executor immediately polls the future when a new
+            //   task is spawned, and
+            // - `AsyncCtx::with_ctx()` is called before the first `.await`
+            //   point is reached
+            //
+            // In that case, `with_ctx()` would panic because `State` is
+            // already mutably borrowed in this `NeovimCtx`.
+            //
+            // Yielding guarantees that by the time `with_ctx()` is called,
+            // the synchronous code in which the `AsyncCtx` was created
+            // will have already finished running.
+            futures_lite::future::yield_now().await;
 
-                if let Err(_payload) =
-                    panic::AssertUnwindSafe(fun(&mut ctx)).catch_unwind().await
-                {
-                    todo!();
-                    // ctx.state().with_mut(|mut state| {
-                    //     state.handle_panic(ctx.namespace(), payload);
-                    // })
-                }
-            })
-            .detach();
+            match panic::AssertUnwindSafe(fun(&mut ctx)).catch_unwind().await {
+                Ok(ret) => ret,
+                Err(_payload) => {
+                    ctx.state().with_mut(|_state| {
+                        // state.handle_panic(ctx.namespace(), payload);
+                        todo!();
+                    })
+                },
+            }
+        });
+
+        TaskLocal::<_, B>::new(task)
     }
 
     /// TODO: docs.

@@ -40,6 +40,7 @@ where
             if let Err(err) = this.call(args, ctx).await.into_result() {
                 ctx.emit_err(err);
             }
-        });
+        })
+        .detach();
     }
 }

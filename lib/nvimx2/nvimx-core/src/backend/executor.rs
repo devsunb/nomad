@@ -43,6 +43,14 @@ pin_project_lite::pin_project! {
     }
 }
 
+pin_project_lite::pin_project! {
+    /// TODO: docs.
+    pub struct TaskLocal<T, B: Backend> {
+        #[pin]
+        inner: <<B as Backend>::LocalExecutor as LocalExecutor>::Task<T>,
+    }
+}
+
 impl<T, B: Backend> TaskBackground<T, B> {
     /// TODO: docs.
     #[inline]
@@ -58,7 +66,31 @@ impl<T, B: Backend> TaskBackground<T, B> {
     }
 }
 
+impl<T, B: Backend> TaskLocal<T, B> {
+    /// TODO: docs.
+    #[inline]
+    pub fn detach(self) {
+        self.inner.detach();
+    }
+
+    #[inline]
+    pub(crate) fn new(
+        inner: <<B as Backend>::LocalExecutor as LocalExecutor>::Task<T>,
+    ) -> Self {
+        Self { inner }
+    }
+}
+
 impl<T, B: Backend> Future for TaskBackground<T, B> {
+    type Output = T;
+
+    #[inline]
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        self.project().inner.poll(cx)
+    }
+}
+
+impl<T, B: Backend> Future for TaskLocal<T, B> {
     type Output = T;
 
     #[inline]

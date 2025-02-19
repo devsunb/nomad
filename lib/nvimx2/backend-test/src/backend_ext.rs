@@ -6,17 +6,20 @@ use crate::executor::TestExecutor;
 /// TODO: docs.
 pub trait BackendExt: Backend {
     /// TODO: docs.
-    fn block_on<R>(
+    fn block_on<R: 'static>(
         mut self,
-        fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R,
+        fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R + 'static,
     ) -> R
     where
-        Self::LocalExecutor: AsRef<TestExecutor>,
+        Self::LocalExecutor: AsMut<TestExecutor>,
     {
-        self.local_executor()
-            .as_ref()
-            .clone()
-            .block_on(self.with_async_ctx(fun))
+        let runner = self
+            .local_executor()
+            .as_mut()
+            .take_runner()
+            .expect("runner has not been taken");
+
+        runner.block_on(self.with_ctx(move |ctx| ctx.spawn_local(fun)))
     }
 }
 

@@ -67,9 +67,11 @@ impl<B: CollabBackend> Module<B> for Collab<B> {
                     if let Err(err) = session.run(ctx).await {
                         ctx.emit_err(err);
                     }
-                });
+                })
+                .detach();
             }
-        });
+        })
+        .detach();
     }
 
     fn on_new_config(&self, new_config: Self::Config, _: &mut NeovimCtx<B>) {

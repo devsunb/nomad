@@ -1,7 +1,6 @@
-use core::any::TypeId;
 use core::marker::PhantomData;
 
-use crate::backend::{Backend, BackgroundExecutor, TaskBackground};
+use crate::backend::{Backend, BackgroundExecutor, TaskBackground, TaskLocal};
 use crate::notify::{Namespace, NotificationId};
 use crate::state::StateHandle;
 use crate::{BufferCtx, NeovimCtx, notify};
@@ -42,6 +41,7 @@ impl<B: Backend> AsyncCtx<'_, B> {
     }
 
     /// TODO: docs.
+    #[must_use = "task handles do nothing unless awaited or detached"]
     #[inline]
     pub fn spawn_background<Fut>(
         &self,
@@ -58,12 +58,16 @@ impl<B: Backend> AsyncCtx<'_, B> {
     }
 
     /// TODO: docs.
+    #[must_use = "task handles do nothing unless awaited or detached"]
     #[inline]
-    pub fn spawn_local<Fut>(&self, fut: Fut)
+    pub fn spawn_local<Out>(
+        &self,
+        fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> Out + 'static,
+    ) -> TaskLocal<Out, B>
     where
-        Fut: AsyncFnOnce(&mut AsyncCtx<B>) + 'static,
+        Out: 'static,
     {
-        self.with_ctx(move |ctx| ctx.spawn_local(fut));
+        self.with_ctx(move |ctx| ctx.spawn_local(fun))
     }
 
     /// TODO: docs.

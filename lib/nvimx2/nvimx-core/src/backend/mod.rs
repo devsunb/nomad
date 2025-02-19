@@ -11,7 +11,13 @@ pub use api::Api;
 pub use backend::Backend;
 pub use backend_adapter::BackendAdapter;
 pub use buffer::Buffer;
-pub use executor::{BackgroundExecutor, LocalExecutor, Task, TaskBackground};
+pub use executor::{
+    BackgroundExecutor,
+    LocalExecutor,
+    Task,
+    TaskBackground,
+    TaskLocal,
+};
 pub use value::{Key, MapAccess, Value};
 
 /// TODO: docs.

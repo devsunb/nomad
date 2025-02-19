@@ -7,8 +7,8 @@ use futures_lite::FutureExt;
 use nvimx_core::backend::{BackgroundExecutor, LocalExecutor, Task};
 
 pub struct TestExecutor {
-    runnable_tx: Sender<Runnable>,
-    runnable_rx: Receiver<Runnable>,
+    runner: Option<Runner>,
+    spawner: Spawner,
 }
 
 pin_project_lite::pin_project! {
@@ -18,12 +18,26 @@ pin_project_lite::pin_project! {
     }
 }
 
+pub(crate) struct Spawner {
+    runnable_tx: Sender<Runnable>,
+}
+
+pub(crate) struct Runner {
+    runnable_rx: Receiver<Runnable>,
+}
+
 impl TestExecutor {
-    pub fn block_on<T>(&self, future: impl Future<Output = T>) -> T {
+    pub(crate) fn take_runner(&mut self) -> Option<Runner> {
+        self.runner.take()
+    }
+}
+
+impl Runner {
+    pub(crate) fn block_on<Fut: Future>(&self, future: Fut) -> Fut::Output {
         futures_lite::future::block_on(self.run(future))
     }
 
-    pub async fn run<T>(&self, future: impl Future<Output = T>) -> T {
+    async fn run<Fut: Future>(&self, future: Fut) -> Fut::Output {
         let keep_polling_runnables = async {
             loop {
                 self.runnable_rx
@@ -35,12 +49,34 @@ impl TestExecutor {
         };
         future.or(keep_polling_runnables).await
     }
+}
 
+impl Spawner {
     fn schedule(&self) -> impl Fn(Runnable) + Send + Sync + 'static {
         let runnable_tx = self.runnable_tx.clone();
         move |runnable| {
             let _ = runnable_tx.send(runnable);
         }
+    }
+
+    fn spawn_background<Fut>(&self, fut: Fut) -> TestTask<Fut::Output>
+    where
+        Fut: Future + Send + 'static,
+        Fut::Output: Send + 'static,
+    {
+        let (runnable, task) = async_task::spawn(fut, self.schedule());
+        runnable.schedule();
+        TestTask { inner: task }
+    }
+
+    fn spawn_local<Fut>(&self, fut: Fut) -> TestTask<Fut::Output>
+    where
+        Fut: Future + 'static,
+        Fut::Output: 'static,
+    {
+        let (runnable, task) = async_task::spawn_local(fut, self.schedule());
+        runnable.schedule();
+        TestTask { inner: task }
     }
 }
 
@@ -52,9 +88,7 @@ impl LocalExecutor for TestExecutor {
         Fut: Future + 'static,
         Fut::Output: 'static,
     {
-        let (runnable, task) = async_task::spawn_local(fut, self.schedule());
-        runnable.schedule();
-        TestTask { inner: task }
+        self.spawner.spawn_local(fut)
     }
 }
 
@@ -66,9 +100,7 @@ impl BackgroundExecutor for TestExecutor {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        let (runnable, task) = async_task::spawn(fut, self.schedule());
-        runnable.schedule();
-        TestTask { inner: task }
+        self.spawner.spawn_background(fut)
     }
 }
 
@@ -78,16 +110,19 @@ impl AsRef<Self> for TestExecutor {
     }
 }
 
-impl Clone for TestExecutor {
-    fn clone(&self) -> Self {
-        todo!()
+impl AsMut<Self> for TestExecutor {
+    fn as_mut(&mut self) -> &mut Self {
+        self
     }
 }
 
 impl Default for TestExecutor {
     fn default() -> Self {
         let (runnable_tx, runnable_rx) = flume::unbounded();
-        Self { runnable_tx, runnable_rx }
+        Self {
+            runner: Some(Runner { runnable_rx }),
+            spawner: Spawner { runnable_tx },
+        }
     }
 }
 
