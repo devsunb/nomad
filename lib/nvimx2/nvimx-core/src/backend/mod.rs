@@ -2,14 +2,12 @@
 
 mod api;
 mod backend;
-mod backend_adapter;
 mod buffer;
 mod executor;
 mod value;
 
 pub use api::Api;
 pub use backend::Backend;
-pub use backend_adapter::BackendAdapter;
 pub use buffer::Buffer;
 pub use executor::{
     BackgroundExecutor,
