@@ -1,7 +1,6 @@
 use core::convert::Infallible;
-use std::borrow::Cow;
 
-use nvimx2::fs::{self, FsNodeKind, FsNodeName, FsNodeNameBuf, Metadata};
+use nvimx2::fs::{self, FsNodeKind, FsNodeName, FsNodeNameBuf};
 
 use crate::{WalkDir, WalkErrorKind};
 
@@ -9,7 +8,7 @@ use crate::{WalkDir, WalkErrorKind};
 pub struct DirEntry<'a, W: WalkDir> {
     inner: W::DirEntry,
     name: FsNodeNameBuf,
-    node_kind: Option<FsNodeKind>,
+    node_kind: FsNodeKind,
     parent_path: &'a fs::AbsPath,
 }
 
@@ -37,7 +36,7 @@ impl<'a, W: WalkDir> DirEntry<'a, W> {
 
     /// TODO: docs.
     #[allow(clippy::same_name_method)]
-    pub fn node_kind(&self) -> Option<FsNodeKind> {
+    pub fn node_kind(&self) -> FsNodeKind {
         self.node_kind
     }
 
@@ -58,36 +57,41 @@ impl<'a, W: WalkDir> DirEntry<'a, W> {
         parent_path: &'a fs::AbsPath,
         inner: W::DirEntry,
     ) -> Result<Self, WalkErrorKind<W>> {
-        use fs::DirEntry;
+        use fs::Metadata;
         let node_kind = inner
             .node_kind()
             .await
             .map_err(WalkErrorKind::DirEntryNodeKind)?;
-        let name = inner
-            .name()
-            .await
-            .map(Cow::into_owned)
-            .map_err(WalkErrorKind::DirEntryName)?;
+        let name = inner.name().await.map_err(WalkErrorKind::DirEntryName)?;
         Ok(Self { inner, name, node_kind, parent_path })
     }
 }
 
-impl<W: WalkDir> fs::DirEntry<W::Fs> for DirEntry<'_, W> {
-    type MetadataError = <W::DirEntry as fs::DirEntry<W::Fs>>::MetadataError;
+impl<W: WalkDir> fs::Metadata<<W::Fs as fs::Fs>::Timestamp>
+    for DirEntry<'_, W>
+{
+    type Error =
+        <W::DirEntry as fs::Metadata<<W::Fs as fs::Fs>::Timestamp>>::Error;
     type NameError = Infallible;
     type NodeKindError = Infallible;
 
-    async fn metadata(&self) -> Result<Metadata<W::Fs>, Self::MetadataError> {
-        self.inner.metadata().await
-    }
-
-    async fn name(&self) -> Result<Cow<'_, FsNodeName>, Self::NameError> {
-        Ok(Cow::Borrowed(&self.name))
-    }
-
-    async fn node_kind(
+    async fn created_at(
         &self,
-    ) -> Result<Option<FsNodeKind>, Self::NodeKindError> {
+    ) -> Result<Option<<W::Fs as fs::Fs>::Timestamp>, Self::Error> {
+        self.inner.created_at().await
+    }
+
+    async fn last_modified_at(
+        &self,
+    ) -> Result<Option<<W::Fs as fs::Fs>::Timestamp>, Self::Error> {
+        self.inner.last_modified_at().await
+    }
+
+    async fn name(&self) -> Result<FsNodeNameBuf, Self::NameError> {
+        Ok(self.name.clone())
+    }
+
+    async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {
         Ok(self.node_kind)
     }
 }

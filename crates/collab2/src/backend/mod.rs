@@ -168,7 +168,7 @@ mod default_read_replica {
 
     use concurrent_queue::{ConcurrentQueue, PushError};
     use eerie::ReplicaBuilder;
-    use fs::{DirEntry, FsNodeKind};
+    use fs::FsNodeKind;
     use nvimx2::ByteOffset;
     use walkdir::{Either, WalkDir, WalkError, WalkErrorKind};
 
@@ -187,11 +187,9 @@ mod default_read_replica {
             let op_queue = Arc::new(ConcurrentQueue::unbounded());
             let op_queue2 = Arc::clone(&op_queue);
             let handler = async move |entry: walkdir::DirEntry<'_, _>| {
-                let Some(node_kind) = entry.node_kind() else { return Ok(()) };
-                let op = match node_kind {
+                let op = match entry.node_kind() {
                     FsNodeKind::File => {
-                        let meta = entry.metadata().await?;
-                        PushNode::File(entry.path(), meta.len)
+                        PushNode::File(entry.path(), entry.len().await?)
                     },
                     FsNodeKind::Directory => PushNode::Directory(entry.path()),
                     FsNodeKind::Symlink => return Ok(()),
@@ -315,7 +313,7 @@ mod root_markers {
 
     use futures_util::stream::{self, StreamExt};
     use futures_util::{pin_mut, select};
-    use nvimx2::fs::{self, DirEntry, Symlink};
+    use nvimx2::fs::{self, Symlink};
     use nvimx2::notify;
     use smol_str::ToSmolStr;
 
@@ -342,7 +340,7 @@ mod root_markers {
 
         fn matches(
             &self,
-            dir_entry: &Fs::DirEntry,
+            dir_entry: &<Fs::Directory as fs::Directory>::Metadata,
         ) -> impl Future<Output = Result<bool, Self::Error>>;
     }
 
@@ -360,10 +358,10 @@ mod root_markers {
     #[debug(bounds(Fs: fs::Fs, M: RootMarker<Fs>))]
     pub enum FindRootErrorKind<Fs: fs::Fs, M: RootMarker<Fs>> {
         DirEntry(DirEntryError<Fs>),
-        FollowSymlink(<Fs::Symlink as fs::Symlink<Fs>>::FollowError),
+        FollowSymlink(<Fs::Symlink as fs::Symlink>::FollowError),
         Marker { dir_entry_name: Option<fs::FsNodeNameBuf>, err: M::Error },
         NodeAtStartPath(Fs::NodeAtPathError),
-        ReadDir(Fs::ReadDirError),
+        ReadDir(<Fs::Directory as fs::Directory>::ReadError),
         StartPathNotFound,
         StartsAtDanglingSymlink,
     }
@@ -371,9 +369,17 @@ mod root_markers {
     #[derive(derive_more::Debug)]
     #[debug(bound(Fs: fs::Fs))]
     pub enum DirEntryError<Fs: fs::Fs> {
-        Access(Fs::DirEntryError),
-        Name(<Fs::DirEntry as fs::DirEntry<Fs>>::NameError),
-        NodeKind(<Fs::DirEntry as fs::DirEntry<Fs>>::NodeKindError),
+        Access(<Fs::Directory as fs::Directory>::ReadError),
+        Name(
+            <<Fs::Directory as fs::Directory>::Metadata as fs::Metadata<
+                Fs::Timestamp,
+            >>::NameError,
+        ),
+        NodeKind(
+            <<Fs::Directory as fs::Directory>::Metadata as fs::Metadata<
+                Fs::Timestamp,
+            >>::NodeKindError,
+        ),
     }
 
     impl<M> FindRootArgs<'_, M> {
@@ -514,13 +520,15 @@ mod root_markers {
 
         async fn matches(
             &self,
-            dir_entry: &Fs::DirEntry,
+            dir_entry: &<Fs::Directory as fs::Directory>::Metadata,
         ) -> Result<bool, Self::Error> {
+            use fs::Metadata;
             Ok(dir_entry.name().await.map_err(DirEntryError::Name)?.as_ref()
                 == ".git"
                 && dir_entry
-                    .is_directory()
+                    .node_kind()
                     .await
+                    .map(fs::FsNodeKind::is_dir)
                     .map_err(DirEntryError::NodeKind)?)
         }
     }

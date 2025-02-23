@@ -1,6 +1,7 @@
 //! TODO: docs.
 
-mod dir_entry;
+mod directory;
+mod file;
 mod fs;
 mod fs_event;
 mod fs_node;
@@ -10,7 +11,7 @@ mod metadata;
 pub mod os;
 mod symlink;
 
-pub use dir_entry::DirEntry;
+pub use directory::Directory;
 #[doc(inline)]
 pub use eerie::fs::{
     AbsPath,
@@ -22,6 +23,7 @@ pub use eerie::fs::{
     FsNodeNameBuf,
     InvalidFsNodeNameError,
 };
+pub use file::File;
 pub use fs::Fs;
 pub use fs_event::{FsEvent, FsEventKind};
 pub use fs_node::FsNode;

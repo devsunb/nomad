@@ -3,39 +3,29 @@ use core::future::Future;
 
 use futures_lite::Stream;
 
-use crate::fs::{AbsPath, DirEntry, FsEvent, FsNode, Symlink};
+use crate::fs::{AbsPath, Directory, File, FsEvent, FsNode, Symlink};
 
 /// TODO: docs.
 pub trait Fs: Sized + Send + 'static {
     /// TODO: docs.
+    type Directory: Directory<Fs = Self>;
+
+    /// TODO: docs.
+    type File: File<Fs = Self>;
+
+    /// TODO: docs.
+    type Symlink: Symlink<Fs = Self>;
+
+    /// TODO: docs.
     type Timestamp: Clone + Ord;
 
     /// TODO: docs.
-    type DirEntry: DirEntry<Self>;
-
-    /// TODO: docs.
-    type Directory;
-
-    /// TODO: docs.
-    type File;
-
-    /// TODO: docs.
-    type Symlink: Symlink<Self>;
-
-    /// TODO: docs.
-    type ReadDir: Stream<Item = Result<Self::DirEntry, Self::DirEntryError>>;
-
-    /// TODO: docs.
-    type DirEntryError: Error;
+    type Watcher: Stream<
+        Item = Result<FsEvent<Self::Timestamp>, Self::WatchError>,
+    >;
 
     /// TODO: docs.
     type NodeAtPathError: Error;
-
-    /// TODO: docs.
-    type ReadDirError: Error;
-
-    /// TODO: docs.
-    type Watcher: Stream<Item = Result<FsEvent<Self>, Self::WatchError>>;
 
     /// TODO: docs.
     type WatchError: Error;
@@ -48,12 +38,6 @@ pub trait Fs: Sized + Send + 'static {
 
     /// TODO: docs.
     fn now(&self) -> Self::Timestamp;
-
-    /// TODO: docs.
-    fn read_dir<P: AsRef<AbsPath>>(
-        &self,
-        dir_path: P,
-    ) -> impl Future<Output = Result<Self::ReadDir, Self::ReadDirError>>;
 
     /// TODO: docs.
     fn watch<P: AsRef<AbsPath>>(

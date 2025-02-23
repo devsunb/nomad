@@ -13,17 +13,17 @@ pub enum FsNodeKind {
 
 impl FsNodeKind {
     /// TODO: docs.
-    pub fn is_dir(&self) -> bool {
+    pub fn is_dir(self) -> bool {
         matches!(self, Self::Directory)
     }
 
     /// TODO: docs.
-    pub fn is_file(&self) -> bool {
+    pub fn is_file(self) -> bool {
         matches!(self, Self::File)
     }
 
     /// TODO: docs.
-    pub fn is_symlink(&self) -> bool {
+    pub fn is_symlink(self) -> bool {
         matches!(self, Self::Symlink)
     }
 }

@@ -1,25 +1,35 @@
-use crate::{ByteOffset, fs};
+use core::error::Error;
+
+use crate::fs::{FsNodeKind, FsNodeNameBuf};
 
 /// TODO: docs.
-pub struct Metadata<Fs: fs::Fs> {
+pub trait Metadata<Ts> {
     /// TODO: docs.
-    pub created_at: Option<Fs::Timestamp>,
+    type Error: Error;
 
     /// TODO: docs.
-    pub last_modified_at: Option<Fs::Timestamp>,
+    type NameError: Error;
 
     /// TODO: docs.
-    pub len: ByteOffset,
-}
+    type NodeKindError: Error;
 
-#[cfg(feature = "os-fs")]
-impl From<async_fs::Metadata> for Metadata<fs::os::OsFs> {
-    #[inline]
-    fn from(metadata: async_fs::Metadata) -> Self {
-        Self {
-            created_at: metadata.created().ok(),
-            last_modified_at: metadata.modified().ok(),
-            len: metadata.len().into(),
-        }
-    }
+    /// TODO: docs.
+    fn created_at(
+        &self,
+    ) -> impl Future<Output = Result<Option<Ts>, Self::Error>>;
+
+    /// TODO: docs.
+    fn last_modified_at(
+        &self,
+    ) -> impl Future<Output = Result<Option<Ts>, Self::Error>>;
+
+    /// TODO: docs.
+    fn name(
+        &self,
+    ) -> impl Future<Output = Result<FsNodeNameBuf, Self::NameError>>;
+
+    /// TODO: docs.
+    fn node_kind(
+        &self,
+    ) -> impl Future<Output = Result<FsNodeKind, Self::NodeKindError>>;
 }

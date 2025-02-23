@@ -4,7 +4,7 @@ use core::pin::Pin;
 
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select};
-use nvimx2::fs;
+use nvimx2::fs::{self, Directory};
 
 use crate::dir_entry::DirEntry;
 use crate::filter::{Either, Filter, Filtered};
@@ -15,13 +15,13 @@ pub trait WalkDir: Sized {
     type Fs: fs::Fs;
 
     /// TODO: docs.
-    type DirEntry: fs::DirEntry<Self::Fs>;
-
-    /// TODO: docs.
-    type DirEntryError: Error;
+    type DirEntry: fs::Metadata<<Self::Fs as fs::Fs>::Timestamp>;
 
     /// TODO: docs.
     type ReadDirError: Error;
+
+    /// TODO: docs.
+    type ReadDirEntryError: Error;
 
     /// TODO: docs.
     fn read_dir(
@@ -29,7 +29,7 @@ pub trait WalkDir: Sized {
         dir_path: &fs::AbsPath,
     ) -> impl Future<
         Output = Result<
-            impl Stream<Item = Result<Self::DirEntry, Self::DirEntryError>>,
+            impl Stream<Item = Result<Self::DirEntry, Self::ReadDirEntryError>>,
             Self::ReadDirError,
         >,
     >;
@@ -83,7 +83,7 @@ pub trait WalkDir: Sized {
                             dir_path: dir_path.to_owned(),
                             kind: Either::Left(kind),
                         })?;
-                        if entry.node_kind().is_some_and(|kind| kind.is_dir()) {
+                        if entry.node_kind().is_dir() {
                             let dir_path = entry.path();
                             let handler = handler.clone();
                             read_children.push(async move {
@@ -189,13 +189,13 @@ pub struct WalkError<K> {
 #[debug(bound(W: WalkDir))]
 pub enum WalkErrorKind<W: WalkDir> {
     /// TODO: docs.
-    DirEntry(W::DirEntryError),
+    DirEntry(W::ReadDirEntryError),
 
     /// TODO: docs.
-    DirEntryName(<W::DirEntry as fs::DirEntry<W::Fs>>::NameError),
+    DirEntryName(<W::DirEntry as fs::Metadata<<W::Fs as fs::Fs>::Timestamp>>::NameError),
 
     /// TODO: docs.
-    DirEntryNodeKind(<W::DirEntry as fs::DirEntry<W::Fs>>::NodeKindError),
+    DirEntryNodeKind(<W::DirEntry as fs::Metadata<<W::Fs as fs::Fs>::Timestamp>>::NodeKindError),
 
     /// TODO: docs.
     ReadDir(W::ReadDirError),
@@ -213,14 +213,28 @@ impl<K> WalkError<K> {
 
 impl<Fs: fs::Fs> WalkDir for Fs {
     type Fs = Self;
-    type DirEntry = <Self as fs::Fs>::DirEntry;
-    type DirEntryError = <Self as fs::Fs>::DirEntryError;
-    type ReadDirError = <Self as fs::Fs>::ReadDirError;
+
+    type DirEntry = <<Self as fs::Fs>::Directory as fs::Directory>::Metadata;
+
+    type ReadDirEntryError =
+        <<Self as fs::Fs>::Directory as fs::Directory>::ReadEntryError;
+
+    type ReadDirError =
+        <<Self as fs::Fs>::Directory as fs::Directory>::ReadError;
 
     async fn read_dir(
         &self,
         dir_path: &fs::AbsPath,
-    ) -> Result<<Self as fs::Fs>::ReadDir, Self::ReadDirError> {
-        fs::Fs::read_dir(self, dir_path).await
+    ) -> Result<
+        impl Stream<Item = Result<Self::DirEntry, Self::ReadDirEntryError>>,
+        Self::ReadDirError,
+    > {
+        match self.node_at_path(dir_path).await {
+            Ok(Some(fs::FsNode::Directory(dir))) => dir.read().await,
+            Ok(Some(fs::FsNode::File(_))) => todo!(),
+            Ok(Some(fs::FsNode::Symlink(_))) => todo!(),
+            Ok(None) => todo!(),
+            Err(_err) => todo!(),
+        }
     }
 }

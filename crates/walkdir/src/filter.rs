@@ -60,7 +60,7 @@ where
     Filter(F::Error),
 
     /// TODO: docs.
-    Walker(W::DirEntryError),
+    Walker(W::ReadDirEntryError),
 }
 
 impl<F, W> Filtered<F, W> {
@@ -78,14 +78,14 @@ where
 {
     type Fs = W::Fs;
     type DirEntry = W::DirEntry;
-    type DirEntryError = FilteredDirEntryError<F, W>;
+    type ReadDirEntryError = FilteredDirEntryError<F, W>;
     type ReadDirError = W::ReadDirError;
 
     async fn read_dir(
         &self,
         dir_path: &fs::AbsPath,
     ) -> Result<
-        impl Stream<Item = Result<Self::DirEntry, Self::DirEntryError>>,
+        impl Stream<Item = Result<Self::DirEntry, Self::ReadDirEntryError>>,
         Self::ReadDirError,
     > {
         let entries = self.walker.read_dir(dir_path).await?.fuse();

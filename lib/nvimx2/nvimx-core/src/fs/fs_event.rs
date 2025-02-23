@@ -1,8 +1,8 @@
-use crate::fs::{self, AbsPathBuf};
+use crate::fs::AbsPathBuf;
 
 /// TODO: docs.
-#[derive(Debug)]
-pub struct FsEvent<Fs: fs::Fs> {
+#[derive(Debug, Clone)]
+pub struct FsEvent<Ts> {
     /// TODO: docs.
     pub kind: FsEventKind,
 
@@ -10,7 +10,7 @@ pub struct FsEvent<Fs: fs::Fs> {
     pub path: AbsPathBuf,
 
     /// TODO: docs.
-    pub timestamp: Fs::Timestamp,
+    pub timestamp: Ts,
 }
 
 /// TODO: docs.
@@ -35,21 +35,6 @@ pub enum FsEventKind {
     RenamedNode(AbsPathBuf),
 }
 
-impl<Fs> Clone for FsEvent<Fs>
-where
-    Fs: fs::Fs,
-    Fs::Timestamp: Clone,
-{
-    #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            kind: self.kind.clone(),
-            path: self.path.clone(),
-            timestamp: self.timestamp.clone(),
-        }
-    }
-}
-
 #[cfg(feature = "os-fs")]
 mod os_fs {
     use notify::EventKind;
@@ -57,8 +42,9 @@ mod os_fs {
     use smallvec::SmallVec;
 
     use super::*;
+    use crate::fs;
 
-    impl FsEvent<fs::os::OsFs> {
+    impl FsEvent<<fs::os::OsFs as fs::Fs>::Timestamp> {
         pub(crate) fn from_notify(
             event: notify::Event,
             timestamp: <fs::os::OsFs as fs::Fs>::Timestamp,

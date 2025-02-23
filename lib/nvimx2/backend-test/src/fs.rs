@@ -1,7 +1,6 @@
 use core::convert::Infallible;
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use std::borrow::Cow;
 use std::sync::{Arc, Mutex};
 
 use futures_lite::Stream;
@@ -11,7 +10,8 @@ use nvimx_core::ByteOffset;
 use nvimx_core::fs::{
     AbsPath,
     AbsPathBuf,
-    DirEntry,
+    Directory,
+    File,
     Fs,
     FsEvent,
     FsNode,
@@ -75,7 +75,7 @@ pin_project_lite::pin_project! {
         fs: TestFs,
         path: AbsPathBuf,
         #[pin]
-        inner: async_broadcast::Receiver<FsEvent<TestFs>>,
+        inner: async_broadcast::Receiver<FsEvent<TestTimestamp>>,
     }
 
     impl PinnedDrop for TestWatcher {
@@ -92,8 +92,8 @@ struct TestFsInner {
 }
 
 struct TestWatchChannel {
-    inactive_rx: async_broadcast::InactiveReceiver<FsEvent<TestFs>>,
-    tx: async_broadcast::Sender<FsEvent<TestFs>>,
+    inactive_rx: async_broadcast::InactiveReceiver<FsEvent<TestTimestamp>>,
+    tx: async_broadcast::Sender<FsEvent<TestTimestamp>>,
 }
 
 impl TestFs {
@@ -148,10 +148,6 @@ impl TestDirectoryHandle {
 impl TestFileHandle {
     fn exists(&self) -> bool {
         self.with_file(|_| true).unwrap_or(false)
-    }
-
-    fn len(&self) -> Result<ByteOffset, TestDirEntryDoesNotExistError> {
-        self.with_file(|file| file.len())
     }
 
     fn with_file<T>(
@@ -281,22 +277,19 @@ impl TestWatchChannel {
         Self { tx, inactive_rx: rx.deactivate() }
     }
 
-    fn rx(&self) -> async_broadcast::Receiver<FsEvent<TestFs>> {
+    fn rx(&self) -> async_broadcast::Receiver<FsEvent<TestTimestamp>> {
         self.inactive_rx.activate_cloned()
     }
 }
 
 impl Fs for TestFs {
-    type Timestamp = TestTimestamp;
-    type DirEntry = TestDirEntry;
     type Directory = TestDirectoryHandle;
     type File = TestFileHandle;
     type Symlink = TestSymlinkHandle;
-    type ReadDir = TestReadDir;
+    type Timestamp = TestTimestamp;
     type Watcher = TestWatcher;
-    type DirEntryError = TestReadDirNextError;
+
     type NodeAtPathError = Infallible;
-    type ReadDirError = TestReadDirError;
     type WatchError = Infallible;
 
     async fn node_at_path<P: AsRef<AbsPath>>(
@@ -325,20 +318,6 @@ impl Fs for TestFs {
 
     fn now(&self) -> Self::Timestamp {
         self.with_inner(|inner| inner.timestamp)
-    }
-
-    async fn read_dir<P: AsRef<AbsPath>>(
-        &self,
-        dir_path: P,
-    ) -> Result<Self::ReadDir, Self::ReadDirError> {
-        let FsNode::Directory(dir_handle) = self
-            .node_at_path(dir_path)
-            .await?
-            .ok_or(TestReadDirError::NoNodeAtPath)?
-        else {
-            return Err(TestReadDirError::NoDirAtPath);
-        };
-        Ok(TestReadDir { dir_handle, next_child_idx: 0 })
     }
 
     async fn watch<P: AsRef<AbsPath>>(
@@ -381,36 +360,32 @@ impl PartialEq for TestDirectory {
     }
 }
 
-impl DirEntry<TestFs> for TestDirEntry {
-    type MetadataError = TestDirEntryDoesNotExistError;
+impl Metadata<TestTimestamp> for TestDirEntry {
+    type Error = Infallible;
     type NameError = TestDirEntryDoesNotExistError;
     type NodeKindError = TestDirEntryDoesNotExistError;
 
-    async fn metadata(&self) -> Result<Metadata<TestFs>, Self::MetadataError> {
-        Ok(Metadata {
-            created_at: None,
-            last_modified_at: None,
-            len: match self {
-                Self::Directory(_) => 0usize.into(),
-                Self::File(file) => file.len()?,
-            },
-        })
+    async fn created_at(&self) -> Result<Option<TestTimestamp>, Self::Error> {
+        Ok(None)
     }
 
-    async fn name(&self) -> Result<Cow<'_, FsNodeName>, Self::NameError> {
+    async fn last_modified_at(
+        &self,
+    ) -> Result<Option<TestTimestamp>, Self::Error> {
+        Ok(None)
+    }
+
+    async fn name(&self) -> Result<FsNodeNameBuf, Self::NameError> {
         self.exists()
             .then(|| self.path().fs_node_name().expect("path is not root"))
-            .map(Cow::Borrowed)
+            .map(ToOwned::to_owned)
             .ok_or(TestDirEntryDoesNotExistError)
     }
 
-    async fn node_kind(
-        &self,
-    ) -> Result<Option<FsNodeKind>, Self::NodeKindError> {
+    async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {
         self.exists()
             .then_some(self.kind())
             .ok_or(TestDirEntryDoesNotExistError)
-            .map(Some)
     }
 }
 
@@ -455,7 +430,7 @@ impl Stream for TestReadDir {
 }
 
 impl Stream for TestWatcher {
-    type Item = Result<FsEvent<TestFs>, Infallible>;
+    type Item = Result<FsEvent<TestTimestamp>, Infallible>;
 
     fn poll_next(
         self: Pin<&mut Self>,
@@ -468,7 +443,36 @@ impl Stream for TestWatcher {
     }
 }
 
-impl Symlink<TestFs> for TestSymlinkHandle {
+impl Directory for TestDirectoryHandle {
+    type Fs = TestFs;
+    type Metadata = TestDirEntry;
+    type ReadEntryError = TestReadDirNextError;
+    type ReadError = TestReadDirError;
+
+    async fn read(&self) -> Result<TestReadDir, Self::ReadError> {
+        let FsNode::Directory(dir_handle) = self
+            .fs
+            .node_at_path(&*self.path)
+            .await?
+            .ok_or(TestReadDirError::NoNodeAtPath)?
+        else {
+            return Err(TestReadDirError::NoDirAtPath);
+        };
+        Ok(TestReadDir { dir_handle, next_child_idx: 0 })
+    }
+}
+
+impl File for TestFileHandle {
+    type Fs = TestFs;
+    type Error = TestDirEntryDoesNotExistError;
+
+    async fn len(&self) -> Result<ByteOffset, Self::Error> {
+        self.with_file(|file| file.len())
+    }
+}
+
+impl Symlink for TestSymlinkHandle {
+    type Fs = TestFs;
     type FollowError = Infallible;
 
     async fn follow(

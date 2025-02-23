@@ -1,25 +1,27 @@
 //! TODO: docs.
 
+use core::convert::Infallible;
 use core::pin::Pin;
 use core::task::{Context, Poll, ready};
-use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::ffi::OsString;
 use std::io;
 use std::time::SystemTime;
 
-use futures_lite::Stream;
+use futures_lite::{Stream, StreamExt};
 use notify::{RecursiveMode, Watcher};
 
+use crate::ByteOffset;
 use crate::fs::{
     AbsPath,
     AbsPathBuf,
-    DirEntry,
+    Directory,
+    File,
     Fs,
     FsEvent,
     FsNode,
     FsNodeKind,
-    FsNodeName,
+    FsNodeNameBuf,
     InvalidFsNodeNameError,
     Metadata,
     Symlink,
@@ -30,18 +32,14 @@ use crate::fs::{
 pub struct OsFs;
 
 /// TODO: docs.
-pub struct OsDirEntry {
-    inner: async_fs::DirEntry,
-}
-
-/// TODO: docs.
 pub struct OsDirectory {
     _metadata: async_fs::Metadata,
+    path: AbsPathBuf,
 }
 
 /// TODO: docs.
 pub struct OsFile {
-    _metadata: async_fs::Metadata,
+    metadata: async_fs::Metadata,
 }
 
 /// TODO: docs.
@@ -50,18 +48,16 @@ pub struct OsSymlink {
     path: AbsPathBuf,
 }
 
-pin_project_lite::pin_project! {
-    /// TODO: docs.
-    pub struct OsReadDir {
-        #[pin]
-        inner: async_fs::ReadDir,
-    }
+/// TODO: docs.
+pub struct OsMetadata {
+    metadata: async_fs::Metadata,
+    node_name: OsString,
 }
 
 pin_project_lite::pin_project! {
     /// TODO: docs.
     pub struct OsWatcher {
-        buffered: VecDeque<FsEvent<OsFs>>,
+        buffered: VecDeque<FsEvent<SystemTime>>,
         #[pin]
         inner: flume::r#async::RecvStream<
             'static,
@@ -83,17 +79,14 @@ pub enum OsNameError {
 }
 
 impl Fs for OsFs {
-    type DirEntry = OsDirEntry;
-    type DirEntryError = io::Error;
     type Directory = OsDirectory;
     type File = OsFile;
     type Symlink = OsSymlink;
-    type NodeAtPathError = io::Error;
-    type ReadDir = OsReadDir;
-    type ReadDirError = io::Error;
     type Timestamp = SystemTime;
-    type WatchError = notify::Error;
     type Watcher = OsWatcher;
+
+    type NodeAtPathError = io::Error;
+    type WatchError = notify::Error;
 
     #[inline]
     async fn node_at_path<P: AsRef<AbsPath>>(
@@ -110,10 +103,11 @@ impl Fs for OsFs {
             return Ok(None);
         };
         Ok(Some(match file_type {
-            FsNodeKind::File => FsNode::File(OsFile { _metadata: metadata }),
-            FsNodeKind::Directory => {
-                FsNode::Directory(OsDirectory { _metadata: metadata })
-            },
+            FsNodeKind::File => FsNode::File(OsFile { metadata }),
+            FsNodeKind::Directory => FsNode::Directory(OsDirectory {
+                _metadata: metadata,
+                path: path.to_owned(),
+            }),
             FsNodeKind::Symlink => FsNode::Symlink(OsSymlink {
                 _metadata: metadata,
                 path: path.to_owned(),
@@ -124,16 +118,6 @@ impl Fs for OsFs {
     #[inline]
     fn now(&self) -> Self::Timestamp {
         SystemTime::now()
-    }
-
-    #[inline]
-    async fn read_dir<P: AsRef<AbsPath>>(
-        &self,
-        dir_path: P,
-    ) -> Result<Self::ReadDir, Self::ReadDirError> {
-        async_fs::read_dir(dir_path.as_ref())
-            .await
-            .map(|inner| OsReadDir { inner })
     }
 
     #[inline]
@@ -159,53 +143,40 @@ impl Fs for OsFs {
     }
 }
 
-impl DirEntry<OsFs> for OsDirEntry {
-    type MetadataError = io::Error;
-    type NameError = OsNameError;
-    type NodeKindError = io::Error;
+impl Directory for OsDirectory {
+    type Fs = OsFs;
+    type Metadata = OsMetadata;
+    type ReadEntryError = io::Error;
+    type ReadError = io::Error;
 
-    #[inline]
-    async fn metadata(&self) -> Result<Metadata<OsFs>, Self::MetadataError> {
-        self.inner.metadata().await.map(Into::into)
-    }
-
-    #[inline]
-    async fn name(&self) -> Result<Cow<'_, FsNodeName>, Self::NameError> {
-        let os_name = self.inner.file_name();
-        let fs_name: &FsNodeName = os_name
-            .to_str()
-            .ok_or_else(|| OsNameError::NotUtf8(os_name.clone()))?
-            .try_into()?;
-        Ok(Cow::Owned(fs_name.to_owned()))
-    }
-
-    #[inline]
-    async fn node_kind(
+    async fn read(
         &self,
-    ) -> Result<Option<FsNodeKind>, Self::NodeKindError> {
-        self.inner.file_type().await.map(|file_type| file_type.try_into().ok())
+    ) -> Result<
+        impl Stream<Item = Result<OsMetadata, Self::ReadEntryError>> + use<>,
+        Self::ReadError,
+    > {
+        async_fs::read_dir(&*self.path).await.map(|read_dir| {
+            read_dir.map(|res| {
+                res.map(|dir_entry| OsMetadata {
+                    metadata: todo!(),
+                    node_name: dir_entry.file_name(),
+                })
+            })
+        })
     }
 }
 
-impl Stream for OsReadDir {
-    type Item = Result<OsDirEntry, io::Error>;
+impl File for OsFile {
+    type Fs = OsFs;
+    type Error = io::Error;
 
-    #[inline]
-    fn poll_next(
-        self: Pin<&mut Self>,
-        ctx: &mut Context,
-    ) -> Poll<Option<Self::Item>> {
-        match ready!(self.project().inner.poll_next(ctx)) {
-            Some(Ok(entry)) => {
-                Poll::Ready(Some(Ok(OsDirEntry { inner: entry })))
-            },
-            Some(Err(err)) => Poll::Ready(Some(Err(err))),
-            None => Poll::Ready(None),
-        }
+    async fn len(&self) -> Result<ByteOffset, Self::Error> {
+        Ok(self.metadata.len().into())
     }
 }
 
-impl Symlink<OsFs> for OsSymlink {
+impl Symlink for OsSymlink {
+    type Fs = OsFs;
     type FollowError = io::Error;
 
     #[inline]
@@ -228,7 +199,7 @@ impl Symlink<OsFs> for OsSymlink {
 }
 
 impl Stream for OsWatcher {
-    type Item = Result<FsEvent<OsFs>, notify::Error>;
+    type Item = Result<FsEvent<SystemTime>, notify::Error>;
 
     #[inline]
     fn poll_next(
@@ -247,5 +218,43 @@ impl Stream for OsWatcher {
             };
             this.buffered.extend(FsEvent::from_notify(event, timestamp));
         }
+    }
+}
+
+impl Metadata<SystemTime> for OsMetadata {
+    type Error = io::Error;
+    type NameError = OsNameError;
+    type NodeKindError = Infallible;
+
+    async fn created_at(&self) -> Result<Option<SystemTime>, Self::Error> {
+        Ok(self.metadata.created().ok())
+    }
+
+    async fn last_modified_at(
+        &self,
+    ) -> Result<Option<SystemTime>, Self::Error> {
+        Ok(self.metadata.modified().ok())
+    }
+
+    async fn name(&self) -> Result<FsNodeNameBuf, Self::NameError> {
+        self.node_name
+            .to_str()
+            .ok_or_else(|| OsNameError::NotUtf8(self.node_name.clone()))?
+            .parse()
+            .map_err(OsNameError::Invalid)
+    }
+
+    async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {
+        let file_type = self.metadata.file_type();
+
+        Ok(if file_type.is_dir() {
+            FsNodeKind::Directory
+        } else if file_type.is_file() {
+            FsNodeKind::File
+        } else if file_type.is_symlink() {
+            FsNodeKind::Symlink
+        } else {
+            unreachable!("checked when creating it")
+        })
     }
 }
