@@ -623,6 +623,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "compact_str"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3fdb1325a1cece981e8a296ab8f0f9b63ae357bd0784a9faaf548cc7b480707a"
+dependencies = [
+ "castaway",
+ "cfg-if",
+ "itoa",
+ "rustversion",
+ "ryu",
+ "static_assertions",
+]
+
+[[package]]
 name = "concurrent-queue"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -766,7 +780,7 @@ version = "0.1.0"
 source = "git+ssh://git@github.com/nomad/eerie.git#a874ac6ae8a58808787ac7fb162093c64c96a596"
 dependencies = [
  "cola",
- "compact_str",
+ "compact_str 0.8.1",
  "fxhash",
  "nohash",
  "serde",
@@ -1618,7 +1632,7 @@ dependencies = [
 name = "nvimx-common"
 version = "0.1.0-dev"
 dependencies = [
- "compact_str",
+ "compact_str 0.9.0",
  "eerie",
  "nvim-oxi",
  "nvimx-diagnostics",
@@ -1630,7 +1644,7 @@ name = "nvimx-core"
 version = "0.1.0-dev"
 dependencies = [
  "async-fs",
- "compact_str",
+ "compact_str 0.9.0",
  "eerie",
  "flume",
  "futures-lite",
@@ -1753,7 +1767,7 @@ dependencies = [
 name = "nvimx-ui"
 version = "0.1.0-dev"
 dependencies = [
- "compact_str",
+ "compact_str 0.8.1",
  "nvim-oxi",
  "quickcheck",
  "quickcheck_macros",

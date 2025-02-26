@@ -1,5 +1,6 @@
 use core::convert::Infallible;
 use core::error::Error;
+use core::fmt;
 use core::pin::Pin;
 
 use futures_util::stream::{self, Stream, StreamExt};
@@ -235,6 +236,17 @@ impl<Fs: fs::Fs> WalkDir for Fs {
             Ok(Some(fs::FsNode::Symlink(_))) => todo!(),
             Ok(None) => todo!(),
             Err(_err) => todo!(),
+        }
+    }
+}
+
+impl<W: WalkDir> fmt::Display for WalkErrorKind<W> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WalkErrorKind::DirEntry(err) => err.fmt(f),
+            WalkErrorKind::DirEntryName(err) => err.fmt(f),
+            WalkErrorKind::DirEntryNodeKind(err) => err.fmt(f),
+            WalkErrorKind::ReadDir(err) => err.fmt(f),
         }
     }
 }

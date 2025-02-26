@@ -92,14 +92,14 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn home_dir(
-        ctx: &mut AsyncCtx<'_, Self>,
+        _: &mut AsyncCtx<'_, Self>,
     ) -> Result<fs::AbsPathBuf, Self::HomeDirError> {
         todo!()
     }
 
     fn lsp_root(
-        id: <Self::Buffer<'_> as Buffer>::Id,
-        ctx: &mut AsyncCtx<'_, Self>,
+        _: <Self::Buffer<'_> as Buffer>::Id,
+        _: &mut AsyncCtx<'_, Self>,
     ) -> Result<Option<fs::AbsPathBuf>, Self::LspRootError> {
         todo!()
     }

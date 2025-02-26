@@ -33,13 +33,14 @@ pub struct OsFs;
 
 /// TODO: docs.
 pub struct OsDirectory {
-    _metadata: async_fs::Metadata,
+    _metadata: Option<async_fs::Metadata>,
     path: AbsPathBuf,
 }
 
 /// TODO: docs.
 pub struct OsFile {
-    metadata: async_fs::Metadata,
+    metadata: Option<async_fs::Metadata>,
+    path: AbsPathBuf,
 }
 
 /// TODO: docs.
@@ -78,6 +79,15 @@ pub enum OsNameError {
     Invalid(#[from] InvalidFsNodeNameError),
 }
 
+impl OsFile {
+    async fn with_metadata<R>(
+        &self,
+        _fun: impl FnOnce(&async_fs::Metadata) -> R,
+    ) -> Result<R, io::Error> {
+        todo!();
+    }
+}
+
 impl Fs for OsFs {
     type Directory = OsDirectory;
     type File = OsFile;
@@ -103,9 +113,12 @@ impl Fs for OsFs {
             return Ok(None);
         };
         Ok(Some(match file_type {
-            FsNodeKind::File => FsNode::File(OsFile { metadata }),
+            FsNodeKind::File => FsNode::File(OsFile {
+                metadata: Some(metadata),
+                path: path.to_owned(),
+            }),
             FsNodeKind::Directory => FsNode::Directory(OsDirectory {
-                _metadata: metadata,
+                _metadata: Some(metadata),
                 path: path.to_owned(),
             }),
             FsNodeKind::Symlink => FsNode::Symlink(OsSymlink {
@@ -164,6 +177,16 @@ impl Directory for OsDirectory {
             })
         })
     }
+
+    async fn parent(&self) -> Option<Self> {
+        self.path
+            .parent()
+            .map(|path| Self { _metadata: None, path: path.to_owned() })
+    }
+
+    fn path(&self) -> &AbsPath {
+        &self.path
+    }
 }
 
 impl File for OsFile {
@@ -171,7 +194,14 @@ impl File for OsFile {
     type Error = io::Error;
 
     async fn len(&self) -> Result<ByteOffset, Self::Error> {
-        Ok(self.metadata.len().into())
+        self.with_metadata(|meta| meta.len().into()).await
+    }
+
+    async fn parent(&self) -> <Self::Fs as Fs>::Directory {
+        OsDirectory {
+            _metadata: None,
+            path: self.path.parent().expect("has a parent").to_owned(),
+        }
     }
 }
 

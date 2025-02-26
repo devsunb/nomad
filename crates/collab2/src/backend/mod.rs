@@ -195,10 +195,26 @@ mod default_read_replica {
                     PushNode::Directory(path) => builder.push_directory(path),
                 };
             }
-            Ok(builder)
+            Ok::<_, walkdir::ForEachError<_, _>>(builder)
         };
 
-        let mut builder = res.await.map_err(Error::Walk)?;
+        let mut builder = match res.await {
+            Ok(builder) => builder,
+            Err(err) => match err.kind {
+                Either::Left(left) => {
+                    return Err(Error::Walk(WalkError {
+                        dir_path: err.dir_path,
+                        kind: left,
+                    }));
+                },
+                Either::Right(right) => {
+                    return Err(Error::Len(WalkError {
+                        dir_path: err.dir_path,
+                        kind: right,
+                    }));
+                },
+            },
+        };
 
         // Update the lengths of the open buffers.
         //
@@ -221,10 +237,8 @@ mod default_read_replica {
         Walk(WalkError<WalkErrorKind<B::Fs>>),
         Len(
             WalkError<
-                    WalkErrorKind<
-                        <<B::Fs as fs::Fs>::Directory as fs::Directory>::MetadataError,
-                    >,
-                >,
+<<<B::Fs as fs::Fs>::Directory as fs::Directory>::Metadata as fs::Metadata>::Error
+            >,
         ),
     }
 
@@ -304,7 +318,7 @@ mod root_markers {
 
     use futures_util::stream::{self, StreamExt};
     use futures_util::{pin_mut, select};
-    use nvimx2::fs::{self, Symlink};
+    use nvimx2::fs::{self, Directory, File, Symlink};
     use nvimx2::notify;
     use smol_str::ToSmolStr;
 
@@ -360,7 +374,7 @@ mod root_markers {
     #[derive(derive_more::Debug)]
     #[debug(bound(Fs: fs::Fs))]
     pub enum DirEntryError<Fs: fs::Fs> {
-        Access(<Fs::Directory as fs::Directory>::ReadError),
+        Access(<Fs::Directory as fs::Directory>::ReadEntryError),
         Name(
             <<Fs::Directory as fs::Directory>::Metadata as fs::Metadata>::NameError,
         ),
@@ -390,10 +404,10 @@ mod root_markers {
                     kind,
                 })?;
 
-            let is_starting_at_dir = loop {
+            let mut dir = loop {
                 match node {
-                    fs::FsNode::Directory(_) => break true,
-                    fs::FsNode::File(_) => break false,
+                    fs::FsNode::Directory(dir) => break dir,
+                    fs::FsNode::File(file) => break file.parent().await,
                     fs::FsNode::Symlink(symlink) => {
                         node = symlink
                             .follow_recursively()
@@ -412,42 +426,31 @@ mod root_markers {
                 }
             };
 
-            let mut dir = if is_starting_at_dir {
-                self.start_from
-            } else {
-                self.start_from
-                    .parent()
-                    .expect("path is of file, so it must have a parent")
-            }
-            .to_owned();
-
             loop {
-                if self.contains_marker(&dir, fs).await? {
-                    return Ok(Some(dir));
+                if self.contains_marker(&dir).await? {
+                    return Ok(Some(dir.path().to_owned()));
                 }
-                if self.stop_at == Some(&*dir) {
+                if self.stop_at == Some(dir.path()) {
                     return Ok(None);
                 }
-                if !dir.pop() {
-                    return Ok(None);
-                }
+                let Some(parent) = dir.parent().await else { return Ok(None) };
+                dir = parent;
             }
         }
 
-        async fn contains_marker<Fs>(
+        async fn contains_marker<Fs: fs::Fs>(
             &self,
-            dir_path: &fs::AbsPath,
-            fs: &mut Fs,
+            dir: &Fs::Directory,
         ) -> Result<bool, FindRootError<Fs, M>>
         where
-            Fs: fs::Fs,
             M: RootMarker<Fs>,
         {
-            let read_dir = fs
-                .read_dir(dir_path)
+            use fs::{Directory, Metadata};
+            let read_dir = dir
+                .read()
                 .await
                 .map_err(|err| FindRootError {
-                    path: dir_path.to_owned(),
+                    path: dir.path().to_owned(),
                     kind: FindRootErrorKind::ReadDir(err),
                 })?
                 .fuse();
@@ -461,7 +464,7 @@ mod root_markers {
                     read_res = read_dir.select_next_some() => {
                         let dir_entry =
                             read_res.map_err(|err| FindRootError {
-                                path: dir_path.to_owned(),
+                                path: dir.path().to_owned(),
                                 kind: FindRootErrorKind::DirEntry(
                                     DirEntryError::Access(err),
                                 ),
@@ -473,10 +476,9 @@ mod root_markers {
                                 Err(err) => {
                                     let dir_entry_name = dir_entry.name()
                                         .await
-                                        .ok()
-                                        .map(|name| name.into_owned());
+                                        .ok();
                                     Err(FindRootError {
-                                        path: dir_path.to_owned(),
+                                        path: dir.path().to_owned(),
                                         kind: FindRootErrorKind::Marker {
                                             dir_entry_name,
                                             err

@@ -6,4 +6,10 @@ mod walkdir;
 
 pub use dir_entry::DirEntry;
 pub use filter::{Either, Filter, Filtered};
-pub use walkdir::{WalkDir, WalkError, WalkErrorKind};
+pub use walkdir::{
+    ForEachError,
+    PathsError,
+    WalkDir,
+    WalkError,
+    WalkErrorKind,
+};

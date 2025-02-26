@@ -12,7 +12,7 @@ publish = false
 [workspace.dependencies]
 async-fs = "2"
 async-net = "2"
-compact_str = "0.8"
+compact_str = "0.9"
 derive_more = { version = "2", features = ["debug"] }
 eerie = { git = "ssh://git@github.com/nomad/eerie.git" }
 flume = { version = "0.11", features = ["async"] }

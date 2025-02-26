@@ -461,6 +461,16 @@ impl Directory for TestDirectoryHandle {
         };
         Ok(TestReadDir { dir_handle, next_child_idx: 0 })
     }
+
+    async fn parent(&self) -> Option<Self> {
+        self.path
+            .parent()
+            .map(|path| Self { path: path.to_owned(), fs: self.fs.clone() })
+    }
+
+    fn path(&self) -> &AbsPath {
+        &self.path
+    }
 }
 
 impl File for TestFileHandle {
@@ -469,6 +479,13 @@ impl File for TestFileHandle {
 
     async fn len(&self) -> Result<ByteOffset, Self::Error> {
         self.with_file(|file| file.len())
+    }
+
+    async fn parent(&self) -> <Self::Fs as Fs>::Directory {
+        TestDirectoryHandle {
+            fs: self.fs.clone(),
+            path: self.path.parent().expect("has a parent").to_owned(),
+        }
     }
 }
 

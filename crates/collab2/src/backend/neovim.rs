@@ -358,15 +358,11 @@ impl notify::Error for NeovimReadReplicaError {
         let err: &dyn fmt::Display = match &self.inner {
             Walk(err) => {
                 msg.push_info(&err.dir_path);
-                match &err.kind {
-                    walkdir::Either::Left(err) => match err {
-                        walkdir::WalkErrorKind::DirEntry(err) => err,
-                        walkdir::WalkErrorKind::DirEntryName(err) => err,
-                        walkdir::WalkErrorKind::DirEntryNodeKind(err) => err,
-                        walkdir::WalkErrorKind::ReadDir(err) => err,
-                    },
-                    walkdir::Either::Right(err) => err,
-                }
+                &err.kind
+            },
+            Len(err) => {
+                msg.push_info(&err.dir_path);
+                &err.kind
             },
         };
 

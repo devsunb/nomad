@@ -2,7 +2,7 @@ use core::error::Error;
 
 use futures_lite::Stream;
 
-use crate::fs::{Fs, Metadata};
+use crate::fs::{AbsPath, Fs, Metadata};
 
 /// TODO: docs.
 pub trait Directory {
@@ -28,4 +28,12 @@ pub trait Directory {
             Self::ReadError,
         >,
     >;
+
+    /// TODO: docs.
+    fn parent(
+        &self,
+    ) -> impl Future<Output = Option<<Self::Fs as Fs>::Directory>>;
+
+    /// TODO: docs.
+    fn path(&self) -> &AbsPath;
 }
