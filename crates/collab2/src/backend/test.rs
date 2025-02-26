@@ -3,21 +3,18 @@
 #![allow(missing_docs)]
 
 use core::convert::Infallible;
-use std::borrow::Cow;
 
 use collab_server::SessionId;
 use collab_server::message::Message;
 use eerie::PeerId;
 use nvimx2::backend::{ApiValue, Backend, Buffer, BufferId};
 use nvimx2::notify::MaybeResult;
-use nvimx2::{AsyncCtx, ByteOffset, fs};
+use nvimx2::{AsyncCtx, fs};
 use serde::{Deserialize, Serialize};
 
 use crate::backend::{
     ActionForSelectedSession,
     CollabBackend,
-    CollabBuffer,
-    CollabFs,
     StartArgs,
     StartInfos,
     default_read_replica,
@@ -64,15 +61,17 @@ impl<B> CollabTestBackend<B> {
 }
 
 impl<B: Backend> CollabBackend for CollabTestBackend<B> {
+    type ServerRx = futures_util::stream::Pending<Result<Message, Infallible>>;
+    type ServerTx = futures_util::sink::Drain<Message>;
+
     type CopySessionIdError = Infallible;
+    type HomeDirError = Infallible;
+    type LspRootError = Infallible;
     type ReadReplicaError = Infallible;
     type SearchProjectRootError = Infallible;
-    type ServerTx = futures_util::sink::Drain<Message>;
-    type ServerRx = futures_util::stream::Pending<Result<Message, Infallible>>;
-    type ServerTxError = Infallible;
     type ServerRxError = Infallible;
+    type ServerTxError = Infallible;
     type StartSessionError = Infallible;
-    type BufferLspRootError = Infallible;
 
     async fn confirm_start(
         project_root: &fs::AbsPath,
@@ -90,6 +89,19 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     ) -> Result<(), Self::CopySessionIdError> {
         ctx.with_backend(|this| this.clipboard = Some(session_id));
         Ok(())
+    }
+
+    async fn home_dir(
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<fs::AbsPathBuf, Self::HomeDirError> {
+        todo!()
+    }
+
+    fn lsp_root(
+        id: <Self::Buffer<'_> as Buffer>::Id,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Option<fs::AbsPathBuf>, Self::LspRootError> {
+        todo!()
     }
 
     async fn read_replica(
@@ -130,39 +142,19 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 }
 
-impl<B: Backend> CollabBuffer for CollabTestBuffer<'_, B> {
-    type LspRootError = Infallible;
-
-    fn lsp_root(
-        _id: Self::Id,
-    ) -> Result<Option<fs::AbsPathBuf>, Self::LspRootError> {
-        todo!()
-    }
-}
-
-impl<B: Backend> CollabFs for CollabTestFs<B> {
-    type HomeDirError = Infallible;
-
-    async fn home_dir(
-        &mut self,
-    ) -> Result<fs::AbsPathBuf, Self::HomeDirError> {
-        todo!()
-    }
-}
-
 impl<B: Backend> Backend for CollabTestBackend<B> {
     type Api = <B as Backend>::Api;
-    type Buffer<'a> = CollabTestBuffer<'a, B>;
+    type Buffer<'a> = <B as Backend>::Buffer<'a>;
     type BufferId = <B as Backend>::BufferId;
     type LocalExecutor = <B as Backend>::LocalExecutor;
     type BackgroundExecutor = <B as Backend>::BackgroundExecutor;
-    type Fs = CollabTestFs<B>;
+    type Fs = <B as Backend>::Fs;
     type Emitter<'this> = <B as Backend>::Emitter<'this>;
     type SerializeError = <B as Backend>::SerializeError;
     type DeserializeError = <B as Backend>::DeserializeError;
 
-    fn buffer(&mut self, _id: BufferId<Self>) -> Option<Self::Buffer<'_>> {
-        todo!();
+    fn buffer(&mut self, id: BufferId<Self>) -> Option<Self::Buffer<'_>> {
+        self.inner.buffer(id)
     }
 
     fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId<Self>> + use<B> {
@@ -170,11 +162,11 @@ impl<B: Backend> Backend for CollabTestBackend<B> {
     }
 
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
-        todo!();
+        self.inner.current_buffer()
     }
 
     fn fs(&mut self) -> Self::Fs {
-        todo!();
+        self.inner.fs()
     }
 
     fn emitter(&mut self) -> Self::Emitter<'_> {
@@ -207,61 +199,6 @@ impl<B: Backend> Backend for CollabTestBackend<B> {
         V: Deserialize<'de>,
     {
         self.inner.deserialize(value)
-    }
-}
-
-impl<B: Backend> Buffer for CollabTestBuffer<'_, B> {
-    type Id = <B as Backend>::BufferId;
-
-    fn byte_len(&self) -> ByteOffset {
-        self.inner.byte_len()
-    }
-
-    fn id(&self) -> Self::Id {
-        self.inner.id()
-    }
-
-    fn name(&self) -> Cow<'_, str> {
-        self.inner.name()
-    }
-}
-
-impl<B: Backend> fs::Fs for CollabTestFs<B> {
-    type Timestamp = <B::Fs as fs::Fs>::Timestamp;
-    type DirEntry = <B::Fs as fs::Fs>::DirEntry;
-    type Directory = <B::Fs as fs::Fs>::Directory;
-    type File = <B::Fs as fs::Fs>::File;
-    type Symlink = fs::SameSymlink<Self, B::Fs>;
-    type ReadDir = <B::Fs as fs::Fs>::ReadDir;
-    type ReadDirEntryError = <B::Fs as fs::Fs>::ReadDirEntryError;
-    type NodeAtPathError = <B::Fs as fs::Fs>::NodeAtPathError;
-    type ReadDirError = <B::Fs as fs::Fs>::ReadDirError;
-    type Watcher = <B::Fs as fs::Fs>::Watcher;
-    type WatchError = <B::Fs as fs::Fs>::WatchError;
-
-    async fn node_at_path<P: AsRef<fs::AbsPath>>(
-        &self,
-        _path: P,
-    ) -> Result<Option<fs::FsNode<Self>>, Self::NodeAtPathError> {
-        todo!();
-    }
-
-    fn now(&self) -> Self::Timestamp {
-        self.inner.now()
-    }
-
-    async fn read_dir<P: AsRef<fs::AbsPath>>(
-        &self,
-        dir_path: P,
-    ) -> Result<Self::ReadDir, Self::ReadDirError> {
-        self.inner.read_dir(dir_path).await
-    }
-
-    async fn watch<P: AsRef<fs::AbsPath>>(
-        &self,
-        path: P,
-    ) -> Result<Self::Watcher, Self::WatchError> {
-        self.inner.watch(path).await
     }
 }
 

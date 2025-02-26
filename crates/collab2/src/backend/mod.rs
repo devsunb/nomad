@@ -19,15 +19,22 @@ use crate::config;
 
 /// A [`Backend`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
-pub trait CollabBackend:
-    for<'a> Backend<
-        Buffer<'a>: CollabBuffer<LspRootError = Self::BufferLspRootError>,
-        Fs: CollabFs,
-    >
-{
+pub trait CollabBackend: Backend {
+    /// TODO: docs.
+    type ServerRx: Stream<Item = Result<Message, Self::ServerRxError>>;
+
+    /// TODO: docs.
+    type ServerTx: Sink<Message, Error = Self::ServerTxError>;
+
     /// The type of error returned by
     /// [`copy_session_id`](CollabBackend::copy_session_id).
     type CopySessionIdError: Debug + notify::Error;
+
+    /// The type of error returned by [`home_dir`](CollabBackend::home_dir).
+    type HomeDirError;
+
+    /// The type of error returned by [`lsp_root`](CollabBackend::lsp_root).
+    type LspRootError: Debug;
 
     /// The type of error returned by
     /// [`read_replica`](CollabBackend::read_replica).
@@ -38,12 +45,6 @@ pub trait CollabBackend:
     type SearchProjectRootError: Debug + notify::Error;
 
     /// TODO: docs.
-    type ServerTx: Sink<Message, Error = Self::ServerTxError>;
-
-    /// TODO: docs.
-    type ServerRx: Stream<Item = Result<Message, Self::ServerRxError>>;
-
-    /// TODO: docs.
     type ServerTxError: Debug + notify::Error;
 
     /// TODO: docs.
@@ -52,9 +53,6 @@ pub trait CollabBackend:
     /// The type of error returned by
     /// [`start_session`](CollabBackend::start_session).
     type StartSessionError: Debug + notify::Error;
-
-    /// The type of error returned by [`lsp_root`](CollabBuffer::lsp_root).
-    type BufferLspRootError: Debug;
 
     /// Asks the user to confirm starting a new collaborative editing session
     /// rooted at the given path.
@@ -68,6 +66,19 @@ pub trait CollabBackend:
         session_id: SessionId,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<(), Self::CopySessionIdError>>;
+
+    /// Returns the absolute path to the user's home directory.
+    fn home_dir(
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
+
+    /// Returns the path to the root of the workspace containing the buffer
+    /// with the given ID, or `None` if there's no language server attached to
+    /// it.
+    fn lsp_root(
+        id: <Self::Buffer<'_> as Buffer>::Id,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
 
     /// TODO: docs.
     fn read_replica(
@@ -96,32 +107,6 @@ pub trait CollabBackend:
         args: StartArgs<'_>,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = Result<StartInfos<Self>, Self::StartSessionError>>;
-}
-
-/// A [`Buffer`] subtrait defining additional capabilities needed by the
-/// actions in this crate.
-pub trait CollabBuffer: Buffer {
-    /// The type of error returned by [`lsp_root`](CollabBuffer::lsp_root).
-    type LspRootError: Debug;
-
-    /// Returns the path to the root of the workspace containing the buffer
-    /// with the given ID, or `None` if there's no language server attached to
-    /// it.
-    fn lsp_root(
-        id: Self::Id,
-    ) -> Result<Option<AbsPathBuf>, Self::LspRootError>;
-}
-
-/// A [`Fs`](fs::Fs) subtrait defining additional capabilities needed by the
-/// actions in this crate.
-pub trait CollabFs: fs::Fs {
-    /// The type of error returned by [`CollabFs`](CollabFs::home_dir).
-    type HomeDirError;
-
-    /// Returns the absolute path to the user's home directory.
-    fn home_dir(
-        &mut self,
-    ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
 }
 
 /// TODO: docs
@@ -233,7 +218,14 @@ mod default_read_replica {
     #[derive(derive_more::Debug)]
     #[debug(bound(B: CollabBackend))]
     pub(super) enum Error<B: CollabBackend> {
-        Walk(WalkError<Either<WalkErrorKind<B::Fs>, <<B::Fs as fs::Fs>::DirEntry as fs::DirEntry<B::Fs>>::MetadataError>>),
+        Walk(WalkError<WalkErrorKind<B::Fs>>),
+        Len(
+            WalkError<
+                    WalkErrorKind<
+                        <<B::Fs as fs::Fs>::Directory as fs::Directory>::MetadataError,
+                    >,
+                >,
+        ),
     }
 
     enum PushNode {
@@ -257,8 +249,7 @@ mod default_search_project_root {
     where
         B: CollabBackend,
     {
-        if let Some(lsp_res) =
-            B::Buffer::lsp_root(buffer_id.clone()).transpose()
+        if let Some(lsp_res) = B::lsp_root(buffer_id.clone(), ctx).transpose()
         {
             return lsp_res.map_err(Error::Lsp);
         }
@@ -273,15 +264,15 @@ mod default_search_project_root {
             .parse::<AbsPathBuf>()
             .map_err(|_| Error::BufNameNotAbsolutePath(buffer_name))?;
 
-        let mut fs = ctx.fs();
-
-        let home_dir = fs.home_dir().await.map_err(Error::HomeDir)?;
+        let home_dir = B::home_dir(ctx).await.map_err(Error::HomeDir)?;
 
         let args = root_markers::FindRootArgs {
             marker: MARKERS,
             start_from: &buffer_path,
             stop_at: Some(&home_dir),
         };
+
+        let mut fs = ctx.fs();
 
         if let Some(res) = args.find(&mut fs).await.transpose() {
             return res.map_err(Error::FindRoot);
@@ -299,9 +290,9 @@ mod default_search_project_root {
         BufNameNotAbsolutePath(String),
         CouldntFindRoot(fs::AbsPathBuf),
         FindRoot(root_markers::FindRootError<B::Fs, Markers>),
-        HomeDir(<B::Fs as CollabFs>::HomeDirError),
+        HomeDir(B::HomeDirError),
         InvalidBufId(BufferId<B>),
-        Lsp(B::BufferLspRootError),
+        Lsp(B::LspRootError),
     }
 }
 

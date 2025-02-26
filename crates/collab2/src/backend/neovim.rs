@@ -12,7 +12,7 @@ use futures_util::io::{ReadHalf, WriteHalf};
 use futures_util::{AsyncReadExt, Sink, Stream};
 use mlua::{Function, Table};
 use nvimx2::fs::{self, AbsPath};
-use nvimx2::neovim::{Neovim, NeovimBuffer, NeovimFs, mlua, oxi};
+use nvimx2::neovim::{Neovim, NeovimBuffer, mlua, oxi};
 use smol_str::ToSmolStr;
 
 use crate::backend::*;
@@ -77,15 +77,17 @@ struct TildePath<'a> {
 }
 
 impl CollabBackend for Neovim {
+    type ServerRx = NeovimServerRx;
+    type ServerTx = NeovimServerTx;
+
     type CopySessionIdError = NeovimCopySessionIdError;
+    type HomeDirError = NeovimHomeDirError;
+    type LspRootError = String;
     type ReadReplicaError = NeovimReadReplicaError;
     type SearchProjectRootError = NeovimSearchProjectRootError;
-    type ServerTx = NeovimServerTx;
-    type ServerRx = NeovimServerRx;
-    type ServerTxError = NeovimServerTxError;
     type ServerRxError = NeovimServerRxError;
+    type ServerTxError = NeovimServerTxError;
     type StartSessionError = NeovimStartSessionError;
-    type BufferLspRootError = String;
 
     async fn confirm_start(
         project_root: &fs::AbsPath,
@@ -95,7 +97,7 @@ impl CollabBackend for Neovim {
             "Start collaborating on the project at \"{}\"?",
             TildePath {
                 path: project_root,
-                home_dir: ctx.fs().home_dir().await.ok().as_deref(),
+                home_dir: Self::home_dir(ctx).await.ok().as_deref(),
             }
         );
 
@@ -121,6 +123,47 @@ impl CollabBackend for Neovim {
     ) -> Result<(), Self::CopySessionIdError> {
         clipboard::set(session_id)
             .map_err(|inner| NeovimCopySessionIdError { inner, session_id })
+    }
+
+    async fn home_dir(
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<AbsPathBuf, Self::HomeDirError> {
+        match home::home_dir() {
+            Some(home_dir) if !home_dir.as_os_str().is_empty() => {
+                home_dir.as_path().try_into().map_err(|err| {
+                    NeovimHomeDirError::InvalidHomeDir(home_dir, err)
+                })
+            },
+            _ => Err(NeovimHomeDirError::CouldntFindHome),
+        }
+    }
+
+    fn lsp_root(
+        buffer: NeovimBuffer,
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
+        /// Returns the root directory of the first language server
+        /// attached to the given buffer, if any.
+        fn inner(buffer: NeovimBuffer) -> Option<String> {
+            let lua = mlua::lua();
+
+            let opts = lua.create_table().ok()?;
+            opts.raw_set("bufnr", buffer).ok()?;
+
+            get_lua_value::<Function>(&["vim", "lsp", "get_clients"])?
+                .call::<Table>(opts)
+                .ok()?
+                .get::<Table>(1)
+                .ok()?
+                .get::<Table>("config")
+                .ok()?
+                .get::<String>("root_dir")
+                .ok()
+        }
+
+        inner(buffer)
+            .map(|root_dir| root_dir.parse().map_err(|_| root_dir))
+            .transpose()
     }
 
     async fn read_replica(
@@ -153,7 +196,7 @@ impl CollabBackend for Neovim {
     ) -> Option<&'pairs (fs::AbsPathBuf, SessionId)> {
         let select = get_lua_value::<Function>(&["vim", "ui", "select"])?;
 
-        let home_dir = ctx.fs().home_dir().await.ok();
+        let home_dir = Self::home_dir(ctx).await.ok();
 
         let items = {
             let t = mlua::lua().create_table().ok()?;
@@ -226,52 +269,6 @@ impl CollabBackend for Neovim {
             server_rx: NeovimServerRx { inner: welcome.rx },
             session_id: welcome.session_id,
         })
-    }
-}
-
-impl CollabBuffer for NeovimBuffer {
-    type LspRootError = String;
-
-    fn lsp_root(
-        buffer: NeovimBuffer,
-    ) -> Result<Option<AbsPathBuf>, Self::LspRootError> {
-        /// Returns the root directory of the first language server
-        /// attached to the given buffer, if any.
-        fn inner(buffer: NeovimBuffer) -> Option<String> {
-            let lua = mlua::lua();
-
-            let opts = lua.create_table().ok()?;
-            opts.raw_set("bufnr", buffer).ok()?;
-
-            get_lua_value::<Function>(&["vim", "lsp", "get_clients"])?
-                .call::<Table>(opts)
-                .ok()?
-                .get::<Table>(1)
-                .ok()?
-                .get::<Table>("config")
-                .ok()?
-                .get::<String>("root_dir")
-                .ok()
-        }
-
-        inner(buffer)
-            .map(|root_dir| root_dir.parse().map_err(|_| root_dir))
-            .transpose()
-    }
-}
-
-impl CollabFs for NeovimFs {
-    type HomeDirError = NeovimHomeDirError;
-
-    async fn home_dir(&mut self) -> Result<AbsPathBuf, Self::HomeDirError> {
-        match home::home_dir() {
-            Some(home_dir) if !home_dir.as_os_str().is_empty() => {
-                home_dir.as_path().try_into().map_err(|err| {
-                    NeovimHomeDirError::InvalidHomeDir(home_dir, err)
-                })
-            },
-            _ => Err(NeovimHomeDirError::CouldntFindHome),
-        }
     }
 }
 
