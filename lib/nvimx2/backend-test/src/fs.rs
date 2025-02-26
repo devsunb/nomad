@@ -360,7 +360,8 @@ impl PartialEq for TestDirectory {
     }
 }
 
-impl Metadata<TestTimestamp> for TestDirEntry {
+impl Metadata for TestDirEntry {
+    type Timestamp = TestTimestamp;
     type Error = Infallible;
     type NameError = TestDirEntryDoesNotExistError;
     type NodeKindError = TestDirEntryDoesNotExistError;

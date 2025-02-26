@@ -146,22 +146,22 @@ where
     }
 }
 
-impl<F, E, W> Filter<W> for F
-where
-    F: AsyncFn(&fs::AbsPath, &W::DirEntry) -> Result<bool, E>,
-    W: WalkDir,
-    E: Error,
-{
-    type Error = E;
-
-    async fn should_filter(
-        &self,
-        dir_path: &fs::AbsPath,
-        dir_entry: &<W as WalkDir>::DirEntry,
-    ) -> Result<bool, Self::Error> {
-        self(dir_path, dir_entry).await
-    }
-}
+// impl<F, E, W> Filter<W> for F
+// where
+//     F: AsyncFn(&fs::AbsPath, &W::DirEntry) -> Result<bool, E>,
+//     W: WalkDir,
+//     E: Error,
+// {
+//     type Error = E;
+//
+//     async fn should_filter(
+//         &self,
+//         dir_path: &fs::AbsPath,
+//         dir_entry: &<W as WalkDir>::DirEntry,
+//     ) -> Result<bool, Self::Error> {
+//         self(dir_path, dir_entry).await
+//     }
+// }
 
 impl<F1, F2, W> Filter<W> for And<F1, F2>
 where

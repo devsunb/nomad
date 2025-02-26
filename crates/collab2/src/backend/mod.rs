@@ -362,14 +362,10 @@ mod root_markers {
     pub enum DirEntryError<Fs: fs::Fs> {
         Access(<Fs::Directory as fs::Directory>::ReadError),
         Name(
-            <<Fs::Directory as fs::Directory>::Metadata as fs::Metadata<
-                Fs::Timestamp,
-            >>::NameError,
+            <<Fs::Directory as fs::Directory>::Metadata as fs::Metadata>::NameError,
         ),
         NodeKind(
-            <<Fs::Directory as fs::Directory>::Metadata as fs::Metadata<
-                Fs::Timestamp,
-            >>::NodeKindError,
+            <<Fs::Directory as fs::Directory>::Metadata as fs::Metadata>::NodeKindError,
         ),
     }
 

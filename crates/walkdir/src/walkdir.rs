@@ -15,7 +15,7 @@ pub trait WalkDir: Sized {
     type Fs: fs::Fs;
 
     /// TODO: docs.
-    type DirEntry: fs::Metadata<<Self::Fs as fs::Fs>::Timestamp>;
+    type DirEntry: fs::Metadata<Timestamp = <Self::Fs as fs::Fs>::Timestamp>;
 
     /// TODO: docs.
     type ReadDirError: Error;
@@ -192,10 +192,10 @@ pub enum WalkErrorKind<W: WalkDir> {
     DirEntry(W::ReadDirEntryError),
 
     /// TODO: docs.
-    DirEntryName(<W::DirEntry as fs::Metadata<<W::Fs as fs::Fs>::Timestamp>>::NameError),
+    DirEntryName(<W::DirEntry as fs::Metadata>::NameError),
 
     /// TODO: docs.
-    DirEntryNodeKind(<W::DirEntry as fs::Metadata<<W::Fs as fs::Fs>::Timestamp>>::NodeKindError),
+    DirEntryNodeKind(<W::DirEntry as fs::Metadata>::NodeKindError),
 
     /// TODO: docs.
     ReadDir(W::ReadDirError),

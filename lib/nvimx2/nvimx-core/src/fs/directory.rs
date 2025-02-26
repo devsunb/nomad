@@ -10,7 +10,7 @@ pub trait Directory {
     type Fs: Fs;
 
     /// TODO: docs.
-    type Metadata: Metadata<<Self::Fs as Fs>::Timestamp>;
+    type Metadata: Metadata<Timestamp = <Self::Fs as Fs>::Timestamp>;
 
     /// TODO: docs.
     type ReadEntryError: Error;

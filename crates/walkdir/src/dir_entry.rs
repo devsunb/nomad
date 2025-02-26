@@ -1,5 +1,6 @@
 use core::convert::Infallible;
 
+use nvimx2::ByteOffset;
 use nvimx2::fs::{self, FsNodeKind, FsNodeName, FsNodeNameBuf};
 
 use crate::{WalkDir, WalkErrorKind};
@@ -26,6 +27,13 @@ impl<'a, W: WalkDir> DirEntry<'a, W> {
     /// TODO: docs.
     pub fn into_inner(self) -> W::DirEntry {
         self.inner
+    }
+
+    /// TODO: docs.
+    pub async fn len(
+        &self,
+    ) -> Result<ByteOffset, <W::DirEntry as fs::Metadata>::Error> {
+        todo!()
     }
 
     /// TODO: docs.
@@ -67,23 +75,21 @@ impl<'a, W: WalkDir> DirEntry<'a, W> {
     }
 }
 
-impl<W: WalkDir> fs::Metadata<<W::Fs as fs::Fs>::Timestamp>
-    for DirEntry<'_, W>
-{
-    type Error =
-        <W::DirEntry as fs::Metadata<<W::Fs as fs::Fs>::Timestamp>>::Error;
+impl<W: WalkDir> fs::Metadata for DirEntry<'_, W> {
+    type Timestamp = <W::Fs as fs::Fs>::Timestamp;
+    type Error = <W::DirEntry as fs::Metadata>::Error;
     type NameError = Infallible;
     type NodeKindError = Infallible;
 
     async fn created_at(
         &self,
-    ) -> Result<Option<<W::Fs as fs::Fs>::Timestamp>, Self::Error> {
+    ) -> Result<Option<Self::Timestamp>, Self::Error> {
         self.inner.created_at().await
     }
 
     async fn last_modified_at(
         &self,
-    ) -> Result<Option<<W::Fs as fs::Fs>::Timestamp>, Self::Error> {
+    ) -> Result<Option<Self::Timestamp>, Self::Error> {
         self.inner.last_modified_at().await
     }
 

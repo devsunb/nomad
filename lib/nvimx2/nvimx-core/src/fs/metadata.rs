@@ -3,7 +3,10 @@ use core::error::Error;
 use crate::fs::{FsNodeKind, FsNodeNameBuf};
 
 /// TODO: docs.
-pub trait Metadata<Ts> {
+pub trait Metadata {
+    /// TODO: docs.
+    type Timestamp;
+
     /// TODO: docs.
     type Error: Error;
 
@@ -16,12 +19,12 @@ pub trait Metadata<Ts> {
     /// TODO: docs.
     fn created_at(
         &self,
-    ) -> impl Future<Output = Result<Option<Ts>, Self::Error>>;
+    ) -> impl Future<Output = Result<Option<Self::Timestamp>, Self::Error>>;
 
     /// TODO: docs.
     fn last_modified_at(
         &self,
-    ) -> impl Future<Output = Result<Option<Ts>, Self::Error>>;
+    ) -> impl Future<Output = Result<Option<Self::Timestamp>, Self::Error>>;
 
     /// TODO: docs.
     fn name(

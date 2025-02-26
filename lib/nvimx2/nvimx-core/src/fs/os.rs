@@ -221,7 +221,8 @@ impl Stream for OsWatcher {
     }
 }
 
-impl Metadata<SystemTime> for OsMetadata {
+impl Metadata for OsMetadata {
+    type Timestamp = SystemTime;
     type Error = io::Error;
     type NameError = OsNameError;
     type NodeKindError = Infallible;
