@@ -271,6 +271,8 @@ impl TestFsNode {
 }
 
 impl TestDirectory {
+    // Should only be used by the `fs!` macro.
+    #[doc(hidden)]
     #[track_caller]
     pub fn insert_child(
         &mut self,
