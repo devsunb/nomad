@@ -4,6 +4,7 @@
 
 use core::convert::Infallible;
 use core::error::Error;
+use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
@@ -51,6 +52,13 @@ pub struct CollabTestBackend<B: Backend> {
                 &[(fs::AbsPathBuf, SessionId)],
                 ActionForSelectedSession,
             ) -> Option<&(fs::AbsPathBuf, SessionId)>,
+        >,
+    >,
+    start_session_with: Option<
+        Box<
+            dyn FnMut(
+                StartArgs<'_>,
+            ) -> Result<StartInfos<Self>, Box<dyn Error>>,
         >,
     >,
 }
@@ -108,6 +116,7 @@ impl<B: Backend> CollabTestBackend<B> {
             inner,
             lsp_root_with: None,
             select_session_with: None,
+            start_session_with: None,
         }
     }
 
@@ -120,6 +129,16 @@ impl<B: Backend> CollabTestBackend<B> {
         + 'static,
     ) -> Self {
         self.select_session_with = Some(Box::new(fun) as _);
+        self
+    }
+
+    pub fn start_session_with<E: Error + 'static>(
+        mut self,
+        mut fun: impl FnMut(StartArgs<'_>) -> Result<StartInfos<Self>, E> + 'static,
+    ) -> Self {
+        self.start_session_with = Some(Box::new(move |args| {
+            fun(args).map_err(|err| Box::new(err) as _)
+        }));
         self
     }
 }
@@ -202,10 +221,28 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn start_session(
-        _args: StartArgs<'_>,
-        _ctx: &mut AsyncCtx<'_, Self>,
+        args: StartArgs<'_>,
+        ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<StartInfos<Self>, Self::StartSessionError> {
-        todo!()
+        #[derive(Debug)]
+        struct NoStarterSet;
+
+        impl fmt::Display for NoStarterSet {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(
+                    f,
+                    "no starter set, call \
+                     CollabTestBackend::start_session_with() to set one"
+                )
+            }
+        }
+
+        impl Error for NoStarterSet {}
+
+        ctx.with_backend(|this| match this.start_session_with.as_mut() {
+            Some(fun) => fun(args),
+            None => Err(Box::new(NoStarterSet) as _),
+        })
     }
 }
 
