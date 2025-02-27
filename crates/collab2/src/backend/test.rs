@@ -26,13 +26,21 @@ pub struct CollabTestBackend<B: Backend> {
     inner: B,
     confirm_start_with: Option<Box<dyn FnMut(&fs::AbsPath) -> bool>>,
     clipboard: Option<SessionId>,
+    home_dir_with:
+        Option<Box<dyn FnMut(<B as Backend>::Fs) -> fs::AbsPathBuf + Send>>,
     lsp_root_with: Option<
         Box<
             dyn FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<fs::AbsPathBuf>,
         >,
     >,
-    home_dir_with:
-        Option<Box<dyn FnMut(<B as Backend>::Fs) -> fs::AbsPathBuf + Send>>,
+    select_session_with: Option<
+        Box<
+            dyn FnMut(
+                &[(fs::AbsPathBuf, SessionId)],
+                ActionForSelectedSession,
+            ) -> Option<&(fs::AbsPathBuf, SessionId)>,
+        >,
+    >,
 }
 
 impl<B: Backend> CollabTestBackend<B> {
@@ -44,6 +52,23 @@ impl<B: Backend> CollabTestBackend<B> {
         self
     }
 
+    pub fn home_dir_with(
+        mut self,
+        fun: impl FnMut(<B as Backend>::Fs) -> fs::AbsPathBuf + Send + 'static,
+    ) -> Self {
+        self.home_dir_with = Some(Box::new(fun) as _);
+        self
+    }
+
+    pub fn lsp_root_with(
+        mut self,
+        fun: impl FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<fs::AbsPathBuf>
+        + 'static,
+    ) -> Self {
+        self.lsp_root_with = Some(Box::new(fun) as _);
+        self
+    }
+
     pub fn new(inner: B) -> Self {
         Self {
             clipboard: None,
@@ -51,7 +76,20 @@ impl<B: Backend> CollabTestBackend<B> {
             home_dir_with: None,
             inner,
             lsp_root_with: None,
+            select_session_with: None,
         }
+    }
+
+    pub fn select_session_with(
+        mut self,
+        fun: impl FnMut(
+            &[(fs::AbsPathBuf, SessionId)],
+            ActionForSelectedSession,
+        ) -> Option<&(fs::AbsPathBuf, SessionId)>
+        + 'static,
+    ) -> Self {
+        self.select_session_with = Some(Box::new(fun) as _);
+        self
     }
 }
 
@@ -123,11 +161,13 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     }
 
     async fn select_session<'pairs>(
-        _sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
-        _action: ActionForSelectedSession,
-        _ctx: &mut AsyncCtx<'_, Self>,
+        sessions: &'pairs [(fs::AbsPathBuf, SessionId)],
+        action: ActionForSelectedSession,
+        ctx: &mut AsyncCtx<'_, Self>,
     ) -> Option<&'pairs (fs::AbsPathBuf, SessionId)> {
-        todo!()
+        ctx.with_backend(|this| {
+            this.select_session_with.as_mut()?(sessions, action)
+        })
     }
 
     async fn start_session(
