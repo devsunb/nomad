@@ -8,6 +8,7 @@ pub use dir_entry::DirEntry;
 pub use filter::{Either, Filter, Filtered};
 pub use walkdir::{
     ForEachError,
+    FsReadDirError,
     PathsError,
     WalkDir,
     WalkError,

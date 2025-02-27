@@ -55,11 +55,7 @@ pub struct CollabTestBackend<B: Backend> {
         >,
     >,
     start_session_with: Option<
-        Box<
-            dyn FnMut(
-                StartArgs<'_>,
-            ) -> Result<StartInfos<Self>, Box<dyn Error>>,
-        >,
+        Box<dyn FnMut(StartArgs<'_>) -> Result<StartInfos<Self>, AnyError>>,
     >,
 }
 
@@ -80,6 +76,11 @@ pin_project_lite::pin_project! {
 #[derive(Debug)]
 pub struct TestTxError {
     inner: flume::SendError<Message>,
+}
+
+#[derive(Debug)]
+pub struct AnyError {
+    inner: Box<dyn Error>,
 }
 
 impl<B: Backend> CollabTestBackend<B> {
@@ -136,10 +137,19 @@ impl<B: Backend> CollabTestBackend<B> {
         mut self,
         mut fun: impl FnMut(StartArgs<'_>) -> Result<StartInfos<Self>, E> + 'static,
     ) -> Self {
-        self.start_session_with = Some(Box::new(move |args| {
-            fun(args).map_err(|err| Box::new(err) as _)
-        }));
+        self.start_session_with =
+            Some(Box::new(move |args| fun(args).map_err(AnyError::new)));
         self
+    }
+}
+
+impl AnyError {
+    pub fn downcast_ref<T: Error + 'static>(&self) -> Option<&T> {
+        self.inner.downcast_ref()
+    }
+
+    fn new<E: Error + 'static>(err: E) -> Self {
+        Self { inner: Box::new(err) as _ }
     }
 }
 
@@ -154,7 +164,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type SearchProjectRootError = default_search_project_root::Error<Self>;
     type ServerRxError = Infallible;
     type ServerTxError = TestTxError;
-    type StartSessionError = Box<dyn Error>;
+    type StartSessionError = AnyError;
 
     async fn confirm_start(
         project_root: &fs::AbsPath,
@@ -241,7 +251,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
         ctx.with_backend(|this| match this.start_session_with.as_mut() {
             Some(fun) => fun(args),
-            None => Err(Box::new(NoStarterSet) as _),
+            None => Err(AnyError::new(NoStarterSet)),
         })
     }
 }
@@ -359,6 +369,18 @@ impl Stream for TestRx {
             .inner
             .poll_next(ctx)
             .map(|maybe_next| maybe_next.map(Ok))
+    }
+}
+
+impl PartialEq for AnyError {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.to_string() == other.inner.to_string()
+    }
+}
+
+impl notify::Error for AnyError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        self.inner.to_message()
     }
 }
 

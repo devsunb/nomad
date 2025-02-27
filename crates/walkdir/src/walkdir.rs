@@ -212,6 +212,26 @@ impl<K> WalkError<K> {
     }
 }
 
+/// TODO: docs.
+#[derive(derive_more::Debug)]
+#[debug(bound(Fs: fs::Fs))]
+pub enum FsReadDirError<Fs: fs::Fs> {
+    /// TODO: docs.
+    NoNodeAtPath,
+
+    /// TODO: docs.
+    NodeAtPath(Fs::NodeAtPathError),
+
+    /// TODO: docs.
+    ReadDir(<Fs::Directory as fs::Directory>::ReadError),
+
+    /// TODO: docs.
+    ReadFile,
+
+    /// TODO: docs.
+    ReadSymlink,
+}
+
 impl<Fs: fs::Fs> WalkDir for Fs {
     type Fs = Self;
 
@@ -220,8 +240,7 @@ impl<Fs: fs::Fs> WalkDir for Fs {
     type ReadDirEntryError =
         <<Self as fs::Fs>::Directory as fs::Directory>::ReadEntryError;
 
-    type ReadDirError =
-        <<Self as fs::Fs>::Directory as fs::Directory>::ReadError;
+    type ReadDirError = FsReadDirError<Self>;
 
     async fn read_dir(
         &self,
@@ -230,12 +249,20 @@ impl<Fs: fs::Fs> WalkDir for Fs {
         impl Stream<Item = Result<Self::DirEntry, Self::ReadDirEntryError>>,
         Self::ReadDirError,
     > {
-        match self.node_at_path(dir_path).await {
-            Ok(Some(fs::FsNode::Directory(dir))) => dir.read().await,
-            Ok(Some(fs::FsNode::File(_))) => todo!(),
-            Ok(Some(fs::FsNode::Symlink(_))) => todo!(),
-            Ok(None) => todo!(),
-            Err(_err) => todo!(),
+        let Some(node) = self
+            .node_at_path(dir_path)
+            .await
+            .map_err(FsReadDirError::NodeAtPath)?
+        else {
+            return Err(FsReadDirError::NoNodeAtPath);
+        };
+
+        match node {
+            fs::FsNode::Directory(dir) => {
+                dir.read().await.map_err(FsReadDirError::ReadDir)
+            },
+            fs::FsNode::File(_) => Err(FsReadDirError::ReadFile),
+            fs::FsNode::Symlink(_) => Err(FsReadDirError::ReadSymlink),
         }
     }
 }
@@ -277,3 +304,46 @@ where
         }
     }
 }
+
+impl<Fs: fs::Fs> PartialEq for FsReadDirError<Fs>
+where
+    Fs::NodeAtPathError: PartialEq,
+    <Fs::Directory as fs::Directory>::ReadError: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        use FsReadDirError::*;
+
+        match (self, other) {
+            (NoNodeAtPath, NoNodeAtPath) => true,
+            (NodeAtPath(l), NodeAtPath(r)) => l == r,
+            (ReadDir(l), ReadDir(r)) => l == r,
+            (ReadFile, ReadFile) => true,
+            (ReadSymlink, ReadSymlink) => true,
+            _ => false,
+        }
+    }
+}
+
+impl<Fs: fs::Fs> fmt::Display for FsReadDirError<Fs> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FsReadDirError::NoNodeAtPath => {
+                write!(f, "no node at path")
+            },
+            FsReadDirError::NodeAtPath(err) => {
+                write!(f, "couldn't get file or directory: {err}")
+            },
+            FsReadDirError::ReadDir(err) => {
+                write!(f, "couldn't read directory: {err}")
+            },
+            FsReadDirError::ReadFile => {
+                write!(f, "couldn't read file at path")
+            },
+            FsReadDirError::ReadSymlink => {
+                write!(f, "couldn't read symlink at path")
+            },
+        }
+    }
+}
+
+impl<Fs: fs::Fs> Error for FsReadDirError<Fs> {}

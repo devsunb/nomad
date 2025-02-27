@@ -11,7 +11,6 @@ neovim = [
   "dep:async-net",
   "dep:clipboard",
   "dep:home",
-  "dep:pin-project-lite",
   "futures-util/async-await-macro",
   "nvimx2/neovim-0-10",
   "nvimx2/neovim-mlua",
@@ -28,6 +27,7 @@ flume = { workspace = true, features = ["async"] }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
 nvimx2 = { workspace = true }
+pin-project-lite = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true }
 smol_str = { workspace = true }
@@ -37,7 +37,6 @@ walkdir = { workspace = true }
 async-net = { workspace = true, optional = true }
 clipboard = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }
-pin-project-lite = { workspace = true, optional = true }
 
 [dev-dependencies]
 nvimx2 = { workspace = true, features = ["tests"] }
