@@ -14,15 +14,15 @@ use crate::backend::{CollabBackend, JoinArgs, JoinInfos};
 use crate::collab::Collab;
 use crate::config::Config;
 use crate::leave::StopChannels;
+use crate::project::{OverlappingProjectError, Projects};
 use crate::session::{NewSessionArgs, Session};
-use crate::sessions::{OverlappingSessionError, Sessions};
 use crate::start::{SessionRxDroppedError, UserNotLoggedInError};
 
 /// The `Action` used to join an existing collaborative editing session.
 pub struct Join<B: CollabBackend> {
     auth_infos: Shared<Option<AuthInfos>>,
     config: Shared<Config>,
-    sessions: Sessions,
+    projects: Projects<B>,
     session_tx: flume::Sender<Session<B>>,
     stop_channels: StopChannels,
 }
@@ -80,7 +80,6 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             server_rx: join_infos.server_rx,
             server_tx: join_infos.server_tx,
             stop_rx: self.stop_channels.insert(join_infos.session_id),
-            session_guard: todo!(),
         });
 
         self.session_tx
@@ -98,7 +97,7 @@ pub enum JoinError<B: CollabBackend> {
     JoinSession(B::JoinSessionError),
 
     /// TODO: docs.
-    OverlappingSession(OverlappingSessionError),
+    OverlappingProject(OverlappingProjectError),
 
     /// TODO: docs.
     RequestProject(RequestProjectError<B>),
@@ -126,7 +125,7 @@ impl<B: CollabBackend> Clone for Join<B> {
             auth_infos: self.auth_infos.clone(),
             config: self.config.clone(),
             stop_channels: self.stop_channels.clone(),
-            sessions: self.sessions.clone(),
+            projects: self.projects.clone(),
             session_tx: self.session_tx.clone(),
         }
     }
@@ -137,7 +136,7 @@ impl<B: CollabBackend> From<&Collab<B>> for Join<B> {
         Self {
             auth_infos: collab.auth_infos.clone(),
             config: collab.config.clone(),
-            sessions: collab.sessions.clone(),
+            projects: collab.projects.clone(),
             session_tx: collab.session_tx.clone(),
             stop_channels: collab.stop_channels.clone(),
         }
@@ -171,7 +170,7 @@ where
 
         match (self, other) {
             (JoinSession(l), JoinSession(r)) => l == r,
-            (OverlappingSession(l), OverlappingSession(r)) => l == r,
+            (OverlappingProject(l), OverlappingProject(r)) => l == r,
             (RequestProject(_), RequestProject(_)) => todo!(),
             (RootForRemoteProject(l), RootForRemoteProject(r)) => l == r,
             (SessionRxDropped(_), SessionRxDropped(_)) => true,
@@ -185,7 +184,7 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
             Self::JoinSession(err) => err.to_message(),
-            Self::OverlappingSession(err) => err.to_message(),
+            Self::OverlappingProject(err) => err.to_message(),
             Self::RequestProject(_) => todo!(),
             Self::RootForRemoteProject(err) => err.to_message(),
             Self::SessionRxDropped(err) => err.to_message(),

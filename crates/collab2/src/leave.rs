@@ -10,13 +10,12 @@ use nvimx2::{AsyncCtx, Shared};
 
 use crate::backend::CollabBackend;
 use crate::collab::Collab;
-use crate::yank::{NoActiveSessionError, SessionSelector};
+use crate::project::{NoActiveSessionError, Projects};
 
 /// TODO: docs.
-#[derive(Clone)]
-pub struct Leave {
+pub struct Leave<B: CollabBackend> {
     channels: StopChannels,
-    session_selector: SessionSelector,
+    projects: Projects<B>,
 }
 
 #[derive(Clone, Default)]
@@ -26,7 +25,7 @@ pub(crate) struct StopChannels {
 
 pub(crate) struct StopSession;
 
-impl<B: CollabBackend> AsyncAction<B> for Leave {
+impl<B: CollabBackend> AsyncAction<B> for Leave<B> {
     const NAME: Name = "leave";
 
     type Args = ();
@@ -36,7 +35,7 @@ impl<B: CollabBackend> AsyncAction<B> for Leave {
         _: Self::Args,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), NoActiveSessionError<B>> {
-        if let Some((_, id)) = self.session_selector.select(ctx).await? {
+        if let Some((_, id)) = self.projects.select(ctx).await? {
             if let Some(sender) = self.channels.take(id) {
                 let _ = sender.send_async(StopSession).await;
             }
@@ -69,15 +68,24 @@ impl StopChannels {
     }
 }
 
-impl<B: CollabBackend> From<&Collab<B>> for Leave {
-    fn from(collab: &Collab<B>) -> Self {
+impl<B: CollabBackend> Clone for Leave<B> {
+    fn clone(&self) -> Self {
         Self {
-            channels: collab.stop_channels.clone(),
-            session_selector: SessionSelector::new(collab.sessions.clone()),
+            channels: self.channels.clone(),
+            projects: self.projects.clone(),
         }
     }
 }
 
-impl<B: CollabBackend> ToCompletionFn<B> for Leave {
+impl<B: CollabBackend> From<&Collab<B>> for Leave<B> {
+    fn from(collab: &Collab<B>) -> Self {
+        Self {
+            channels: collab.stop_channels.clone(),
+            projects: collab.projects.clone(),
+        }
+    }
+}
+
+impl<B: CollabBackend> ToCompletionFn<B> for Leave<B> {
     fn to_completion_fn(&self) {}
 }

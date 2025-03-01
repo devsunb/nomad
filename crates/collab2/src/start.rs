@@ -13,14 +13,14 @@ use crate::backend::{CollabBackend, StartArgs};
 use crate::collab::Collab;
 use crate::config::Config;
 use crate::leave::StopChannels;
+use crate::project::{OverlappingProjectError, Projects};
 use crate::session::{NewSessionArgs, Session};
-use crate::sessions::{OverlappingSessionError, Sessions};
 
 /// The `Action` used to start a new collaborative editing session.
 pub struct Start<B: CollabBackend> {
     auth_infos: Shared<Option<AuthInfos>>,
     config: Shared<Config>,
-    sessions: Sessions,
+    projects: Projects<B>,
     session_tx: flume::Sender<Session<B>>,
     stop_channels: StopChannels,
 }
@@ -54,14 +54,9 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             return Ok(());
         }
 
-        let guard = self
-            .sessions
-            .start_guard(project_root)
-            .map_err(StartError::OverlappingSession)?;
-
         let start_args = StartArgs {
             auth_infos: &auth_infos,
-            project_root: guard.root(),
+            project_root: &project_root,
             server_address: &self.config.with(|c| c.server_address.clone()),
         };
 
@@ -70,7 +65,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .map_err(StartError::StartSession)?;
 
         let replica =
-            B::read_replica(start_infos.local_peer.id(), guard.root(), ctx)
+            B::read_replica(start_infos.local_peer.id(), &project_root, ctx)
                 .await
                 .map_err(StartError::ReadReplica)?;
 
@@ -81,7 +76,6 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             _replica: replica,
             server_rx: start_infos.server_rx,
             server_tx: start_infos.server_tx,
-            session_guard: guard.into_active(start_infos.session_id),
             stop_rx: self.stop_channels.insert(start_infos.session_id),
         });
 
@@ -100,7 +94,7 @@ pub enum StartError<B: CollabBackend> {
     NoBufferFocused(NoBufferFocusedError<B>),
 
     /// TODO: docs.
-    OverlappingSession(OverlappingSessionError),
+    OverlappingProject(OverlappingProjectError),
 
     /// TODO: docs.
     ReadReplica(B::ReadReplicaError),
@@ -133,7 +127,7 @@ impl<B: CollabBackend> Clone for Start<B> {
             auth_infos: self.auth_infos.clone(),
             config: self.config.clone(),
             stop_channels: self.stop_channels.clone(),
-            sessions: self.sessions.clone(),
+            projects: self.projects.clone(),
             session_tx: self.session_tx.clone(),
         }
     }
@@ -144,7 +138,7 @@ impl<B: CollabBackend> From<&Collab<B>> for Start<B> {
         Self {
             auth_infos: collab.auth_infos.clone(),
             config: collab.config.clone(),
-            sessions: collab.sessions.clone(),
+            projects: collab.projects.clone(),
             session_tx: collab.session_tx.clone(),
             stop_channels: collab.stop_channels.clone(),
         }
@@ -184,7 +178,7 @@ where
 
         match (self, other) {
             (NoBufferFocused(_), NoBufferFocused(_)) => true,
-            (OverlappingSession(l), OverlappingSession(r)) => l == r,
+            (OverlappingProject(l), OverlappingProject(r)) => l == r,
             (ReadReplica(l), ReadReplica(r)) => l == r,
             (SearchProjectRoot(l), SearchProjectRoot(r)) => l == r,
             (SessionRxDropped(_), SessionRxDropped(_)) => true,
@@ -199,7 +193,7 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
             Self::NoBufferFocused(err) => err.to_message(),
-            Self::OverlappingSession(err) => err.to_message(),
+            Self::OverlappingProject(err) => err.to_message(),
             Self::ReadReplica(err) => err.to_message(),
             Self::SearchProjectRoot(err) => err.to_message(),
             Self::SessionRxDropped(err) => err.to_message(),

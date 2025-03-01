@@ -10,7 +10,6 @@ pub mod join;
 mod leave;
 mod project;
 mod session;
-mod sessions;
 pub mod start;
 mod yank;
 

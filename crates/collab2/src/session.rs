@@ -8,7 +8,6 @@ use nvimx2::{AsyncCtx, notify};
 
 use crate::backend::CollabBackend;
 use crate::leave::StopSession;
-use crate::sessions::{Active, SessionGuard};
 
 pub(crate) struct Session<B: CollabBackend> {
     args: NewSessionArgs<B>,
@@ -34,9 +33,6 @@ pub(crate) struct NewSessionArgs<B: CollabBackend> {
     /// TODO: docs.
     pub(crate) stop_rx: Receiver<StopSession>,
 
-    /// TODO: docs.
-    pub(crate) session_guard: SessionGuard<Active>,
-
     /// TODO: docs..
     pub(crate) server_tx: B::ServerTx,
 
@@ -61,13 +57,7 @@ impl<B: CollabBackend> Session<B> {
         self,
         _ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), RunSessionError<B>> {
-        let NewSessionArgs {
-            stop_rx,
-            server_rx,
-            server_tx,
-            session_guard: _guard,
-            ..
-        } = self.args;
+        let NewSessionArgs { stop_rx, server_rx, server_tx, .. } = self.args;
 
         pin_mut!(server_rx);
         pin_mut!(server_tx);

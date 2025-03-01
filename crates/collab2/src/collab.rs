@@ -10,8 +10,8 @@ use crate::backend::CollabBackend;
 use crate::config::Config;
 use crate::join::Join;
 use crate::leave::{Leave, StopChannels};
+use crate::project::Projects;
 use crate::session::Session;
-use crate::sessions::Sessions;
 use crate::start::Start;
 use crate::yank::Yank;
 
@@ -19,8 +19,8 @@ use crate::yank::Yank;
 pub struct Collab<B: CollabBackend> {
     pub(crate) auth_infos: Shared<Option<AuthInfos>>,
     pub(crate) config: Shared<Config>,
+    pub(crate) projects: Projects<B>,
     pub(crate) session_tx: Sender<Session<B>>,
-    pub(crate) sessions: Sessions,
     pub(crate) stop_channels: StopChannels,
     session_rx: Cell<Option<Receiver<Session<B>>>>,
 }
@@ -32,7 +32,7 @@ impl<B: CollabBackend> Collab<B> {
     }
 
     /// Returns a new instance of the [`Leave`] action.
-    pub fn leave(&self) -> Leave {
+    pub fn leave(&self) -> Leave<B> {
         self.into()
     }
 
@@ -42,7 +42,7 @@ impl<B: CollabBackend> Collab<B> {
     }
 
     /// Returns a new instance of the [`Yank`] action.
-    pub fn yank(&self) -> Yank {
+    pub fn yank(&self) -> Yank<B> {
         self.into()
     }
 }
@@ -93,8 +93,8 @@ impl<B: CollabBackend> From<&auth::Auth> for Collab<B> {
         Self {
             auth_infos: auth.infos().clone(),
             config: Default::default(),
+            projects: Default::default(),
             session_tx,
-            sessions: Default::default(),
             stop_channels: Default::default(),
             session_rx: Cell::new(Some(session_rx)),
         }
