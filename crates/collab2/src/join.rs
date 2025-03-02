@@ -4,6 +4,9 @@ use core::marker::PhantomData;
 
 use auth::AuthInfos;
 use collab_server::SessionId;
+use collab_server::message::{FileContents, Message, ProjectRequest};
+use eerie::Replica;
+use futures_util::{SinkExt, StreamExt};
 use nvimx2::action::AsyncAction;
 use nvimx2::command::{Parse, ToCompletionFn};
 use nvimx2::fs::Directory;
@@ -25,15 +28,6 @@ pub struct Join<B: CollabBackend> {
     config: Shared<Config>,
     projects: Projects<B>,
     stop_channels: StopChannels,
-}
-
-impl<B: CollabBackend> Join<B> {
-    async fn request_project(
-        &self,
-        _join_infos: &mut JoinInfos<B>,
-    ) -> Result<Project<B>, RequestProjectError<B>> {
-        todo!();
-    }
 }
 
 impl<B: CollabBackend> AsyncAction<B> for Join<B> {
@@ -61,22 +55,31 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             .await
             .map_err(JoinError::JoinSession)?;
 
-        let project = self
-            .request_project(&mut join_infos)
-            .await
-            .map_err(JoinError::RequestProject)?;
+        let project_root = match self
+            .config
+            .with(|c| c.store_remote_projects_under.clone())
+        {
+            Some(path) => path,
+            None => B::default_dir_for_remote_projects(ctx)
+                .await
+                .map_err(JoinError::DefaultDirForRemoteProjects)?,
+        }
+        .join(&join_infos.project_name);
 
-        let project_root = B::root_for_remote_project(&project, ctx)
-            .await
-            .map_err(JoinError::RootForRemoteProject)?;
+        let ProjectResponse { buffered, file_contents, replica } =
+            request_project(&mut join_infos)
+                .await
+                .map_err(JoinError::RequestProject)?;
 
-        project.flush(&project_root, ctx.fs()).await;
+        // flush_project(&replica, &file_contents, &project_root, ctx.fs())
+        //     .await
+        //     .map_err(JoinError::FlushProject)?;
 
         let project = self
             .projects
             .insert(NewProjectArgs {
-                replica: todo!(),
-                root: project_root.path().to_owned(),
+                replica,
+                root: project_root,
                 session_id: join_infos.session_id,
             })
             .map_err(JoinError::OverlappingProject)?;
@@ -102,10 +105,61 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
     }
 }
 
+struct ProjectResponse {
+    buffered: Vec<Message>,
+    file_contents: FileContents,
+    replica: Replica,
+}
+
+async fn request_project<B: CollabBackend>(
+    join_infos: &mut JoinInfos<B>,
+) -> Result<ProjectResponse, RequestProjectError<B>> {
+    let request_from = join_infos
+        .remote_peers
+        .as_slice()
+        .first()
+        .expect("can't be empty")
+        .id();
+
+    join_infos
+        .server_tx
+        .send(Message::ProjectRequest(ProjectRequest {
+            requested_by: join_infos.local_peer.clone(),
+            request_from,
+        }))
+        .await
+        .map_err(RequestProjectError::SendRequest)?;
+
+    let mut buffered = Vec::new();
+
+    let response = loop {
+        let message = join_infos
+            .server_rx
+            .next()
+            .await
+            .ok_or(RequestProjectError::SessionEnded)?
+            .map_err(RequestProjectError::RecvResponse)?;
+
+        match message {
+            Message::ProjectResponse(response) => break *response,
+            other => buffered.push(other),
+        }
+    };
+
+    Ok(ProjectResponse {
+        buffered,
+        file_contents: response.file_contents,
+        replica: Replica::decode(join_infos.local_peer.id(), response.replica),
+    })
+}
+
 /// The type of error that can occur when [`Join`]ing a session fails.
 #[derive(derive_more::Debug)]
 #[debug(bound(B: CollabBackend))]
 pub enum JoinError<B: CollabBackend> {
+    /// TODO: docs.
+    DefaultDirForRemoteProjects(B::DefaultDirForRemoteProjectsError),
+
     /// TODO: docs.
     JoinSession(B::JoinSessionError),
 
@@ -116,9 +170,6 @@ pub enum JoinError<B: CollabBackend> {
     RequestProject(RequestProjectError<B>),
 
     /// TODO: docs.
-    RootForRemoteProject(B::RootForRemoteProjectError),
-
-    /// TODO: docs.
     UserNotLoggedIn(UserNotLoggedInError<B>),
 }
 
@@ -126,7 +177,13 @@ pub enum JoinError<B: CollabBackend> {
 /// from another peer in a session fails.
 pub enum RequestProjectError<B: CollabBackend> {
     /// TODO: docs.
-    Todo(core::marker::PhantomData<B>),
+    RecvResponse(B::ServerRxError),
+
+    /// TODO: docs.
+    SendRequest(B::ServerTxError),
+
+    /// TODO: docs.
+    SessionEnded,
 }
 
 impl<B: CollabBackend> Clone for Join<B> {
@@ -166,7 +223,7 @@ impl<B> PartialEq for JoinError<B>
 where
     B: CollabBackend,
     B::JoinSessionError: PartialEq,
-    B::RootForRemoteProjectError: PartialEq,
+    B::DefaultDirForRemoteProjectsError: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
         use JoinError::*;
@@ -175,7 +232,10 @@ where
             (JoinSession(l), JoinSession(r)) => l == r,
             (OverlappingProject(l), OverlappingProject(r)) => l == r,
             (RequestProject(_), RequestProject(_)) => todo!(),
-            (RootForRemoteProject(l), RootForRemoteProject(r)) => l == r,
+            (
+                DefaultDirForRemoteProjects(l),
+                DefaultDirForRemoteProjects(r),
+            ) => l == r,
             (UserNotLoggedIn(_), UserNotLoggedIn(_)) => true,
             _ => false,
         }
@@ -188,7 +248,7 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
             Self::JoinSession(err) => err.to_message(),
             Self::OverlappingProject(err) => err.to_message(),
             Self::RequestProject(_) => todo!(),
-            Self::RootForRemoteProject(err) => err.to_message(),
+            Self::DefaultDirForRemoteProjects(err) => err.to_message(),
             Self::UserNotLoggedIn(err) => err.to_message(),
         }
     }
