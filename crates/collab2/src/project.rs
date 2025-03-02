@@ -4,8 +4,8 @@ use std::collections::hash_map::Entry;
 use collab_server::SessionId;
 use collab_server::message::{Peer, Peers};
 use eerie::Replica;
-use fxhash::FxHashMap;
-use nvimx2::fs::{AbsPath, AbsPathBuf, Fs};
+use fxhash::{FxHashMap, FxHashSet};
+use nvimx2::fs::{AbsPath, AbsPathBuf};
 use nvimx2::{AsyncCtx, Shared, notify};
 use smol_str::ToSmolStr;
 
@@ -32,13 +32,13 @@ pub struct OverlappingProjectError {
 pub struct NoActiveSessionError<B>(PhantomData<B>);
 
 pub(crate) struct Projects<B: CollabBackend> {
-    map: Shared<FxHashMap<SessionId, ProjectState<B>>>,
+    active: Shared<FxHashMap<SessionId, Shared<Project<B>>>>,
+    starting: Shared<FxHashSet<AbsPathBuf>>,
 }
 
 pub(crate) struct ProjectGuard<B: CollabBackend> {
     root: AbsPathBuf,
     projects: Projects<B>,
-    session_id: SessionId,
 }
 
 pub(crate) struct NewProjectArgs {
@@ -46,26 +46,13 @@ pub(crate) struct NewProjectArgs {
     pub(crate) local_peer: Peer,
     pub(crate) remote_peers: Peers,
     pub(crate) replica: Replica,
-}
-
-enum ProjectState<B: CollabBackend> {
-    Active(Shared<Project<B>>),
-    Joining(ProjectGuard<B>),
-    Starting(ProjectGuard<B>),
+    pub(crate) session_id: SessionId,
 }
 
 impl<B: CollabBackend> Project<B> {
     /// TODO: docs.
     pub fn is_host(&self) -> bool {
         self.local_peer.id() == self.host.id()
-    }
-
-    /// TODO: docs.
-    pub(crate) async fn flush(
-        &self,
-        _project_root: &<B::Fs as Fs>::Directory,
-        _fs: B::Fs,
-    ) {
     }
 }
 
@@ -74,28 +61,20 @@ impl<B: CollabBackend> Projects<B> {
         &self,
         session_id: SessionId,
     ) -> Option<Shared<Project<B>>> {
-        self.map.with(|map| match map.get(&session_id)? {
-            ProjectState::Active(project) => Some(project.clone()),
-            _ => None,
-        })
+        self.active.with(|map| map.get(&session_id).cloned())
     }
 
-    pub(crate) fn join_guard(
+    pub(crate) fn new_guard(
         &self,
         project_root: AbsPathBuf,
-        session_id: SessionId,
     ) -> Result<ProjectGuard<B>, OverlappingProjectError> {
         let guard = ProjectGuard {
-            root: project_root,
+            root: project_root.clone(),
             projects: self.clone(),
-            session_id,
         };
 
-        let state = ProjectState::Joining(guard.priv_clone());
-
-        self.map.with_mut(|map| {
-            let prev = map.insert(session_id, state);
-            assert!(prev.is_none());
+        self.starting.with_mut(|map| {
+            assert!(map.insert(project_root));
         });
 
         Ok(guard)
@@ -136,6 +115,10 @@ impl<B: CollabBackend> Projects<B> {
 
 impl<B: CollabBackend> ProjectGuard<B> {
     pub(crate) fn activate(self, args: NewProjectArgs) -> Shared<Project<B>> {
+        self.projects.starting.with_mut(|set| {
+            assert!(set.remove(&self.root));
+        });
+
         let project = Shared::new(Project {
             host: args.host,
             local_peer: args.local_peer,
@@ -143,11 +126,11 @@ impl<B: CollabBackend> ProjectGuard<B> {
             remote_peers: args.remote_peers,
             replica: args.replica,
             root: self.root.clone(),
-            session_id: self.session_id,
+            session_id: args.session_id,
         });
 
-        self.projects.map.with_mut(|map| {
-            map.insert(self.session_id, ProjectState::Active(project.clone()));
+        self.projects.active.with_mut(|map| {
+            map.insert(args.session_id, project.clone());
         });
 
         project
@@ -155,14 +138,6 @@ impl<B: CollabBackend> ProjectGuard<B> {
 
     pub(crate) fn root(&self) -> &AbsPath {
         &self.root
-    }
-
-    fn priv_clone(&self) -> Self {
-        Self {
-            root: self.root.clone(),
-            projects: self.projects.clone(),
-            session_id: self.session_id,
-        }
     }
 }
 
@@ -174,7 +149,7 @@ impl<B> NoActiveSessionError<B> {
 
 impl<B: CollabBackend> Drop for Project<B> {
     fn drop(&mut self) {
-        self.projects.map.with_mut(|map| {
+        self.projects.active.with_mut(|map| {
             map.remove(&self.session_id);
         });
     }
@@ -182,29 +157,20 @@ impl<B: CollabBackend> Drop for Project<B> {
 
 impl<B: CollabBackend> Default for Projects<B> {
     fn default() -> Self {
-        Self { map: Default::default() }
+        Self { active: Default::default(), starting: Default::default() }
     }
 }
 
 impl<B: CollabBackend> Clone for Projects<B> {
     fn clone(&self) -> Self {
-        Self { map: self.map.clone() }
+        Self { active: self.active.clone(), starting: self.starting.clone() }
     }
 }
 
 impl<B: CollabBackend> Drop for ProjectGuard<B> {
     fn drop(&mut self) {
-        self.projects.map.with_mut(|map| {
-            let Entry::Occupied(entry) = map.entry(self.session_id) else {
-                unreachable!()
-            };
-
-            if matches!(
-                entry.get(),
-                ProjectState::Joining(_) | ProjectState::Starting(_)
-            ) {
-                entry.remove();
-            }
+        self.projects.starting.with_mut(|set| {
+            set.remove(&self.root);
         });
     }
 }

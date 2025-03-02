@@ -49,13 +49,18 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .await
             .map_err(StartError::SearchProjectRoot)?;
 
-        if !B::confirm_start(&project_root, ctx).await {
+        let project_guard = self
+            .projects
+            .new_guard(project_root)
+            .map_err(StartError::OverlappingProject)?;
+
+        if !B::confirm_start(project_guard.root(), ctx).await {
             return Ok(());
         }
 
         let start_args = StartArgs {
             auth_infos: &auth_infos,
-            project_root: &project_root,
+            project_root: project_guard.root(),
             server_address: &self.config.with(|c| c.server_address.clone()),
         };
 
@@ -63,25 +68,24 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .await
             .map_err(StartError::StartSession)?;
 
-        let replica =
-            B::read_replica(start_infos.local_peer.id(), &project_root, ctx)
-                .await
-                .map_err(StartError::ReadReplica)?;
+        let replica = B::read_replica(
+            start_infos.local_peer.id(),
+            project_guard.root(),
+            ctx,
+        )
+        .await
+        .map_err(StartError::ReadReplica)?;
 
-        let project = self
-            .projects
-            .insert(NewProjectArgs {
-                replica,
-                root: project_root,
-                session_id: start_infos.session_id,
-            })
-            .map_err(StartError::OverlappingProject)?;
+        let project = project_guard.activate(NewProjectArgs {
+            host: todo!(),
+            local_peer: start_infos.local_peer,
+            replica,
+            remote_peers: start_infos.remote_peers,
+            session_id: start_infos.session_id,
+        });
 
         let session = Session::new(NewSessionArgs {
-            _is_host: true,
-            _local_peer: start_infos.local_peer,
             _project: project,
-            _remote_peers: start_infos.remote_peers,
             server_rx: start_infos.server_rx,
             server_tx: start_infos.server_tx,
             stop_rx: self.stop_channels.insert(start_infos.session_id),

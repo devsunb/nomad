@@ -67,7 +67,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
 
         let project_guard = self
             .projects
-            .join_guard(project_root, join_infos.session_id)
+            .new_guard(project_root)
             .map_err(JoinError::OverlappingProject)?;
 
         let ProjectResponse { buffered, file_contents, replica } =
@@ -89,6 +89,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             local_peer: join_infos.local_peer,
             replica,
             remote_peers: join_infos.remote_peers,
+            session_id: join_infos.session_id,
         });
 
         let session = Session::new(NewSessionArgs {
@@ -158,11 +159,12 @@ async fn request_project<B: CollabBackend>(
 }
 
 async fn flush_project<Fs: fs::Fs>(
-    replica: &Replica,
-    file_contents: &FileContents,
-    project_root: &AbsPath,
-    fs: Fs,
-) -> Result<(), FlushProjectError<B>> {
+    _replica: &Replica,
+    _file_contents: &FileContents,
+    _project_root: &AbsPath,
+    _fs: Fs,
+) -> Result<(), FlushProjectError<Fs>> {
+    todo!();
 }
 
 /// The type of error that can occur when [`Join`]ing a session fails.
