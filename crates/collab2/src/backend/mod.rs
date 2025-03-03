@@ -134,6 +134,9 @@ pub trait CollabBackend: Backend {
 pub enum ActionForSelectedSession {
     /// TODO: docs
     CopySessionId,
+
+    /// TODO: docs
+    Leave,
 }
 
 /// TODO: docs.

@@ -6,16 +6,18 @@ use eerie::{PeerId, Replica};
 use fxhash::{FxHashMap, FxHashSet};
 use nvimx2::fs::{AbsPath, AbsPathBuf};
 use nvimx2::{AsyncCtx, Shared, notify};
+use smallvec::SmallVec;
 use smol_str::ToSmolStr;
 
 use crate::CollabBackend;
+use crate::backend::ActionForSelectedSession;
 
 /// TODO: docs.
 pub struct Project<B: CollabBackend> {
     host_id: PeerId,
     local_peer: Peer,
-    remote_peers: Peers,
-    replica: Replica,
+    _remote_peers: Peers,
+    _replica: Replica,
     root: AbsPathBuf,
     session_id: SessionId,
     _phantom: PhantomData<B>,
@@ -94,34 +96,28 @@ impl<B: CollabBackend> Projects<B> {
 
     pub(crate) async fn select(
         &self,
-        _ctx: &mut AsyncCtx<'_, B>,
+        action: ActionForSelectedSession,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Option<(AbsPathBuf, SessionId)>, NoActiveSessionError<B>> {
-        todo!();
-        // let active_sessions = self
-        //     .sessions
-        //     .iter()
-        //     .filter_map(|(root, state)| match state {
-        //         SessionState::Active(session_id) => Some((root, session_id)),
-        //         _ => None,
-        //     })
-        //     .collect::<SmallVec<[_; 1]>>();
-        //
-        // let session = match &*active_sessions {
-        //     [] => return Err(NoActiveSessionError::new()),
-        //     [single] => single,
-        //     sessions => match B::select_session(
-        //         sessions,
-        //         ActionForSelectedSession::CopySessionId,
-        //         ctx,
-        //     )
-        //     .await
-        //     {
-        //         Some(session) => session,
-        //         None => return Ok(None),
-        //     },
-        // };
-        //
-        // Ok(Some(session.clone()))
+        let active_sessions = self.active.with(|map| {
+            map.iter()
+                .map(|(session_id, handle)| {
+                    let root = handle.with(|proj| proj.root.clone());
+                    (root, *session_id)
+                })
+                .collect::<SmallVec<[_; 1]>>()
+        });
+
+        let session = match &*active_sessions {
+            [] => return Err(NoActiveSessionError::new()),
+            [single] => single,
+            sessions => match B::select_session(sessions, action, ctx).await {
+                Some(session) => session,
+                None => return Ok(None),
+            },
+        };
+
+        Ok(Some(session.clone()))
     }
 
     fn insert(&self, project: Project<B>) -> ProjectHandle<B> {
@@ -147,8 +143,8 @@ impl<B: CollabBackend> ProjectGuard<B> {
         self.projects.insert(Project {
             host_id: args.host_id,
             local_peer: args.local_peer,
-            remote_peers: args.remote_peers,
-            replica: args.replica,
+            _remote_peers: args.remote_peers,
+            _replica: args.replica,
             root: self.root.clone(),
             session_id: args.session_id,
             _phantom: PhantomData,

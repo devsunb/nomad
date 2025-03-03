@@ -225,7 +225,10 @@ impl CollabBackend for Neovim {
 
         let prompt = match action {
             ActionForSelectedSession::CopySessionId => {
-                "Choose the session to yank the ID of: "
+                "Choose which session to yank the ID of: "
+            },
+            ActionForSelectedSession::Leave => {
+                "Choose which session to leave: "
             },
         };
 

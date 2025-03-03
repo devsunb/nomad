@@ -3,7 +3,7 @@ use nvimx2::action::AsyncAction;
 use nvimx2::command::ToCompletionFn;
 use nvimx2::notify::{self, Name};
 
-use crate::backend::CollabBackend;
+use crate::backend::{ActionForSelectedSession, CollabBackend};
 use crate::collab::Collab;
 use crate::project::{NoActiveSessionError, Projects};
 
@@ -25,7 +25,7 @@ impl<B: CollabBackend> AsyncAction<B> for Yank<B> {
     ) -> Result<(), YankError<B>> {
         let Some((_, session_id)) = self
             .projects
-            .select(ctx)
+            .select(ActionForSelectedSession::CopySessionId, ctx)
             .await
             .map_err(YankError::NoActiveSession)?
         else {

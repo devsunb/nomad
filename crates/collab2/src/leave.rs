@@ -8,7 +8,7 @@ use nvimx2::command::ToCompletionFn;
 use nvimx2::notify::Name;
 use nvimx2::{AsyncCtx, Shared};
 
-use crate::backend::CollabBackend;
+use crate::backend::{ActionForSelectedSession, CollabBackend};
 use crate::collab::Collab;
 use crate::project::{NoActiveSessionError, Projects};
 
@@ -35,7 +35,9 @@ impl<B: CollabBackend> AsyncAction<B> for Leave<B> {
         _: Self::Args,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), NoActiveSessionError<B>> {
-        if let Some((_, id)) = self.projects.select(ctx).await? {
+        if let Some((_, id)) =
+            self.projects.select(ActionForSelectedSession::Leave, ctx).await?
+        {
             if let Some(sender) = self.channels.take(id) {
                 let _ = sender.send_async(StopSession).await;
             }
