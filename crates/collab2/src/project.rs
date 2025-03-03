@@ -123,6 +123,19 @@ impl<B: CollabBackend> Projects<B> {
         //
         // Ok(Some(session.clone()))
     }
+
+    fn insert(&self, project: Project<B>) -> ProjectHandle<B> {
+        let session_id = project.session_id;
+        let handle = ProjectHandle {
+            inner: Shared::new(project),
+            projects: self.clone(),
+        };
+        self.active.with_mut(|map| {
+            let prev = map.insert(session_id, handle.clone());
+            assert!(prev.is_none());
+        });
+        handle
+    }
 }
 
 impl<B: CollabBackend> ProjectGuard<B> {
@@ -131,24 +144,15 @@ impl<B: CollabBackend> ProjectGuard<B> {
             assert!(set.remove(&self.root));
         });
 
-        let handle = ProjectHandle {
-            inner: Shared::new(Project {
-                host: args.host,
-                local_peer: args.local_peer,
-                remote_peers: args.remote_peers,
-                replica: args.replica,
-                root: self.root.clone(),
-                session_id: args.session_id,
-                _phantom: PhantomData,
-            }),
-            projects: self.projects.clone(),
-        };
-
-        self.projects.active.with_mut(|map| {
-            map.insert(args.session_id, handle.clone());
-        });
-
-        handle
+        self.projects.insert(Project {
+            host: args.host,
+            local_peer: args.local_peer,
+            remote_peers: args.remote_peers,
+            replica: args.replica,
+            root: self.root.clone(),
+            session_id: args.session_id,
+            _phantom: PhantomData,
+        })
     }
 
     pub(crate) fn root(&self) -> &AbsPath {
