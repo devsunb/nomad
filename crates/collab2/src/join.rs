@@ -84,7 +84,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
         .await
         .map_err(JoinError::FlushProject)?;
 
-        let project = project_guard.activate(NewProjectArgs {
+        let project_handle = project_guard.activate(NewProjectArgs {
             host: sesh_infos.host,
             local_peer: sesh_infos.local_peer,
             replica,
@@ -93,7 +93,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
         });
 
         let session = Session::new(NewSessionArgs {
-            _project: project,
+            project_handle,
             server_rx: sesh_infos.server_rx,
             server_tx: sesh_infos.server_tx,
             stop_rx: self.stop_channels.insert(sesh_infos.session_id),

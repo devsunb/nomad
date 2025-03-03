@@ -2,11 +2,11 @@ use core::marker::PhantomData;
 
 use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select};
-use nvimx2::{AsyncCtx, Shared, notify};
+use nvimx2::{AsyncCtx, notify};
 
-use crate::Project;
 use crate::backend::CollabBackend;
 use crate::leave::StopSession;
+use crate::project::ProjectHandle;
 
 pub(crate) struct Session<B: CollabBackend> {
     args: NewSessionArgs<B>,
@@ -14,7 +14,7 @@ pub(crate) struct Session<B: CollabBackend> {
 
 pub(crate) struct NewSessionArgs<B: CollabBackend> {
     /// TODO: docs.
-    pub(crate) _project: Shared<Project<B>>,
+    pub(crate) project_handle: ProjectHandle<B>,
 
     /// TODO: docs..
     pub(crate) server_rx: B::ServerRx,

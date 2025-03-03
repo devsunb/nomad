@@ -22,6 +22,11 @@ pub struct Project<B: CollabBackend> {
 }
 
 /// TODO: docs.
+pub struct ProjectHandle<B: CollabBackend> {
+    inner: Shared<Project<B>>,
+}
+
+/// TODO: docs.
 #[derive(Debug, PartialEq)]
 pub struct OverlappingProjectError {
     pub(crate) existing_root: AbsPathBuf,
@@ -31,7 +36,7 @@ pub struct OverlappingProjectError {
 pub struct NoActiveSessionError<B>(PhantomData<B>);
 
 pub(crate) struct Projects<B: CollabBackend> {
-    active: Shared<FxHashMap<SessionId, Shared<Project<B>>>>,
+    active: Shared<FxHashMap<SessionId, ProjectHandle<B>>>,
     starting: Shared<FxHashSet<AbsPathBuf>>,
 }
 
@@ -55,11 +60,22 @@ impl<B: CollabBackend> Project<B> {
     }
 }
 
+impl<B: CollabBackend> ProjectHandle<B> {
+    /// TODO: docs.
+    pub fn with<R>(&self, fun: impl FnOnce(&Project<B>) -> R) -> R {
+        self.inner.with(fun)
+    }
+
+    fn new(inner: Project<B>) -> Self {
+        Self { inner: Shared::new(inner) }
+    }
+}
+
 impl<B: CollabBackend> Projects<B> {
     pub(crate) fn get(
         &self,
         session_id: SessionId,
-    ) -> Option<Shared<Project<B>>> {
+    ) -> Option<ProjectHandle<B>> {
         self.active.with(|map| map.get(&session_id).cloned())
     }
 
@@ -113,12 +129,12 @@ impl<B: CollabBackend> Projects<B> {
 }
 
 impl<B: CollabBackend> ProjectGuard<B> {
-    pub(crate) fn activate(self, args: NewProjectArgs) -> Shared<Project<B>> {
+    pub(crate) fn activate(self, args: NewProjectArgs) -> ProjectHandle<B> {
         self.projects.starting.with_mut(|set| {
             assert!(set.remove(&self.root));
         });
 
-        let project = Shared::new(Project {
+        let handle = ProjectHandle::new(Project {
             host: args.host,
             local_peer: args.local_peer,
             projects: self.projects.clone(),
@@ -129,10 +145,10 @@ impl<B: CollabBackend> ProjectGuard<B> {
         });
 
         self.projects.active.with_mut(|map| {
-            map.insert(args.session_id, project.clone());
+            map.insert(args.session_id, handle.clone());
         });
 
-        project
+        handle
     }
 
     pub(crate) fn root(&self) -> &AbsPath {
@@ -146,13 +162,20 @@ impl<B> NoActiveSessionError<B> {
     }
 }
 
-impl<B: CollabBackend> Drop for Project<B> {
+impl<B: CollabBackend> Clone for ProjectHandle<B> {
+    fn clone(&self) -> Self {
+        Self { inner: self.inner.clone() }
+    }
+}
+
+impl<B: CollabBackend> Drop for ProjectHandle<B> {
     fn drop(&mut self) {
         // FIXME: this doesn't work, the instance in the `Projects` will never
         // be dropped.
-        self.projects.active.with_mut(|map| {
-            map.remove(&self.session_id);
-        });
+        //
+        // self.projects.active.with_mut(|map| {
+        //     map.remove(&self.session_id);
+        // });
     }
 }
 
