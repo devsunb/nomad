@@ -1,7 +1,5 @@
 //! TODO: docs.
 
-use core::marker::PhantomData;
-
 use auth::AuthInfos;
 use collab_server::SessionId;
 use collab_server::message::{FileContents, Message, ProjectRequest};
@@ -42,7 +40,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
         let auth_infos = self
             .auth_infos
             .with(|infos| infos.as_ref().cloned())
-            .ok_or_else(JoinError::user_not_logged_in)?;
+            .ok_or(JoinError::UserNotLoggedIn)?;
 
         let join_args = JoinArgs {
             auth_infos: &auth_infos,
@@ -187,7 +185,7 @@ pub enum JoinError<B: CollabBackend> {
     RequestProject(RequestProjectError<B>),
 
     /// TODO: docs.
-    UserNotLoggedIn(UserNotLoggedInError<B>),
+    UserNotLoggedIn,
 }
 
 /// The type of error that can occur when requesting the state of the project
@@ -239,13 +237,6 @@ impl<B: CollabBackend> ToCompletionFn<B> for Join<B> {
     fn to_completion_fn(&self) {}
 }
 
-impl<B: CollabBackend> JoinError<B> {
-    /// Creates a new [`JoinError::UserNotLoggedIn`] variant.
-    pub fn user_not_logged_in() -> Self {
-        Self::UserNotLoggedIn(UserNotLoggedInError(PhantomData))
-    }
-}
-
 impl<B> PartialEq for JoinError<B>
 where
     B: CollabBackend,
@@ -266,7 +257,7 @@ where
             (JoinSession(l), JoinSession(r)) => l == r,
             (OverlappingProject(l), OverlappingProject(r)) => l == r,
             (RequestProject(l), RequestProject(r)) => l == r,
-            (UserNotLoggedIn(_), UserNotLoggedIn(_)) => true,
+            (UserNotLoggedIn, UserNotLoggedIn) => true,
             _ => false,
         }
     }
@@ -280,7 +271,9 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
             Self::JoinSession(err) => err.to_message(),
             Self::OverlappingProject(err) => err.to_message(),
             Self::RequestProject(err) => err.to_message(),
-            Self::UserNotLoggedIn(err) => err.to_message(),
+            Self::UserNotLoggedIn => {
+                UserNotLoggedInError::<B>::new().to_message()
+            },
         }
     }
 }

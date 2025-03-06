@@ -1,6 +1,5 @@
 //! TODO: docs.
 
-use core::fmt;
 use core::marker::PhantomData;
 
 use auth::AuthInfos;
@@ -37,12 +36,12 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
         let auth_infos = self
             .auth_infos
             .with(|infos| infos.as_ref().cloned())
-            .ok_or_else(StartError::user_not_logged_in)?;
+            .ok_or(StartError::UserNotLoggedIn)?;
 
         let buffer_id = ctx.with_ctx(|ctx| {
             ctx.current_buffer()
                 .map(|buf| buf.id())
-                .ok_or_else(StartError::no_buffer_focused)
+                .ok_or(StartError::NoBufferFocused)
         })?;
 
         let project_root = B::search_project_root(buffer_id, ctx)
@@ -112,7 +111,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
 #[debug(bound(B: CollabBackend))]
 pub enum StartError<B: CollabBackend> {
     /// TODO: docs.
-    NoBufferFocused(NoBufferFocusedError<B>),
+    NoBufferFocused,
 
     /// TODO: docs.
     OverlappingProject(OverlappingProjectError),
@@ -130,14 +129,14 @@ pub enum StartError<B: CollabBackend> {
     StartSession(B::StartSessionError),
 
     /// TODO: docs.
-    UserNotLoggedIn(UserNotLoggedInError<B>),
+    UserNotLoggedIn,
 }
 
 /// TODO: docs.
-pub struct NoBufferFocusedError<B>(PhantomData<B>);
+struct NoBufferFocusedError<B>(PhantomData<B>);
 
 /// TODO: docs.
-pub struct UserNotLoggedInError<B>(pub(crate) PhantomData<B>);
+pub(crate) struct UserNotLoggedInError<B>(PhantomData<B>);
 
 impl<B: CollabBackend> Clone for Start<B> {
     fn clone(&self) -> Self {
@@ -165,15 +164,15 @@ impl<B: CollabBackend> ToCompletionFn<B> for Start<B> {
     fn to_completion_fn(&self) {}
 }
 
-impl<B: CollabBackend> StartError<B> {
-    /// Creates a new [`StartError::NoBufferFocused`] variant.
-    pub fn no_buffer_focused() -> Self {
-        Self::NoBufferFocused(NoBufferFocusedError(PhantomData))
+impl<B> NoBufferFocusedError<B> {
+    fn new() -> Self {
+        Self(PhantomData)
     }
+}
 
-    /// Creates a new [`StartError::UserNotLoggedIn`] variant.
-    pub fn user_not_logged_in() -> Self {
-        Self::UserNotLoggedIn(UserNotLoggedInError(PhantomData))
+impl<B> UserNotLoggedInError<B> {
+    pub(crate) fn new() -> Self {
+        Self(PhantomData)
     }
 }
 
@@ -188,13 +187,13 @@ where
         use StartError::*;
 
         match (self, other) {
-            (NoBufferFocused(_), NoBufferFocused(_)) => true,
+            (NoBufferFocused, NoBufferFocused) => true,
             (OverlappingProject(l), OverlappingProject(r)) => l == r,
             (ProjectRootIsFsRoot, ProjectRootIsFsRoot) => true,
             (ReadReplica(l), ReadReplica(r)) => l == r,
             (SearchProjectRoot(l), SearchProjectRoot(r)) => l == r,
             (StartSession(l), StartSession(r)) => l == r,
-            (UserNotLoggedIn(_), UserNotLoggedIn(_)) => true,
+            (UserNotLoggedIn, UserNotLoggedIn) => true,
             _ => false,
         }
     }
@@ -203,7 +202,9 @@ where
 impl<B: CollabBackend> notify::Error for StartError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
-            Self::NoBufferFocused(err) => err.to_message(),
+            Self::NoBufferFocused => {
+                NoBufferFocusedError::<B>::new().to_message()
+            },
             Self::OverlappingProject(err) => err.to_message(),
             Self::ProjectRootIsFsRoot => (
                 notify::Level::Error,
@@ -215,20 +216,10 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
             Self::ReadReplica(err) => err.to_message(),
             Self::SearchProjectRoot(err) => err.to_message(),
             Self::StartSession(err) => err.to_message(),
-            Self::UserNotLoggedIn(err) => err.to_message(),
+            Self::UserNotLoggedIn => {
+                UserNotLoggedInError::<B>::new().to_message()
+            },
         }
-    }
-}
-
-impl<B> fmt::Debug for NoBufferFocusedError<B> {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Ok(())
-    }
-}
-
-impl<B> fmt::Debug for UserNotLoggedInError<B> {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Ok(())
     }
 }
 

@@ -12,7 +12,7 @@ fn cannot_start_session_if_not_logged_in() {
     CollabTestBackend::<TestBackend>::default().block_on(async move |ctx| {
         let collab = Collab::from(&Auth::default());
         let err = collab.start().call((), ctx).await.unwrap_err();
-        assert_eq!(err, StartError::user_not_logged_in());
+        assert_eq!(err, StartError::UserNotLoggedIn);
     });
 }
 
@@ -21,6 +21,6 @@ fn cannot_start_session_if_no_buffer_is_focused() {
     CollabTestBackend::<TestBackend>::default().block_on(async move |ctx| {
         let collab = Collab::from(&Auth::dummy("foo"));
         let err = collab.start().call((), ctx).await.unwrap_err();
-        assert_eq!(err, StartError::no_buffer_focused());
+        assert_eq!(err, StartError::NoBufferFocused);
     });
 }
