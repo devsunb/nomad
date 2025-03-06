@@ -231,20 +231,24 @@ impl Directory for OsDirectory {
 
     async fn create_directory(
         &self,
-        _directory_name: &FsNodeName,
+        directory_name: &FsNodeName,
     ) -> Result<Self, Self::CreateDirectoryError> {
-        todo!();
+        OsFs::default()
+            .create_directory(self.path().join(directory_name))
+            .await
     }
 
     async fn create_file(
         &self,
-        _file_name: &FsNodeName,
+        file_name: &FsNodeName,
     ) -> Result<OsFile, Self::CreateFileError> {
-        todo!();
+        OsFs::default().create_file(self.path().join(file_name)).await
     }
 
     async fn delete_all(&self) -> Result<(), Self::DeleteAllError> {
-        todo!();
+        async_fs::remove_dir_all(self.path()).await?;
+        async_fs::create_dir(self.path()).await?;
+        Ok(())
     }
 
     async fn read(
