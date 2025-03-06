@@ -1,13 +1,15 @@
 //! TODO: docs.
 
+use core::fmt;
+
 use auth::AuthInfos;
 use collab_server::SessionId;
 use collab_server::message::{FileContents, Message, ProjectRequest};
-use eerie::Replica;
-use futures_util::{SinkExt, StreamExt};
+use eerie::{DirectoryId, FileId, Replica};
+use futures_util::{SinkExt, StreamExt, future, stream};
 use nvimx2::action::AsyncAction;
 use nvimx2::command::{Parse, ToCompletionFn};
-use nvimx2::fs::{self, AbsPath};
+use nvimx2::fs::{self, AbsPath, Directory, File};
 use nvimx2::notify::Name;
 use nvimx2::{AsyncCtx, Shared, notify};
 
@@ -73,14 +75,10 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
                 .await
                 .map_err(JoinError::RequestProject)?;
 
-        flush_project(
-            &replica,
-            &file_contents,
-            project_guard.root(),
-            ctx.fs(),
-        )
-        .await
-        .map_err(JoinError::FlushProject)?;
+        ProjectTree::new(&replica, &file_contents)
+            .flush(project_guard.root(), ctx.fs())
+            .await
+            .map_err(JoinError::FlushProject)?;
 
         let project_handle = project_guard.activate(NewProjectArgs {
             host_id: sesh_infos.host_id,
@@ -112,6 +110,11 @@ struct ProjectResponse {
     buffered: Vec<Message>,
     file_contents: FileContents,
     replica: Replica,
+}
+
+struct ProjectTree<'a> {
+    file_contents: &'a FileContents,
+    replica: &'a Replica,
 }
 
 async fn request_project<B: CollabBackend>(
@@ -156,13 +159,81 @@ async fn request_project<B: CollabBackend>(
     })
 }
 
-async fn flush_project<Fs: fs::Fs>(
-    _replica: &Replica,
-    _file_contents: &FileContents,
-    _project_root: &AbsPath,
-    _fs: Fs,
-) -> Result<(), FlushProjectError<Fs>> {
-    todo!();
+impl<'a> ProjectTree<'a> {
+    async fn flush<Fs: fs::Fs>(
+        &self,
+        flush_under: &AbsPath,
+        fs: Fs,
+    ) -> Result<(), FlushProjectError<Fs>> {
+        let root = fs
+            .get_or_create_directory(flush_under)
+            .await
+            .map_err(FlushProjectError::GetOrCreateRoot)?;
+
+        root.delete_all()
+            .await
+            .map_err(FlushProjectError::DeleteAllUnderRoot)?;
+
+        let root_id = self.replica.root().id();
+
+        self.flush_directory(root_id, &root).await
+    }
+
+    async fn flush_directory<Fs: fs::Fs>(
+        &self,
+        dir_id: DirectoryId,
+        dir: &Fs::Directory,
+    ) -> Result<(), FlushProjectError<Fs>> {
+        let parent = self.replica.directory(dir_id).expect("ID is valid");
+
+        let flush_dirs = parent.child_directories().map(|child| {
+            let child_id = child.id();
+            let child_name = child.name().expect("child can't be root");
+            async move {
+                let child = dir
+                    .create_directory(child_name)
+                    .await
+                    .map_err(FlushProjectError::CreateDirectory)?;
+                self.flush_directory::<Fs>(child_id, &child).await
+            }
+        });
+
+        let flush_files = parent.child_files().map(|child| {
+            let child_id = child.id();
+            let child_name = child.name();
+            async move {
+                let child = dir
+                    .create_file(child_name)
+                    .await
+                    .map_err(FlushProjectError::CreateFile)?;
+                self.flush_file::<Fs>(child_id, &child).await
+            }
+        });
+
+        let mut flush_children = flush_dirs
+            .map(future::Either::Left)
+            .chain(flush_files.map(future::Either::Right))
+            .collect::<stream::FuturesOrdered<_>>();
+
+        while let Some(res) = flush_children.next().await {
+            res?;
+        }
+
+        Ok(())
+    }
+
+    async fn flush_file<Fs: fs::Fs>(
+        &self,
+        file_id: FileId,
+        file: &Fs::File,
+    ) -> Result<(), FlushProjectError<Fs>> {
+        let contents = self.file_contents.get(file_id).expect("ID is valid");
+        file.write(contents).await.map_err(FlushProjectError::WriteToFile)
+    }
+
+    fn new(replica: &'a Replica, file_contents: &'a FileContents) -> Self {
+        Self { file_contents, replica }
+    }
 }
 
 /// The type of error that can occur when [`Join`]ing a session fails.
@@ -208,7 +279,19 @@ pub enum RequestProjectError<B: CollabBackend> {
 #[debug(bound(Fs: fs::Fs))]
 pub enum FlushProjectError<Fs: fs::Fs> {
     /// TODO: docs.
-    Todo(core::marker::PhantomData<Fs>),
+    CreateDirectory(<Fs::Directory as fs::Directory>::CreateDirectoryError),
+
+    /// TODO: docs.
+    CreateFile(<Fs::Directory as fs::Directory>::CreateFileError),
+
+    /// TODO: docs.
+    DeleteAllUnderRoot(<Fs::Directory as fs::Directory>::DeleteAllError),
+
+    /// TODO: docs.
+    GetOrCreateRoot(Fs::CreateDirectoryError),
+
+    /// TODO: docs.
+    WriteToFile(<Fs::File as fs::File>::WriteError),
 }
 
 impl<B: CollabBackend> Clone for Join<B> {
@@ -278,15 +361,38 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
     }
 }
 
-impl<Fs: fs::Fs> PartialEq for FlushProjectError<Fs> {
-    fn eq(&self, _other: &Self) -> bool {
-        todo!();
+impl<Fs: fs::Fs> PartialEq for FlushProjectError<Fs>
+where
+    Fs::CreateDirectoryError: PartialEq,
+    <Fs::Directory as fs::Directory>::CreateDirectoryError: PartialEq,
+    <Fs::Directory as fs::Directory>::CreateFileError: PartialEq,
+    <Fs::Directory as fs::Directory>::DeleteAllError: PartialEq,
+    <Fs::File as fs::File>::WriteError: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        use FlushProjectError::*;
+
+        match (self, other) {
+            (CreateDirectory(l), CreateDirectory(r)) => l == r,
+            (CreateFile(l), CreateFile(r)) => l == r,
+            (DeleteAllUnderRoot(l), DeleteAllUnderRoot(r)) => l == r,
+            (GetOrCreateRoot(l), GetOrCreateRoot(r)) => l == r,
+            (WriteToFile(l), WriteToFile(r)) => l == r,
+            _ => false,
+        }
     }
 }
 
 impl<Fs: fs::Fs> notify::Error for FlushProjectError<Fs> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        todo!();
+        let err: &dyn fmt::Display = match self {
+            Self::CreateDirectory(err) => err,
+            Self::CreateFile(err) => err,
+            Self::DeleteAllUnderRoot(err) => err,
+            Self::GetOrCreateRoot(err) => err,
+            Self::WriteToFile(err) => err,
+        };
+        (notify::Level::Error, notify::Message::from_display(err))
     }
 }
 
