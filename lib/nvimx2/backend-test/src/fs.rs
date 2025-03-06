@@ -562,7 +562,7 @@ impl Directory for TestDirectoryHandle {
 
     type CreateDirectoryError = Infallible;
     type CreateFileError = Infallible;
-    type DeleteAllError = Infallible;
+    type ClearError = Infallible;
     type ReadEntryError = TestReadDirNextError;
     type ReadError = TestReadDirError;
 
@@ -580,7 +580,7 @@ impl Directory for TestDirectoryHandle {
         todo!();
     }
 
-    async fn delete_all(&self) -> Result<(), Self::DeleteAllError> {
+    async fn clear(&self) -> Result<(), Self::ClearError> {
         todo!();
     }
 

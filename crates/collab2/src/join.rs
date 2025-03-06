@@ -170,9 +170,7 @@ impl<'a> ProjectTree<'a> {
             .await
             .map_err(FlushProjectError::GetOrCreateRoot)?;
 
-        root.delete_all()
-            .await
-            .map_err(FlushProjectError::DeleteAllUnderRoot)?;
+        root.clear().await.map_err(FlushProjectError::ClearRoot)?;
 
         let root_id = self.replica.root().id();
 
@@ -285,7 +283,7 @@ pub enum FlushProjectError<Fs: fs::Fs> {
     CreateFile(<Fs::Directory as fs::Directory>::CreateFileError),
 
     /// TODO: docs.
-    DeleteAllUnderRoot(<Fs::Directory as fs::Directory>::DeleteAllError),
+    ClearRoot(<Fs::Directory as fs::Directory>::ClearError),
 
     /// TODO: docs.
     GetOrCreateRoot(Fs::CreateDirectoryError),
@@ -366,7 +364,7 @@ where
     Fs::CreateDirectoryError: PartialEq,
     <Fs::Directory as fs::Directory>::CreateDirectoryError: PartialEq,
     <Fs::Directory as fs::Directory>::CreateFileError: PartialEq,
-    <Fs::Directory as fs::Directory>::DeleteAllError: PartialEq,
+    <Fs::Directory as fs::Directory>::ClearError: PartialEq,
     <Fs::File as fs::File>::WriteError: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -375,7 +373,7 @@ where
         match (self, other) {
             (CreateDirectory(l), CreateDirectory(r)) => l == r,
             (CreateFile(l), CreateFile(r)) => l == r,
-            (DeleteAllUnderRoot(l), DeleteAllUnderRoot(r)) => l == r,
+            (ClearRoot(l), ClearRoot(r)) => l == r,
             (GetOrCreateRoot(l), GetOrCreateRoot(r)) => l == r,
             (WriteToFile(l), WriteToFile(r)) => l == r,
             _ => false,
@@ -388,7 +386,7 @@ impl<Fs: fs::Fs> notify::Error for FlushProjectError<Fs> {
         let err: &dyn fmt::Display = match self {
             Self::CreateDirectory(err) => err,
             Self::CreateFile(err) => err,
-            Self::DeleteAllUnderRoot(err) => err,
+            Self::ClearRoot(err) => err,
             Self::GetOrCreateRoot(err) => err,
             Self::WriteToFile(err) => err,
         };

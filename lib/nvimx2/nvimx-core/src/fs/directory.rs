@@ -19,7 +19,7 @@ pub trait Directory: Sized {
     type CreateFileError: Error;
 
     /// TODO: docs.
-    type DeleteAllError: Error;
+    type ClearError: Error;
 
     /// TODO: docs.
     type ReadEntryError: Error;
@@ -40,9 +40,9 @@ pub trait Directory: Sized {
     ) -> impl Future<Output = Result<<Self::Fs as Fs>::File, Self::CreateFileError>>;
 
     /// TODO: docs.
-    fn delete_all(
+    fn clear(
         &self,
-    ) -> impl Future<Output = Result<(), Self::DeleteAllError>>;
+    ) -> impl Future<Output = Result<(), Self::ClearError>>;
 
     /// TODO: docs.
     fn read(

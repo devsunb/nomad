@@ -223,9 +223,9 @@ impl Directory for OsDirectory {
     type Fs = OsFs;
     type Metadata = OsMetadata;
 
+    type ClearError = io::Error;
     type CreateDirectoryError = io::Error;
     type CreateFileError = io::Error;
-    type DeleteAllError = io::Error;
     type ReadEntryError = io::Error;
     type ReadError = io::Error;
 
@@ -245,7 +245,7 @@ impl Directory for OsDirectory {
         OsFs::default().create_file(self.path().join(file_name)).await
     }
 
-    async fn delete_all(&self) -> Result<(), Self::DeleteAllError> {
+    async fn clear(&self) -> Result<(), Self::ClearError> {
         async_fs::remove_dir_all(self.path()).await?;
         async_fs::create_dir(self.path()).await?;
         Ok(())
