@@ -10,8 +10,8 @@ use std::io;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-use futures_util::select;
 use futures_util::stream::{self, Stream, StreamExt};
+use futures_util::{AsyncWriteExt, select};
 use notify::{RecursiveMode, Watcher};
 
 use crate::ByteOffset;
@@ -42,7 +42,7 @@ pub struct OsDirectory {
 
 /// TODO: docs.
 pub struct OsFile {
-    _file: RefCell<Option<async_fs::File>>,
+    file: RefCell<Option<async_fs::File>>,
     metadata: LazyOsMetadata,
 }
 
@@ -86,6 +86,26 @@ pub enum OsNameError {
 struct LazyOsMetadata {
     metadata: RefCell<Option<async_fs::Metadata>>,
     path: AbsPathBuf,
+}
+
+impl OsFile {
+    fn open_options() -> async_fs::OpenOptions {
+        let mut opts = async_fs::OpenOptions::new();
+        opts.read(true).write(true);
+        opts
+    }
+
+    async fn with_file_async<R>(
+        &self,
+        fun: impl AsyncFnOnce(&mut async_fs::File) -> R,
+    ) -> Result<R, io::Error> {
+        if let Some(file) = &mut *self.file.borrow_mut() {
+            return Ok(fun(file).await);
+        }
+        let file = Self::open_options().open(self.path()).await?;
+        *self.file.borrow_mut() = Some(file);
+        Ok(fun(self.file.borrow_mut().as_mut().expect("just set it")).await)
+    }
 }
 
 impl LazyOsMetadata {
@@ -138,14 +158,9 @@ impl Fs for OsFs {
         path: P,
     ) -> Result<Self::File, Self::CreateFileError> {
         let path = path.as_ref();
-        let file = async_fs::OpenOptions::new()
-            .create_new(true)
-            .read(true)
-            .write(true)
-            .open(path)
-            .await?;
+        let file = OsFile::open_options().create_new(true).open(path).await?;
         Ok(Self::File {
-            _file: RefCell::new(Some(file)),
+            file: RefCell::new(Some(file)),
             metadata: LazyOsMetadata::lazy(path.to_owned()),
         })
     }
@@ -166,7 +181,7 @@ impl Fs for OsFs {
         };
         Ok(Some(match file_type {
             FsNodeKind::File => FsNode::File(OsFile {
-                _file: RefCell::new(None),
+                file: RefCell::new(None),
                 metadata: LazyOsMetadata::new(metadata, path.to_owned()),
             }),
             FsNodeKind::Directory => FsNode::Directory(OsDirectory {
@@ -344,9 +359,12 @@ impl File for OsFile {
 
     async fn write<C: AsRef<[u8]>>(
         &self,
-        _new_contents: C,
+        new_contents: C,
     ) -> Result<(), Self::WriteError> {
-        todo!();
+        self.with_file_async(async move |file| {
+            file.write_all(new_contents.as_ref()).await
+        })
+        .await?
     }
 }
 
