@@ -3,17 +3,27 @@ use std::borrow::Cow;
 use crop::Rope;
 use nvimx_core::ByteOffset;
 use nvimx_core::backend::Buffer;
+use nvimx_core::fs::AbsPathBuf;
 
 /// TODO: docs.
 pub struct TestBuffer {
-    contents: Rope,
-    id: TestBufferId,
-    name: String,
+    pub(crate) contents: Rope,
+    pub(crate) id: TestBufferId,
+    pub(crate) name: String,
+    pub(crate) path: AbsPathBuf,
 }
 
 /// TODO: docs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct TestBufferId(u64);
+pub struct TestBufferId(pub(crate) u64);
+
+impl TestBufferId {
+    pub(crate) fn post_inc(&mut self) -> Self {
+        let id = *self;
+        self.0 += 1;
+        id
+    }
+}
 
 impl Buffer for TestBuffer {
     type Id = TestBufferId;

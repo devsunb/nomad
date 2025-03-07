@@ -105,6 +105,29 @@ impl TestFs {
         Self { inner: Arc::new(Mutex::new(TestFsInner::new(root))) }
     }
 
+    pub(crate) fn node_at_path_sync(
+        &self,
+        path: &AbsPath,
+    ) -> Option<FsNode<Self>> {
+        let Some(kind) = self.with_inner(|inner| {
+            inner.node_at_path(path).as_deref().map(TestFsNode::kind)
+        }) else {
+            return None;
+        };
+        let node = match kind {
+            FsNodeKind::File => FsNode::File(TestFileHandle {
+                fs: self.clone(),
+                path: path.to_owned(),
+            }),
+            FsNodeKind::Directory => FsNode::Directory(TestDirectoryHandle {
+                fs: self.clone(),
+                path: path.to_owned(),
+            }),
+            FsNodeKind::Symlink => unreachable!(),
+        };
+        Some(node)
+    }
+
     fn delete_node(&self, path: &AbsPath) -> Result<(), TestDeleteNodeError> {
         self.with_inner(|inner| inner.delete_node(path))
     }
@@ -164,6 +187,16 @@ impl TestDirectoryHandle {
 }
 
 impl TestFileHandle {
+    pub(crate) fn name(&self) -> &FsNodeName {
+        self.path.node_name().expect("path is not root")
+    }
+
+    pub(crate) fn read_sync(
+        &self,
+    ) -> Result<Vec<u8>, TestDirEntryDoesNotExistError> {
+        self.with_file(|file| file.contents().to_vec())
+    }
+
     fn exists(&self) -> bool {
         self.with_file(|_| true).unwrap_or(false)
     }
@@ -444,24 +477,7 @@ impl Fs for TestFs {
         &self,
         path: P,
     ) -> Result<Option<FsNode<Self>>, Self::NodeAtPathError> {
-        let path = path.as_ref();
-        let Some(kind) = self.with_inner(|inner| {
-            inner.node_at_path(path).as_deref().map(TestFsNode::kind)
-        }) else {
-            return Ok(None);
-        };
-        let node = match kind {
-            FsNodeKind::File => FsNode::File(TestFileHandle {
-                fs: self.clone(),
-                path: path.to_owned(),
-            }),
-            FsNodeKind::Directory => FsNode::Directory(TestDirectoryHandle {
-                fs: self.clone(),
-                path: path.to_owned(),
-            }),
-            FsNodeKind::Symlink => unreachable!(),
-        };
-        Ok(Some(node))
+        Ok(self.node_at_path_sync(path.as_ref()))
     }
 
     fn now(&self) -> Self::Timestamp {

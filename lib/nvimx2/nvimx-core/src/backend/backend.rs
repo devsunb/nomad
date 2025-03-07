@@ -69,6 +69,12 @@ pub trait Backend: 'static + Sized {
     fn emitter(&mut self) -> Self::Emitter<'_>;
 
     /// TODO: docs.
+    fn focus_buffer_at(
+        &mut self,
+        path: &fs::AbsPath,
+    ) -> Option<Self::Buffer<'_>>;
+
+    /// TODO: docs.
     fn local_executor(&mut self) -> &mut Self::LocalExecutor;
 
     /// TODO: docs.

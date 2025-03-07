@@ -356,6 +356,10 @@ impl<B: Backend> Backend for CollabTestBackend<B> {
         self.inner.local_executor()
     }
 
+    fn focus_buffer_at(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
+        self.inner.focus_buffer_at(path)
+    }
+
     fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
         self.inner.background_executor()
     }

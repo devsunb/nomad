@@ -1,5 +1,7 @@
 use ::serde::{Deserialize, Serialize};
+use nvim_oxi::api::Window;
 use nvimx_core::backend::Backend;
+use nvimx_core::fs::AbsPath;
 use nvimx_core::notify::Namespace;
 use nvimx_core::plugin::Plugin;
 
@@ -72,6 +74,30 @@ impl Backend for Neovim {
     #[inline]
     fn local_executor(&mut self) -> &mut Self::LocalExecutor {
         &mut self.local_executor
+    }
+
+    #[inline]
+    fn focus_buffer_at(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
+        let buf = oxi::api::call_function::<_, oxi::api::Buffer>(
+            "bufadd",
+            (path.as_str(),),
+        )
+        .ok()?;
+
+        if !buf.is_loaded() {
+            oxi::api::set_option_value(
+                "buflisted",
+                true,
+                &oxi::api::opts::OptionOpts::builder()
+                    .buffer(buf.clone())
+                    .build(),
+            )
+            .ok()?;
+        }
+
+        Window::current().set_buf(&buf).ok()?;
+
+        Some(NeovimBuffer::new(buf))
     }
 
     #[inline]

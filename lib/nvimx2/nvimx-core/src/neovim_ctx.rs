@@ -10,6 +10,7 @@ use crate::backend::{
     TaskBackground,
     TaskLocal,
 };
+use crate::fs::AbsPath;
 use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::PluginId;
@@ -55,6 +56,15 @@ impl<'a, B: Backend> NeovimCtx<'a, B> {
     #[inline]
     pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
         self.emit_message(notify::Level::Info, message)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn focus_buffer_at(
+        &mut self,
+        path: &AbsPath,
+    ) -> Result<Option<BufferCtx<'_, B>>, core::convert::Infallible> {
+        Ok(self.backend_mut().focus_buffer_at(path).map(BufferCtx::new))
     }
 
     /// TODO: docs.

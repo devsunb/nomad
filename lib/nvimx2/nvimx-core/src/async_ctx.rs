@@ -1,6 +1,7 @@
 use core::marker::PhantomData;
 
 use crate::backend::{Backend, BackgroundExecutor, TaskBackground, TaskLocal};
+use crate::fs::AbsPath;
 use crate::notify::{Namespace, NotificationId};
 use crate::plugin::PluginId;
 use crate::state::StateHandle;
@@ -28,6 +29,15 @@ impl<B: Backend> AsyncCtx<'_, B> {
     #[inline]
     pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
         self.emit_message(notify::Level::Info, message)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn focus_buffer_at(
+        &mut self,
+        path: &AbsPath,
+    ) -> Result<(), core::convert::Infallible> {
+        self.with_ctx(move |ctx| ctx.focus_buffer_at(path).map(|_| ()))
     }
 
     /// TODO: docs.
