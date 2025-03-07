@@ -32,8 +32,11 @@ pub struct ProjectHandle<B: CollabBackend> {
 /// TODO: docs.
 #[derive(Debug, PartialEq)]
 pub struct OverlappingProjectError {
-    pub(crate) existing_root: AbsPathBuf,
-    pub(crate) new_root: AbsPathBuf,
+    /// TODO: docs.
+    pub existing_root: AbsPathBuf,
+
+    /// TODO: docs.
+    pub new_root: AbsPathBuf,
 }
 
 pub struct NoActiveSessionError<B>(PhantomData<B>);
@@ -64,6 +67,11 @@ impl<B: CollabBackend> Project<B> {
 }
 
 impl<B: CollabBackend> ProjectHandle<B> {
+    /// TODO: docs.
+    pub fn root(&self) -> AbsPathBuf {
+        self.with(|proj| proj.root.clone())
+    }
+
     /// TODO: docs.
     pub fn with<R>(&self, fun: impl FnOnce(&Project<B>) -> R) -> R {
         self.inner.with(fun)
