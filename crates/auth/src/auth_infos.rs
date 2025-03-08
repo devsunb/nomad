@@ -1,4 +1,5 @@
 use collab_server::configs::nomad::NomadAuthenticateInfos;
+use collab_server::message::GitHubHandle;
 
 /// TODO: docs.
 #[derive(Debug, Clone)]
@@ -7,6 +8,11 @@ pub struct AuthInfos {
 }
 
 impl AuthInfos {
+    /// TODO: docs.
+    pub fn handle(&self) -> &GitHubHandle {
+        &self.inner.github_handle
+    }
+
     #[cfg(any(test, feature = "test"))]
     #[track_caller]
     pub(crate) fn dummy<Gh>(github_handle: Gh) -> Self
