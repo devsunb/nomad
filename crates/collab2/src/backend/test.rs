@@ -8,10 +8,18 @@ use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use collab_server::SessionId;
-use collab_server::message::Message;
+use collab_server::message::{Message, Peer};
+use collab_server::tests::TestAuthInfos;
+use collab_server::{
+    CollabConnection,
+    Knock,
+    SessionId,
+    SessionIntent,
+    client,
+};
+use duplex_stream::duplex;
 use eerie::PeerId;
-use futures_util::{Sink, Stream};
+use futures_util::{AsyncReadExt, Sink, Stream};
 use nvimx2::AsyncCtx;
 use nvimx2::backend::{ApiValue, Backend, Buffer, BufferId};
 use nvimx2::fs::{AbsPath, AbsPathBuf};
@@ -28,13 +36,7 @@ use crate::backend::{
     default_search_project_root,
 };
 
-pub fn message_channel() -> (TestTx, TestRx) {
-    let (inner_tx, inner_rx) = flume::unbounded();
-    (
-        TestTx { inner: inner_tx.into_sink() },
-        TestRx { inner: inner_rx.into_stream() },
-    )
-}
+type TestConfig = collab_server::tests::TestConfig<32>;
 
 #[allow(clippy::type_complexity)]
 pub struct CollabTestBackend<B: Backend> {
@@ -43,9 +45,6 @@ pub struct CollabTestBackend<B: Backend> {
     clipboard: Option<SessionId>,
     default_dir_for_remote_projects: Option<AbsPathBuf>,
     home_dir: Option<AbsPathBuf>,
-    join_session_with: Option<
-        Box<dyn FnMut(JoinArgs<'_>) -> Result<SessionInfos<Self>, AnyError>>,
-    >,
     lsp_root_with: Option<
         Box<dyn FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<AbsPathBuf>>,
     >,
@@ -57,9 +56,13 @@ pub struct CollabTestBackend<B: Backend> {
             ) -> Option<&(AbsPathBuf, SessionId)>,
         >,
     >,
-    start_session_with: Option<
-        Box<dyn FnMut(StartArgs<'_>) -> Result<SessionInfos<Self>, AnyError>>,
-    >,
+    server_tx: Option<flume::Sender<CollabConnection<TestConfig>>>,
+}
+
+pub struct CollabTestServer {
+    inner: collab_server::CollabServer<TestConfig>,
+    conn_rx: flume::Receiver<CollabConnection<TestConfig>>,
+    conn_tx: flume::Sender<CollabConnection<TestConfig>>,
 }
 
 pin_project_lite::pin_project! {
@@ -98,16 +101,6 @@ impl<B: Backend> CollabTestBackend<B> {
         self
     }
 
-    pub fn join_session_with<E: Error + 'static>(
-        mut self,
-        mut fun: impl FnMut(JoinArgs<'_>) -> Result<SessionInfos<Self>, E>
-        + 'static,
-    ) -> Self {
-        self.join_session_with =
-            Some(Box::new(move |args| fun(args).map_err(AnyError::new)));
-        self
-    }
-
     pub fn lsp_root_with(
         mut self,
         fun: impl FnMut(<B::Buffer<'_> as Buffer>::Id) -> Option<AbsPathBuf>
@@ -124,10 +117,9 @@ impl<B: Backend> CollabTestBackend<B> {
             default_dir_for_remote_projects: None,
             home_dir: None,
             inner,
-            join_session_with: None,
             lsp_root_with: None,
             select_session_with: None,
-            start_session_with: None,
+            server_tx: None,
         }
     }
 
@@ -143,16 +135,6 @@ impl<B: Backend> CollabTestBackend<B> {
         self
     }
 
-    pub fn start_session_with<E: Error + 'static>(
-        mut self,
-        mut fun: impl FnMut(StartArgs<'_>) -> Result<SessionInfos<Self>, E>
-        + 'static,
-    ) -> Self {
-        self.start_session_with =
-            Some(Box::new(move |args| fun(args).map_err(AnyError::new)));
-        self
-    }
-
     pub fn with_default_dir_for_remote_projects(
         mut self,
         dir_path: AbsPathBuf,
@@ -165,11 +147,51 @@ impl<B: Backend> CollabTestBackend<B> {
         self.home_dir = Some(dir_path);
         self
     }
+
+    pub fn with_server(mut self, server: &CollabTestServer) -> Self {
+        self.server_tx = Some(server.conn_tx.clone());
+        self
+    }
+}
+
+impl CollabTestServer {
+    pub async fn run(self) {
+        use collab_server::Server;
+
+        let (done_tx, done_rx) = flume::bounded::<()>(1);
+
+        std::thread::spawn(move || {
+            self.inner.run(self.conn_rx.into_stream());
+            done_tx.send(()).unwrap();
+        });
+
+        done_rx.recv_async().await.unwrap();
+    }
 }
 
 impl AnyError {
     pub fn downcast_ref<T: Error + 'static>(&self) -> Option<&T> {
         self.inner.downcast_ref()
+    }
+
+    fn from_str(s: &str) -> Self {
+        struct StrError(String);
+
+        impl fmt::Debug for StrError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Debug::fmt(&self.0, f)
+            }
+        }
+
+        impl fmt::Display for StrError {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                fmt::Display::fmt(&self.0, f)
+            }
+        }
+
+        impl Error for StrError {}
+
+        Self::new(StrError(s.to_owned()))
     }
 
     fn new<E: Error + 'static>(err: E) -> Self {
@@ -233,24 +255,35 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
         args: JoinArgs<'_>,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<SessionInfos<Self>, Self::JoinSessionError> {
-        #[derive(Debug)]
-        struct NoJoinerSet;
+        let server_tx = ctx
+            .with_backend(|this| this.server_tx.clone())
+            .ok_or(AnyError::from_str("no server set"))?;
 
-        impl fmt::Display for NoJoinerSet {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(
-                    f,
-                    "no joiner set, call \
-                     CollabTestBackend::join_session_with() to set one"
-                )
-            }
-        }
+        let (client_io, server_io) = duplex(usize::MAX);
 
-        impl Error for NoJoinerSet {}
+        server_tx.send(CollabConnection::new(server_io)).await?;
 
-        ctx.with_backend(|this| match this.join_session_with.as_mut() {
-            Some(fun) => fun(args),
-            None => Err(AnyError::new(NoJoinerSet)),
+        let (reader, writer) = client_io.split();
+
+        let knock = Knock::<TestAuthInfos> {
+            auth_infos: args.auth_infos.handle().clone(),
+            session_intent: SessionIntent::JoinExisting(args.session_id),
+        };
+
+        let github_handle = knock.auth_infos.github_handle.clone();
+
+        let welcome = client::Knocker::<_, _, TestConfig>::new(reader, writer)
+            .knock(knock)
+            .await?;
+
+        Ok(SessionInfos {
+            host_id: welcome.host_id,
+            local_peer: Peer::new(welcome.peer_id, github_handle),
+            project_name: welcome.project_name,
+            remote_peers: welcome.other_peers,
+            server_rx: welcome.rx,
+            server_tx: welcome.tx,
+            session_id: welcome.session_id,
         })
     }
 
@@ -295,24 +328,37 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
         args: StartArgs<'_>,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> Result<SessionInfos<Self>, Self::StartSessionError> {
-        #[derive(Debug)]
-        struct NoStarterSet;
+        let server_tx = ctx
+            .with_backend(|this| this.server_tx.clone())
+            .ok_or(AnyError::from_str("no server set"))?;
 
-        impl fmt::Display for NoStarterSet {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(
-                    f,
-                    "no starter set, call \
-                     CollabTestBackend::start_session_with() to set one"
-                )
-            }
-        }
+        let (client_io, server_io) = duplex(usize::MAX);
 
-        impl Error for NoStarterSet {}
+        server_tx.send(CollabConnection::new(server_io)).await?;
 
-        ctx.with_backend(|this| match this.start_session_with.as_mut() {
-            Some(fun) => fun(args),
-            None => Err(AnyError::new(NoStarterSet)),
+        let (reader, writer) = client_io.split();
+
+        let knock = Knock::<TestAuthInfos> {
+            auth_infos: args.auth_infos.handle().clone(),
+            session_intent: SessionIntent::StartNew(
+                args.project_name.to_owned(),
+            ),
+        };
+
+        let github_handle = knock.auth_infos.github_handle.clone();
+
+        let welcome = client::Knocker::<_, _, TestConfig>::new(reader, writer)
+            .knock(knock)
+            .await?;
+
+        Ok(SessionInfos {
+            host_id: welcome.host_id,
+            local_peer: Peer::new(welcome.peer_id, github_handle),
+            project_name: welcome.project_name,
+            remote_peers: welcome.other_peers,
+            server_rx: welcome.rx,
+            server_tx: welcome.tx,
+            session_id: welcome.session_id,
         })
     }
 }
@@ -383,6 +429,17 @@ impl<B: Backend> Backend for CollabTestBackend<B> {
     }
 }
 
+impl Default for CollabTestServer {
+    fn default() -> Self {
+        let (conn_tx, conn_rx) = flume::unbounded();
+        Self {
+            conn_rx,
+            conn_tx,
+            inner: collab_server::CollabServer::default(),
+        }
+    }
+}
+
 impl<B: Backend + Default> Default for CollabTestBackend<B> {
     fn default() -> Self {
         Self::new(B::default())
@@ -436,6 +493,12 @@ impl Stream for TestRx {
             .inner
             .poll_next(ctx)
             .map(|maybe_next| maybe_next.map(Ok))
+    }
+}
+
+impl<E: Error + 'static> From<E> for AnyError {
+    fn from(err: E) -> Self {
+        Self::new(err)
     }
 }
 
