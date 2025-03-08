@@ -217,7 +217,7 @@ mod default_read_replica {
             let handler = async move |entry: walkdir::DirEntry<'_, _>| {
                 let op = match entry.node_kind() {
                     FsNodeKind::File => {
-                        PushNode::File(entry.path(), entry.len())
+                        PushNode::File(entry.path(), entry.byte_len())
                     },
                     FsNodeKind::Directory => PushNode::Directory(entry.path()),
                     FsNodeKind::Symlink => return Ok(()),

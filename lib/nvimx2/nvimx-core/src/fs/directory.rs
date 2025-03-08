@@ -49,6 +49,20 @@ pub trait Directory: Sized {
     fn delete(self) -> impl Future<Output = Result<(), Self::DeleteError>>;
 
     /// TODO: docs.
+    #[inline]
+    fn name(&self) -> Option<&FsNodeName> {
+        self.path().node_name()
+    }
+
+    /// TODO: docs.
+    fn parent(
+        &self,
+    ) -> impl Future<Output = Option<<Self::Fs as Fs>::Directory>>;
+
+    /// TODO: docs.
+    fn path(&self) -> &AbsPath;
+
+    /// TODO: docs.
     fn read(
         &self,
     ) -> impl Future<
@@ -58,12 +72,4 @@ pub trait Directory: Sized {
             Self::ReadError,
         >,
     >;
-
-    /// TODO: docs.
-    fn parent(
-        &self,
-    ) -> impl Future<Output = Option<<Self::Fs as Fs>::Directory>>;
-
-    /// TODO: docs.
-    fn path(&self) -> &AbsPath;
 }

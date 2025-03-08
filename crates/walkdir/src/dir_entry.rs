@@ -82,8 +82,8 @@ impl<W: WalkDir> fs::Metadata for DirEntry<'_, W> {
         self.inner.last_modified_at()
     }
 
-    fn len(&self) -> ByteOffset {
-        self.inner.len()
+    fn byte_len(&self) -> ByteOffset {
+        self.inner.byte_len()
     }
 
     async fn name(&self) -> Result<FsNodeNameBuf, Self::NameError> {

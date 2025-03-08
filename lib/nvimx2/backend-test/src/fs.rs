@@ -109,11 +109,9 @@ impl TestFs {
         &self,
         path: &AbsPath,
     ) -> Option<FsNode<Self>> {
-        let Some(kind) = self.with_inner(|inner| {
+        let kind = self.with_inner(|inner| {
             inner.node_at_path(path).as_deref().map(TestFsNode::kind)
-        }) else {
-            return None;
-        };
+        })?;
         let node = match kind {
             FsNodeKind::File => FsNode::File(TestFileHandle {
                 fs: self.clone(),
@@ -187,10 +185,6 @@ impl TestDirectoryHandle {
 }
 
 impl TestFileHandle {
-    pub(crate) fn name(&self) -> &FsNodeName {
-        self.path.node_name().expect("path is not root")
-    }
-
     pub(crate) fn read_sync(
         &self,
     ) -> Result<Vec<u8>, TestDirEntryDoesNotExistError> {
@@ -539,7 +533,7 @@ impl Metadata for TestDirEntry {
     }
 
     #[track_caller]
-    fn len(&self) -> ByteOffset {
+    fn byte_len(&self) -> ByteOffset {
         match self {
             TestDirEntry::Directory(_) => 0usize.into(),
             TestDirEntry::File(file) => file
@@ -679,7 +673,7 @@ impl File for TestFileHandle {
     type Error = TestDirEntryDoesNotExistError;
     type WriteError = TestDirEntryDoesNotExistError;
 
-    async fn len(&self) -> Result<ByteOffset, Self::Error> {
+    async fn byte_len(&self) -> Result<ByteOffset, Self::Error> {
         self.with_file(|file| file.len())
     }
 
@@ -712,6 +706,10 @@ impl Symlink for TestSymlinkHandle {
     type DeleteError = TestDeleteNodeError;
     type FollowError = Infallible;
 
+    async fn delete(self) -> Result<(), Self::DeleteError> {
+        self.fs.delete_node(&self.path)
+    }
+
     async fn follow(
         &self,
     ) -> Result<Option<FsNode<TestFs>>, Self::FollowError> {
@@ -724,8 +722,8 @@ impl Symlink for TestSymlinkHandle {
         unreachable!()
     }
 
-    async fn delete(self) -> Result<(), Self::DeleteError> {
-        self.fs.delete_node(&self.path)
+    fn path(&self) -> &AbsPath {
+        &self.path
     }
 }
 

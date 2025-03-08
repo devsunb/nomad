@@ -89,12 +89,14 @@ struct LazyOsMetadata {
 }
 
 impl OsFile {
+    #[inline]
     fn open_options() -> async_fs::OpenOptions {
         let mut opts = async_fs::OpenOptions::new();
         opts.read(true).write(true);
         opts
     }
 
+    #[inline]
     async fn with_file_async<R>(
         &self,
         fun: impl AsyncFnOnce(&mut async_fs::File) -> R,
@@ -109,14 +111,17 @@ impl OsFile {
 }
 
 impl LazyOsMetadata {
+    #[inline]
     fn lazy(path: AbsPathBuf) -> Self {
         Self { metadata: RefCell::new(None), path }
     }
 
+    #[inline]
     fn new(metadata: async_fs::Metadata, path: AbsPathBuf) -> Self {
         Self { metadata: RefCell::new(Some(metadata)), path }
     }
 
+    #[inline]
     async fn with<R>(
         &self,
         fun: impl FnOnce(&async_fs::Metadata) -> R,
@@ -233,6 +238,7 @@ impl Directory for OsDirectory {
     type ReadEntryError = io::Error;
     type ReadError = io::Error;
 
+    #[inline]
     async fn create_directory(
         &self,
         directory_name: &FsNodeName,
@@ -242,6 +248,7 @@ impl Directory for OsDirectory {
             .await
     }
 
+    #[inline]
     async fn create_file(
         &self,
         file_name: &FsNodeName,
@@ -249,6 +256,7 @@ impl Directory for OsDirectory {
         OsFs::default().create_file(self.path().join(file_name)).await
     }
 
+    #[inline]
     async fn clear(&self) -> Result<(), Self::ClearError> {
         async_fs::remove_dir_all(self.path()).await?;
         async_fs::create_dir(self.path()).await?;
@@ -260,6 +268,19 @@ impl Directory for OsDirectory {
         async_fs::remove_dir_all(self.path()).await
     }
 
+    #[inline]
+    async fn parent(&self) -> Option<Self> {
+        self.path().parent().map(|parent| Self {
+            metadata: LazyOsMetadata::lazy(parent.to_owned()),
+        })
+    }
+
+    #[inline]
+    fn path(&self) -> &AbsPath {
+        &self.metadata.path
+    }
+
+    #[inline]
     async fn read(
         &self,
     ) -> Result<
@@ -318,16 +339,6 @@ impl Directory for OsDirectory {
             },
         ))
     }
-
-    async fn parent(&self) -> Option<Self> {
-        self.path().parent().map(|parent| Self {
-            metadata: LazyOsMetadata::lazy(parent.to_owned()),
-        })
-    }
-
-    fn path(&self) -> &AbsPath {
-        &self.metadata.path
-    }
 }
 
 impl File for OsFile {
@@ -337,14 +348,17 @@ impl File for OsFile {
     type Error = io::Error;
     type WriteError = io::Error;
 
-    async fn len(&self) -> Result<ByteOffset, Self::Error> {
+    #[inline]
+    async fn byte_len(&self) -> Result<ByteOffset, Self::Error> {
         self.metadata.with(|meta| meta.len().into()).await
     }
 
+    #[inline]
     async fn delete(self) -> Result<(), Self::DeleteError> {
         async_fs::remove_file(self.path()).await
     }
 
+    #[inline]
     async fn parent(&self) -> <Self::Fs as Fs>::Directory {
         OsDirectory {
             metadata: LazyOsMetadata::lazy(
@@ -353,10 +367,12 @@ impl File for OsFile {
         }
     }
 
+    #[inline]
     fn path(&self) -> &AbsPath {
         &self.metadata.path
     }
 
+    #[inline]
     async fn write<C: AsRef<[u8]>>(
         &self,
         new_contents: C,
@@ -396,6 +412,11 @@ impl Symlink for OsSymlink {
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
         OsFs::default().node_at_path(path).await
     }
+
+    #[inline]
+    fn path(&self) -> &AbsPath {
+        &self.path
+    }
 }
 
 impl Stream for OsWatcher {
@@ -427,18 +448,22 @@ impl Metadata for OsMetadata {
     type NameError = OsNameError;
     type NodeKindError = Infallible;
 
+    #[inline]
+    fn byte_len(&self) -> ByteOffset {
+        self.metadata.len().into()
+    }
+
+    #[inline]
     fn created_at(&self) -> Option<SystemTime> {
         self.metadata.created().ok()
     }
 
+    #[inline]
     fn last_modified_at(&self) -> Option<SystemTime> {
         self.metadata.modified().ok()
     }
 
-    fn len(&self) -> ByteOffset {
-        self.metadata.len().into()
-    }
-
+    #[inline]
     async fn name(&self) -> Result<FsNodeNameBuf, Self::NameError> {
         self.node_name
             .to_str()
@@ -447,6 +472,7 @@ impl Metadata for OsMetadata {
             .map_err(OsNameError::Invalid)
     }
 
+    #[inline]
     async fn node_kind(&self) -> Result<FsNodeKind, Self::NodeKindError> {
         Ok(self.node_kind)
     }

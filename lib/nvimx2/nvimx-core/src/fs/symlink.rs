@@ -1,6 +1,6 @@
 use core::error::Error;
 
-use crate::fs::{self, FsNode};
+use crate::fs::{self, AbsPath, FsNode, FsNodeName};
 
 /// TODO: docs.
 pub trait Symlink {
@@ -25,4 +25,12 @@ pub trait Symlink {
     fn follow_recursively(
         &self,
     ) -> impl Future<Output = Result<Option<FsNode<Self::Fs>>, Self::FollowError>>;
+
+    /// TODO: docs.
+    fn name(&self) -> &FsNodeName {
+        self.path().node_name().expect("path is not root")
+    }
+
+    /// TODO: docs.
+    fn path(&self) -> &AbsPath;
 }

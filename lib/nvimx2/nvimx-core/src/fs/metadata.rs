@@ -18,13 +18,13 @@ pub trait Metadata {
     type NodeKindError: Error;
 
     /// TODO: docs.
+    fn byte_len(&self) -> ByteOffset;
+
+    /// TODO: docs.
     fn created_at(&self) -> Option<Self::Timestamp>;
 
     /// TODO: docs.
     fn last_modified_at(&self) -> Option<Self::Timestamp>;
-
-    /// TODO: docs.
-    fn len(&self) -> ByteOffset;
 
     /// TODO: docs.
     fn name(
