@@ -82,7 +82,7 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
         assert_eq!(err.new_root, "/a");
     });
 
-    future::block_on(future::zip(run_test, server.run()));
+    future::block_on(future::race(run_test, server.run()));
 }
 
 fn path(path: &str) -> AbsPathBuf {

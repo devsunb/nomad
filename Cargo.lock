@@ -619,7 +619,7 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
+source = "git+ssh://git@github.com/nomad/collab.git#9bbd66ccd7b828b2263c795d3acb3fd4a17060b3"
 dependencies = [
  "bincode",
  "bytes",
@@ -673,7 +673,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
+source = "git+ssh://git@github.com/nomad/collab.git#9bbd66ccd7b828b2263c795d3acb3fd4a17060b3"
 dependencies = [
  "codecs",
  "eerie",
@@ -686,7 +686,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
+source = "git+ssh://git@github.com/nomad/collab.git#9bbd66ccd7b828b2263c795d3acb3fd4a17060b3"
 dependencies = [
  "async-compat",
  "codecs",
@@ -914,7 +914,7 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
+source = "git+ssh://git@github.com/nomad/collab.git#9bbd66ccd7b828b2263c795d3acb3fd4a17060b3"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1148,7 +1148,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#cc24383a669036c96adedec883c943268bbba629"
+source = "git+ssh://git@github.com/nomad/collab.git#9bbd66ccd7b828b2263c795d3acb3fd4a17060b3"
 dependencies = [
  "codecs",
  "collab-message",
@@ -1537,7 +1537,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]
