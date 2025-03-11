@@ -25,6 +25,7 @@ pub struct Project<B: CollabBackend> {
 /// TODO: docs.
 pub struct ProjectHandle<B: CollabBackend> {
     inner: Shared<Project<B>>,
+    is_dropping_last_instance: Shared<bool>,
     projects: Projects<B>,
 }
 
@@ -69,6 +70,11 @@ impl<B: CollabBackend> ProjectHandle<B> {
     /// TODO: docs.
     pub fn root(&self) -> AbsPathBuf {
         self.with(|proj| proj.root.clone())
+    }
+
+    /// TODO: docs.
+    pub fn session_id(&self) -> B::SessionId {
+        self.with(|proj| proj.session_id)
     }
 
     /// TODO: docs.
@@ -162,6 +168,7 @@ impl<B: CollabBackend> Projects<B> {
         let session_id = project.session_id;
         let handle = ProjectHandle {
             inner: Shared::new(project),
+            is_dropping_last_instance: Shared::new(false),
             projects: self.clone(),
         };
         self.active.with_mut(|map| {
@@ -201,21 +208,25 @@ impl<B> NoActiveSessionError<B> {
 
 impl<B: CollabBackend> Clone for ProjectHandle<B> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone(), projects: self.projects.clone() }
+        Self {
+            inner: self.inner.clone(),
+            is_dropping_last_instance: self.is_dropping_last_instance.clone(),
+            projects: self.projects.clone(),
+        }
     }
 }
 
 impl<B: CollabBackend> Drop for ProjectHandle<B> {
     fn drop(&mut self) {
-        let session_id = if self.inner.strong_count() == 2 {
-            self.with(|project| project.session_id)
-        } else {
-            return;
-        };
+        if self.inner.strong_count() == 2
+            && !self.is_dropping_last_instance.get()
+        {
+            self.is_dropping_last_instance.set(true);
 
-        self.projects.active.with_mut(|map| {
-            map.remove(&session_id);
-        });
+            self.projects.active.with_mut(|map| {
+                map.remove(&self.session_id());
+            });
+        }
     }
 }
 
