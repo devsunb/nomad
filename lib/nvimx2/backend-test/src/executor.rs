@@ -3,7 +3,7 @@ use core::task::{Context, Poll};
 
 use async_task::Runnable;
 use flume::{Receiver, Sender};
-use futures_lite::future;
+use futures_lite::future::{self, FutureExt};
 use nvimx_core::backend::{BackgroundExecutor, LocalExecutor, Task};
 
 pub struct TestExecutor {
@@ -33,14 +33,27 @@ impl TestExecutor {
 }
 
 impl Runner {
-    pub(crate) async fn run<Fut: Future>(&self, future: Fut) -> Fut::Output {
+    pub(crate) async fn run<Fut: Future>(
+        &self,
+        future: Fut,
+        run_all: bool,
+    ) -> Fut::Output {
         let keep_polling_runnables = async {
             while let Ok(runnable) = self.runnable_rx.recv_async().await {
                 runnable.run();
             }
         };
-        let (out, ()) = future::zip(future, keep_polling_runnables).await;
-        out
+        if run_all {
+            let (out, ()) = future::zip(future, keep_polling_runnables).await;
+            out
+        } else {
+            future
+                .or(async move {
+                    keep_polling_runnables.await;
+                    unreachable!("future will always complete first");
+                })
+                .await
+        }
     }
 }
 

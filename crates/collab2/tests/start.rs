@@ -80,8 +80,6 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
         };
         assert_eq!(err.existing_root, "/a/b");
         assert_eq!(err.new_root, "/a");
-
-        collab.leave().call((), ctx).await.unwrap();
     });
 
     future::block_on(run_test.or(server.run()));

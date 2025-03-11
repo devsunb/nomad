@@ -30,7 +30,7 @@ fn replicate_simple_project() {
 
     let (started_tx, started_rx) = flume::bounded(1);
 
-    let run_peer1 = peer1.run(async move |ctx| {
+    let run_peer1 = peer1.run_all(async move |ctx| {
         let collab = Collab::from(&Auth::dummy("peer1"));
         ctx.focus_buffer_at(&path("/foo/mars.txt")).unwrap();
         collab.start().call((), ctx).await.unwrap();
@@ -46,7 +46,6 @@ fn replicate_simple_project() {
             fs1.node_at_path(path("/foo")).await.unwrap().unwrap(),
             fs2.node_at_path(path("/remote/foo")).await.unwrap().unwrap(),
         );
-        collab.leave().call((), ctx).await.unwrap();
     });
 
     future::block_on(run_peer1.or(run_peer2).or(server.run()));
