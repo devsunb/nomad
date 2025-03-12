@@ -5,14 +5,15 @@
 use core::convert::Infallible;
 use core::error::Error;
 use core::fmt;
+use core::num::NonZeroU32;
 use core::pin::Pin;
 use core::str::FromStr;
 use core::task::{Context, Poll};
 use std::io;
 
-use collab_server::message::{Message, Peer};
-use collab_server::test::{TestConfig, TestSessionId};
-use collab_server::{Knock, SessionIntent, client};
+use collab_server::message::{Message, Peer, PeerId};
+use collab_server::test::{TestConfig as InnerConfig, TestSessionId};
+use collab_server::{Config, Knock, SessionIntent, client};
 use duplex_stream::{DuplexStream, duplex};
 use futures_util::io::{ReadHalf, WriteHalf};
 use futures_util::{AsyncReadExt, Sink, Stream};
@@ -29,6 +30,7 @@ use crate::backend::{
     SessionInfos,
     StartArgs,
 };
+use crate::config;
 
 #[allow(clippy::type_complexity)]
 pub struct CollabTestBackend<B: Backend> {
@@ -51,13 +53,30 @@ pub struct CollabTestBackend<B: Backend> {
     server_tx: Option<flume::Sender<DuplexStream>>,
 }
 
-pub struct CollabTestServer {
-    inner: collab_server::CollabServer<TestConfig>,
+pub struct CollabServer {
+    inner: collab_server::CollabServer<ServerConfig>,
     conn_rx: flume::Receiver<DuplexStream>,
     conn_tx: flume::Sender<DuplexStream>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[derive(Default)]
+pub struct Authenticator;
+
+#[derive(Default)]
+pub struct ServerConfig {
+    inner: InnerConfig,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[serde(transparent)]
 pub struct SessionId(pub u64);
 
@@ -150,13 +169,13 @@ impl<B: Backend> CollabTestBackend<B> {
         self
     }
 
-    pub fn with_server(mut self, server: &CollabTestServer) -> Self {
+    pub fn with_server(mut self, server: &CollabServer) -> Self {
         self.server_tx = Some(server.conn_tx.clone());
         self
     }
 }
 
-impl CollabTestServer {
+impl CollabServer {
     pub async fn run(self) {
         let (done_tx, done_rx) = flume::bounded::<()>(1);
 
@@ -204,6 +223,10 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
     type ServerTx = TestTx;
     type SessionId = SessionId;
 
+    type Io = DuplexStream;
+    type ServerConfig = ServerConfig;
+    type ConnectToServerError = AnyError;
+
     type CopySessionIdError = Infallible;
     type DefaultDirForRemoteProjectsError = NoDefaultDirForRemoteProjectsError;
     type HomeDirError = AnyError;
@@ -221,6 +244,21 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
             Some(fun) => fun(project_root),
             None => true,
         })
+    }
+
+    async fn connect_to_server(
+        _: config::ServerAddress,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Self::Io, Self::ConnectToServerError> {
+        let server_tx = ctx
+            .with_backend(|this| this.server_tx.clone())
+            .ok_or(AnyError::from_str("no server set"))?;
+
+        let (client_io, server_io) = duplex(usize::MAX);
+
+        server_tx.send(server_io)?;
+
+        Ok(client_io)
     }
 
     async fn copy_session_id(
@@ -266,7 +304,7 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
         let github_handle = args.auth_infos.handle().clone();
 
-        let knock = Knock::<TestConfig> {
+        let knock = Knock::<InnerConfig> {
             auth_infos: github_handle.clone(),
             session_intent: SessionIntent::JoinExisting(
                 args.session_id.into(),
@@ -320,16 +358,15 @@ impl<B: Backend> CollabBackend for CollabTestBackend<B> {
 
         let github_handle = args.auth_infos.handle().clone();
 
-        let knock = Knock::<TestConfig> {
+        let knock = Knock::<InnerConfig> {
             auth_infos: github_handle.clone(),
             session_intent: SessionIntent::StartNew(
                 args.project_name.to_owned(),
             ),
         };
 
-        let welcome = client::Knocker::<_, _, TestConfig>::new(reader, writer)
-            .knock(knock)
-            .await?;
+        let welcome =
+            client::Knocker::new(reader, writer).knock(knock).await?;
 
         Ok(SessionInfos {
             host_id: welcome.host_id,
@@ -409,14 +446,29 @@ impl<B: Backend> Backend for CollabTestBackend<B> {
     }
 }
 
-impl Default for CollabTestServer {
+impl Config for ServerConfig {
+    const MAX_FRAME_LEN: NonZeroU32 = <InnerConfig as Config>::MAX_FRAME_LEN;
+    const SERVER_PEER_ID: PeerId = <InnerConfig as Config>::SERVER_PEER_ID;
+
+    type Authenticator = Authenticator;
+    type Executor = <InnerConfig as Config>::Executor;
+    type SessionId = SessionId;
+
+    fn authenticator(&self) -> &Self::Authenticator {
+        &Authenticator
+    }
+    fn executor(&self) -> &Self::Executor {
+        self.inner.executor()
+    }
+    fn new_session_id(&self) -> Self::SessionId {
+        self.inner.new_session_id().into()
+    }
+}
+
+impl Default for CollabServer {
     fn default() -> Self {
         let (conn_tx, conn_rx) = flume::unbounded();
-        Self {
-            conn_rx,
-            conn_tx,
-            inner: collab_server::CollabServer::default(),
-        }
+        Self { conn_rx, conn_tx, inner: Default::default() }
     }
 }
 
@@ -426,11 +478,41 @@ impl<B: Backend + Default> Default for CollabTestBackend<B> {
     }
 }
 
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub enum Never {}
+
+impl fmt::Display for Never {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unreachable!()
+    }
+}
+
+impl Error for Never {}
+
+impl collab_server::Authenticator for Authenticator {
+    type Infos = auth::AuthInfos;
+    type Error = Never;
+
+    async fn authenticate(&self, _: &Self::Infos) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
 impl FromStr for SessionId {
     type Err = core::num::ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         s.parse().map(SessionId)
+    }
+}
+
+impl TryFrom<nvimx2::command::CommandArgs<'_>> for SessionId {
+    type Error = Infallible;
+
+    fn try_from(
+        _: nvimx2::command::CommandArgs<'_>,
+    ) -> Result<Self, Self::Error> {
+        unreachable!()
     }
 }
 

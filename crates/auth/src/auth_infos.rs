@@ -2,7 +2,8 @@ use collab_server::message::GitHubHandle;
 use collab_server::nomad::NomadAuthenticateInfos;
 
 /// TODO: docs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(transparent)]
 pub struct AuthInfos {
     inner: NomadAuthenticateInfos,
 }
@@ -30,8 +31,14 @@ impl AuthInfos {
     }
 }
 
+impl AsRef<GitHubHandle> for AuthInfos {
+    fn as_ref(&self) -> &GitHubHandle {
+        self.handle()
+    }
+}
+
 impl From<AuthInfos> for NomadAuthenticateInfos {
-    fn from(auth_infos: AuthInfos) -> Self {
-        auth_infos.inner
+    fn from(infos: AuthInfos) -> Self {
+        infos.inner
     }
 }

@@ -2,7 +2,7 @@
 
 use auth::Auth;
 use collab2::Collab;
-use collab2::backend::test::{CollabTestBackend, CollabTestServer, SessionId};
+use collab2::backend::test::{CollabTestBackend, CollabServer, SessionId};
 use collab2::start::StartError;
 use futures_lite::future::{self, FutureExt};
 use nvimx2::action::AsyncAction;
@@ -57,7 +57,7 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
         },
     };
 
-    let server = CollabTestServer::default();
+    let server = CollabServer::default();
 
     let backend = CollabTestBackend::new(TestBackend::new(fs))
         .with_home_dir(AbsPathBuf::root())

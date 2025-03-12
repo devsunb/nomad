@@ -10,8 +10,12 @@ publish.workspace = true
 test = ["nvimx2/tests"]
 
 [dependencies]
-collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client", "nomad"] }
+collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = [
+  "client",
+  "nomad",
+] }
 nvimx2 = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 
 [lints]
 workspace = true

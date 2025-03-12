@@ -227,6 +227,7 @@ version = "0.1.0-dev"
 dependencies = [
  "collab-server",
  "nvimx2",
+ "serde",
 ]
 
 [[package]]
@@ -542,7 +543,7 @@ dependencies = [
 [[package]]
 name = "codecs"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#83ebfed019b0bddfd90bde5ebf7639f8a28f1b31"
+source = "git+ssh://git@github.com/nomad/collab.git#73751a9b090432aa51442cf525e64bea247d78c7"
 dependencies = [
  "bincode",
  "bytes",
@@ -596,7 +597,7 @@ dependencies = [
 [[package]]
 name = "collab-message"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#83ebfed019b0bddfd90bde5ebf7639f8a28f1b31"
+source = "git+ssh://git@github.com/nomad/collab.git#73751a9b090432aa51442cf525e64bea247d78c7"
 dependencies = [
  "codecs",
  "eerie",
@@ -609,7 +610,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#83ebfed019b0bddfd90bde5ebf7639f8a28f1b31"
+source = "git+ssh://git@github.com/nomad/collab.git#73751a9b090432aa51442cf525e64bea247d78c7"
 dependencies = [
  "codecs",
  "collab-message",
@@ -829,7 +830,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#83ebfed019b0bddfd90bde5ebf7639f8a28f1b31"
+source = "git+ssh://git@github.com/nomad/collab.git#73751a9b090432aa51442cf525e64bea247d78c7"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1057,7 +1058,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#83ebfed019b0bddfd90bde5ebf7639f8a28f1b31"
+source = "git+ssh://git@github.com/nomad/collab.git#73751a9b090432aa51442cf525e64bea247d78c7"
 dependencies = [
  "codecs",
  "collab-message",
@@ -1425,7 +1426,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc2f4eb4bc735547cfed7c0a4922cbd04a4655978c09b54f1f7b228750664c34"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]

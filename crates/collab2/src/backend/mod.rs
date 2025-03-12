@@ -10,10 +10,12 @@ use core::fmt::Debug;
 use core::hash::Hash;
 use core::str::FromStr;
 
+use collab_server::Authenticator;
 use collab_server::message::{Message, Peer, Peers};
 use eerie::PeerId;
-use futures_util::{Sink, Stream};
+use futures_util::{AsyncRead, AsyncWrite, Sink, Stream};
 use nvimx2::backend::{Backend, Buffer};
+use nvimx2::command::CommandArgs;
 use nvimx2::fs::{self, AbsPath, AbsPathBuf, FsNodeNameBuf};
 use nvimx2::{AsyncCtx, notify};
 
@@ -35,6 +37,19 @@ pub trait CollabBackend: Backend {
         + Eq
         + Hash
         + serde::de::DeserializeOwned;
+
+    /// TODO: docs.
+    type Io: AsyncRead + AsyncWrite + Unpin;
+
+    /// TODO: docs.
+    type ServerConfig: collab_server::Config<
+            Authenticator: Authenticator<Infos: From<auth::AuthInfos>>,
+            SessionId: for<'a> TryFrom<CommandArgs<'a>, Error: notify::Error>,
+        >;
+
+    /// The type of error returned by
+    /// [`connect_to_server`](CollabBackend::connect_to_server).
+    type ConnectToServerError: Debug + notify::Error;
 
     /// The type of error returned by
     /// [`copy_session_id`](CollabBackend::copy_session_id).
@@ -70,6 +85,12 @@ pub trait CollabBackend: Backend {
         project_root: &AbsPath,
         ctx: &mut AsyncCtx<'_, Self>,
     ) -> impl Future<Output = bool>;
+
+    /// TODO: docs.
+    fn connect_to_server(
+        server_addr: config::ServerAddress,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<Output = Result<Self::Io, Self::ConnectToServerError>>;
 
     /// Copies the given [`SessionId`](Self::SessionId) to the user's clipboard.
     fn copy_session_id(

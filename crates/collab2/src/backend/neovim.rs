@@ -1,4 +1,5 @@
 use core::fmt;
+use core::num::NonZeroU32;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use std::ffi::OsString;
@@ -8,15 +9,31 @@ use std::{env, io};
 use async_net::TcpStream;
 use collab_server::message::Message;
 use collab_server::nomad::{NomadConfig, NomadSessionId};
-use collab_server::{SessionIntent, client};
+use collab_server::{Config, SessionIntent, client};
 use futures_util::io::{ReadHalf, WriteHalf};
 use futures_util::{AsyncReadExt, Sink, Stream};
 use mlua::{Function, Table};
+use nvimx2::command::{CommandArgs, Parse};
 use nvimx2::fs::{self, AbsPath, FsNodeName};
 use nvimx2::neovim::{Neovim, NeovimBuffer, mlua, oxi};
 use smol_str::ToSmolStr;
 
 use crate::backend::*;
+
+pub struct ServerConfig;
+
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(transparent)]
+pub struct SessionId(NomadSessionId);
 
 pin_project_lite::pin_project! {
     pub struct NeovimServerTx {
@@ -36,6 +53,11 @@ pin_project_lite::pin_project! {
 pub struct NeovimCopySessionIdError {
     inner: clipboard::ClipboardError,
     session_id: NomadSessionId,
+}
+
+#[derive(Debug)]
+pub struct NeovimConnectToServerError {
+    inner: io::Error,
 }
 
 #[derive(Debug)]
@@ -85,6 +107,10 @@ impl CollabBackend for Neovim {
     type ServerTx = NeovimServerTx;
     type SessionId = NomadSessionId;
 
+    type Io = async_net::TcpStream;
+    type ServerConfig = ServerConfig;
+    type ConnectToServerError = NeovimConnectToServerError;
+
     type CopySessionIdError = NeovimCopySessionIdError;
     type DefaultDirForRemoteProjectsError = NeovimDataDirError;
     type HomeDirError = NeovimHomeDirError;
@@ -120,6 +146,15 @@ impl CollabBackend for Neovim {
             1 => true,
             _ => unreachable!("only provided {} options", options.len()),
         }
+    }
+
+    async fn connect_to_server(
+        server_addr: config::ServerAddress,
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Self::Io, Self::ConnectToServerError> {
+        async_net::TcpStream::connect(&*server_addr)
+            .await
+            .map_err(|inner| NeovimConnectToServerError { inner })
     }
 
     async fn copy_session_id(
@@ -183,12 +218,12 @@ impl CollabBackend for Neovim {
             .map_err(NeovimNewSessionError::TcpConnect)?
             .split();
 
+        let github_handle = args.auth_infos.handle().clone();
+
         let knock = collab_server::Knock::<NomadConfig> {
             auth_infos: args.auth_infos.clone().into(),
             session_intent: SessionIntent::JoinExisting(args.session_id),
         };
-
-        let github_handle = knock.auth_infos.github_handle.clone();
 
         let welcome = client::Knocker::new(reader, writer)
             .knock(knock)
@@ -300,14 +335,14 @@ impl CollabBackend for Neovim {
             .map_err(NeovimNewSessionError::TcpConnect)?
             .split();
 
+        let github_handle = args.auth_infos.handle().clone();
+
         let knock = collab_server::Knock::<NomadConfig> {
             auth_infos: args.auth_infos.clone().into(),
             session_intent: SessionIntent::StartNew(
                 args.project_name.to_owned(),
             ),
         };
-
-        let github_handle = knock.auth_infos.github_handle.clone();
 
         let welcome = client::Knocker::new(reader, writer)
             .knock(knock)
@@ -323,6 +358,37 @@ impl CollabBackend for Neovim {
             server_tx: NeovimServerTx { inner: welcome.tx },
             session_id: welcome.session_id,
         })
+    }
+}
+
+impl Config for ServerConfig {
+    const MAX_FRAME_LEN: NonZeroU32 = <NomadConfig as Config>::MAX_FRAME_LEN;
+    const SERVER_PEER_ID: PeerId = <NomadConfig as Config>::SERVER_PEER_ID;
+
+    type Authenticator = <NomadConfig as Config>::Authenticator;
+    #[cfg(feature = "test")]
+    type Executor = <NomadConfig as Config>::Executor;
+    type SessionId = SessionId;
+
+    #[cfg(feature = "test")]
+    fn authenticator(&self) -> &Self::Authenticator {
+        unreachable!()
+    }
+    #[cfg(feature = "test")]
+    fn executor(&self) -> &Self::Executor {
+        unreachable!()
+    }
+    #[cfg(feature = "test")]
+    fn new_session_id(&self) -> Self::SessionId {
+        unreachable!()
+    }
+}
+
+impl<'a> TryFrom<CommandArgs<'a>> for SessionId {
+    type Error = <Parse<NomadSessionId> as TryFrom<CommandArgs<'a>>>::Error;
+
+    fn try_from(args: CommandArgs<'a>) -> Result<Self, Self::Error> {
+        Parse::<NomadSessionId>::try_from(args).map(|Parse(inner)| Self(inner))
     }
 }
 
@@ -398,6 +464,15 @@ impl notify::Error for NeovimCopySessionIdError {
         msg.push_str("couldn't copy ")
             .push_info(self.session_id.to_smolstr())
             .push_str(" to clipboard: ")
+            .push_str(self.inner.to_smolstr());
+        (notify::Level::Error, msg)
+    }
+}
+
+impl notify::Error for NeovimConnectToServerError {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        let mut msg = notify::Message::new();
+        msg.push_str("couldn't connect to the server: ")
             .push_str(self.inner.to_smolstr());
         (notify::Level::Error, msg)
     }
