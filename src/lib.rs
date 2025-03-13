@@ -19,7 +19,7 @@ impl Plugin<Neovim> for Mad {
 
 impl<B> Module<B> for Mad
 where
-    B: Backend + collab2::CollabBackend,
+    B: Backend + collab::CollabBackend,
 {
     const NAME: Name = "mad";
 
@@ -27,7 +27,7 @@ where
 
     fn api(&self, ctx: &mut ApiCtx<B>) {
         let auth = auth::Auth::dummy("noib3");
-        let collab = collab2::Collab::from(&auth);
+        let collab = collab::Collab::from(&auth);
 
         ctx.with_command(auth.login())
             .with_command(auth.logout())

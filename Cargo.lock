@@ -563,6 +563,44 @@ dependencies = [
 name = "collab"
 version = "0.1.0-dev"
 dependencies = [
+ "async-net",
+ "auth",
+ "clipboard",
+ "collab-server",
+ "concurrent-queue",
+ "derive_more",
+ "duplex-stream",
+ "ed",
+ "eerie",
+ "flume",
+ "futures-lite",
+ "futures-util",
+ "fxhash",
+ "home",
+ "pin-project-lite",
+ "serde",
+ "smallvec",
+ "smol_str",
+ "walkdir 0.1.0-dev",
+]
+
+[[package]]
+name = "collab-message"
+version = "0.0.9"
+source = "git+ssh://git@github.com/nomad/collab.git#73751a9b090432aa51442cf525e64bea247d78c7"
+dependencies = [
+ "codecs",
+ "eerie",
+ "fxhash",
+ "serde",
+ "smallvec",
+ "smol_str",
+]
+
+[[package]]
+name = "collab-old"
+version = "0.1.0-dev"
+dependencies = [
  "async-fs",
  "async-net",
  "async-recursion",
@@ -586,19 +624,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "collab-message"
-version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab.git#73751a9b090432aa51442cf525e64bea247d78c7"
-dependencies = [
- "codecs",
- "eerie",
- "fxhash",
- "serde",
- "smallvec",
- "smol_str",
-]
-
-[[package]]
 name = "collab-server"
 version = "0.0.9"
 source = "git+ssh://git@github.com/nomad/collab.git#73751a9b090432aa51442cf525e64bea247d78c7"
@@ -618,31 +643,6 @@ dependencies = [
  "serde",
  "thiserror 2.0.12",
  "ulid",
-]
-
-[[package]]
-name = "collab2"
-version = "0.1.0-dev"
-dependencies = [
- "async-net",
- "auth",
- "clipboard",
- "collab-server",
- "concurrent-queue",
- "derive_more",
- "duplex-stream",
- "ed",
- "eerie",
- "flume",
- "futures-lite",
- "futures-util",
- "fxhash",
- "home",
- "pin-project-lite",
- "serde",
- "smallvec",
- "smol_str",
- "walkdir 0.1.0-dev",
 ]
 
 [[package]]
@@ -1525,7 +1525,7 @@ name = "mad"
 version = "0.1.0-dev"
 dependencies = [
  "auth",
- "collab2",
+ "collab",
  "ed",
  "version",
 ]

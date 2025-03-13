@@ -1,9 +1,9 @@
 #![allow(missing_docs)]
 
 use auth::Auth;
-use collab2::Collab;
-use collab2::mock::{CollabMock, CollabServer, SessionId};
-use collab2::start::StartError;
+use collab::Collab;
+use collab::mock::{CollabMock, CollabServer, SessionId};
+use collab::start::StartError;
 use ed::action::AsyncAction;
 use ed::fs::AbsPathBuf;
 use ed::mock::{self, BackendExt, Mock};

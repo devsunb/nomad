@@ -6,27 +6,59 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+mock = [
+  "dep:duplex-stream",
+  "auth/mock",
+  "collab-server/server",
+  "collab-server/test",
+  "ed/mock",
+]
+neovim = [
+  "dep:async-net",
+  "dep:clipboard",
+  "dep:home",
+  "collab-server/nomad",
+  "ed/neovim",
+  "ed/neovim-mlua",
+]
+
 [dependencies]
-async-fs = { workspace = true }
-async-net = "2.0"
-async-recursion = "1"
-async-stream = "0.3"
-clipboard = { workspace = true }
-collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = ["client", "nomad"] }
+auth = { workspace = true }
+collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = [
+  "client",
+] }
+concurrent-queue = "2.5"
+derive_more = { workspace = true }
+ed = { workspace = true }
 eerie = { workspace = true }
-flume = { workspace = true }
+flume = { workspace = true, features = ["async"] }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
-nohash = { workspace = true }
-nomad = { workspace = true }
-nvimx = { workspace = true }
 pin-project-lite = { workspace = true }
-root-finder = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true }
 smol_str = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
+walkdir = { workspace = true }
+
+# Mock-only dependencies.
+duplex-stream = { git = "ssh://git@github.com/nomad/collab.git", optional = true }
+
+# Neovim-only dependencies.
+async-net = { workspace = true, optional = true }
+clipboard = { workspace = true, optional = true }
+home = { version = "0.5", optional = true }
+
+[dev-dependencies]
+futures-lite = { workspace = true, features = ["default"] }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "join"
+required-features = ["mock"]
+
+[[test]]
+name = "start"
+required-features = ["mock"]

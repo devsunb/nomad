@@ -31,7 +31,7 @@ ed = { path = "./lib/ed" }
 
 auth = { path = "./crates/auth" }
 clipboard = { path = "./crates/clipboard" }
-collab2 = { path = "./crates/collab2" }
+collab = { path = "./crates/collab" }
 nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 version = { path = "./crates/version" }
@@ -87,6 +87,6 @@ neovim-nightly = ["ed/neovim-nightly"]
 
 [dependencies]
 auth = { workspace = true }
-collab2 = { workspace = true, features = ["neovim"] }
+collab = { workspace = true, features = ["neovim"] }
 ed = { workspace = true, features = ["neovim"] }
 version = { workspace = true }

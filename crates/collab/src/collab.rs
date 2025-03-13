@@ -1,57 +1,82 @@
-use nvimx::Shared;
-use nvimx::ctx::NeovimCtx;
-use nvimx::plugin::{
-    ConfigReceiver,
-    Module,
-    ModuleApi,
-    ModuleName,
-    module_name,
-};
+use auth::AuthInfos;
+use ed::module::{ApiCtx, Module};
+use ed::notify::Name;
+use ed::{EditorCtx, Shared};
 
-use crate::actions::{Join, Start, Yank};
+use crate::backend::{CollabBackend, SessionId};
 use crate::config::Config;
-use crate::session_status::SessionStatus;
+use crate::join::Join;
+use crate::leave::{Leave, StopChannels};
+use crate::project::{ProjectHandle, Projects};
+use crate::start::Start;
+use crate::yank::Yank;
 
 /// TODO: docs.
-pub struct Collab {
+pub struct Collab<B: CollabBackend> {
+    pub(crate) auth_infos: Shared<Option<AuthInfos>>,
     pub(crate) config: Shared<Config>,
-    pub(crate) config_rx: ConfigReceiver<Self>,
-    pub(crate) session_status: Shared<SessionStatus>,
+    pub(crate) projects: Projects<B>,
+    pub(crate) stop_channels: StopChannels<B>,
 }
 
-impl Module for Collab {
-    const NAME: ModuleName = module_name!("collab");
+impl<B: CollabBackend> Collab<B> {
+    /// Returns a new instance of the [`Join`] action.
+    pub fn join(&self) -> Join<B> {
+        self.into()
+    }
+
+    /// Returns a new instance of the [`Leave`] action.
+    pub fn leave(&self) -> Leave<B> {
+        self.into()
+    }
+
+    /// Returns a handle to the project for the given [`SessionId`], if any.
+    pub fn project(
+        &self,
+        session_id: SessionId<B>,
+    ) -> Option<ProjectHandle<B>> {
+        self.projects.get(session_id)
+    }
+
+    /// Returns a new instance of the [`Start`] action.
+    pub fn start(&self) -> Start<B> {
+        self.into()
+    }
+
+    /// Returns a new instance of the [`Yank`] action.
+    pub fn yank(&self) -> Yank<B> {
+        self.into()
+    }
+}
+
+impl<B: CollabBackend> Module<B> for Collab<B> {
+    const NAME: Name = "collab";
 
     type Config = Config;
-    type Plugin = nomad::Nomad;
 
-    fn init(&self, ctx: NeovimCtx<'_>) -> ModuleApi<Self> {
-        let join = Join::from(self);
-        let start = Start::from(self);
-        let yank = Yank::new(self.session_status.clone());
-
-        ModuleApi::new(ctx.to_static())
-            .subcommand(join.clone())
-            .subcommand(start.clone())
-            .subcommand(yank.clone())
-            .function(join)
-            .function(start)
-            .function(yank)
+    fn api(&self, ctx: &mut ApiCtx<B>) {
+        ctx.with_command(self.join())
+            .with_command(self.leave())
+            .with_command(self.start())
+            .with_command(self.yank())
+            .with_function(self.join())
+            .with_function(self.leave())
+            .with_function(self.start())
+            .with_function(self.yank());
     }
 
-    async fn run(mut self, _: NeovimCtx<'static>) {
-        loop {
-            self.config.set(self.config_rx.recv().await);
-        }
+    fn on_new_config(&self, new_config: Self::Config, _: &mut EditorCtx<B>) {
+        self.config.set(new_config);
     }
 }
 
-impl From<ConfigReceiver<Self>> for Collab {
-    fn from(config_rx: ConfigReceiver<Self>) -> Self {
+impl<B: CollabBackend> From<&auth::Auth> for Collab<B> {
+    fn from(auth: &auth::Auth) -> Self {
         Self {
-            config: Shared::default(),
-            config_rx,
-            session_status: Shared::default(),
+            auth_infos: auth.infos().clone(),
+            config: Default::default(),
+            projects: Default::default(),
+            stop_channels: Default::default(),
         }
     }
 }
