@@ -7,10 +7,8 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-default = ["neovim-nightly"]
 mlua = ["nvim-oxi/mlua", "nvim-oxi/__vendored_luajit"]
-neovim-0-10 = ["nvim-oxi/neovim-0-10"]
-neovim-nightly = ["nvim-oxi/neovim-nightly"]
+nightly = ["nvim-oxi/neovim-nightly"]
 
 [dependencies]
 async-oneshot = { git = "https://github.com/irrustible/async-oneshot", rev = "811bedf" }
@@ -18,7 +16,10 @@ async-task = "4.7"
 concurrent-queue = "2.5"
 futures-executor = { version = "0.3", features = ["thread-pool"] }
 neovim-macros = { path = "./macros" }
-nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = ["libuv"] }
+nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = [
+  "libuv",
+  "neovim-0-10",
+] }
 nvimx-core = { path = "../core", features = ["os-fs"] }
 pin-project-lite = { workspace = true }
 serde = { workspace = true }

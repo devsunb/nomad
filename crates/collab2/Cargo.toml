@@ -19,8 +19,7 @@ neovim = [
   "dep:clipboard",
   "dep:home",
   "collab-server/nomad",
-  "futures-util/async-await-macro",
-  "nvimx2/neovim-0-10",
+  "nvimx2/neovim",
   "nvimx2/neovim-mlua",
 ]
 
