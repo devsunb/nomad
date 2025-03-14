@@ -1,3 +1,5 @@
+//! TODO: docs.
+
 use ed::action::AsyncAction;
 use ed::backend::Backend;
 use ed::command::ToCompletionFn;

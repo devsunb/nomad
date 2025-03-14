@@ -8,13 +8,15 @@ publish.workspace = true
 
 [features]
 mock = ["ed/mock"]
+neovim = ["ed/neovim", "keyring/apple-native", "keyring/secret-service"]
 
 [dependencies]
 collab-server = { git = "ssh://git@github.com/nomad/collab.git", default-features = false, features = [
-  "client",
   "nomad",
 ] }
 ed = { workspace = true }
+# keyring = { version = "4.0.0-alpha.1", default-features = false }
+keyring = { git = "ssh://git@github.com/noib3/keyring-rs.git", default-features = false }
 serde = { workspace = true, features = ["derive"] }
 
 [lints]

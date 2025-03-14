@@ -18,8 +18,7 @@ impl AuthInfos {
     #[track_caller]
     pub(crate) fn dummy<Gh>(github_handle: Gh) -> Self
     where
-        Gh: TryInto<collab_server::message::GitHubHandle>,
-        Gh::Error: core::fmt::Debug,
+        Gh: TryInto<GitHubHandle, Error: core::fmt::Debug>,
     {
         Self {
             inner: NomadAuthenticateInfos {
