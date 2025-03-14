@@ -57,10 +57,25 @@ impl<B: AuthBackend> Module<B> for Auth {
     }
 
     fn on_init(&self, ctx: &mut EditorCtx<B>) {
-        let credential_store = self.credential_store.clone();
         let credential_builder = B::credential_builder(ctx);
+        let credential_store = self.credential_store.clone();
         ctx.spawn_background(async move {
             credential_store.run(credential_builder.await).await;
+        })
+        .detach();
+
+        let auth_infos = self.infos.clone();
+        let credential_store = self.credential_store.clone();
+        ctx.spawn_local(async move |_| {
+            let Some(entry) = credential_store.get_entry().await.ok() else {
+                return;
+            };
+            let Some(persisted) =
+                entry.retrieve_persisted().await.ok().flatten()
+            else {
+                return;
+            };
+            auth_infos.set(Some(persisted));
         })
         .detach();
     }
