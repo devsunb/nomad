@@ -1,5 +1,7 @@
-use ed::AsyncCtx;
+use collab_server::message::GitHubHandle;
+use collab_server::nomad::NomadAuthenticateInfos;
 use ed::neovim::Neovim;
+use ed::{AsyncCtx, EditorCtx};
 
 use crate::AuthInfos;
 use crate::backend::AuthBackend;
@@ -9,7 +11,7 @@ impl AuthBackend for Neovim {
 
     #[allow(clippy::manual_async_fn)]
     fn credential_builder(
-        _: &mut ed::EditorCtx<Self>,
+        _: &mut EditorCtx<Self>,
     ) -> impl Future<Output = Box<keyring::CredentialBuilder>> + Send + 'static
     {
         async move { keyring::builtin_credential_builder() }
@@ -18,6 +20,9 @@ impl AuthBackend for Neovim {
     async fn login(
         _: &mut AsyncCtx<'_, Self>,
     ) -> Result<AuthInfos, Self::LoginError> {
-        todo!()
+        Ok(NomadAuthenticateInfos {
+            github_handle: "noib3".parse::<GitHubHandle>().expect("valid"),
+        }
+        .into())
     }
 }

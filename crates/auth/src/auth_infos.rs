@@ -36,6 +36,12 @@ impl AsRef<GitHubHandle> for AuthInfos {
     }
 }
 
+impl From<NomadAuthenticateInfos> for AuthInfos {
+    fn from(inner: NomadAuthenticateInfos) -> Self {
+        Self { inner }
+    }
+}
+
 impl From<AuthInfos> for NomadAuthenticateInfos {
     fn from(infos: AuthInfos) -> Self {
         infos.inner

@@ -1,9 +1,9 @@
 #![allow(missing_docs)]
 
-use ed::AsyncCtx;
 use ed::backend::{ApiValue, Backend, BufferId};
 use ed::fs::AbsPath;
 use ed::notify::MaybeResult;
+use ed::{AsyncCtx, EditorCtx};
 use serde::{Deserialize, Serialize};
 
 use crate::{AuthBackend, AuthInfos};
@@ -23,7 +23,7 @@ impl<B: Backend> AuthBackend for AuthMock<B> {
 
     #[allow(clippy::manual_async_fn)]
     fn credential_builder(
-        _: &mut ed::EditorCtx<Self>,
+        _: &mut EditorCtx<Self>,
     ) -> impl Future<Output = Box<keyring::CredentialBuilder>> + Send + 'static
     {
         async move { todo!() }
