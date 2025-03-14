@@ -36,7 +36,7 @@ impl<B: AuthBackend> AsyncAction<B> for Login {
             .credential_store
             .get_entry()
             .await
-            .map_err(LoginError::GetCredentialEntry)?;
+            .map_err(LoginError::GetCredential)?;
 
         let auth_infos = B::login(ctx).await.map_err(LoginError::Login)?;
 
@@ -52,7 +52,7 @@ pub enum LoginError<B: AuthBackend> {
     AlreadyLoggedIn(GitHubHandle),
 
     /// TODO: docs.
-    GetCredentialEntry(keyring::Error),
+    GetCredential(keyring::Error),
 
     /// TODO: docs.
     Login(B::LoginError),

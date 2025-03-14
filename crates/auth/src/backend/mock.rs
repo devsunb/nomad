@@ -92,4 +92,3 @@ impl<B: Backend> Backend for AuthMock<B> {
         self.inner.deserialize(value)
     }
 }
-

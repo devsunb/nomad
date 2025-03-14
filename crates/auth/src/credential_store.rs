@@ -35,6 +35,10 @@ impl CredentialStore {
 }
 
 impl CredentialEntry {
+    pub(crate) async fn delete(&self) -> Result<(), keyring::Error> {
+        todo!()
+    }
+
     pub(crate) async fn persist(
         &self,
         _auth_infos: AuthInfos,
