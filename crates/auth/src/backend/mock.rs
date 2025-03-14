@@ -1,11 +1,12 @@
 #![allow(missing_docs)]
 
+use ed::AsyncCtx;
 use ed::backend::{ApiValue, Backend, BufferId};
 use ed::fs::AbsPath;
 use ed::notify::MaybeResult;
 use serde::{Deserialize, Serialize};
 
-use crate::AuthBackend;
+use crate::{AuthBackend, AuthInfos};
 
 pub struct AuthMock<B: Backend> {
     inner: B,
@@ -18,11 +19,20 @@ impl<B: Backend> AuthMock<B> {
 }
 
 impl<B: Backend> AuthBackend for AuthMock<B> {
+    type LoginError = core::convert::Infallible;
+
+    #[allow(clippy::manual_async_fn)]
     fn credential_store(
         _: &mut ed::EditorCtx<Self>,
     ) -> impl Future<Output = Box<keyring::CredentialBuilder>> + Send + 'static
     {
         async move { todo!() }
+    }
+
+    async fn login(
+        _: &mut AsyncCtx<'_, Self>,
+    ) -> Result<AuthInfos, Self::LoginError> {
+        todo!()
     }
 }
 
@@ -82,3 +92,4 @@ impl<B: Backend> Backend for AuthMock<B> {
         self.inner.deserialize(value)
     }
 }
+
