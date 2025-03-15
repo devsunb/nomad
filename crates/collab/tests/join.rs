@@ -30,14 +30,14 @@ fn replicate_simple_project() {
     let (started_tx, started_rx) = flume::bounded(1);
 
     let run_peer1 = peer1.run_all(async move |ctx| {
-        let collab = Collab::from(&Auth::dummy("peer1"));
+        let collab = Collab::from(&Auth::logged_in("peer1"));
         ctx.focus_buffer_at(&path("/foo/mars.txt")).unwrap();
         collab.start().call((), ctx).await.unwrap();
         started_tx.send(SessionId(1)).unwrap();
     });
 
     let run_peer2 = peer2.run(async move |ctx| {
-        let collab = Collab::from(&Auth::dummy("peer2"));
+        let collab = Collab::from(&Auth::logged_in("peer2"));
         let session_id = started_rx.recv_async().await.unwrap();
         collab.join().call(session_id, ctx).await.unwrap();
         let fs2 = ctx.fs();

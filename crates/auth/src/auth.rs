@@ -35,7 +35,7 @@ impl Auth {
     /// TODO: docs.
     #[cfg(any(test, feature = "mock"))]
     #[track_caller]
-    pub fn dummy<Gh>(github_handle: Gh) -> Self
+    pub fn logged_in<Gh>(github_handle: Gh) -> Self
     where
         Gh: TryInto<collab_server::message::GitHubHandle>,
         Gh::Error: core::fmt::Debug,
@@ -58,18 +58,16 @@ impl<B: AuthBackend> Module<B> for Auth {
 
     fn on_init(&self, ctx: &mut EditorCtx<B>) {
         let credential_builder = B::credential_builder(ctx);
-        let credential_store = self.credential_store.clone();
+        let store = self.credential_store.clone();
         ctx.spawn_background(async move {
-            credential_store.run(credential_builder.await).await;
+            store.run(credential_builder.await).await;
         })
         .detach();
 
         let auth_infos = self.infos.clone();
-        let credential_store = self.credential_store.clone();
+        let store = self.credential_store.clone();
         ctx.spawn_local(async move |_| {
-            if let Some(infos) =
-                credential_store.retrieve().await.ok().flatten()
-            {
+            if let Some(infos) = store.retrieve().await.ok().flatten() {
                 auth_infos.set(Some(infos));
             }
         })
