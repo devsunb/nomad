@@ -1,15 +1,13 @@
-use std::sync::Arc;
-
-use flume::{Receiver, Sender};
+use std::sync::{Arc, OnceLock};
 
 use crate::AuthInfos;
 
 #[derive(Clone)]
 pub(crate) struct CredentialStore {
-    /// TODO: remove this once https://github.com/zesterer/flume/issues/155 is
-    /// addressed.
-    rx: Arc<Receiver<Request>>,
-    tx: Sender<Request>,
+    entry: Arc<OnceLock<keyring::Entry>>,
+    builder: Arc<OnceLock<Box<keyring::CredentialBuilder>>>,
+    builder_rx: Arc<flume::Receiver<Box<keyring::CredentialBuilder>>>,
+    builder_tx: flume::Sender<Box<keyring::CredentialBuilder>>,
 }
 
 pub(crate) enum Error {
@@ -17,104 +15,63 @@ pub(crate) enum Error {
     Op(keyring::Error),
 }
 
-enum Request {
-    Delete(Sender<Result<(), Error>>),
-    Persist(AuthInfos, Sender<Result<(), Error>>),
-    Retrieve(Sender<Result<Option<AuthInfos>, Error>>),
-}
-
 impl CredentialStore {
     const APP_NAME: &str = "nomad";
     const SECRET_NAME: &str = "auth-infos";
 
     pub(crate) async fn delete(&self) -> Result<(), Error> {
-        let (tx, rx) = flume::bounded(1);
-        self.send_request(Request::Delete(tx)).await;
-        rx.recv_async().await.expect("tx is still alive")
+        self.entry().await?.delete_credential().map_err(Error::Op)
     }
 
     pub(crate) async fn persist(&self, infos: AuthInfos) -> Result<(), Error> {
-        let (tx, rx) = flume::bounded(1);
-        self.send_request(Request::Persist(infos, tx)).await;
-        rx.recv_async().await.expect("tx is still alive")
+        let entry = self.entry().await?;
+        let json = match serde_json::to_string(&infos) {
+            Ok(json) => json,
+            Err(_) => unreachable!("Serialize impl never fails"),
+        };
+        entry.set_password(&json).map_err(Error::Op)
     }
 
     pub(crate) async fn retrieve(&self) -> Result<Option<AuthInfos>, Error> {
-        let (tx, rx) = flume::bounded(1);
-        self.send_request(Request::Retrieve(tx)).await;
-        rx.recv_async().await.expect("tx is still alive")
-    }
-
-    pub(crate) async fn run(self, builder: Box<keyring::CredentialBuilder>) {
-        let mut maybe_entry = None;
-
-        while let Ok(req) = self.rx.recv() {
-            let entry = match &maybe_entry {
-                Some(entry) => entry,
-                None => match builder.build(
-                    None,
-                    Self::APP_NAME,
-                    Self::SECRET_NAME,
-                ) {
-                    Ok(cred) => {
-                        let entry = keyring::Entry::new_with_credential(cred);
-                        &*maybe_entry.insert(entry)
-                    },
-                    Err(err) => {
-                        req.respond_with_get_credential_err(err);
-                        continue;
-                    },
-                },
-            };
-
-            match req {
-                Request::Delete(tx) => {
-                    let msg = entry.delete_credential().map_err(Error::Op);
-                    let _ = tx.send(msg);
-                },
-                Request::Persist(infos, tx) => {
-                    let json = match serde_json::to_string(&infos) {
-                        Ok(json) => json,
-                        Err(_) => unreachable!("Serialize impl never fails"),
-                    };
-                    let msg = entry.set_password(&json).map_err(Error::Op);
-                    let _ = tx.send(msg);
-                },
-                Request::Retrieve(tx) => {
-                    let msg = match entry.get_password() {
-                        Ok(json) => Ok(serde_json::from_str(&json).ok()),
-                        Err(keyring::Error::NoEntry) => Ok(None),
-                        Err(err) => Err(Error::Op(err)),
-                    };
-                    let _ = tx.send(msg);
-                },
-            }
+        match self.entry().await?.get_password() {
+            Ok(json) => Ok(serde_json::from_str(&json).ok()),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(err) => Err(Error::Op(err)),
         }
     }
 
-    async fn send_request(&self, req: Request) {
-        // NOTE: once https://github.com/zesterer/flume/issues/155 is addrssed
-        // and we no longer store the Receiver in Self, we'll have to send it
-        // via a method that, if all receivers have been dropped, will wait for
-        // one to be constructed from a Sender.
-        self.tx
-            .send_async(req)
-            .await
-            .expect("we have an instance of the Receiver, this can't fail")
+    pub(crate) fn set_builder(
+        &self,
+        builder: Box<keyring::CredentialBuilder>,
+    ) {
+        self.builder_tx.send(builder).expect("rx is still alive");
     }
-}
 
-impl Request {
-    fn respond_with_get_credential_err(&self, err: keyring::Error) {
-        match self {
-            Request::Delete(tx) => {
-                let _ = tx.send(Err(Error::GetCredential(err)));
+    async fn builder(&self) -> &keyring::CredentialBuilder {
+        match self.builder.get() {
+            Some(builder) => &**builder,
+            None => {
+                let builder = self
+                    .builder_rx
+                    .recv_async()
+                    .await
+                    .expect("tx is still alive");
+                &**self.builder.get_or_init(|| builder)
             },
-            Request::Persist(_, tx) => {
-                let _ = tx.send(Err(Error::GetCredential(err)));
-            },
-            Request::Retrieve(tx) => {
-                let _ = tx.send(Err(Error::GetCredential(err)));
+        }
+    }
+
+    async fn entry(&self) -> Result<&keyring::Entry, Error> {
+        match &self.entry.get() {
+            Some(entry) => Ok(entry),
+            None => {
+                let entry = self
+                    .builder()
+                    .await
+                    .build(None, Self::APP_NAME, Self::SECRET_NAME)
+                    .map(keyring::Entry::new_with_credential)
+                    .map_err(Error::GetCredential)?;
+                Ok(self.entry.get_or_init(|| entry))
             },
         }
     }
@@ -122,7 +79,12 @@ impl Request {
 
 impl Default for CredentialStore {
     fn default() -> Self {
-        let (tx, rx) = flume::bounded(1);
-        Self { rx: Arc::new(rx), tx }
+        let (builder_tx, builder_rx) = flume::bounded(1);
+        Self {
+            entry: Default::default(),
+            builder: Default::default(),
+            builder_rx: Arc::new(builder_rx),
+            builder_tx,
+        }
     }
 }

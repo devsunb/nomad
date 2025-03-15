@@ -60,7 +60,7 @@ impl<B: AuthBackend> Module<B> for Auth {
         let credential_builder = B::credential_builder(ctx);
         let store = self.credential_store.clone();
         ctx.spawn_background(async move {
-            store.run(credential_builder.await).await;
+            store.set_builder(credential_builder.await);
         })
         .detach();
 

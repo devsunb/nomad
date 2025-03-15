@@ -36,7 +36,12 @@ impl<B: AuthBackend> AsyncAction<B> for Login {
 
         self.infos.set(Some(auth_infos.clone()));
 
-        self.credential_store.persist(auth_infos).await.map_err(Into::into)
+        let credential_store = self.credential_store.clone();
+        ctx.spawn_background(async move {
+            credential_store.persist(auth_infos).await
+        })
+        .await
+        .map_err(Into::into)
     }
 }
 

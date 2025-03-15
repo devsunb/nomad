@@ -24,7 +24,7 @@ impl<B: Backend> AsyncAction<B> for Logout {
     async fn call(
         &mut self,
         _: Self::Args,
-        _: &mut AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), LogoutError> {
         self.infos.with_mut(|maybe_infos| {
             if maybe_infos.is_some() {
@@ -35,7 +35,10 @@ impl<B: Backend> AsyncAction<B> for Logout {
             }
         })?;
 
-        self.credential_store.delete().await.map_err(Into::into)
+        let credential_store = self.credential_store.clone();
+        ctx.spawn_background(async move { credential_store.delete().await })
+            .await
+            .map_err(Into::into)
     }
 }
 
