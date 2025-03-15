@@ -76,6 +76,20 @@ impl From<credential_store::Error> for LogoutError {
 
 impl notify::Error for LogoutError {
     fn to_message(&self) -> (notify::Level, notify::Message) {
-        todo!();
+        let mut msg = notify::Message::new();
+        match self {
+            Self::DeleteCredential(err) => {
+                msg.push_str("couldn't delete credentials from keyring: ")
+                    .push_str(err.to_string());
+            },
+            Self::GetCredential(err) => {
+                msg.push_str("couldn't get credential from keyring: ")
+                    .push_str(err.to_string());
+            },
+            Self::NotLoggedIn => {
+                msg.push_str("not logged in");
+            },
+        }
+        (notify::Level::Error, msg)
     }
 }
