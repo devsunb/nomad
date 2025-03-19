@@ -24,70 +24,39 @@ pub trait VimNotifyProvider: 'static {
 }
 
 /// TODO: docs.
-pub enum NeovimEmitter {
-    /// TODO: docs.
-    VimNotify(VimNotify),
-
-    /// TODO: docs.
-    Custom(Box<dyn Emitter>),
+pub struct NeovimEmitter {
+    inner: Box<dyn VimNotifyProvider>,
 }
-
-/// TODO: docs.
-pub struct VimNotify {
-    provider: Box<dyn VimNotifyProvider>,
-}
-
-struct DefaultProvider;
 
 /// https://github.com/rcarriga/nvim-notify
-struct NvimNotify;
+pub struct NvimNotify;
 
-impl VimNotify {
+/// TODO: docs.
+pub struct VimNotify;
+
+impl NeovimEmitter {
     /// TODO: docs.
     #[inline]
     pub fn new<P: VimNotifyProvider>(provider: P) -> Self {
-        Self { provider: Box::new(provider) }
+        Self { inner: Box::new(provider) }
     }
 }
 
 impl Emitter for NeovimEmitter {
     #[inline]
     fn emit(&mut self, notification: Notification) -> NotificationId {
-        match self {
-            Self::VimNotify(emitter) => emitter.emit(notification),
-            Self::Custom(emitter) => emitter.emit(notification),
-        }
-    }
-}
-
-impl Emitter for VimNotify {
-    #[inline]
-    fn emit(&mut self, notification: Notification) -> NotificationId {
-        let message = self.provider.to_message(&notification);
-        let level = notification.level.convert();
-        let opts = self.provider.to_opts(&notification);
-        match oxi::api::notify(&message, level, &opts) {
-            Ok(obj) => self.provider.to_notification_id(obj),
-            Err(_err) => NotificationId::new(0),
-        }
+        self.inner.emit(notification)
     }
 }
 
 impl Default for NeovimEmitter {
     #[inline]
     fn default() -> Self {
-        Self::VimNotify(Default::default())
+        Self::new(VimNotify)
     }
 }
 
-impl Default for VimNotify {
-    #[inline]
-    fn default() -> Self {
-        Self::new(DefaultProvider)
-    }
-}
-
-impl VimNotifyProvider for DefaultProvider {
+impl VimNotifyProvider for VimNotify {
     #[inline]
     fn to_message(&mut self, notification: &Notification) -> String {
         format!(
@@ -103,8 +72,7 @@ impl VimNotifyProvider for DefaultProvider {
     }
 
     #[inline]
-    fn to_notification_id(&mut self, obj: oxi::Object) -> NotificationId {
-        debug_assert!(obj.is_nil());
+    fn to_notification_id(&mut self, _: oxi::Object) -> NotificationId {
         NotificationId::new(0)
     }
 }
@@ -168,6 +136,19 @@ impl VimNotifyProvider for Box<dyn VimNotifyProvider> {
         notify_return: oxi::Object,
     ) -> NotificationId {
         (**self).to_notification_id(notify_return)
+    }
+}
+
+impl Emitter for Box<dyn VimNotifyProvider> {
+    #[inline]
+    fn emit(&mut self, notification: Notification) -> NotificationId {
+        let message = self.to_message(&notification);
+        let level = notification.level.convert();
+        let opts = self.to_opts(&notification);
+        match oxi::api::notify(&message, level, &opts) {
+            Ok(obj) => self.to_notification_id(obj),
+            Err(_err) => NotificationId::new(0),
+        }
     }
 }
 
