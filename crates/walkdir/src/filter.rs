@@ -1,11 +1,24 @@
 use core::error::Error;
 use core::fmt;
 
-use ed::fs;
-use futures_util::stream::{self, Stream, StreamExt};
+use ed::fs::{self, AbsPath};
+use futures_util::stream::{self, FusedStream, Stream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select};
 
-use crate::WalkDir;
+use crate::{DirEntri, WalkDir, WalkDir2};
+
+/// TODO: docs.
+pub trait Filter2<Fs: fs::Fs> {
+    /// TODO: docs.
+    type Error: Error;
+
+    /// TODO: docs.
+    fn should_filter(
+        &self,
+        dir_path: &AbsPath,
+        dir_entry: &DirEntri<Fs>,
+    ) -> impl Future<Output = Result<bool, Self::Error>>;
+}
 
 /// TODO: docs.
 pub trait Filter<W: WalkDir> {
@@ -31,6 +44,12 @@ pub trait Filter<W: WalkDir> {
 
 /// TODO: docs.
 pub struct Filtered<F, W> {
+    filter: F,
+    walker: W,
+}
+
+/// TODO: docs.
+pub struct Filtered2<F, W> {
     filter: F,
     walker: W,
 }
@@ -63,7 +82,29 @@ where
     Walker(W::ReadDirEntryError),
 }
 
+/// TODO: docs.
+pub enum FilteredDirEntryError2<Fi, Fs, W>
+where
+    Fi: Filter2<Fs>,
+    Fs: fs::Fs,
+    W: WalkDir2<Fs>,
+{
+    /// TODO: docs.
+    Filter(Fi::Error),
+
+    /// TODO: docs.
+    Walker(W::ReadEntryError),
+}
+
 impl<F, W> Filtered<F, W> {
+    /// TODO: docs.
+    #[inline]
+    pub(crate) fn new(filter: F, walker: W) -> Self {
+        Self { filter, walker }
+    }
+}
+
+impl<F, W> Filtered2<F, W> {
     /// TODO: docs.
     #[inline]
     pub(crate) fn new(filter: F, walker: W) -> Self {
@@ -115,6 +156,61 @@ where
                             Ok((entry, false)) => break Ok(entry),
                             Err(err) => {
                                 break Err(FilteredDirEntryError::Filter(err));
+                            },
+                            Ok((_, true)) => (),
+                        },
+                        complete => return None,
+                    }
+                };
+                Some((item, (entries, filters)))
+            },
+        ))
+    }
+}
+
+impl<Fs, Fi, W> WalkDir2<Fs> for Filtered2<Fi, W>
+where
+    Fs: fs::Fs,
+    Fi: Filter2<Fs>,
+    W: WalkDir2<Fs>,
+{
+    type ReadError = W::ReadError;
+    type ReadEntryError = FilteredDirEntryError2<Fi, Fs, W>;
+
+    async fn read_dir(
+        &self,
+        dir_path: &AbsPath,
+    ) -> Result<
+        impl FusedStream<Item = Result<DirEntri<Fs>, Self::ReadEntryError>>,
+        Self::ReadError,
+    > {
+        let entries = self.walker.read_dir(dir_path).await?;
+        let filters = stream::FuturesUnordered::new();
+        Ok(stream::unfold(
+            (Box::pin(entries), filters),
+            move |(mut entries, mut filters)| async move {
+                let item = loop {
+                    select! {
+                        entry_res = entries.select_next_some() => {
+                            let entry = match entry_res {
+                                Ok(entry) => entry,
+                                Err(err) => {
+                                    break Err(FilteredDirEntryError2::Walker(
+                                        err,
+                                    ));
+                                },
+                            };
+                            filters.push(async move {
+                                self.filter
+                                    .should_filter(dir_path, &entry)
+                                    .await
+                                    .map(|filtr| (entry, filtr))
+                            });
+                        },
+                        res = filters.select_next_some() => match res {
+                            Ok((entry, false)) => break Ok(entry),
+                            Err(err) => {
+                                break Err(FilteredDirEntryError2::Filter(err));
                             },
                             Ok((_, true)) => (),
                         },
@@ -246,5 +342,43 @@ impl<F, W> Error for FilteredDirEntryError<F, W>
 where
     F: Filter<W>,
     W: WalkDir,
+{
+}
+
+impl<Fi, Fs, W> fmt::Debug for FilteredDirEntryError2<Fi, Fs, W>
+where
+    Fi: Filter2<Fs>,
+    W: WalkDir2<Fs>,
+    Fs: fs::Fs,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FilteredDirEntryError2::Filter(err) => err.fmt(f),
+            FilteredDirEntryError2::Walker(err) => err.fmt(f),
+        }
+    }
+}
+
+impl<Fi, Fs, W> fmt::Display for FilteredDirEntryError2<Fi, Fs, W>
+where
+    Fi: Filter2<Fs>,
+    W: WalkDir2<Fs>,
+    Fs: fs::Fs,
+{
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            FilteredDirEntryError2::Filter(err) => err.fmt(f),
+            FilteredDirEntryError2::Walker(err) => err.fmt(f),
+        }
+    }
+}
+
+impl<Fi, Fs, W> Error for FilteredDirEntryError2<Fi, Fs, W>
+where
+    Fi: Filter2<Fs>,
+    W: WalkDir2<Fs>,
+    Fs: fs::Fs,
 {
 }

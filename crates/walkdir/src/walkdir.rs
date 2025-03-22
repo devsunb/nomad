@@ -3,12 +3,177 @@ use core::error::Error;
 use core::fmt;
 use core::pin::Pin;
 
-use ed::fs::{self, Directory};
-use futures_util::stream::{self, Stream, StreamExt};
+use ed::fs::{self, AbsPath, AbsPathBuf, Directory, Metadata};
+use futures_util::stream::{self, FusedStream, Stream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select};
 
 use crate::dir_entry::DirEntry;
-use crate::filter::{Either, Filter, Filtered};
+use crate::filter::{Either, Filter, Filter2, Filtered, Filtered2};
+
+/// TODO: docs.
+pub type DirEntri<Fs> = <<Fs as fs::Fs>::Directory as fs::Directory>::Metadata;
+
+/// TODO: docs.
+pub trait WalkDir2<Fs: fs::Fs>: Sized {
+    /// The type of error that can occur when reading a directory fails.
+    type ReadError: Error;
+
+    /// The type of error that can occur when reading a specific entry in a
+    /// directory fails.
+    type ReadEntryError: Error;
+
+    /// TODO: docs.
+    fn read_dir(
+        &self,
+        dir_path: &AbsPath,
+    ) -> impl Future<
+        Output = Result<
+            impl FusedStream<Item = Result<DirEntri<Fs>, Self::ReadEntryError>>,
+            Self::ReadError,
+        >,
+    >;
+
+    /// TODO: docs.
+    #[inline]
+    fn filter<F>(self, filter: F) -> Filtered2<F, Self>
+    where
+        F: Filter2<Fs>,
+    {
+        Filtered2::new(filter, self)
+    }
+
+    /// TODO: docs.
+    #[allow(clippy::type_complexity)]
+    #[inline]
+    fn for_each<'a, H, E>(
+        &'a self,
+        dir_path: &'a AbsPath,
+        handler: H,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<(), WalkDirError2<Fs, Self, E>>> + 'a>,
+    >
+    where
+        H: AsyncFn(&AbsPath, DirEntri<Fs>) -> Result<(), E> + Clone + 'a,
+        E: 'a,
+    {
+        Box::pin(async move {
+            let entries = self
+                .read_dir(dir_path)
+                .await
+                .map_err(WalkDirError2::ReadDir)?;
+            let mut handle_entries = stream::FuturesUnordered::new();
+            let mut read_children = stream::FuturesUnordered::new();
+            pin_mut!(entries);
+            loop {
+                select! {
+                    res = entries.select_next_some() => {
+                        let entry = res.map_err(WalkDirError2::ReadEntry)?;
+                        let node_kind = entry
+                            .node_kind()
+                            .await
+                            .map_err(WalkDirError2::NodeKind)?;
+                        if node_kind.is_dir() {
+                            let dir_name = entry
+                                .name()
+                                .await
+                                .map_err(WalkDirError2::NodeName)?;
+                            let dir_path = dir_path.join(&dir_name);
+                            let handler = handler.clone();
+                            read_children.push(async move {
+                                self.for_each(&dir_path, handler).await
+                            });
+                        }
+                        let handler = &handler;
+                        handle_entries.push(async move {
+                            handler(dir_path, entry).await
+                        });
+                    },
+                    res = read_children.select_next_some() => res?,
+                    res = handle_entries.select_next_some() => {
+                        res.map_err(WalkDirError2::Other)?;
+                    },
+                    complete => return Ok(()),
+                }
+            }
+        })
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn paths<'a>(
+        &'a self,
+        dir_path: &'a AbsPath,
+    ) -> impl FusedStream<
+        Item = Result<
+            AbsPathBuf,
+            WalkDirError2<Fs, Self, <DirEntri<Fs> as Metadata>::NameError>,
+        >,
+    > + 'a {
+        self.to_stream(dir_path, async |dir_path, entry| {
+            entry.name().await.map(|name| dir_path.join(&name))
+        })
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn to_stream<'a, H, T, E>(
+        &'a self,
+        dir_path: &'a AbsPath,
+        handler: H,
+    ) -> impl FusedStream<Item = Result<T, WalkDirError2<Fs, Self, E>>> + 'a
+    where
+        H: AsyncFn(&AbsPath, DirEntri<Fs>) -> Result<T, E> + Clone + 'a,
+        T: 'a,
+        E: 'a,
+    {
+        let (tx, rx) = flume::unbounded();
+        let for_each = self
+            .for_each(dir_path, async move |dir_path, entry| {
+                let _ = tx.send(handler(dir_path, entry).await?);
+                Ok(())
+            })
+            .boxed_local()
+            .fuse();
+        futures_util::stream::unfold(
+            (for_each, rx),
+            move |(mut for_each, rx)| async move {
+                let res = select! {
+                    res = for_each => match res {
+                        Ok(()) => return None,
+                        Err(err) => Err(err),
+                    },
+                    res = rx.recv_async() => match res {
+                        Ok(value) => Ok(value),
+                        Err(_err) => return None,
+                    },
+                };
+                Some((res, (for_each, rx)))
+            },
+        )
+    }
+}
+
+/// TODO: docs.
+pub enum WalkDirError2<Fs, W, T>
+where
+    Fs: fs::Fs,
+    W: WalkDir2<Fs>,
+{
+    /// TODO: docs.
+    Other(T),
+
+    /// TODO: docs.
+    NodeKind(<DirEntri<Fs> as Metadata>::NodeKindError),
+
+    /// TODO: docs.
+    NodeName(<DirEntri<Fs> as Metadata>::NameError),
+
+    /// TODO: docs.
+    ReadDir(W::ReadError),
+
+    /// TODO: docs.
+    ReadEntry(W::ReadEntryError),
+}
 
 /// TODO: docs.
 pub trait WalkDir: Sized {
