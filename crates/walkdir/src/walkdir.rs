@@ -77,7 +77,7 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
                                 self.for_each(&dir_path, handler).await
                             });
                         }
-                        let handler = &handler;
+                        let handler = handler.clone();
                         handle_entries.push(async move {
                             handler(dir_path, entry).await
                         });
