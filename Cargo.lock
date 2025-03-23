@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "abs-path"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/abs-path.git#f4264a40288600cc0db7ba3716893af767463255"
+source = "git+ssh://git@github.com/nomad/abs-path.git#0a9421ec66cdca8bc8f78250832efa8d4af091a8"
 dependencies = [
  "abs-path-core",
  "abs-path-macros",
@@ -14,7 +14,7 @@ dependencies = [
 [[package]]
 name = "abs-path-core"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/abs-path.git#f4264a40288600cc0db7ba3716893af767463255"
+source = "git+ssh://git@github.com/nomad/abs-path.git#0a9421ec66cdca8bc8f78250832efa8d4af091a8"
 dependencies = [
  "compact_str 0.9.0",
  "serde",
@@ -24,7 +24,7 @@ dependencies = [
 [[package]]
 name = "abs-path-macros"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/abs-path.git#f4264a40288600cc0db7ba3716893af767463255"
+source = "git+ssh://git@github.com/nomad/abs-path.git#0a9421ec66cdca8bc8f78250832efa8d4af091a8"
 dependencies = [
  "abs-path-core",
  "quote",
@@ -3042,6 +3042,7 @@ dependencies = [
  "ed",
  "flume",
  "futures-util",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
