@@ -1,3 +1,4 @@
+use core::ops::Range;
 use core::time::Duration;
 use core::{iter, str};
 use std::io;
@@ -19,12 +20,6 @@ pub struct GitIgnore {
 /// TODO: docs.
 #[derive(Debug, thiserror::Error)]
 pub enum GitIgnoreError {
-    #[error(
-        "The stdout of {cmd:?} contained an empty line",
-        cmd = GitIgnore::command()
-    )]
-    EmptyPath,
-
     #[error(
         "Running {cmd:?} failed with exit code {0:?}",
         cmd = GitIgnore::command()
@@ -172,20 +167,28 @@ impl IgnoredPaths {
     fn contains<'a>(&self, path: impl Iterator<Item = &'a NodeName>) -> bool {
         let mut cursor = Cursor::new(self);
         for component in path {
-            if let Some(SeekResult::FoundAt(_)) = cursor.seek(component) {
-                return true;
+            if let Some(result) = cursor.seek(component) {
+                return matches!(result, SeekResult::FoundAt(_));
             }
         }
         false
     }
 
     fn insert(&mut self, path: &str) -> Result<(), GitIgnoreError> {
+        assert!(!path.is_empty());
+
+        let path = path.trim_matches(MAIN_SEPARATOR);
         let mut cursor = Cursor::new(self);
         let mut components = path.split(MAIN_SEPARATOR);
 
         let idx = loop {
             let Some(component) = components.next() else {
-                break cursor.insert_at.ok_or(GitIgnoreError::EmptyPath)?;
+                let range = cursor.matched_range().expect(
+                    "path is not empty, so Cursor::seek() must've been \
+                     called at least once",
+                );
+                self.inner.splice(range, iter::once(path.into()));
+                return Ok(());
             };
 
             let component =
@@ -211,25 +214,95 @@ impl IgnoredPaths {
 }
 
 struct Cursor<'a> {
-    _paths: &'a [CompactString],
-    insert_at: Option<usize>,
+    paths: &'a [CompactString],
+
+    /// The index of the first element of `paths` in the original slice
+    /// constructed in [`Cursor::new`], or `None` if [`Cursor::seek`] has never
+    /// been called.
+    start_idx: Option<usize>,
+
+    /// The number of leading bytes in each element of `paths` that have
+    /// already been matched by previous calls to [`Cursor::seek`].
+    num_bytes_already_matched: usize,
 }
 
 enum SeekResult {
     /// TODO: docs.
-    FoundAt(usize),
+    FoundAt(#[allow(dead_code)] usize),
 
     /// TODO: docs.
     InsertAt(usize),
 }
 
 impl<'a> Cursor<'a> {
-    fn new(paths: &'a IgnoredPaths) -> Self {
-        Self { _paths: paths.inner.as_slice(), insert_at: None }
+    fn first_component(&self, path: &'a str) -> &'a str {
+        path[self.num_bytes_already_matched..]
+            .split(MAIN_SEPARATOR)
+            .next()
+            .expect("path is not empty")
     }
 
-    fn seek(&mut self, _node_name: &NodeName) -> Option<SeekResult> {
-        todo!()
+    fn matched_range(&self) -> Option<Range<usize>> {
+        self.start_idx.map(|start_idx| start_idx..start_idx + self.paths.len())
+    }
+
+    fn new(paths: &'a IgnoredPaths) -> Self {
+        Self {
+            paths: paths.inner.as_slice(),
+            start_idx: None,
+            num_bytes_already_matched: 0,
+        }
+    }
+
+    fn seek(&mut self, node_name: &NodeName) -> Option<SeekResult> {
+        // Look for the index of the 1st path whose first component matches the
+        // node_name.
+        let idx_match = match self
+            .paths
+            .binary_search_by(|path| self.first_component(path).cmp(node_name))
+        {
+            Ok(idx) => idx,
+            Err(idx) => {
+                return Some(SeekResult::InsertAt(
+                    self.start_idx.unwrap_or(0) + idx,
+                ));
+            },
+        };
+
+        // Binary search may not return the first match when multiple matches
+        // exist.
+        //
+        // Example: with paths ["a/a", "a/b", "a/c"] and node_name "a", the
+        // search might return index 1, but the first match is at index 0.
+
+        let num_matches_backward = self.paths[..idx_match]
+            .iter()
+            .rev()
+            .take_while(|path| self.first_component(path) == node_name)
+            .count();
+
+        let num_matches_forward = self.paths[idx_match + 1..]
+            .iter()
+            .take_while(|path| self.first_component(path) == node_name)
+            .count();
+
+        let idx_first_match = idx_match - num_matches_backward;
+        let idx_last_match = idx_match + num_matches_forward;
+
+        let new_start_idx = self.start_idx.unwrap_or(0) + idx_first_match;
+        self.start_idx = Some(new_start_idx);
+        self.paths = &self.paths[idx_first_match..idx_last_match + 1];
+
+        if let [path] = self.paths {
+            if &path[self.num_bytes_already_matched..] == node_name {
+                return Some(SeekResult::FoundAt(new_start_idx));
+            }
+        }
+
+        self.num_bytes_already_matched +=
+            node_name.len() + MAIN_SEPARATOR.len_utf8();
+
+        None
     }
 }
 
@@ -262,5 +335,93 @@ impl Filter<os::OsFs> for GitIgnore {
         self.with_inner(|inner| inner.is_ignored(path))
             .map_err(Either::Right)?
             .map_err(Either::Right)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn ignored_paths_1() {
+        let paths = IgnoredPaths::from_lines(["a/", "a/foo.txt"]);
+        assert!(paths.contains_str("a"));
+        assert!(paths.contains_str("a/bar.txt"));
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn ignored_paths_2() {
+        let paths = IgnoredPaths::from_lines(["a/foo.txt", "a/bar.txt"]);
+        assert!(!paths.contains_str("a"));
+        assert!(!paths.contains_str("a/baz.txt"));
+        assert!(paths.contains_str("a/foo.txt"));
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn ignored_paths_3() {
+        let paths = IgnoredPaths::from_lines(["a/b/foo.txt", "a/b/c/foo.txt"]);
+        assert!(!paths.contains_str("a/b/"));
+        assert!(!paths.contains_str("a/b/bar.txt"));
+        assert!(paths.contains_str("a/b/foo.txt"));
+        assert!(paths.contains_str("a/b/c/foo.txt"));
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn ignored_paths_4() {
+        let paths = IgnoredPaths::from_lines(["abc"]);
+        assert!(!paths.contains_str("a"));
+        assert!(!paths.contains_str("ab"));
+        assert!(!paths.contains_str("a/bc"));
+        assert!(!paths.contains_str("ab/c"));
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn ignored_paths_5() {
+        let mut array = ["a/foo.txt", "a/bar.txt", "a/baz.txt"];
+        let paths = IgnoredPaths::from_lines(array);
+        array.sort();
+        assert_eq!(paths.inner, array);
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn ignored_paths_6() {
+        let paths = IgnoredPaths::from_lines([
+            "a/foo.txt",
+            "a/bar.txt",
+            "a/baz.txt",
+            "a/",
+        ]);
+        assert_eq!(paths.inner, ["a"]);
+    }
+
+    #[test]
+    #[cfg_attr(target_os = "windows", ignore)]
+    fn ignored_paths_7() {
+        let paths = IgnoredPaths::from_lines(["a/foo.txt", "a/foo.txt/"]);
+        assert_eq!(paths.inner, ["a/foo.txt"]);
+    }
+
+    impl IgnoredPaths {
+        fn contains_str(&self, s: &str) -> bool {
+            self.contains(
+                s.trim_matches(MAIN_SEPARATOR).split(MAIN_SEPARATOR).map(
+                    |component| <&NodeName>::try_from(component).unwrap(),
+                ),
+            )
+        }
+
+        fn from_lines<'a>(lines: impl IntoIterator<Item = &'a str>) -> Self {
+            let mut this = Self::default();
+            for line in lines {
+                this.insert(line).unwrap();
+            }
+            this
+        }
     }
 }
