@@ -1,5 +1,5 @@
 use abs_path::{AbsPath, AbsPathBuf};
-use ed::fs::FsNode;
+use ed::fs::{FsNode, Symlink};
 use ed::{AsyncCtx, fs};
 
 use crate::CollabBackend;
@@ -19,7 +19,7 @@ pub(crate) struct EventStreamBuilder<B> {
 
 /// TODO: docs.
 pub(crate) enum PushError<Fs: fs::Fs> {
-    Todo(core::marker::PhantomData<Fs>),
+    FollowSymlink(<Fs::Symlink as Symlink>::FollowError),
 }
 
 impl<B: CollabBackend> EventStream<B> {
@@ -46,7 +46,7 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
         ctx: &AsyncCtx<'_, B>,
     ) -> Result<(), PushError<B::Fs>> {
         match node {
-            FsNode::Directory(dir) => self.push_directory(dir, ctx).await,
+            FsNode::Directory(dir) => self.push_directory(dir).await,
             FsNode::File(file) => self.push_file(file, ctx).await,
             FsNode::Symlink(symlink) => self.push_symlink(symlink, ctx).await,
         }
@@ -55,7 +55,6 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
     async fn push_directory(
         &self,
         _dir: &<B::Fs as fs::Fs>::Directory,
-        _ctx: &AsyncCtx<'_, B>,
     ) -> Result<(), PushError<B::Fs>> {
         todo!()
     }
@@ -70,9 +69,26 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
 
     async fn push_symlink(
         &self,
-        _symlink: &<B::Fs as fs::Fs>::Symlink,
-        _ctx: &AsyncCtx<'_, B>,
+        symlink: &<B::Fs as fs::Fs>::Symlink,
+        ctx: &AsyncCtx<'_, B>,
     ) -> Result<(), PushError<B::Fs>> {
-        todo!()
+        // FIXME: we should add a watcher on the symlink itself to react to its
+        // deletion.
+
+        let Some(node) = symlink
+            .follow_recursively()
+            .await
+            .map_err(PushError::FollowSymlink)?
+        else {
+            return Ok(());
+        };
+
+        match node {
+            FsNode::Directory(dir) => self.push_directory(&dir).await,
+            FsNode::File(file) => self.push_file(&file, ctx).await,
+            FsNode::Symlink(_) => unreachable!(
+                "following recursively must resolve to a File or Directory"
+            ),
+        }
     }
 }
