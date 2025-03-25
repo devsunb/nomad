@@ -14,7 +14,7 @@ mod symlink;
 #[doc(inline)]
 pub use abs_path::*;
 pub use directory::{
-    ChildCreation,
+    NodeCreation,
     Directory,
     DirectoryDeletion,
     DirectoryEvent,

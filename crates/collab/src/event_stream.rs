@@ -2,7 +2,7 @@ use std::sync::Mutex;
 
 use abs_path::AbsPath;
 use ed::AsyncCtx;
-use ed::fs::{self, Directory, DirectoryEvent, FsNode, Symlink};
+use ed::fs::{self, Directory, FsNode, Symlink};
 use futures_util::select;
 use futures_util::stream::{SelectAll, StreamExt};
 
@@ -55,38 +55,53 @@ impl<B: CollabBackend> EventStream<B> {
 
     async fn on_directory_event(
         &mut self,
-        _dir_event: &DirectoryEvent<<B::Fs as fs::Fs>::Directory>,
+        event: &fs::DirectoryEvent<<B::Fs as fs::Fs>::Directory>,
+        ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<(), PushError<B::Fs>> {
+        match event {
+            fs::DirectoryEvent::Creation(node_creation) => {
+                self.on_node_creation(node_creation, ctx).await
+            },
+            fs::DirectoryEvent::Deletion(directory_deletion) => {
+                self.on_directory_deletion(directory_deletion, ctx).await;
+                Ok(())
+            },
+            fs::DirectoryEvent::Move(directory_move) => {
+                self.on_directory_move(directory_move, ctx).await;
+                Ok(())
+            },
+        }
+    }
+
+    async fn on_directory_deletion(
+        &mut self,
+        _deletion: &fs::DirectoryDeletion,
+        _ctx: &mut AsyncCtx<'_, B>,
+    ) {
+        // Many of the things discussed in `on_directory_move` apply here too.
+        todo!()
+    }
+
+    async fn on_directory_move(
+        &mut self,
+        _move: &fs::DirectoryMove<<B::Fs as fs::Fs>::Directory>,
+        _ctx: &mut AsyncCtx<'_, B>,
+    ) {
+        todo!()
+    }
+
+    async fn on_node_creation(
+        &mut self,
+        _creation: &fs::NodeCreation<B::Fs>,
         _ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<(), PushError<B::Fs>> {
-        // If the event is a move, we're probably about to receive a bunch of
-        // notifications about the children being moved too. Worse yet, the
-        // children events are not even guaranteed to be emitted after the root
-        // move event.
-        //
-        // This might be the most difficult notification to handle. Basically,
-        // we want to buffer the events for a while, wait for all of them to be
-        // emitted, and then emit the root move once we timer has elapsed.
-        //
-        // How we do this is:
-        //
-        // - when we get a move event, we add it to some queue and start a
-        // timer for some hard-coded duration (e.g. 100ms);
-        //
-        // - if we don't get another move event for that duration, we emit the
-        // move event;
-        //
-        // - if we do, we reset the timer and start waiting again. Once the
-        // timer finally expires, we check the queue and group all the entries
-        // into their respective moves (the exact algorithm is tbd at this
-        // point, but basically try to match related moves by looking at the
-        // parent-child relationships in the paths before and after the move);
         todo!()
     }
 }
 
 impl<B: CollabBackend> EventStreamBuilder<B> {
     pub(crate) fn build(self, fs_filter: B::FsFilter) -> EventStream<B> {
-        let mut stream = self.stream.into_inner().expect("poisoned");
+        let stream = self.stream.into_inner().expect("poisoned");
         let EventStream { directory_streams, .. } = stream;
         EventStream { directory_streams, fs_filter }
     }
@@ -97,32 +112,18 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
         ctx: &AsyncCtx<'_, B>,
     ) -> Result<(), PushError<B::Fs>> {
         match node {
-            FsNode::Directory(dir) => self.push_directory(dir).await,
+            FsNode::Directory(dir) => {
+                self.push_directory(dir).await;
+                Ok(())
+            },
             FsNode::File(file) => self.push_file(file, ctx).await,
             FsNode::Symlink(symlink) => self.push_symlink(symlink, ctx).await,
         }
     }
 
-    async fn push_directory(
-        &self,
-        dir: &<B::Fs as fs::Fs>::Directory,
-    ) -> Result<(), PushError<B::Fs>> {
-        // Do we even need to do anything w/ the stream besides pushing it into
-        // a `SelectAll`?
-        //
-        // Watching a directory for changes will yield events whose variants
-        // are:
-        //
-        // 1: the directory is deleted (guaranteed to be the last event,
-        //    followed by a None);
-        // 2: the directory is renamed;
-        // 3: the directory is moved to a new location (need to de-dup all the
-        //    events about the children being moved w/ it);
-        // 4: a child node is created;
-
+    async fn push_directory(&self, dir: &<B::Fs as fs::Fs>::Directory) {
         let stream = dir.watch().await;
         self.stream.lock().expect("poisoned").directory_streams.push(stream);
-        Ok(())
     }
 
     async fn push_file(
@@ -150,7 +151,10 @@ impl<B: CollabBackend> EventStreamBuilder<B> {
         };
 
         match node {
-            FsNode::Directory(dir) => self.push_directory(&dir).await,
+            FsNode::Directory(dir) => {
+                self.push_directory(&dir).await;
+                Ok(())
+            },
             FsNode::File(file) => self.push_file(&file, ctx).await,
             FsNode::Symlink(_) => unreachable!(
                 "following recursively must resolve to a File or Directory"

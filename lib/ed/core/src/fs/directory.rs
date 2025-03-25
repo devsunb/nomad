@@ -85,22 +85,13 @@ pub trait Directory: Sized {
 /// TODO: docs.
 pub enum DirectoryEvent<Dir: Directory> {
     /// TODO: docs.
-    Creation(ChildCreation<Dir::Fs>),
+    Creation(NodeCreation<Dir::Fs>),
 
     /// TODO: docs.
     Deletion(DirectoryDeletion),
 
     /// TODO: docs.
     Move(DirectoryMove<Dir>),
-}
-
-/// TODO: docs.
-pub struct ChildCreation<Fs: fs::Fs> {
-    /// TODO: docs.
-    pub child: FsNode<Fs>,
-
-    /// TODO: docs.
-    pub parent: Fs::Directory,
 }
 
 /// TODO: docs.
@@ -116,4 +107,13 @@ pub struct DirectoryMove<Dir: Directory> {
 
     /// TODO: docs.
     pub old_path: AbsPathBuf,
+}
+
+/// TODO: docs.
+pub struct NodeCreation<Fs: fs::Fs> {
+    /// TODO: docs.
+    pub child: FsNode<Fs>,
+
+    /// TODO: docs.
+    pub parent: Fs::Directory,
 }
