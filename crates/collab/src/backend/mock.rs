@@ -274,6 +274,7 @@ impl<B: Backend> Backend for CollabMock<B> {
     type BackgroundExecutor = <B as Backend>::BackgroundExecutor;
     type Fs = <B as Backend>::Fs;
     type Emitter<'this> = <B as Backend>::Emitter<'this>;
+    type EventHandle = <B as Backend>::EventHandle;
     type SerializeError = <B as Backend>::SerializeError;
     type DeserializeError = <B as Backend>::DeserializeError;
 
@@ -318,6 +319,12 @@ impl<B: Backend> Backend for CollabMock<B> {
         V: Deserialize<'de>,
     {
         self.inner.deserialize(value)
+    }
+    fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&Self::Buffer<'_>),
+    {
+        self.inner.on_buffer_created(fun)
     }
 }
 

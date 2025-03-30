@@ -53,6 +53,7 @@ impl Backend for Neovim {
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
+    type EventHandle = ();
     type Selection<'a> = NeovimBuffer;
     type SelectionId = NeovimBuffer;
 
@@ -145,6 +146,14 @@ impl Backend for Neovim {
         value: value::NeovimValue,
     ) -> Result<T, serde::NeovimDeserializeError> {
         serde::deserialize(value)
+    }
+
+    #[inline]
+    fn on_buffer_created<Fun>(&mut self, _fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&Self::Buffer<'_>),
+    {
+        todo!();
     }
 
     #[inline]

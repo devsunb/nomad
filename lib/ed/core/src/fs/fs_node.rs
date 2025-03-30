@@ -1,6 +1,8 @@
 use core::error::Error;
 use core::fmt;
 
+use abs_path::AbsPath;
+
 use crate::fs::{self, Directory, File, FsNodeKind, Symlink};
 
 /// TODO: docs.
@@ -95,6 +97,16 @@ impl<Fs: fs::Fs> FsNode<Fs> {
             Self::Symlink(symlink) => {
                 symlink.meta().await.map_err(NodeMetadataError::Symlink)
             },
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn path(&self) -> &AbsPath {
+        match self {
+            Self::File(file) => file.path(),
+            Self::Directory(directory) => directory.path(),
+            Self::Symlink(symlink) => symlink.path(),
         }
     }
 }

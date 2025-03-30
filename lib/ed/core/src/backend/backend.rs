@@ -52,6 +52,9 @@ pub trait Backend: 'static + Sized {
     type Emitter<'this>: notify::Emitter;
 
     /// TODO: docs.
+    type EventHandle;
+
+    /// TODO: docs.
     type Selection<'a>;
 
     /// TODO: docs.
@@ -94,6 +97,11 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     fn background_executor(&mut self) -> &mut Self::BackgroundExecutor;
+
+    /// TODO: docs.
+    fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    where
+        Fun: FnMut(&Self::Buffer<'_>) + 'static;
 
     /// TODO: docs.
     fn selection(
