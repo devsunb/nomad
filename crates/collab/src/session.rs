@@ -5,9 +5,10 @@ use abs_path::AbsPathBuf;
 use collab_server::client::ClientRxError;
 use ed::backend::{AgentId, Buffer};
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata};
-use ed::{AsyncCtx, notify};
+use ed::{AsyncCtx, Shared, notify};
 use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select};
+use fxhash::FxHashSet;
 use walkdir::Filter;
 
 use crate::backend::{CollabBackend, MessageRx, MessageTx};
@@ -45,6 +46,8 @@ pub(crate) struct EventRx<B: CollabBackend> {
     root_id: <B::Fs as Fs>::NodeId,
     /// The path to the root of the project.
     root_path: AbsPathBuf,
+    /// A set of buffer IDs for buffers that have just been saved.
+    saved_buffers: Shared<FxHashSet<B::BufferId>>,
 }
 
 pub(crate) enum RunSessionError {
@@ -121,6 +124,7 @@ impl<B: CollabBackend> EventRx<B> {
             fs_filter: B::fs_filter(root.path(), ctx),
             root_id: root.id(),
             root_path: root.path().to_owned(),
+            saved_buffers: Default::default(),
         }
     }
 
@@ -186,18 +190,19 @@ impl<B: CollabBackend> EventRx<B> {
         });
 
         let tx = self.buffer_tx.clone();
-        let _handle = buffer.on_removed(move |buf, _agent_id| {
+        let _handle = buffer.on_removed(move |buf, _removed_by| {
             let event = BufferEvent::Removed(buf.id());
             let _ = tx.send(Event::Buffer(event));
         });
 
+        let saved_buffers = self.saved_buffers.clone();
         let tx = self.buffer_tx.clone();
-        let _handle = buffer.on_saved(move |buf, _agent_id| {
-            // TODO: we always store the event to dedup the next
-            // FileEvent::Modification. If the agent_id is ours, we don't emit
-            // the event.
-            let event = BufferEvent::Saved(buf.id());
-            let _ = tx.send(Event::Buffer(event));
+        let _handle = buffer.on_saved(move |buf, saved_by| {
+            saved_buffers.with_mut(|buffers| buffers.insert(buf.id()));
+            if saved_by != agent_id {
+                let event = BufferEvent::Saved(buf.id());
+                let _ = tx.send(Event::Buffer(event));
+            }
         });
     }
 }
