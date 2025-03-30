@@ -70,6 +70,12 @@ pub trait Backend: 'static + Sized {
     fn buffer(&mut self, id: Self::BufferId) -> Option<Self::Buffer<'_>>;
 
     /// TODO: docs.
+    fn buffer_at_path(
+        &mut self,
+        path: &fs::AbsPath,
+    ) -> Option<Self::Buffer<'_>>;
+
+    /// TODO: docs.
     fn buffer_ids(
         &mut self,
     ) -> impl Iterator<Item = Self::BufferId> + use<Self>;

@@ -1,5 +1,5 @@
 use ::serde::{Deserialize, Serialize};
-use ed_core::backend::Backend;
+use ed_core::backend::{Backend, Buffer};
 use ed_core::fs::AbsPath;
 use ed_core::notify::Namespace;
 use ed_core::plugin::Plugin;
@@ -66,8 +66,15 @@ impl Backend for Neovim {
     }
 
     #[inline]
+    fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
+        self.buffer_ids().find(|buf| &*buf.name() == path)
+    }
+
+    #[inline]
     fn buffer_ids(&mut self) -> impl Iterator<Item = NeovimBuffer> + use<> {
-        oxi::api::list_bufs().map(NeovimBuffer::new)
+        oxi::api::list_bufs()
+            .filter(|buf| buf.is_loaded())
+            .map(NeovimBuffer::new)
     }
 
     #[inline]

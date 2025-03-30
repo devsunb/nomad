@@ -266,6 +266,11 @@ impl Directory for OsDirectory {
     }
 
     #[inline]
+    fn id(&self) -> Inode {
+        todo!()
+    }
+
+    #[inline]
     async fn meta(&self) -> Result<OsMetadata, Self::MetadataError> {
         self.metadata
             .with(|inner| OsMetadata {
@@ -374,6 +379,11 @@ impl File for OsFile {
     #[inline]
     async fn delete(self) -> Result<(), Self::DeleteError> {
         async_fs::remove_file(self.path()).await
+    }
+
+    #[inline]
+    fn id(&self) -> Inode {
+        todo!()
     }
 
     #[inline]

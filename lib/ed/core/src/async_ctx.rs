@@ -1,6 +1,12 @@
 use core::marker::PhantomData;
 
-use crate::backend::{Backend, BackgroundExecutor, TaskBackground, TaskLocal};
+use crate::backend::{
+    AgentId,
+    Backend,
+    BackgroundExecutor,
+    TaskBackground,
+    TaskLocal,
+};
 use crate::fs::AbsPath;
 use crate::notify::{Namespace, NotificationId};
 use crate::plugin::PluginId;
@@ -50,6 +56,12 @@ impl<B: Backend> AsyncCtx<'_, B> {
     #[inline]
     pub fn fs(&self) -> B::Fs {
         self.with_ctx(|ctx| ctx.fs())
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn new_agent_id(&self) -> AgentId {
+        self.with_ctx(|ctx| ctx.new_agent_id())
     }
 
     /// TODO: docs.

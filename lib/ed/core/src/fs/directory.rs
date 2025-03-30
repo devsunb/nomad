@@ -53,6 +53,9 @@ pub trait Directory: Sized {
     fn delete(self) -> impl Future<Output = Result<(), Self::DeleteError>>;
 
     /// TODO: docs.
+    fn id(&self) -> <Self::Fs as Fs>::NodeId;
+
+    /// TODO: docs.
     fn meta(
         &self,
     ) -> impl Future<Output = Result<<Self::Fs as Fs>::Metadata, Self::MetadataError>>;

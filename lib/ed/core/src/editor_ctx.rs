@@ -3,6 +3,7 @@ use core::panic;
 use futures_lite::FutureExt;
 
 use crate::backend::{
+    AgentId,
     Backend,
     BackgroundExecutor,
     BufferId,
@@ -38,6 +39,12 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
         buffer_id: BufferId<B>,
     ) -> Option<BufferCtx<'_, B>> {
         self.backend_mut().buffer(buffer_id).map(BufferCtx::new)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn buffer_at_path(&mut self, path: &AbsPath) -> Option<B::Buffer<'_>> {
+        self.backend_mut().buffer_at_path(path)
     }
 
     /// TODO: docs.
@@ -92,6 +99,12 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
             Some(module) => module,
             None => panic!("module {:?} not found", M::NAME),
         }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn new_agent_id(&mut self) -> AgentId {
+        todo!()
     }
 
     /// TODO: docs.

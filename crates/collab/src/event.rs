@@ -1,7 +1,7 @@
 use core::ops::Range;
 
 use ed::ByteOffset;
-use ed::backend::Backend;
+use ed::backend::{Backend, Replacement};
 use ed::fs::{DirectoryEvent, FileEvent, Fs};
 use smallvec::SmallVec;
 use smol_str::SmolStr;
@@ -25,43 +25,31 @@ pub(crate) enum Event<B: Backend> {
 }
 
 pub(crate) enum BufferEvent<B: Backend> {
-    Edited(BufferEdit<B>),
-    Saved(BufferSave<B>),
+    Edited(B::BufferId, SmallVec<[Replacement; 1]>),
+    Removed(B::BufferId),
+    Saved(B::BufferId),
 }
 
-pub(crate) struct BufferEdit<B: Backend> {
+pub(crate) struct CursorEvent<B: Backend> {
     pub(crate) buffer_id: B::BufferId,
-    pub(crate) edit: SmallVec<[Replacement; 1]>,
+    pub(crate) cursor_id: B::CursorId,
+    pub(crate) kind: CursorEventKind,
 }
 
-pub(crate) struct BufferSave<B: Backend> {
+pub(crate) enum CursorEventKind {
+    Created,
+    Moved(ByteOffset),
+    Removed,
+}
+
+pub(crate) struct SelectionEvent<B: Backend> {
     pub(crate) buffer_id: B::BufferId,
-    pub(crate) saved_at: <B::Fs as Fs>::Timestamp,
+    pub(crate) selection_id: B::SelectionId,
+    pub(crate) kind: SelectionEventKind,
 }
 
-pub(crate) enum CursorEvent<B: Backend> {
-    /// A new cursor with the given ID was created.
-    Created(B::CursorId),
-
-    /// The cursor with the given ID was moved to a different location.
-    Relocated(B::CursorId),
-
-    /// The cursor with the given ID was removed.
-    Removed(B::CursorId),
-}
-
-pub(crate) struct Replacement {
-    pub(crate) deleted_range: Range<ByteOffset>,
-    pub(crate) inserted_text: SmolStr,
-}
-
-pub(crate) enum SelectionEvent<B: Backend> {
-    /// A new selection with the given ID was created.
-    Created(B::SelectionId),
-
-    /// TODO: docs.
-    Relocated(B::SelectionId),
-
-    /// The selection with the given ID was removed.
-    Removed(B::SelectionId),
+pub(crate) enum SelectionEventKind {
+    Created,
+    Changed(Range<ByteOffset>),
+    Removed,
 }

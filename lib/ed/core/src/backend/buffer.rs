@@ -41,6 +41,7 @@ pub trait Buffer {
 }
 
 /// TODO: docs.
+#[derive(Debug, Clone)]
 pub struct Edit {
     /// TODO: docs.
     pub made_by: AgentId,
@@ -50,6 +51,7 @@ pub struct Edit {
 }
 
 /// TODO: docs.
+#[derive(Debug, Clone)]
 pub struct Replacement {
     removed_range: Range<ByteOffset>,
     inserted_text: SmolStr,

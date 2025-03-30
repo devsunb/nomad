@@ -25,5 +25,5 @@ pub type ApiValue<B> = <<B as Backend>::Api as Api>::Value;
 pub type BufferId<B> = <B as Backend>::BufferId;
 
 /// TODO: docs.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct AgentId(u64);

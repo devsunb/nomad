@@ -3,14 +3,7 @@ use core::error::Error;
 use futures_util::Stream;
 
 use crate::ByteOffset;
-use crate::fs::{
-    self,
-    AbsPath,
-    NodeDeletion,
-    NodeMove,
-    Fs,
-    NodeName,
-};
+use crate::fs::{self, AbsPath, Fs, NodeDeletion, NodeMove, NodeName};
 
 /// TODO: docs.
 pub trait File {
@@ -39,6 +32,9 @@ pub trait File {
 
     /// TODO: docs.
     fn delete(self) -> impl Future<Output = Result<(), Self::DeleteError>>;
+
+    /// TODO: docs.
+    fn id(&self) -> <Self::Fs as Fs>::NodeId;
 
     /// TODO: docs.
     fn meta(
