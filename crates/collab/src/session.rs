@@ -3,7 +3,16 @@ use std::io;
 use abs_path::AbsPathBuf;
 use collab_server::client::ClientRxError;
 use ed::backend::{AgentId, Buffer};
-use ed::fs::{self, Directory, File, Fs, FsNode, Metadata};
+use ed::fs::{
+    self,
+    Directory,
+    DirectoryEvent,
+    File,
+    FileEvent,
+    Fs,
+    FsNode,
+    Metadata,
+};
 use ed::{AsyncCtx, Shared, notify};
 use futures_util::{
     FutureExt,
@@ -14,7 +23,6 @@ use futures_util::{
     select_biased,
 };
 use fxhash::{FxBuildHasher, FxHashSet};
-use indexmap::IndexMap;
 use walkdir::Filter;
 
 use crate::backend::{CollabBackend, MessageRx, MessageTx};
@@ -191,6 +199,22 @@ impl<B: CollabBackend> EventRx<B> {
         }
     }
 
+    async fn handle_dir_event(
+        &mut self,
+        event: DirectoryEvent<B::Fs>,
+        ctx: &AsyncCtx<'_, B>,
+    ) -> Result<Option<DirectoryEvent<B::Fs>>, EventRxError<B>> {
+        todo!();
+    }
+
+    async fn handle_file_event(
+        &mut self,
+        event: FileEvent<B::Fs>,
+        ctx: &AsyncCtx<'_, B>,
+    ) -> Result<Option<FileEvent<B::Fs>>, EventRxError<B>> {
+        todo!();
+    }
+
     async fn next(
         &mut self,
         ctx: &AsyncCtx<'_, B>,
@@ -198,17 +222,22 @@ impl<B: CollabBackend> EventRx<B> {
         loop {
             let mut dir_stream = self.directory_streams.as_stream(0);
             let mut file_stream = self.file_streams.as_stream(0);
-            select_biased! {
-                _dir_event = dir_stream.select_next_some() => {
-                    todo!();
+
+            return Ok(select_biased! {
+                event = dir_stream.select_next_some() => {
+                    match self.handle_dir_event(event, ctx).await? {
+                        Some(dir_event) => Event::Directory(dir_event),
+                        None => continue,
+                    }
                 },
-                _file_event = file_stream.select_next_some() => {
-                    todo!();
+                event = file_stream.select_next_some() => {
+                    match self.handle_file_event(event, ctx).await? {
+                        Some(file_event) => Event::File(file_event),
+                        None => continue,
+                    }
                 },
-                _event = self.buffer_rx.select_next_some() => {
-                    todo!();
-                },
-            }
+                event = self.buffer_rx.select_next_some() => event,
+            });
         }
     }
 
