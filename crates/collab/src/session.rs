@@ -1,4 +1,3 @@
-use core::ops::Not;
 use std::io;
 
 use abs_path::AbsPathBuf;
@@ -6,15 +5,25 @@ use collab_server::client::ClientRxError;
 use ed::backend::{AgentId, Buffer};
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata};
 use ed::{AsyncCtx, Shared, notify};
-use flume::Receiver;
-use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select};
-use fxhash::FxHashSet;
+use futures_util::{
+    FutureExt,
+    SinkExt,
+    StreamExt,
+    pin_mut,
+    select,
+    select_biased,
+};
+use fxhash::{FxBuildHasher, FxHashSet};
+use indexmap::IndexMap;
 use walkdir::Filter;
 
 use crate::backend::{CollabBackend, MessageRx, MessageTx};
 use crate::event::{self, BufferEvent, Event};
 use crate::leave::StopSession;
 use crate::project::ProjectHandle;
+use crate::seq_ext::StreamableSeq;
+
+type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
 pub(crate) struct Session<B: CollabBackend> {
     args: NewSessionArgs<B>,
@@ -31,14 +40,24 @@ pub(crate) struct NewSessionArgs<B: CollabBackend> {
     pub(crate) project_handle: ProjectHandle<B>,
 
     /// TODO: docs.
-    pub(crate) stop_rx: Receiver<StopSession>,
+    pub(crate) stop_rx: flume::Receiver<StopSession>,
 }
 
 pub(crate) struct EventRx<B: CollabBackend> {
     /// The `AgentId` of the `Session` that owns this `EventRx`.
     agent_id: AgentId,
-    buffer_rx: flume::Receiver<Event<B>>,
+    buffer_rx: flume::r#async::RecvStream<'static, Event<B>>,
     buffer_tx: flume::Sender<Event<B>>,
+    /// Map from a directory's node ID to its event stream.
+    directory_streams: FxIndexMap<
+        <B::Fs as Fs>::NodeId,
+        <<B::Fs as Fs>::Directory as Directory>::EventStream,
+    >,
+    /// Map from a file's node ID to its event stream.
+    file_streams: FxIndexMap<
+        <B::Fs as Fs>::NodeId,
+        <<B::Fs as Fs>::File as File>::EventStream,
+    >,
     /// A filter used to check if [`FsNode`]s created under the project root
     /// should be part of the project.
     fs_filter: B::FsFilter,
@@ -119,8 +138,10 @@ impl<B: CollabBackend> EventRx<B> {
         let (buffer_tx, buffer_rx) = flume::unbounded();
         Self {
             agent_id: ctx.new_agent_id(),
-            buffer_rx,
+            buffer_rx: buffer_rx.into_stream(),
             buffer_tx,
+            directory_streams: Default::default(),
+            file_streams: Default::default(),
             fs_filter: B::fs_filter(root.path(), ctx),
             root_id: root.id(),
             root_path: root.path().to_owned(),
@@ -156,10 +177,10 @@ impl<B: CollabBackend> EventRx<B> {
     ) {
         match node {
             FsNode::Directory(dir) => {
-                // self.directory_streams.push(dir.id(), dir.watch());
+                // self.directory_streams.insert(dir.id(), dir.watch());
             },
             FsNode::File(file) => {
-                // self.file_streams.push(file.id(), file.watch());
+                // self.file_streams.insert(file.id(), file.watch());
                 ctx.with_ctx(|ctx| {
                     if let Some(mut buffer) = ctx.buffer_at_path(file.path()) {
                         self.watch_buffer(file, &mut buffer);
@@ -167,6 +188,27 @@ impl<B: CollabBackend> EventRx<B> {
                 });
             },
             FsNode::Symlink(_) => {},
+        }
+    }
+
+    async fn next(
+        &mut self,
+        ctx: &AsyncCtx<'_, B>,
+    ) -> Result<Event<B>, EventRxError<B>> {
+        loop {
+            let mut dir_stream = self.directory_streams.as_stream(0);
+            let mut file_stream = self.file_streams.as_stream(0);
+            select_biased! {
+                _dir_event = dir_stream.select_next_some() => {
+                    todo!();
+                },
+                _file_event = file_stream.select_next_some() => {
+                    todo!();
+                },
+                _event = self.buffer_rx.select_next_some() => {
+                    todo!();
+                },
+            }
         }
     }
 
