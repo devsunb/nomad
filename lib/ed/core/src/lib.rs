@@ -6,7 +6,6 @@
 pub mod action;
 mod async_ctx;
 pub mod backend;
-mod buffer_ctx;
 mod byte_offset;
 pub mod command;
 mod editor_ctx;
@@ -19,7 +18,6 @@ mod state;
 mod util;
 
 pub use async_ctx::AsyncCtx;
-pub use buffer_ctx::BufferCtx;
 pub use byte_offset::ByteOffset;
 pub use editor_ctx::EditorCtx;
 pub use shared::Shared;

@@ -1,6 +1,6 @@
 use std::io;
 
-use abs_path::AbsPathBuf;
+use abs_path::{AbsPath, AbsPathBuf};
 use collab_server::client::ClientRxError;
 use ed::backend::{AgentId, Buffer};
 use ed::fs::{
@@ -71,6 +71,7 @@ pub(crate) struct EventRx<B: CollabBackend> {
     /// A filter used to check if [`FsNode`]s created under the project root
     /// should be part of the project.
     fs_filter: B::FsFilter,
+    new_buffer_rx: flume::r#async::RecvStream<'static, B::BufferId>,
     /// The ID of the root of the project.
     root_id: <B::Fs as Fs>::NodeId,
     /// The path to the root of the project.
@@ -145,7 +146,16 @@ impl<B: CollabBackend> EventRx<B> {
         root: &<B::Fs as Fs>::Directory,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Self {
+        let (new_buffer_tx, new_buffer_rx) = flume::unbounded();
+
+        let _handle = ctx.with_ctx(|ctx| {
+            ctx.on_buffer_created(move |buf| {
+                let _ = new_buffer_tx.send(buf.id());
+            })
+        });
+
         let (buffer_tx, buffer_rx) = flume::unbounded();
+
         Self {
             agent_id: ctx.new_agent_id(),
             buffer_rx: buffer_rx.into_stream(),
@@ -153,6 +163,7 @@ impl<B: CollabBackend> EventRx<B> {
             directory_streams: Default::default(),
             file_streams: Default::default(),
             fs_filter: B::fs_filter(root.path(), ctx),
+            new_buffer_rx: new_buffer_rx.into_stream(),
             root_id: root.id(),
             root_path: root.path().to_owned(),
             saved_buffers: Default::default(),
@@ -266,11 +277,11 @@ impl<B: CollabBackend> EventRx<B> {
         })
     }
 
-    async fn handle_file_event(
+    fn handle_file_event(
         &mut self,
         event: FileEvent<B::Fs>,
-    ) -> Result<Option<FileEvent<B::Fs>>, EventRxError<B>> {
-        Ok(match event {
+    ) -> Option<FileEvent<B::Fs>> {
+        match event {
             FileEvent::Deletion(ref deletion) => {
                 if deletion.node_id != deletion.deletion_root_id {
                     // This event was caused by an ancestor of the file being
@@ -287,9 +298,9 @@ impl<B: CollabBackend> EventRx<B> {
                     // moved. We should ignore it, unless it's about the root.
                     if r#move.node_id == self.root_id {
                         self.root_path = r#move.new_path.clone();
-                        return Ok(Some(FileEvent::Move(r#move)));
+                        return Some(FileEvent::Move(r#move));
                     } else {
-                        return Ok(None);
+                        return None;
                     }
                 }
 
@@ -311,7 +322,50 @@ impl<B: CollabBackend> EventRx<B> {
                 // let the Project handle that?
                 Some(event)
             },
-        })
+        }
+    }
+
+    async fn handle_new_buffer(
+        &mut self,
+        buffer_id: B::BufferId,
+        ctx: &AsyncCtx<'_, B>,
+    ) -> Result<(), EventRxError<B>> {
+        let Some(buffer_name) = ctx.with_ctx(|ctx| {
+            ctx.buffer(buffer_id.clone()).map(|buf| buf.name().into_owned())
+        }) else {
+            return Ok(());
+        };
+
+        let Ok(buffer_path) = <&AbsPath>::try_from(&*buffer_name) else {
+            return Ok(());
+        };
+
+        if !buffer_path.starts_with(&self.root_path) {
+            return Ok(());
+        }
+
+        let Some(node) = ctx
+            .fs()
+            .node_at_path(buffer_path)
+            .await
+            .map_err(EventRxError::NodeAtPath)?
+        else {
+            return Ok(());
+        };
+
+        if !self.should_watch(&node).await? {
+            return Ok(());
+        }
+
+        let FsNode::File(file) = node else { return Ok(()) };
+
+        ctx.with_ctx(|ctx| {
+            if let Some(mut buffer) = ctx.buffer(buffer_id) {
+                self.watch_buffer(&file, &mut buffer);
+            }
+        });
+
+        Ok(())
     }
 
     async fn next(
@@ -330,12 +384,16 @@ impl<B: CollabBackend> EventRx<B> {
                     }
                 },
                 event = file_stream.select_next_some() => {
-                    match self.handle_file_event(event).await? {
+                    match self.handle_file_event(event) {
                         Some(file_event) => Event::File(file_event),
                         None => continue,
                     }
                 },
                 event = self.buffer_rx.select_next_some() => event,
+                buffer_id = self.new_buffer_rx.select_next_some() => {
+                    self.handle_new_buffer(buffer_id, ctx).await?;
+                    continue;
+                },
             });
         }
     }

@@ -11,7 +11,7 @@ use crate::fs::AbsPath;
 use crate::notify::{Namespace, NotificationId};
 use crate::plugin::PluginId;
 use crate::state::StateHandle;
-use crate::{BufferCtx, EditorCtx, notify};
+use crate::{EditorCtx, notify};
 
 /// TODO: docs.
 pub struct AsyncCtx<'a, B: Backend> {
@@ -48,7 +48,7 @@ impl<B: Backend> AsyncCtx<'_, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn for_each_buffer(&self, fun: impl FnMut(BufferCtx<'_, B>)) {
+    pub fn for_each_buffer(&self, fun: impl FnMut(B::Buffer<'_>)) {
         self.with_ctx(move |ctx| ctx.for_each_buffer(fun))
     }
 

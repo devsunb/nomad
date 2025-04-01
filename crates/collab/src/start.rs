@@ -8,16 +8,16 @@ use collab_server::message::{Peer, PeerId};
 use collab_server::{SessionIntent, client};
 use concurrent_queue::{ConcurrentQueue, PushError};
 use ed::action::AsyncAction;
-use ed::backend::Backend;
+use ed::backend::{Backend, Buffer};
 use ed::command::ToCompletionFn;
 use ed::fs::{
     self,
     AbsPath,
     AbsPathBuf,
     Fs,
-    NodeKind,
     Metadata,
     MetadataNameError,
+    NodeKind,
 };
 use ed::notify::{self, Name};
 use ed::{AsyncCtx, ByteOffset, Shared};

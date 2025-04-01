@@ -25,9 +25,9 @@ use crate::fs::{
     Fs,
     FsEvent,
     FsNode,
-    NodeKind,
     Metadata,
     MetadataNameError,
+    NodeKind,
     NodeName,
     Symlink,
 };

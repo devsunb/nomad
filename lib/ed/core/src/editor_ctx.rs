@@ -2,6 +2,7 @@ use core::panic;
 
 use futures_lite::FutureExt;
 
+use crate::AsyncCtx;
 use crate::backend::{
     AgentId,
     Backend,
@@ -16,7 +17,6 @@ use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::PluginId;
 use crate::state::StateMut;
-use crate::{AsyncCtx, BufferCtx};
 
 /// TODO: docs.
 pub struct EditorCtx<'a, B: Backend> {
@@ -34,11 +34,8 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn buffer(
-        &mut self,
-        buffer_id: BufferId<B>,
-    ) -> Option<BufferCtx<'_, B>> {
-        self.backend_mut().buffer(buffer_id).map(BufferCtx::new)
+    pub fn buffer(&mut self, buffer_id: BufferId<B>) -> Option<B::Buffer<'_>> {
+        self.backend_mut().buffer(buffer_id)
     }
 
     /// TODO: docs.
@@ -49,8 +46,8 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn current_buffer(&mut self) -> Option<BufferCtx<'_, B>> {
-        self.backend_mut().current_buffer().map(BufferCtx::new)
+    pub fn current_buffer(&mut self) -> Option<B::Buffer<'_>> {
+        self.backend_mut().current_buffer()
     }
 
     /// TODO: docs.
@@ -70,16 +67,14 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
     pub fn focus_buffer_at(
         &mut self,
         path: &AbsPath,
-    ) -> Result<Option<BufferCtx<'_, B>>, core::convert::Infallible> {
-        Ok(self.backend_mut().focus_buffer_at(path).map(BufferCtx::new))
+    ) -> Result<Option<B::Buffer<'_>>, core::convert::Infallible> {
+        Ok(self.backend_mut().focus_buffer_at(path))
     }
 
     /// TODO: docs.
     #[inline]
-    pub fn for_each_buffer(&mut self, mut fun: impl FnMut(BufferCtx<'_, B>)) {
-        self.backend_mut().for_each_buffer(|buf| {
-            fun(BufferCtx::new(buf));
-        })
+    pub fn for_each_buffer(&mut self, fun: impl FnMut(B::Buffer<'_>)) {
+        self.backend_mut().for_each_buffer(fun);
     }
 
     /// TODO: docs.
@@ -99,6 +94,15 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
             Some(module) => module,
             None => panic!("module {:?} not found", M::NAME),
         }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn on_buffer_created<Fun>(&mut self, fun: Fun) -> B::EventHandle
+    where
+        Fun: FnMut(&B::Buffer<'_>) + 'static,
+    {
+        self.backend_mut().on_buffer_created(fun)
     }
 
     /// TODO: docs.
