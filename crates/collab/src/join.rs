@@ -93,7 +93,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
 
         let project_handle = project_guard.activate(NewProjectArgs {
             host_id: welcome.host_id,
-            local_peer,
+            peer_handle: local_peer.github_handle().clone(),
             replica,
             remote_peers: welcome.other_peers,
             session_id: welcome.session_id,

@@ -2,7 +2,7 @@
 
 use core::cell::RefCell;
 use core::marker::PhantomData;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use auth::AuthInfos;
 use collab_server::message::{Peer, PeerId};
@@ -16,6 +16,7 @@ use ed::fs::{
     AbsPath,
     AbsPathBuf,
     Directory,
+    File,
     Fs,
     FsNode,
     Metadata,
@@ -92,7 +93,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .map_err(StartError::ConnectToServer)?
             .split();
 
-        let github_handle = auth_infos.handle().clone();
+        let peer_handle = auth_infos.handle().clone();
 
         let knock = collab_server::Knock::<B::ServerConfig> {
             auth_infos: auth_infos.into(),
@@ -104,24 +105,21 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .await
             .map_err(StartError::Knock)?;
 
-        let replica = read_replica(
-            welcome.host_id,
-            project_guard.root().to_owned(),
-            ctx,
-        )
-        .await
-        .map_err(StartError::ReadReplica)?;
+        let (replica, event_rx) =
+            read_replica2(project_guard.root(), welcome.peer_id, ctx)
+                .await
+                .map_err(StartError::ReadReplica)?;
 
         let project_handle = project_guard.activate(NewProjectArgs {
             host_id: welcome.host_id,
-            local_peer: Peer::new(welcome.peer_id, github_handle),
-            replica,
+            peer_handle,
             remote_peers: welcome.other_peers,
+            replica,
             session_id: welcome.session_id,
         });
 
         let session = Session {
-            event_rx: todo!(),
+            event_rx,
             message_rx: welcome.rx,
             message_tx: welcome.tx,
             project_handle,
@@ -144,8 +142,9 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
 
 async fn read_replica2<B: CollabBackend>(
     project_root: &AbsPath,
+    peer_id: PeerId,
     ctx: &mut AsyncCtx<'_, B>,
-) -> Result<ReplicaBuilder, ReadReplicaError2<B>> {
+) -> Result<(Replica, EventRx<B>), ReadReplicaError2<B>> {
     let root = match ctx.fs().node_at_path(project_root).await {
         Ok(Some(node)) => node,
         _ => todo!(),
@@ -155,8 +154,9 @@ async fn read_replica2<B: CollabBackend>(
 
     event_rx.watch(&root, ctx);
 
-    match &root {
+    let replica = match &root {
         FsNode::Directory(dir) => {
+            // let worktree = Arc::new(Mutex::new(Worktree::new()));
             let event_rx = RefCell::new(&mut event_rx);
 
             ctx.fs()
@@ -180,16 +180,47 @@ async fn read_replica2<B: CollabBackend>(
 
                     event_rx.borrow_mut().watch(&node, ctx);
 
+                    ctx.spawn_background(async move {
+                        let child = match &node {
+                            FsNode::Directory(_) => {
+                                // eerie::Directory::new(node_name)
+                            },
+                            FsNode::File(_file) => {
+                                // let file_contents = file.read().await?;
+                                // match str::from_utf8(&*file_contents) {
+                                //     Ok(contents) => eerie::File::new_text(
+                                //         node_name, contents,
+                                //     ),
+                                //     Err(_) => eerie::File::new_binary(
+                                //         node_name, contents,
+                                //     ),
+                                // }
+                            },
+                            FsNode::Symlink(_) => {
+                                unreachable!("already checked")
+                            },
+                        };
+
+                        // worktree
+                        //     .lock()
+                        //     .dir_at_path_mut(parent_path)
+                        //     .expect("parent exists")
+                        //     .create_child(child);
+                    })
+                    .await;
+
                     Ok(())
                 })
                 .await
                 .map_err(ReadReplicaError2::Walk)?;
-        },
-        FsNode::File(_) => {},
-        FsNode::Symlink(_) => {},
-    }
 
-    todo!();
+            todo!();
+        },
+        FsNode::File(_) => todo!(),
+        FsNode::Symlink(_) => todo!(),
+    };
+
+    Ok((replica, event_rx))
 }
 
 enum ReadReplicaError2<B: CollabBackend> {
@@ -339,7 +370,7 @@ pub enum StartError<B: CollabBackend> {
     ProjectRootIsFsRoot,
 
     /// TODO: docs.
-    ReadReplica(ReadReplicaError<B>),
+    ReadReplica(ReadReplicaError2<B>),
 
     /// TODO: docs.
     SearchProjectRoot(SearchProjectRootError<B>),
@@ -435,7 +466,7 @@ where
     B: CollabBackend,
     B::ConnectToServerError: PartialEq,
     // client::KnockError<B::ServerConfig>: PartialEq,
-    ReadReplicaError<B>: PartialEq,
+    ReadReplicaError2<B>: PartialEq,
     SearchProjectRootError<B>: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -505,6 +536,12 @@ impl<B: CollabBackend> notify::Error for ReadReplicaError<B> {
             ReadReplicaError::Walk(err) => notify::Message::from_display(err),
         };
         (notify::Level::Error, msg)
+    }
+}
+
+impl<B: CollabBackend> notify::Error for ReadReplicaError2<B> {
+    default fn to_message(&self) -> (notify::Level, notify::Message) {
+        todo!();
     }
 }
 

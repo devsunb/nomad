@@ -3,7 +3,7 @@ use core::error::Error;
 use crate::fs::{AbsPath, Fs, FsNode, NodeName};
 
 /// TODO: docs.
-pub trait Symlink {
+pub trait Symlink: Send {
     /// TODO: docs.
     type Fs: Fs;
 

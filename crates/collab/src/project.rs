@@ -3,7 +3,8 @@
 use core::fmt;
 use core::marker::PhantomData;
 
-use collab_server::message::{Message, Peer, Peers};
+use collab_server::message::{GitHubHandle, Message, Peer, Peers};
+use ed::backend::AgentId;
 use ed::fs::{AbsPath, AbsPathBuf};
 use ed::{AsyncCtx, Shared, notify};
 use eerie::{PeerId, Replica};
@@ -17,11 +18,12 @@ use crate::event::Event;
 
 /// TODO: docs.
 pub struct Project<B: CollabBackend> {
+    agent_id: AgentId,
     host_id: PeerId,
-    local_peer: Peer,
+    peer_handle: GitHubHandle,
     _remote_peers: Peers,
-    _replica: Replica,
-    root: AbsPathBuf,
+    replica: Replica,
+    root_path: AbsPathBuf,
     session_id: SessionId<B>,
 }
 
@@ -57,7 +59,7 @@ pub(crate) struct ProjectGuard<B: CollabBackend> {
 
 pub(crate) struct NewProjectArgs<B: CollabBackend> {
     pub(crate) host_id: PeerId,
-    pub(crate) local_peer: Peer,
+    pub(crate) peer_handle: GitHubHandle,
     pub(crate) remote_peers: Peers,
     pub(crate) replica: Replica,
     pub(crate) session_id: SessionId<B>,
@@ -66,7 +68,7 @@ pub(crate) struct NewProjectArgs<B: CollabBackend> {
 impl<B: CollabBackend> Project<B> {
     /// TODO: docs.
     pub fn is_host(&self) -> bool {
-        self.local_peer.id() == self.host_id
+        self.replica.id() == self.host_id
     }
 
     /// TODO: docs.
@@ -87,7 +89,7 @@ impl<B: CollabBackend> Project<B> {
 impl<B: CollabBackend> ProjectHandle<B> {
     /// TODO: docs.
     pub fn root(&self) -> AbsPathBuf {
-        self.with(|proj| proj.root.clone())
+        self.with(|proj| proj.root_path.clone())
     }
 
     /// TODO: docs.
@@ -127,8 +129,8 @@ impl<B: CollabBackend> Projects<B> {
             .with(|map| {
                 map.values().find_map(|handle| {
                     handle.with(|proj| {
-                        overlaps(&proj.root, &project_root)
-                            .then(|| proj.root.clone())
+                        overlaps(&proj.root_path, &project_root)
+                            .then(|| proj.root_path.clone())
                     })
                 })
             })
@@ -169,7 +171,7 @@ impl<B: CollabBackend> Projects<B> {
         let active_sessions = self.active.with(|map| {
             map.iter()
                 .map(|(session_id, handle)| {
-                    let root = handle.with(|proj| proj.root.clone());
+                    let root = handle.with(|proj| proj.root_path.clone());
                     (root, *session_id)
                 })
                 .collect::<SmallVec<[_; 1]>>()
@@ -209,11 +211,12 @@ impl<B: CollabBackend> ProjectGuard<B> {
         });
 
         self.projects.insert(Project {
+            agent_id: todo!(),
             host_id: args.host_id,
-            local_peer: args.local_peer,
+            peer_handle: args.peer_handle,
             _remote_peers: args.remote_peers,
-            _replica: args.replica,
-            root: self.root.clone(),
+            replica: args.replica,
+            root_path: self.root.clone(),
             session_id: args.session_id,
         })
     }

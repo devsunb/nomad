@@ -6,7 +6,7 @@ use crate::ByteOffset;
 use crate::fs::{self, AbsPath, Fs, NodeDeletion, NodeMove, NodeName};
 
 /// TODO: docs.
-pub trait File {
+pub trait File: Send {
     /// TODO: docs.
     type EventStream: Stream<Item = FileEvent<Self::Fs>> + Unpin;
 
