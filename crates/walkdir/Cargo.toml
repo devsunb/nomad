@@ -11,6 +11,7 @@ default = ["gitignore"]
 gitignore = ["dep:compact_str", "ed/os-fs"]
 
 [dependencies]
+abs-path = { workspace = true }
 cauchy = { workspace = true }
 derive_more = { workspace = true }
 ed = { workspace = true }

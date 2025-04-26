@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
+use collab_project::Project;
 use collab_server::message::PeerId;
 use collab_server::{SessionIntent, client};
 use ed::action::AsyncAction;
@@ -14,7 +15,7 @@ use ed::notify::{self, Name};
 use ed::{AsyncCtx, Shared};
 use futures_util::AsyncReadExt;
 use smol_str::ToSmolStr;
-use walkdir::WalkDir;
+use walkdir::FsExt;
 
 use crate::backend::CollabBackend;
 use crate::collab::Collab;
@@ -168,13 +169,13 @@ async fn search_project_root<B: CollabBackend>(
         .ok_or(SearchProjectRootError::CouldntFindRoot(buffer_path))
 }
 
-/// Constructs a [`collab_project::Project`] by reading the contents of the
-/// directory at the given path.
+/// Constructs a [`Project`] by reading the contents of the directory at the
+/// given path.
 async fn read_project<B: CollabBackend>(
     project_root: &AbsPath,
     local_id: PeerId,
     ctx: &mut AsyncCtx<'_, B>,
-) -> Result<(collab_project::Project, EventRx<B>), ReadProjectError<B>> {
+) -> Result<(Project, EventRx<B>), ReadProjectError<B>> {
     let fs = ctx.fs();
 
     let root_node = fs
@@ -195,16 +196,13 @@ async fn read_project<B: CollabBackend>(
 
     let event_rx = EventRx::<B>::new(&root_dir, ctx);
 
-    let project = ctx
+    let (project, _fs_filter) = ctx
         .spawn_background(async move {
-            let mut project_builder =
-                collab_project::Project::builder(local_id);
-
+            let mut project_builder = Project::builder(local_id);
             let builder_mut = Shared::new(&mut project_builder);
+            let walker = fs.walk(&root_dir).filter(fs_filter);
 
-            root_dir
-                .walker()
-                .filter(fs_filter)
+            walker
                 .for_each(async |parent_path, node_meta| {
                     read_node(
                         parent_path,
@@ -218,7 +216,7 @@ async fn read_project<B: CollabBackend>(
                 .await
                 .map_err(ReadProjectError::WalkRoot)?;
 
-            Ok(project_builder.build())
+            Ok((project_builder.build(), walker.into_inner().into_filter()))
         })
         .await?;
 
@@ -337,7 +335,13 @@ pub enum ReadProjectError<B: CollabBackend> {
     ReadNode(ReadNodeError<B::Fs>),
 
     /// TODO: docs.
-    WalkRoot(walkdir::WalkError<B::Fs, B::Fs, ReadNodeError<B::Fs>>),
+    WalkRoot(
+        walkdir::WalkError<
+            B::Fs,
+            walkdir::Filtered<B::FsFilter, B::Fs>,
+            ReadNodeError<B::Fs>,
+        >,
+    ),
 }
 
 /// TODO: docs.

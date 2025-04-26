@@ -18,7 +18,7 @@ use crate::config;
 /// actions in this crate.
 pub trait CollabBackend: Backend {
     /// TODO: docs.
-    type FsFilter: walkdir::Filter<Self::Fs> + Send;
+    type FsFilter: walkdir::Filter<Self::Fs, Error: Send> + Send;
 
     /// TODO: docs.
     type Io: AsyncRead + AsyncWrite + Unpin;
