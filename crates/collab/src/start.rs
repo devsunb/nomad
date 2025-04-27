@@ -5,6 +5,7 @@ use core::marker::PhantomData;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
+use collab_project::fs::{File as ProjectFile, Node as ProjectNode};
 use collab_project::{Project, ProjectBuilder};
 use collab_server::message::PeerId;
 use collab_server::{SessionIntent, client};
@@ -246,6 +247,21 @@ async fn read_project<B: CollabBackend>(
         .await?;
 
     let event_stream = stream_builder.build(ctx);
+
+    ctx.for_each_buffer(|mut buf| {
+        let Some(_text_file) = <&AbsPath>::try_from(&*buf.name())
+            .ok()
+            .and_then(|path| path.strip_prefix(root_path))
+            .and_then(|path| match project.node_at_path(path)? {
+                ProjectNode::File(ProjectFile::Text(file)) => Some(file),
+                _ => None,
+            })
+        else {
+            return;
+        };
+
+        // event_stream.watch_buffer(text_file.id(), &mut buf);
+    });
 
     Ok((project, event_stream))
 }

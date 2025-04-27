@@ -104,17 +104,54 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         }
     }
 
-    pub(crate) fn watch(
+    pub(crate) fn watch_buffer(
         &mut self,
-        node: &FsNode<B::Fs>,
-        ctx: &AsyncCtx<'_, B>,
+        file_id: <B::Fs as fs::Fs>::NodeId,
+        buffer: &mut B::Buffer<'_>,
     ) {
+        let agent_id = self.agent_id;
+
+        let tx = self.buffer_tx.clone();
+        let edits_handle = buffer.on_edited(move |buf, edit| {
+            if edit.made_by != agent_id {
+                return;
+            }
+            let event =
+                BufferEvent::Edited(buf.id(), edit.replacements.clone());
+            let _ = tx.send(Event::Buffer(event));
+        });
+
+        let tx = self.buffer_tx.clone();
+        let removed_handle = buffer.on_removed(move |buf, _removed_by| {
+            let event = BufferEvent::Removed(buf.id());
+            let _ = tx.send(Event::Buffer(event));
+        });
+
+        let saved_buffers = self.saved_buffers.clone();
+        let tx = self.buffer_tx.clone();
+        let saved_handle = buffer.on_saved(move |buf, saved_by| {
+            saved_buffers.with_mut(|buffers| buffers.insert(buf.id()));
+            if saved_by != agent_id {
+                let event = BufferEvent::Saved(buf.id());
+                let _ = tx.send(Event::Buffer(event));
+            }
+        });
+
+        self.buffer_handles.insert(
+            buffer.id(),
+            smallvec_inline![edits_handle, removed_handle, saved_handle],
+        );
+
+        self.node_to_buf_ids.insert(file_id, buffer.id());
+    }
+
+    fn watch(&mut self, node: &FsNode<B::Fs>, ctx: &AsyncCtx<'_, B>) {
         self.fs_streams.watch(node);
 
         if let FsNode::File(file) = node {
             ctx.with_ctx(|ctx| {
                 if let Some(mut buffer) = ctx.buffer_at_path(file.path()) {
-                    self.watch_buffer(file, &mut buffer);
+                    self.watch_buffer(file.id(), &mut buffer);
                 }
             });
         }
@@ -282,7 +319,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
         ctx.with_ctx(|ctx| {
             if let Some(mut buffer) = ctx.buffer(buffer_id) {
-                self.watch_buffer(&file, &mut buffer);
+                self.watch_buffer(file.id(), &mut buffer);
             }
         });
 
@@ -308,49 +345,6 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                 .should_filter(parent_path, &meta)
                 .await
                 .map_err(EventRxError::FsFilter)?)
-    }
-
-    fn watch_buffer(
-        &mut self,
-        file: &<B::Fs as Fs>::File,
-        buffer: &mut B::Buffer<'_>,
-    ) {
-        debug_assert_eq!(file.path(), &*buffer.name());
-
-        let agent_id = self.agent_id;
-
-        let tx = self.buffer_tx.clone();
-        let edits_handle = buffer.on_edited(move |buf, edit| {
-            if edit.made_by != agent_id {
-                return;
-            }
-            let event =
-                BufferEvent::Edited(buf.id(), edit.replacements.clone());
-            let _ = tx.send(Event::Buffer(event));
-        });
-
-        let tx = self.buffer_tx.clone();
-        let removed_handle = buffer.on_removed(move |buf, _removed_by| {
-            let event = BufferEvent::Removed(buf.id());
-            let _ = tx.send(Event::Buffer(event));
-        });
-
-        let saved_buffers = self.saved_buffers.clone();
-        let tx = self.buffer_tx.clone();
-        let saved_handle = buffer.on_saved(move |buf, saved_by| {
-            saved_buffers.with_mut(|buffers| buffers.insert(buf.id()));
-            if saved_by != agent_id {
-                let event = BufferEvent::Saved(buf.id());
-                let _ = tx.send(Event::Buffer(event));
-            }
-        });
-
-        self.buffer_handles.insert(
-            buffer.id(),
-            smallvec_inline![edits_handle, removed_handle, saved_handle],
-        );
-
-        self.node_to_buf_ids.insert(file.id(), buffer.id());
     }
 }
 
