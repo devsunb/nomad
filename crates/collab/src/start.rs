@@ -1,6 +1,7 @@
 //! TODO: docs.
 
 use core::marker::PhantomData;
+use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
@@ -9,7 +10,7 @@ use collab_server::message::PeerId;
 use collab_server::{SessionIntent, client};
 use ed::AsyncCtx;
 use ed::action::AsyncAction;
-use ed::backend::Buffer;
+use ed::backend::{BackgroundExecutor, Buffer};
 use ed::command::ToCompletionFn;
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
@@ -197,30 +198,42 @@ async fn read_project<B: CollabBackend>(
 
     let event_rx = EventRx::<B>::new(&root_dir, ctx);
 
-    let (project, _fs_filter) = ctx
-        .spawn_background(async move {
-            let walker = fs.walk(&root_dir).filter(fs_filter);
-            let project_root = root_dir.path();
-            let mut project_builder = Project::builder(local_id);
-            let builder_mut = Shared::new(&mut project_builder);
+    let (project, _fs_filter) = async move {
+        let walker = fs.walk(&root_dir).filter(fs_filter);
+        let project_root = Arc::new(root_dir.path().to_owned());
+        let project_builder = Shared::new(Project::builder(local_id));
+        let mut background_executor = ctx.background_executor();
 
-            walker
-                .for_each(async |parent_path, node_meta| {
-                    read_node(
-                        project_root,
-                        parent_path,
-                        node_meta,
-                        &builder_mut,
-                        &fs,
-                    )
+        let project_builder2 = project_builder.clone();
+        walker
+            .for_each(async move |parent_path, node_meta| {
+                let parent_path = parent_path.to_owned();
+
+                background_executor
+                    .spawn(async move {
+                        read_node(
+                            &**project_root,
+                            &parent_path,
+                            node_meta,
+                            &project_builder2,
+                            &fs,
+                        )
+                        .await
+                    })
                     .await
-                })
-                .await
-                .map_err(ReadProjectError::WalkRoot)?;
+            })
+            .await
+            .map_err(ReadProjectError::WalkRoot)?;
 
-            Ok((project_builder.build(), walker.into_inner().into_filter()))
-        })
-        .await?;
+        Ok((
+            project_builder
+                .into_inner()
+                .expect("all other instances have been dropped")
+                .build(),
+            walker.into_inner().into_filter(),
+        ))
+    }
+    .await?;
 
     Ok((project, event_rx))
 }
@@ -230,7 +243,7 @@ async fn read_node<Fs: fs::Fs>(
     project_root: &AbsPath,
     parent_path: &AbsPath,
     node_meta: Fs::Metadata,
-    project_builder: &Shared<&mut ProjectBuilder, MultiThreaded>,
+    project_builder: &Shared<ProjectBuilder, MultiThreaded>,
     fs: &Fs,
 ) -> Result<(), ReadNodeError<Fs>> {
     let node_name = node_meta.name().map_err(ReadNodeError::NodeName)?;

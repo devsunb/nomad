@@ -24,6 +24,12 @@ pub struct AsyncCtx<'a, B: Backend> {
 impl<B: Backend> AsyncCtx<'_, B> {
     /// TODO: docs.
     #[inline]
+    pub fn background_executor(&self) -> B::BackgroundExecutor {
+        self.state.with_mut(|mut state| state.background_executor().clone())
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn emit_err<Err>(&self, err: Err) -> NotificationId
     where
         Err: notify::Error,

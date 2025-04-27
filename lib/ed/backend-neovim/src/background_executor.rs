@@ -5,6 +5,7 @@ use ed_core::backend::{BackgroundExecutor, Task};
 use futures_executor::ThreadPool;
 
 /// TODO: docs.
+#[derive(Clone)]
 pub struct NeovimBackgroundExecutor {
     thread_pool: ThreadPool,
 }
