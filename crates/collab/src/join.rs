@@ -20,7 +20,7 @@ use collab_server::{SessionIntent, client};
 use ed::AsyncCtx;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
-use ed::fs::{self, AbsPath, Directory, File, Fs};
+use ed::fs::{self, AbsPath, Directory, File, Fs, Symlink};
 use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
@@ -222,9 +222,60 @@ async fn write_directory<Fs: fs::Fs>(
     _project_dir: ProjectDirectory<'_>,
     _fs_dir: &Fs::Directory,
     _stream_builder: &Shared<&mut EventStreamBuilder<Fs>, MultiThreaded>,
-    _node_id_maps: &Shared<&mut NodeIdMaps<Fs>, MultiThreaded>,
+    node_id_maps: &Shared<&mut NodeIdMaps<Fs>, MultiThreaded>,
 ) -> Result<(), WriteProjectError<Fs>> {
     todo!();
+}
+
+/// TODO: docs.
+async fn write_file<Fs: fs::Fs>(
+    project_file: ProjectFile<'_>,
+    parent: &Fs::Directory,
+    _stream_builder: &Shared<&mut EventStreamBuilder<Fs>, MultiThreaded>,
+    node_id_maps: &Shared<&mut NodeIdMaps<Fs>, MultiThreaded>,
+) -> Result<(), WriteProjectError<Fs>> {
+    let file_name = project_file.name();
+
+    let node_id = match project_file {
+        ProjectFile::Binary(binary_file) => {
+            let mut file = parent
+                .create_file(file_name)
+                .await
+                .map_err(WriteProjectError::CreateFile)?;
+
+            file.write(binary_file.contents())
+                .await
+                .map_err(WriteProjectError::WriteFile)?;
+
+            file.id()
+        },
+
+        ProjectFile::Text(text_file) => {
+            let mut file = parent
+                .create_file(file_name)
+                .await
+                .map_err(WriteProjectError::CreateFile)?;
+
+            // TODO: write the Rope w/o allocating an intermediate string.
+            file.write(text_file.contents().to_string())
+                .await
+                .map_err(WriteProjectError::WriteFile)?;
+
+            file.id()
+        },
+
+        ProjectFile::Symlink(symlink) => parent
+            .create_symlink(file_name, symlink.target_path())
+            .await
+            .map_err(WriteProjectError::CreateSymlink)?
+            .id(),
+    };
+
+    node_id_maps.with_mut(|maps| {
+        maps.node2file.insert(node_id, project_file.id());
+    });
+
+    Ok(())
 }
 
 struct ProjectResponse {
@@ -378,7 +429,7 @@ impl<'a> ProjectTree<'a> {
                 file.write(text_file.contents().to_string()).await
             },
         }
-        .map_err(WriteProjectError::WriteToFile)
+        .map_err(WriteProjectError::WriteFile)
     }
 
     fn new(project: &'a Project) -> Self {
@@ -435,6 +486,9 @@ pub enum WriteProjectError<Fs: fs::Fs> {
     CreateFile(<Fs::Directory as fs::Directory>::CreateFileError),
 
     /// TODO: docs.
+    CreateSymlink(<Fs::Directory as fs::Directory>::CreateSymlinkError),
+
+    /// TODO: docs.
     ClearRoot(<Fs::Directory as fs::Directory>::ClearError),
 
     /// TODO: docs.
@@ -447,7 +501,7 @@ pub enum WriteProjectError<Fs: fs::Fs> {
     GetNodeAtRoot(Fs::NodeAtPathError),
 
     /// TODO: docs.
-    WriteToFile(<Fs::File as fs::File>::WriteError),
+    WriteFile(<Fs::File as fs::File>::WriteError),
 }
 
 /// A `Send` newtype around a `NonNull<Project>`.
@@ -510,11 +564,12 @@ impl<Fs: fs::Fs> notify::Error for WriteProjectError<Fs> {
         let err: &dyn fmt::Display = match self {
             Self::CreateDirectory(err) => err,
             Self::CreateFile(err) => err,
+            Self::CreateSymlink(err) => err,
             Self::ClearRoot(err) => err,
             Self::DeleteNodeAtRoot(err) => err,
             Self::CreateRootDirectory(err) => err,
             Self::GetNodeAtRoot(err) => err,
-            Self::WriteToFile(err) => err,
+            Self::WriteFile(err) => err,
         };
         (notify::Level::Error, notify::Message::from_display(err))
     }
