@@ -145,7 +145,7 @@ impl Fs for OsFs {
     type WatchError = notify::Error;
 
     #[inline]
-    async fn create_directory<P: AsRef<AbsPath>>(
+    async fn create_directory<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
     ) -> Result<Self::Directory, Self::CreateDirectoryError> {
@@ -155,7 +155,7 @@ impl Fs for OsFs {
     }
 
     #[inline]
-    async fn create_file<P: AsRef<AbsPath>>(
+    async fn create_file<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
     ) -> Result<Self::File, Self::CreateFileError> {
@@ -230,6 +230,7 @@ impl Directory for OsDirectory {
     type ClearError = io::Error;
     type CreateDirectoryError = io::Error;
     type CreateFileError = io::Error;
+    type CreateSymlinkError = io::Error;
     type DeleteError = io::Error;
     type MetadataError = io::Error;
     type ReadEntryError = io::Error;
@@ -251,6 +252,15 @@ impl Directory for OsDirectory {
         file_name: &NodeName,
     ) -> Result<OsFile, Self::CreateFileError> {
         OsFs::default().create_file(self.path().join(file_name)).await
+    }
+
+    #[inline]
+    async fn create_symlink(
+        &self,
+        _symlink_name: &NodeName,
+        _target_path: &str,
+    ) -> Result<OsSymlink, Self::CreateFileError> {
+        todo!();
     }
 
     #[inline]

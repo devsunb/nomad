@@ -34,7 +34,9 @@ pub trait File: Send + Sync {
     ) -> impl Future<Output = Result<ByteOffset, Self::Error>>;
 
     /// TODO: docs.
-    fn delete(self) -> impl Future<Output = Result<(), Self::DeleteError>>;
+    fn delete(
+        self,
+    ) -> impl Future<Output = Result<(), Self::DeleteError>> + Send;
 
     /// TODO: docs.
     fn id(&self) -> <Self::Fs as Fs>::NodeId;

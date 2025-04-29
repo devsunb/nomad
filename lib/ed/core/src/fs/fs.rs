@@ -53,16 +53,18 @@ pub trait Fs: Clone + Send + Sync + 'static {
     type WatchError: Error + Send;
 
     /// TODO: docs.
-    fn create_directory<P: AsRef<AbsPath>>(
+    fn create_directory<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
-    ) -> impl Future<Output = Result<Self::Directory, Self::CreateDirectoryError>>;
+    ) -> impl Future<
+        Output = Result<Self::Directory, Self::CreateDirectoryError>,
+    > + Send;
 
     /// TODO: docs.
-    fn create_file<P: AsRef<AbsPath>>(
+    fn create_file<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
-    ) -> impl Future<Output = Result<Self::File, Self::CreateFileError>>;
+    ) -> impl Future<Output = Result<Self::File, Self::CreateFileError>> + Send;
 
     /// TODO: docs.
     fn node_at_path<P: AsRef<AbsPath> + Send>(

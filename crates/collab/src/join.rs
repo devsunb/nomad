@@ -1,24 +1,35 @@
 //! TODO: docs.
 
 use core::fmt;
+use core::ops::Deref;
+use core::ptr::NonNull;
 use std::io;
 
+use abs_path::AbsPathBuf;
 use auth::AuthInfos;
 use collab_project::Project;
-use collab_project::fs::{DirectoryId, File as ProjectFile, FileId, Node};
+use collab_project::fs::{
+    Directory as ProjectDirectory,
+    DirectoryId,
+    File as ProjectFile,
+    FileId,
+    Node,
+};
 use collab_server::message::{Message, Peer, ProjectRequest};
 use collab_server::{SessionIntent, client};
+use ed::AsyncCtx;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
-use ed::fs::{self, AbsPath, Directory, File};
-use ed::notify::Name;
-use ed::{AsyncCtx, Shared, notify};
+use ed::fs::{self, AbsPath, Directory, File, Fs};
+use ed::notify::{self, Name};
+use ed::shared::{MultiThreaded, Shared};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
+use fxhash::FxHashMap;
 
 use crate::backend::{CollabBackend, SessionId, Welcome};
 use crate::collab::Collab;
 use crate::config::Config;
-use crate::event_stream::EventStream;
+use crate::event_stream::{EventStream, EventStreamBuilder};
 use crate::leave::StopChannels;
 use crate::project::{
     IdMaps,
@@ -95,7 +106,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
                 .map_err(JoinError::RequestProject)?;
 
         let (event_stream, id_maps) =
-            write_project(&project, project_guard.root(), ctx)
+            write_project(&project, project_guard.root().to_owned(), ctx)
                 .await
                 .map_err(JoinError::WriteProject)?;
 
@@ -133,12 +144,86 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
     }
 }
 
+impl<B: CollabBackend> From<&Collab<B>> for Join<B> {
+    fn from(collab: &Collab<B>) -> Self {
+        Self {
+            auth_infos: collab.auth_infos.clone(),
+            config: collab.config.clone(),
+            projects: collab.projects.clone(),
+            stop_channels: collab.stop_channels.clone(),
+        }
+    }
+}
+
+impl<B: CollabBackend> ToCompletionFn<B> for Join<B> {
+    fn to_completion_fn(&self) {}
+}
+
 /// TODO: docs.
 async fn write_project<B: CollabBackend>(
     project: &Project,
-    root_path: &AbsPath,
+    root_path: AbsPathBuf,
     ctx: &mut AsyncCtx<'_, B>,
 ) -> Result<(EventStream<B>, IdMaps<B>), WriteProjectError<B::Fs>> {
+    let fs = ctx.fs();
+
+    // SAFETY: we're awaiting on the following background task and not
+    // detaching it, so the pointer is guaranteed to point to a `Project`
+    // for its entire duration.
+    let project_ptr = unsafe { ProjectPtr::new(project) };
+
+    let (project_root, stream_builder, node_id_maps) = ctx
+        .spawn_background(async move {
+            if let Some(node) = fs
+                .node_at_path(&root_path)
+                .await
+                .map_err(WriteProjectError::GetNodeAtRoot)?
+            {
+                node.delete()
+                    .await
+                    .map_err(WriteProjectError::DeleteNodeAtRoot)?
+            }
+
+            let project_root = fs
+                .create_directory(&root_path)
+                .await
+                .map_err(WriteProjectError::CreateRootDirectory)?;
+
+            let mut stream_builder = EventStreamBuilder::new(&project_root);
+            let stream_builder_mut = Shared::new(&mut stream_builder);
+
+            let mut node_id_maps = NodeIdMaps::default();
+            let node_id_maps_mut = Shared::new(&mut node_id_maps);
+
+            write_directory(
+                project_ptr,
+                project_ptr.root(),
+                &project_root,
+                &stream_builder_mut,
+                &node_id_maps_mut,
+            )
+            .await?;
+
+            Ok((project_root, stream_builder, node_id_maps))
+        })
+        .await?;
+
+    let project_filter = B::project_filter(&project_root, ctx);
+
+    Ok((
+        stream_builder.push_filter(project_filter).build(ctx),
+        node_id_maps.into(),
+    ))
+}
+
+/// TODO: docs.
+async fn write_directory<Fs: fs::Fs>(
+    _project: ProjectPtr,
+    _project_dir: ProjectDirectory<'_>,
+    _fs_dir: &Fs::Directory,
+    _stream_builder: &Shared<&mut EventStreamBuilder<Fs>, MultiThreaded>,
+    _node_id_maps: &Shared<&mut NodeIdMaps<Fs>, MultiThreaded>,
+) -> Result<(), WriteProjectError<Fs>> {
     todo!();
 }
 
@@ -212,7 +297,7 @@ impl<'a> ProjectTree<'a> {
         let root = fs
             .create_directory(flush_under)
             .await
-            .map_err(WriteProjectError::GetOrCreateRoot)?;
+            .map_err(WriteProjectError::CreateRootDirectory)?;
 
         root.clear().await.map_err(WriteProjectError::ClearRoot)?;
 
@@ -356,7 +441,7 @@ pub enum WriteProjectError<Fs: fs::Fs> {
     DeleteNodeAtRoot(fs::NodeDeleteError<Fs>),
 
     /// TODO: docs.
-    GetOrCreateRoot(Fs::CreateDirectoryError),
+    CreateRootDirectory(Fs::CreateDirectoryError),
 
     /// TODO: docs.
     GetNodeAtRoot(Fs::NodeAtPathError),
@@ -365,20 +450,44 @@ pub enum WriteProjectError<Fs: fs::Fs> {
     WriteToFile(<Fs::File as fs::File>::WriteError),
 }
 
-impl<B: CollabBackend> From<&Collab<B>> for Join<B> {
-    fn from(collab: &Collab<B>) -> Self {
+/// A `Send` newtype around a `NonNull<Project>`.
+#[derive(Clone, Copy)]
+struct ProjectPtr(NonNull<Project>);
+
+#[derive(cauchy::Default)]
+struct NodeIdMaps<Fs: fs::Fs> {
+    node2dir: FxHashMap<Fs::NodeId, DirectoryId>,
+    node2file: FxHashMap<Fs::NodeId, FileId>,
+}
+
+impl ProjectPtr {
+    /// SAFETY: same as [`NonNull::as_ref()`].
+    unsafe fn new(proj: &Project) -> Self {
+        Self(proj.into())
+    }
+}
+
+impl<B: CollabBackend> From<NodeIdMaps<B::Fs>> for IdMaps<B> {
+    fn from(node_id_maps: NodeIdMaps<B::Fs>) -> Self {
         Self {
-            auth_infos: collab.auth_infos.clone(),
-            config: collab.config.clone(),
-            projects: collab.projects.clone(),
-            stop_channels: collab.stop_channels.clone(),
+            node2dir: node_id_maps.node2dir,
+            node2file: node_id_maps.node2file,
+            ..Default::default()
         }
     }
 }
 
-impl<B: CollabBackend> ToCompletionFn<B> for Join<B> {
-    fn to_completion_fn(&self) {}
+impl Deref for ProjectPtr {
+    type Target = Project;
+
+    fn deref(&self) -> &Self::Target {
+        // SAFETY: up to the caller of `ProjectPtr::new`.
+        unsafe { self.0.as_ref() }
+    }
 }
+
+/// SAFETY: `&Project` is not aliased.
+unsafe impl Send for ProjectPtr {}
 
 impl<B: CollabBackend> notify::Error for JoinError<B> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
@@ -403,7 +512,7 @@ impl<Fs: fs::Fs> notify::Error for WriteProjectError<Fs> {
             Self::CreateFile(err) => err,
             Self::ClearRoot(err) => err,
             Self::DeleteNodeAtRoot(err) => err,
-            Self::GetOrCreateRoot(err) => err,
+            Self::CreateRootDirectory(err) => err,
             Self::GetNodeAtRoot(err) => err,
             Self::WriteToFile(err) => err,
         };

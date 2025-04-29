@@ -20,6 +20,9 @@ pub trait Directory: Send + Sync + Sized {
     type CreateFileError: Error + Send;
 
     /// TODO: docs.
+    type CreateSymlinkError: Error + Send;
+
+    /// TODO: docs.
     type ClearError: Error + Send;
 
     /// TODO: docs.
@@ -38,19 +41,32 @@ pub trait Directory: Send + Sync + Sized {
     fn create_directory(
         &self,
         directory_name: &NodeName,
-    ) -> impl Future<Output = Result<Self, Self::CreateDirectoryError>>;
+    ) -> impl Future<Output = Result<Self, Self::CreateDirectoryError>> + Send;
 
     /// TODO: docs.
     fn create_file(
         &self,
         file_name: &NodeName,
-    ) -> impl Future<Output = Result<<Self::Fs as Fs>::File, Self::CreateFileError>>;
+    ) -> impl Future<
+        Output = Result<<Self::Fs as Fs>::File, Self::CreateFileError>,
+    > + Send;
+
+    /// TODO: docs.
+    fn create_symlink(
+        &self,
+        symlink_name: &NodeName,
+        target_path: &str,
+    ) -> impl Future<
+        Output = Result<<Self::Fs as Fs>::Symlink, Self::CreateSymlinkError>,
+    > + Send;
 
     /// TODO: docs.
     fn clear(&self) -> impl Future<Output = Result<(), Self::ClearError>>;
 
     /// TODO: docs.
-    fn delete(self) -> impl Future<Output = Result<(), Self::DeleteError>>;
+    fn delete(
+        self,
+    ) -> impl Future<Output = Result<(), Self::DeleteError>> + Send;
 
     /// TODO: docs.
     fn id(&self) -> <Self::Fs as Fs>::NodeId;
