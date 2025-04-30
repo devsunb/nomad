@@ -614,11 +614,7 @@ mod neovim_error_impls {
 
     impl notify::Error for ReadProjectError<Neovim> {
         fn to_message(&self) -> (notify::Level, notify::Message) {
-            let msg = match &self {
-                Self::Walk(err) => notify::Message::from_display(err),
-            };
-
-            (notify::Level::Error, msg)
+            todo!();
         }
     }
 

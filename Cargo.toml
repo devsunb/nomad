@@ -1,6 +1,6 @@
 [workspace]
 members = ["crates/*", "lib/*", "lib/ed/*", "lib/ed/*/macros", "xtask"]
-exclude = ["lib/ed/src"]
+exclude = ["lib/ed/src", "lib/nvimx", "crates/collab-old"]
 
 [workspace.package]
 version = "0.1.0-dev"
@@ -37,22 +37,6 @@ nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 version = { path = "./crates/version" }
 walkdir = { path = "./crates/walkdir" }
-
-# Soon to be removed..
-async-fs = "2"
-nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
-nvimx = { path = "./lib/nvimx" }
-nvimx-common = { path = "./lib/nvimx/nvimx-common" }
-nvimx-ctx = { path = "./lib/nvimx/nvimx-ctx" }
-nvimx-diagnostics = { path = "./lib/nvimx/nvimx-diagnostics" }
-nvimx-emit = { path = "./lib/nvimx/nvimx-emit" }
-nvimx-event = { path = "./lib/nvimx/nvimx-event" }
-nvimx-executor = { path = "./lib/nvimx/nvimx-executor" }
-nvimx-fs = { path = "./lib/nvimx/nvimx-fs" }
-nvimx-macros = { path = "./lib/nvimx/nvimx-macros" }
-nvimx-plugin = { path = "./lib/nvimx/nvimx-plugin" }
-nvimx-ui = { path = "./lib/nvimx/nvimx-ui" }
-thiserror = "2"
 
 [workspace.lints.clippy]
 bool_to_int_with_if = "deny"
