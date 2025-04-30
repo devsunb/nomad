@@ -7,6 +7,7 @@ use std::io;
 
 use abs_path::AbsPathBuf;
 use auth::AuthInfos;
+use collab_project::Project;
 use collab_project::fs::{
     Directory as ProjectDirectory,
     DirectoryId,
@@ -14,7 +15,6 @@ use collab_project::fs::{
     FileId,
     Node,
 };
-use collab_project::{PeerId, Project};
 use collab_server::message::{Message, Peer, ProjectRequest};
 use collab_server::{SessionIntent, client};
 use ed::AsyncCtx;
