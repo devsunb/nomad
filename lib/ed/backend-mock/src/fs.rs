@@ -510,13 +510,13 @@ impl fs::Fs for MockFs {
     type NodeId = MockNodeId;
     type Timestamp = MockTimestamp;
 
-    type CreateDirectoryError = CreateNodeError;
+    type CreateDirectoriesError = CreateNodeError;
     type NodeAtPathError = Infallible;
 
-    async fn create_directory<P: AsRef<AbsPath>>(
+    async fn create_all_missing_directories<P: AsRef<AbsPath>>(
         &self,
         path: P,
-    ) -> Result<Self::Directory, Self::CreateDirectoryError> {
+    ) -> Result<Self::Directory, Self::CreateDirectoriesError> {
         let path = path.as_ref();
         self.with_inner(|fs| {
             fs.create_node(path, Node::Directory(DirectoryInner::new()))

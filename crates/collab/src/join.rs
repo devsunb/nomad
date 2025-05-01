@@ -228,7 +228,7 @@ async fn write_project<B: CollabBackend>(
             }
 
             let project_root = fs
-                .create_directory(&root_path)
+                .create_all_missing_directories(&root_path)
                 .await
                 .map_err(WriteProjectError::CreateRootDirectory)?;
 
@@ -416,7 +416,7 @@ pub enum WriteProjectError<Fs: fs::Fs> {
     DeleteNodeAtRoot(fs::NodeDeleteError<Fs>),
 
     /// TODO: docs.
-    CreateRootDirectory(Fs::CreateDirectoryError),
+    CreateRootDirectory(Fs::CreateDirectoriesError),
 
     /// TODO: docs.
     GetNodeAtRoot(Fs::NodeAtPathError),

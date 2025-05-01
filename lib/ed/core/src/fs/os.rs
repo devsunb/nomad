@@ -108,16 +108,16 @@ impl Fs for OsFs {
     type NodeId = Inode;
     type Timestamp = SystemTime;
 
-    type CreateDirectoryError = io::Error;
+    type CreateDirectoriesError = io::Error;
     type NodeAtPathError = io::Error;
 
     #[inline]
-    async fn create_directory<P: AsRef<AbsPath> + Send>(
+    async fn create_all_missing_directories<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
-    ) -> Result<Self::Directory, Self::CreateDirectoryError> {
+    ) -> Result<Self::Directory, Self::CreateDirectoriesError> {
         let path = path.as_ref();
-        async_fs::create_dir(path).await?;
+        async_fs::create_dir_all(path).await?;
         let metadata = async_fs::metadata(path).await?;
         Ok(OsDirectory { path: path.to_owned(), metadata })
     }
@@ -176,9 +176,10 @@ impl Directory for OsDirectory {
         &self,
         directory_name: &NodeName,
     ) -> Result<Self, Self::CreateDirectoryError> {
-        OsFs::default()
-            .create_directory(self.path().join(directory_name))
-            .await
+        let path = self.path.clone().join(directory_name);
+        async_fs::create_dir(&path).await?;
+        let metadata = async_fs::metadata(&path).await?;
+        Ok(Self { metadata, path })
     }
 
     #[inline]

@@ -26,17 +26,17 @@ pub trait Fs: Clone + Send + Sync + 'static {
     type Timestamp: Clone + Ord;
 
     /// TODO: docs.
-    type CreateDirectoryError: Error + Send;
+    type CreateDirectoriesError: Error + Send;
 
     /// TODO: docs.
     type NodeAtPathError: Error + Send;
 
     /// TODO: docs.
-    fn create_directory<P: AsRef<AbsPath> + Send>(
+    fn create_all_missing_directories<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
     ) -> impl Future<
-        Output = Result<Self::Directory, Self::CreateDirectoryError>,
+        Output = Result<Self::Directory, Self::CreateDirectoriesError>,
     > + Send;
 
     /// TODO: docs.
