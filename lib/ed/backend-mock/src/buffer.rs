@@ -2,7 +2,8 @@ use core::ops::{Deref, DerefMut};
 use std::borrow::Cow;
 
 use crop::Rope;
-use ed_core::{ByteOffset, backend};
+use ed_core::ByteOffset;
+use ed_core::backend::{self, AgentId, Edit};
 
 use crate::mock::{self, CallbackKind, Callbacks};
 
@@ -31,7 +32,8 @@ impl BufferId {
     }
 }
 
-impl<'a> backend::Buffer for Buffer<'a> {
+impl backend::Buffer for Buffer<'_> {
+    type Backend = mock::Mock;
     type Id = BufferId;
     type EventHandle = mock::EventHandle;
 
@@ -47,25 +49,25 @@ impl<'a> backend::Buffer for Buffer<'a> {
         Cow::Borrowed(&self.name)
     }
 
-    fn on_edited<Fun>(&mut self, _fun: Fun) -> Self::EventHandle
+    fn on_edited<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self, &backend::Edit) + 'static,
+        Fun: FnMut(&Buffer<'_>, &Edit) + 'static,
     {
-        todo!()
+        self.callbacks.insert(CallbackKind::OnBufferEdited(Box::new(fun)))
     }
 
-    fn on_removed<Fun>(&mut self, _fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self, backend::AgentId) + 'static,
+        Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
     {
-        todo!()
+        self.callbacks.insert(CallbackKind::OnBufferRemoved(Box::new(fun)))
     }
 
-    fn on_saved<Fun>(&mut self, _fun: Fun) -> Self::EventHandle
+    fn on_saved<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self, backend::AgentId) + 'static,
+        Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
     {
-        todo!()
+        self.callbacks.insert(CallbackKind::OnBufferSaved(Box::new(fun)))
     }
 }
 

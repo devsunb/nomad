@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
+use super::Backend;
 use crate::ByteOffset;
 use crate::backend::AgentId;
 
@@ -14,6 +15,9 @@ pub trait Buffer {
 
     /// TODO: docs.
     type Id: Clone;
+
+    /// TODO: docs.
+    type Backend: Backend;
 
     /// TODO: docs.
     fn byte_len(&self) -> ByteOffset;
@@ -27,17 +31,17 @@ pub trait Buffer {
     /// TODO: docs.
     fn on_edited<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self, &Edit) + 'static;
+        Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, &Edit) + 'static;
 
     /// TODO: docs.
     fn on_removed<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self, AgentId) + 'static;
+        Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
 
     /// TODO: docs.
     fn on_saved<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
-        Fun: FnMut(&Self, AgentId) + 'static;
+        Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
 }
 
 /// TODO: docs.

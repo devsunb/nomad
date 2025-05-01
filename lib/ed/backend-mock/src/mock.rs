@@ -1,5 +1,5 @@
 use abs_path::AbsPath;
-use ed_core::backend::{ApiValue, Backend};
+use ed_core::backend::{AgentId, ApiValue, Backend, Edit};
 use ed_core::fs::FsNode;
 use ed_core::notify::MaybeResult;
 use ed_core::shared::Shared;
@@ -37,6 +37,9 @@ pub(crate) struct Callbacks {
 
 pub(crate) enum CallbackKind {
     OnBufferCreated(Box<dyn FnMut(&Buffer<'_>) + 'static>),
+    OnBufferEdited(Box<dyn FnMut(&Buffer<'_>, &Edit) + 'static>),
+    OnBufferRemoved(Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
+    OnBufferSaved(Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
 }
 
 impl Mock {
