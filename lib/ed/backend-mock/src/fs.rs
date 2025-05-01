@@ -5,6 +5,7 @@ use core::task::{Context, Poll};
 use std::sync::{Arc, Mutex};
 
 use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf};
+use cauchy::PartialEq;
 use ed_core::ByteOffset;
 use ed_core::fs::{
     self,
@@ -13,7 +14,6 @@ use ed_core::fs::{
     FileEvent,
     Fs,
     FsEvent,
-    FsEventKind,
     NodeKind,
     SymlinkEvent,
 };
@@ -98,12 +98,12 @@ pub struct DirectoryInner {
     children: IndexMap<NodeNameBuf, (MockMetadata, Node)>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 struct FileInner {
     contents: Vec<u8>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 struct SymlinkInner {
     target_path: String,
 }
@@ -260,9 +260,15 @@ impl FsInner {
 
         let node_name = path.node_name().expect("path is not root");
 
-        let parent = self.dir_at_path(parent_path).ok_or_else(|| {
-            DeleteNodeError::NodeDoesNotExist(path.to_owned())
-        })?;
+        let parent = self
+            .node_at_path(parent_path)
+            .and_then(|node| match node {
+                Node::Directory(dir) => Some(dir),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                DeleteNodeError::NodeDoesNotExist(path.to_owned())
+            })?;
 
         if !parent.delete_child(node_name) {
             return Err(DeleteNodeError::NodeDoesNotExist(path.to_owned()));
@@ -773,12 +779,6 @@ impl fs::Metadata for MockMetadata {
     }
 }
 
-impl PartialEq for FileInner {
-    fn eq(&self, other: &Self) -> bool {
-        self.contents == other.contents
-    }
-}
-
 impl PartialEq for DirectoryInner {
     fn eq(&self, other: &Self) -> bool {
         self.children == other.children
@@ -793,26 +793,23 @@ impl Stream for ReadDir {
         _: &mut Context<'_>,
     ) -> Poll<Option<Self::Item>> {
         let this = self.project();
-        let (name, kind) = match this.dir_handle.fs.with_inner(|inner| {
+        let metadata = match this.dir_handle.fs.with_inner(|inner| {
             Ok(inner
-                .dir_at_path(&this.dir_handle.path)
+                .node_at_path(&this.dir_handle.path)
+                .and_then(|node| match node {
+                    Node::Directory(dir) => Some(dir),
+                    _ => None,
+                })
                 .ok_or(ReadDirNextError::DirWasDeleted)?
                 .children
                 .get_index(*this.next_child_idx)
-                .map(|(name, node)| (name.to_owned(), node.kind())))
+                .map(|(_name, (meta, _))| meta.clone()))
         }) {
-            Ok(Some(tuple)) => tuple,
+            Ok(Some(meta)) => meta,
             Ok(None) => return Poll::Ready(None),
             Err(err) => return Poll::Ready(Some(Err(err))),
         };
         *this.next_child_idx += 1;
-        let mut child_path = this.dir_handle.path.clone();
-        child_path.push(name);
-        let metadata = match kind {
-            NodeKind::File => MockMetadata,
-            NodeKind::Directory => MockMetadata,
-            NodeKind::Symlink => MockMetadata,
-        };
         Poll::Ready(Some(Ok(metadata)))
     }
 }
@@ -864,14 +861,18 @@ impl PartialEq for MockFile {
 }
 
 impl fmt::Debug for MockSymlink {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.with_inner(|dir| fmt::Debug::fmt(dir, f)) {
+            Ok(res) => res,
+            Err(err) => fmt::Debug::fmt(&err, f),
+        }
     }
 }
 
 impl PartialEq for MockSymlink {
-    fn eq(&self, _: &Self) -> bool {
-        unreachable!()
+    fn eq(&self, other: &Self) -> bool {
+        self.with_inner(|l| other.with_inner(|r| l == r).unwrap_or(false))
+            .unwrap_or(false)
     }
 }
 
