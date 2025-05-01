@@ -109,7 +109,6 @@ impl Fs for OsFs {
     type Timestamp = SystemTime;
 
     type CreateDirectoryError = io::Error;
-    type CreateFileError = io::Error;
     type NodeAtPathError = io::Error;
 
     #[inline]
@@ -121,17 +120,6 @@ impl Fs for OsFs {
         async_fs::create_dir(path).await?;
         let metadata = async_fs::metadata(path).await?;
         Ok(OsDirectory { path: path.to_owned(), metadata })
-    }
-
-    #[inline]
-    async fn create_file<P: AsRef<AbsPath> + Send>(
-        &self,
-        path: P,
-    ) -> Result<Self::File, Self::CreateFileError> {
-        let path = path.as_ref();
-        let file = OsFile::open_options().create_new(true).open(path).await?;
-        let metadata = file.metadata().await?;
-        Ok(OsFile { file: file.into(), metadata, path: path.to_owned() })
     }
 
     #[inline]
@@ -198,7 +186,10 @@ impl Directory for OsDirectory {
         &self,
         file_name: &NodeName,
     ) -> Result<OsFile, Self::CreateFileError> {
-        OsFs::default().create_file(self.path().join(file_name)).await
+        let path = self.path.clone().join(file_name);
+        let file = OsFile::open_options().create_new(true).open(&path).await?;
+        let metadata = file.metadata().await?;
+        Ok(OsFile { file: file.into(), metadata, path })
     }
 
     #[inline]

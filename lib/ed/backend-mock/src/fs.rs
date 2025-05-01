@@ -164,29 +164,6 @@ impl MockFs {
     }
 }
 
-impl DirEntry {
-    fn exists(&self) -> bool {
-        match self {
-            Self::Directory(dir_handle) => dir_handle.exists(),
-            Self::File(file_handle) => file_handle.exists(),
-        }
-    }
-
-    fn kind(&self) -> NodeKind {
-        match self {
-            Self::Directory(_) => NodeKind::Directory,
-            Self::File(_) => NodeKind::File,
-        }
-    }
-
-    fn path(&self) -> &AbsPath {
-        match self {
-            Self::Directory(handle) => &handle.path,
-            Self::File(handle) => &handle.path,
-        }
-    }
-}
-
 impl MockDirectory {
     fn create_node(
         &self,
@@ -534,7 +511,6 @@ impl fs::Fs for MockFs {
     type Timestamp = MockTimestamp;
 
     type CreateDirectoryError = CreateNodeError;
-    type CreateFileError = CreateNodeError;
     type NodeAtPathError = Infallible;
 
     async fn create_directory<P: AsRef<AbsPath>>(
@@ -546,17 +522,6 @@ impl fs::Fs for MockFs {
             fs.create_node(path, Node::Directory(DirectoryInner::new()))
         })?;
         Ok(MockDirectory { fs: self.clone(), path: path.to_owned() })
-    }
-
-    async fn create_file<P: AsRef<AbsPath>>(
-        &self,
-        path: P,
-    ) -> Result<Self::File, Self::CreateFileError> {
-        let path = path.as_ref();
-        self.with_inner(|fs| {
-            fs.create_node(path, Node::File(FileInner::new("")))
-        })?;
-        Ok(MockFile { fs: self.clone(), path: path.to_owned() })
     }
 
     async fn node_at_path<P: AsRef<AbsPath>>(

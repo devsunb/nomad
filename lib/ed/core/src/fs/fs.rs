@@ -29,9 +29,6 @@ pub trait Fs: Clone + Send + Sync + 'static {
     type CreateDirectoryError: Error + Send;
 
     /// TODO: docs.
-    type CreateFileError: Error + Send;
-
-    /// TODO: docs.
     type NodeAtPathError: Error + Send;
 
     /// TODO: docs.
@@ -41,12 +38,6 @@ pub trait Fs: Clone + Send + Sync + 'static {
     ) -> impl Future<
         Output = Result<Self::Directory, Self::CreateDirectoryError>,
     > + Send;
-
-    /// TODO: docs.
-    fn create_file<P: AsRef<AbsPath> + Send>(
-        &self,
-        path: P,
-    ) -> impl Future<Output = Result<Self::File, Self::CreateFileError>> + Send;
 
     /// TODO: docs.
     fn node_at_path<P: AsRef<AbsPath> + Send>(
