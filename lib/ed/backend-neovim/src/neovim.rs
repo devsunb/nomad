@@ -18,9 +18,15 @@ use crate::{
 
 /// TODO: docs.
 pub struct Neovim {
+    augroup_id: u32,
     emitter: notify::NeovimEmitter,
     local_executor: executor::NeovimLocalExecutor,
     background_executor: executor::NeovimBackgroundExecutor,
+}
+
+/// TODO: docs.
+pub struct EventHandle {
+    autocmd_id: u32,
 }
 
 impl Neovim {
@@ -28,6 +34,13 @@ impl Neovim {
     #[inline]
     pub fn init() -> Self {
         Self {
+            augroup_id: oxi::api::create_augroup(
+                "",
+                &oxi::api::opts::CreateAugroupOpts::builder()
+                    .clear(true)
+                    .build(),
+            )
+            .expect("couldn't create augroup"),
             emitter: notify::NeovimEmitter::default(),
             local_executor: executor::NeovimLocalExecutor::init(),
             background_executor: executor::NeovimBackgroundExecutor::init(),
@@ -53,7 +66,7 @@ impl Backend for Neovim {
     type LocalExecutor = executor::NeovimLocalExecutor;
     type BackgroundExecutor = executor::NeovimBackgroundExecutor;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
-    type EventHandle = ();
+    type EventHandle = EventHandle;
     type Selection<'a> = NeovimBuffer;
     type SelectionId = NeovimBuffer;
 
@@ -160,7 +173,15 @@ impl Backend for Neovim {
     where
         Fun: FnMut(&Self::Buffer<'_>),
     {
-        todo!();
+        let opts = oxi::api::opts::CreateAutocmdOpts::builder()
+            .group(self.augroup_id)
+            .callback(|_autocmd_args| false)
+            .build();
+
+        let autocmd_id = oxi::api::create_autocmd(["BufReadPost"], &opts)
+            .expect("couldn't create autocmd");
+
+        EventHandle { autocmd_id }
     }
 
     #[inline]

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use ed_core::ByteOffset;
 use ed_core::backend::{AgentId, Buffer, Edit};
 
+use crate::neovim::EventHandle;
 use crate::{Neovim, oxi};
 
 /// TODO: docs.
@@ -141,7 +142,7 @@ impl Point {
 
 impl Buffer for NeovimBuffer {
     type Backend = Neovim;
-    type EventHandle = ();
+    type EventHandle = EventHandle;
     type Id = Self;
 
     #[inline]
