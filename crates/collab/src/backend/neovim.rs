@@ -10,7 +10,7 @@ use collab_server::message::PeerId;
 use collab_server::nomad::{NomadConfig, NomadSessionId};
 use ed::command::{CommandArgs, Parse};
 use ed::fs::{self, Directory};
-use ed::neovim::buffer::{BufferId, NeovimBuffer};
+use ed::neovim::buffer::BufferId;
 use ed::neovim::{Neovim, mlua, oxi};
 use ed::{AsyncCtx, notify};
 use mlua::{Function, Table};

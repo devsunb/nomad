@@ -10,7 +10,7 @@ use crate::mock::{self, CallbackKind, Callbacks};
 /// TODO: docs.
 pub struct Buffer<'a> {
     pub(crate) inner: &'a mut BufferInner,
-    pub(crate) callbacks: Callbacks,
+    pub(crate) callbacks: &'a Callbacks,
 }
 
 /// TODO: docs.

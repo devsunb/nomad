@@ -30,7 +30,7 @@ pub struct EventHandle {
     callbacks: Callbacks,
 }
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub(crate) struct Callbacks {
     inner: Shared<SlotMap<DefaultKey, CallbackKind>>,
 }
@@ -64,7 +64,7 @@ impl Mock {
     fn buffer_mut(&mut self, id: BufferId) -> Buffer<'_> {
         Buffer {
             inner: self.buffers.get_mut(&id).expect("buffer exists"),
-            callbacks: self.callbacks.clone(),
+            callbacks: &self.callbacks,
         }
     }
 
@@ -101,10 +101,10 @@ impl Mock {
 }
 
 impl Callbacks {
-    pub(crate) fn insert(&mut self, kind: CallbackKind) -> EventHandle {
+    pub(crate) fn insert(&self, kind: CallbackKind) -> EventHandle {
         EventHandle {
             key: self.inner.with_mut(|map| map.insert(kind)),
-            callbacks: self.clone(),
+            callbacks: Self { inner: self.inner.clone() },
         }
     }
 
