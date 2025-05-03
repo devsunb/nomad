@@ -40,11 +40,13 @@ impl<'a> NeovimBuffer<'a> {
         Self::new(BufferId::of_focused(), events)
     }
 
+    #[track_caller]
     #[inline]
     pub(crate) fn get_name(self) -> PathBuf {
         self.inner().get_name().expect("buffer exists")
     }
 
+    #[track_caller]
     #[inline]
     pub(crate) fn is_focused(self) -> bool {
         api::Window::current().get_buf().expect("window is valid")
@@ -104,6 +106,7 @@ impl<'a> NeovimBuffer<'a> {
         Replacement::new(deleted_range, &*inserted_text)
     }
 
+    #[track_caller]
     #[inline]
     pub(crate) fn selection(&self) -> Option<Range<ByteOffset>> {
         let mode = api::get_mode().expect("couldn't get mode").mode;
@@ -136,6 +139,7 @@ impl<'a> NeovimBuffer<'a> {
     /// Converts the given [`Point`] to the corresponding [`ByteOffset`] in the
     /// buffer.
     #[track_caller]
+    #[inline]
     fn byte_offset_of_point(self, point: Point) -> ByteOffset {
         let line_offset: ByteOffset = self
             .inner()
@@ -147,6 +151,7 @@ impl<'a> NeovimBuffer<'a> {
 
     /// Returns the text in the given point range.
     #[track_caller]
+    #[inline]
     fn get_text_in_point_range(
         &self,
         point_range: Range<Point>,
@@ -177,7 +182,37 @@ impl<'a> NeovimBuffer<'a> {
         text
     }
 
+    #[inline]
+    fn inner(&self) -> api::Buffer {
+        debug_assert!(self.id.is_valid());
+        self.id.into()
+    }
+
+    /// Converts the given [`ByteOffset`] to the corresponding [`Point`] in the
+    /// buffer.
+    #[track_caller]
+    #[inline]
+    fn point_of_byte_offset(self, byte_offset: ByteOffset) -> Point {
+        let line_idx = self
+            .inner()
+            .call(move |_| {
+                api::call_function::<_, usize>(
+                    "byte2line",
+                    (byte_offset.into_u64() as u32,),
+                )
+                .expect("args are valid")
+            })
+            .expect("todo");
+
+        let line_byte_offset =
+            self.inner().get_offset(line_idx).expect("todo");
+
+        Point { line_idx, byte_offset: byte_offset - line_byte_offset }
+    }
+
     /// Returns the [`Point`] at the end of the buffer.
+    #[track_caller]
+    #[inline]
     fn point_of_eof(self) -> Point {
         fn point_of_eof(buffer: NeovimBuffer) -> Result<Point, api::Error> {
             let nvim_buf = buffer.inner();
@@ -205,10 +240,28 @@ impl<'a> NeovimBuffer<'a> {
         point_of_eof(self).expect("not deleted")
     }
 
+    /// Replaces the text in the given point range with the new text.
+    #[track_caller]
     #[inline]
-    fn inner(&self) -> api::Buffer {
-        debug_assert!(self.id.is_valid());
-        self.id.0.into()
+    fn replace_text_in_point_range(
+        &self,
+        delete_range: Range<Point>,
+        insert_text: &str,
+    ) {
+        // If the text has a trailing newline, Neovim expects an additional
+        // empty line to be included.
+        let lines = insert_text
+            .lines()
+            .chain(insert_text.ends_with('\n').then_some(""));
+
+        self.inner()
+            .set_text(
+                delete_range.start.line_idx..delete_range.end.line_idx,
+                delete_range.start.byte_offset.into(),
+                delete_range.end.byte_offset.into(),
+                lines,
+            )
+            .expect("replacing text failed");
     }
 }
 
@@ -255,6 +308,28 @@ impl Buffer for NeovimBuffer<'_> {
     #[inline]
     fn id(&self) -> Self::Id {
         self.id
+    }
+
+    #[inline]
+    fn edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    where
+        R: IntoIterator<Item = Replacement>,
+    {
+        for replacement in replacements {
+            self.events.with_mut(|events| {
+                let ids = &mut events.agent_ids.edited_buffer;
+                let maybe_prev = ids.insert(self.id(), agent_id);
+                debug_assert!(maybe_prev.is_none());
+            });
+
+            let range = replacement.removed_range();
+            let deletion_start = self.point_of_byte_offset(range.start);
+            let deletion_end = self.point_of_byte_offset(range.end);
+            self.replace_text_in_point_range(
+                deletion_start..deletion_end,
+                replacement.inserted_text(),
+            );
+        }
     }
 
     #[inline]

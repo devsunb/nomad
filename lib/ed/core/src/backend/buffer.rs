@@ -26,6 +26,11 @@ pub trait Buffer {
     fn id(&self) -> Self::Id;
 
     /// TODO: docs.
+    fn edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    where
+        R: IntoIterator<Item = Replacement>;
+
+    /// TODO: docs.
     fn name(&self) -> Cow<'_, str>;
 
     /// TODO: docs.

@@ -107,6 +107,13 @@ impl Callbacks {
             callbacks: self.clone(),
         }
     }
+
+    pub(crate) fn with_mut<R>(
+        &self,
+        f: impl FnOnce(&mut SlotMap<DefaultKey, CallbackKind>) -> R,
+    ) -> R {
+        self.inner.with_mut(f)
+    }
 }
 
 impl Backend for Mock {

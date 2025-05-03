@@ -41,8 +41,8 @@ pub(crate) trait Event: Clone + Into<EventKind> {
 }
 
 pub(crate) struct Events {
+    pub(crate) agent_ids: AgentIds,
     augroup_id: u32,
-    agent_ids: AgentIds,
     on_buffer_created: EventCallbacks<BufReadPost>,
     on_buffer_edited: NoHashMap<BufferId, EventCallbacks<OnBytes>>,
     on_buffer_removed: NoHashMap<BufferId, EventCallbacks<BufUnload>>,
