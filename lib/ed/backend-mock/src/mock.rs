@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use slotmap::{DefaultKey, SlotMap};
 
 use crate::api::Api;
-use crate::buffer::{Buffer, BufferId, BufferInner};
+use crate::buffer::{Buffer, BufferId, BufferInner, Cursor, CursorId};
 use crate::emitter::Emitter;
 use crate::executor::Executor;
 use crate::fs::MockFs;
@@ -86,11 +86,11 @@ impl Mock {
                 .expect("file is not valid UTF-8")
                 .into();
 
-        let buffer = BufferInner {
+        let buffer = BufferInner::new(
+            self.next_buffer_id.post_inc(),
+            path.to_string(),
             contents,
-            id: self.next_buffer_id.post_inc(),
-            name: path.to_string(),
-        };
+        );
 
         let buffer_id = buffer.id;
 
@@ -122,8 +122,8 @@ impl Backend for Mock {
     type Api = Api;
     type Buffer<'a> = Buffer<'a>;
     type BufferId = BufferId;
-    type Cursor<'a> = ();
-    type CursorId = ();
+    type Cursor<'a> = Cursor<'a>;
+    type CursorId = CursorId;
     type EventHandle = EventHandle;
     type LocalExecutor = Executor;
     type BackgroundExecutor = Executor;
@@ -153,8 +153,12 @@ impl Backend for Mock {
         self.current_buffer.map(|id| self.buffer_mut(id))
     }
 
-    fn cursor(&mut self, _id: Self::CursorId) -> Option<Self::Cursor<'_>> {
-        todo!()
+    fn cursor(
+        &mut self,
+        cursor_id: Self::CursorId,
+    ) -> Option<Self::Cursor<'_>> {
+        self.buffer(cursor_id.buffer_id())
+            .and_then(|buf| buf.into_cursor(cursor_id))
     }
 
     fn fs(&mut self) -> Self::Fs {

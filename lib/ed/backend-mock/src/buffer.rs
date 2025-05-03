@@ -3,9 +3,12 @@ use std::borrow::Cow;
 
 use crop::Rope;
 use ed_core::ByteOffset;
-use ed_core::backend::{self, AgentId, Edit, Replacement};
+use ed_core::backend::{self, AgentId, Buffer as _, Edit, Replacement};
+use slotmap::SlotMap;
 
 use crate::mock::{self, CallbackKind, Callbacks};
+
+type AnnotationId = slotmap::DefaultKey;
 
 /// TODO: docs.
 pub struct Buffer<'a> {
@@ -14,22 +17,77 @@ pub struct Buffer<'a> {
 }
 
 /// TODO: docs.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct BufferId(pub(crate) u64);
+
+/// TODO: docs.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct CursorId {
+    buffer_id: BufferId,
+    id_in_buffer: AnnotationId,
+}
+
+/// TODO: docs.
+pub struct Cursor<'a> {
+    pub(crate) buffer: &'a mut BufferInner,
+    pub(crate) cursor_id: CursorId,
+}
+
+/// TODO: docs.
 #[doc(hidden)]
 pub struct BufferInner {
+    pub(crate) cursors: SlotMap<AnnotationId, CursorInner>,
     pub(crate) contents: Rope,
     pub(crate) id: BufferId,
     pub(crate) name: String,
 }
 
 /// TODO: docs.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct BufferId(pub(crate) u64);
+#[doc(hidden)]
+pub struct CursorInner {
+    pub(crate) id_in_buffer: AnnotationId,
+    pub(crate) offset: ByteOffset,
+}
 
 impl BufferId {
     pub(crate) fn post_inc(&mut self) -> Self {
         let id = *self;
         self.0 += 1;
         id
+    }
+}
+
+impl CursorId {
+    pub(crate) fn buffer_id(&self) -> BufferId {
+        self.buffer_id
+    }
+}
+
+impl<'a> Buffer<'a> {
+    pub(crate) fn into_cursor(
+        self,
+        cursor_id: CursorId,
+    ) -> Option<Cursor<'a>> {
+        debug_assert_eq!(cursor_id.buffer_id(), self.id());
+        self.inner
+            .cursors
+            .contains_key(cursor_id.id_in_buffer)
+            .then_some(Cursor { buffer: self.inner, cursor_id })
+    }
+}
+
+impl BufferInner {
+    pub(crate) fn new(id: BufferId, name: String, contents: Rope) -> Self {
+        Self { cursors: Default::default(), contents, id, name }
+    }
+}
+
+impl CursorInner {
+    pub(crate) fn react_to_replacement(&mut self, replacement: &Replacement) {
+        if replacement.removed_range().start > self.offset {
+            return;
+        }
+        todo!();
     }
 }
 
@@ -61,6 +119,9 @@ impl backend::Buffer for Buffer<'_> {
                 usize::from(range.start)..usize::from(range.end),
                 replacement.inserted_text(),
             );
+            for cursor in self.cursors.values_mut() {
+                cursor.react_to_replacement(replacement);
+            }
         }
 
         self.callbacks.with_mut(|callbacks| {
