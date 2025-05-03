@@ -52,20 +52,23 @@ impl backend::Buffer for Buffer<'_> {
     where
         Fun: FnMut(&Buffer<'_>, &Edit) + 'static,
     {
-        self.callbacks.insert(CallbackKind::OnBufferEdited(Box::new(fun)))
+        let cb_kind = CallbackKind::OnBufferEdited(self.id(), Box::new(fun));
+        self.callbacks.insert(cb_kind)
     }
 
     fn on_removed<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
     {
-        self.callbacks.insert(CallbackKind::OnBufferRemoved(Box::new(fun)))
+        let cb_kind = CallbackKind::OnBufferRemoved(self.id(), Box::new(fun));
+        self.callbacks.insert(cb_kind)
     }
 
     fn on_saved<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
     {
-        self.callbacks.insert(CallbackKind::OnBufferSaved(Box::new(fun)))
+        let cb_kind = CallbackKind::OnBufferSaved(self.id(), Box::new(fun));
+        self.callbacks.insert(cb_kind)
     }
 }

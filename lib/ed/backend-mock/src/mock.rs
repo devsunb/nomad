@@ -38,9 +38,9 @@ pub(crate) struct Callbacks {
 #[allow(clippy::type_complexity)]
 pub(crate) enum CallbackKind {
     OnBufferCreated(Box<dyn FnMut(&Buffer<'_>) + 'static>),
-    OnBufferEdited(Box<dyn FnMut(&Buffer<'_>, &Edit) + 'static>),
-    OnBufferRemoved(Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
-    OnBufferSaved(Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
+    OnBufferEdited(BufferId, Box<dyn FnMut(&Buffer<'_>, &Edit) + 'static>),
+    OnBufferRemoved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
+    OnBufferSaved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
 }
 
 impl Mock {
