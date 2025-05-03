@@ -25,10 +25,10 @@ pub(crate) trait Event: Clone + Into<EventKind> {
     type RegisterOutput;
 
     /// TODO: docs.
-    fn get_or_insert_callbacks<'cbs>(
+    fn get_or_insert_callbacks<'ev>(
         &self,
-        events: &'cbs mut Events,
-    ) -> &'cbs mut EventCallbacks<Self>;
+        events: &'ev mut Events,
+    ) -> &'ev mut EventCallbacks<Self>;
 
     /// TODO: docs.
     fn register(&self, events: Shared<Events>) -> Self::RegisterOutput;
@@ -178,10 +178,10 @@ impl Event for BufReadPost {
     type RegisterOutput = u32;
 
     #[inline]
-    fn get_or_insert_callbacks<'cbs>(
+    fn get_or_insert_callbacks<'ev>(
         &self,
-        events: &'cbs mut Events,
-    ) -> &'cbs mut EventCallbacks<Self> {
+        events: &'ev mut Events,
+    ) -> &'ev mut EventCallbacks<Self> {
         &mut events.on_buffer_created
     }
 
@@ -229,10 +229,10 @@ impl Event for BufUnload {
     type RegisterOutput = u32;
 
     #[inline]
-    fn get_or_insert_callbacks<'cbs>(
+    fn get_or_insert_callbacks<'ev>(
         &self,
-        events: &'cbs mut Events,
-    ) -> &'cbs mut EventCallbacks<Self> {
+        events: &'ev mut Events,
+    ) -> &'ev mut EventCallbacks<Self> {
         events.on_buffer_removed.entry(self.0).or_default()
     }
 
@@ -292,10 +292,10 @@ impl Event for BufWritePost {
     type RegisterOutput = u32;
 
     #[inline]
-    fn get_or_insert_callbacks<'cbs>(
+    fn get_or_insert_callbacks<'ev>(
         &self,
-        events: &'cbs mut Events,
-    ) -> &'cbs mut EventCallbacks<Self> {
+        events: &'ev mut Events,
+    ) -> &'ev mut EventCallbacks<Self> {
         events.on_buffer_saved.entry(self.0).or_default()
     }
 
@@ -355,10 +355,10 @@ impl Event for OnBytes {
     type RegisterOutput = ();
 
     #[inline]
-    fn get_or_insert_callbacks<'cbs>(
+    fn get_or_insert_callbacks<'ev>(
         &self,
-        events: &'cbs mut Events,
-    ) -> &'cbs mut EventCallbacks<Self> {
+        events: &'ev mut Events,
+    ) -> &'ev mut EventCallbacks<Self> {
         events.on_buffer_edited.entry(self.0).or_default()
     }
 
@@ -399,7 +399,7 @@ impl Event for OnBytes {
             })
             .build();
 
-        api::Buffer::from(self.0)
+        api::Buffer::from(buffer_id)
             .attach(false, &opts)
             .expect("couldn't attach to buffer");
     }
