@@ -105,7 +105,7 @@ impl GitIgnoreInner {
     }
 
     fn is_outdated(&self) -> bool {
-        Instant::now() - self.last_refreshed_ignored_paths_at
+        self.last_refreshed_ignored_paths_at.elapsed()
             > GitIgnore::REFRESH_IGNORED_PATHS_AFTER
     }
 

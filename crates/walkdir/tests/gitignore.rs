@@ -63,8 +63,10 @@ fn gitignore_cache_is_refreshed_after_expiration() {
 
     repo.init();
 
+    let gitignore = GitIgnore::new(repo.path().to_owned());
+
     assert_eq!(
-        repo.non_ignored_paths().remove_git_dir(),
+        repo.non_ignored_paths_with_gitignore(&gitignore).remove_git_dir(),
         ["/b.txt", "/.gitignore"]
     );
 
@@ -78,19 +80,19 @@ fn gitignore_cache_is_refreshed_after_expiration() {
     // We won't react to the change until the GitIgnore cache expires.
     std::thread::sleep(GitIgnore::REFRESH_IGNORED_PATHS_AFTER / 2);
     assert_eq!(
-        repo.non_ignored_paths().remove_git_dir(),
+        repo.non_ignored_paths_with_gitignore(&gitignore).remove_git_dir(),
         ["/b.txt", "/.gitignore"]
     );
 
     // Now the cache will be refreshed and we'll detect the change.
     std::thread::sleep(GitIgnore::REFRESH_IGNORED_PATHS_AFTER / 2);
     assert_eq!(
-        repo.non_ignored_paths().remove_git_dir(),
+        repo.non_ignored_paths_with_gitignore(&gitignore).remove_git_dir(),
         ["/a.txt", "/.gitignore"]
     );
 }
 
-trait GitRepository {
+trait GitRepository: Directory {
     /// Creates a directory from the given [`mock::fs::MockFs`].
     ///
     /// Note that the returned directory will not be initialized as a Git
@@ -102,7 +104,18 @@ trait GitRepository {
 
     /// Returns the paths of all non-gitignored files and directories in the
     /// repository, relative to its root.
-    fn non_ignored_paths(&self) -> NonIgnoredPaths;
+    fn non_ignored_paths(&self) -> NonIgnoredPaths {
+        self.non_ignored_paths_with_gitignore(&GitIgnore::new(
+            self.path().to_owned(),
+        ))
+    }
+
+    /// Same as [`Self::non_ignored_paths`], but uses the given [`GitIgnore`]
+    /// instance instead of creating a new one.
+    fn non_ignored_paths_with_gitignore(
+        &self,
+        gitignore: &GitIgnore,
+    ) -> NonIgnoredPaths;
 }
 
 impl GitRepository for TempDir {
@@ -140,7 +153,10 @@ impl GitRepository for TempDir {
             .expect("failed to `git init` directory");
     }
 
-    fn non_ignored_paths(&self) -> NonIgnoredPaths {
+    fn non_ignored_paths_with_gitignore(
+        &self,
+        gitignore: &GitIgnore,
+    ) -> NonIgnoredPaths {
         use futures_util::StreamExt;
         use walkdir::FsExt;
 
@@ -148,7 +164,7 @@ impl GitRepository for TempDir {
             NonIgnoredPaths {
                 inner: OsFs::default()
                     .walk(self)
-                    .filter(GitIgnore::new(self.path().to_owned()))
+                    .filter(gitignore)
                     .paths()
                     .map(Result::unwrap)
                     .map(|path| {
