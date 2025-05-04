@@ -13,7 +13,7 @@ pub trait FsExt: fs::Fs {
     #[inline]
     fn walk<'dir>(
         &self,
-        dir: &'dir Self::Directory,
+        dir: &'dir impl Directory<Fs = Self>,
     ) -> Walker<'dir, Self, Self> {
         Walker::new(self.clone(), dir)
     }
@@ -65,7 +65,7 @@ where
 
     /// TODO: docs.
     #[inline]
-    pub fn new(inner: W, dir: &'dir <Fs as fs::Fs>::Directory) -> Self {
+    pub fn new(inner: W, dir: &'dir impl Directory<Fs = Fs>) -> Self {
         Self { inner, dir_path: dir.path(), fs: PhantomData }
     }
 

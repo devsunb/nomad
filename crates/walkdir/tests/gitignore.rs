@@ -5,13 +5,14 @@ use std::collections::HashSet;
 
 use abs_path::AbsPathBuf;
 use ed::fs::Directory;
-use ed::fs::os::{OsDirectory, OsFs};
+use ed::fs::os::OsFs;
 use ed::mock;
+use tempdir::TempDir;
 
 #[test]
 #[cfg_attr(not(feature = "git-in-PATH"), ignore = "git is not in $PATH")]
 fn gitignore_1() {
-    let repo = <OsDirectory as GitRepository>::create(mock::fs! {
+    let repo = <TempDir as GitRepository>::create(mock::fs! {
         "a.txt": "",
         "b.txt": "",
         ".gitignore": "a.txt",
@@ -28,7 +29,7 @@ fn gitignore_1() {
 #[test]
 #[cfg_attr(not(feature = "git-in-PATH"), ignore = "git is not in $PATH")]
 fn gitignore_is_ignored_if_not_in_git_repo() {
-    let repo = <OsDirectory as GitRepository>::create(mock::fs! {
+    let repo = <TempDir as GitRepository>::create(mock::fs! {
         "a.txt": "",
         "b.txt": "",
         ".gitignore": "a.txt",
@@ -40,7 +41,7 @@ fn gitignore_is_ignored_if_not_in_git_repo() {
 #[test]
 #[cfg_attr(feature = "git-in-PATH", ignore = "git is in $PATH")]
 fn gitignore_is_ignored_if_git_is_not_in_path() {
-    let repo = <OsDirectory as GitRepository>::create(mock::fs! {
+    let repo = <TempDir as GitRepository>::create(mock::fs! {
         "a.txt": "",
         "b.txt": "",
         ".gitignore": "a.txt",
@@ -64,8 +65,13 @@ trait GitRepository {
     fn non_ignored_paths(&self) -> NonIgnoredPaths;
 }
 
-impl GitRepository for OsDirectory {
+impl GitRepository for TempDir {
     fn create(_fs: mock::fs::MockFs) -> Self {
+        use tempdir::FsExt;
+        let _tempdir = futures_executor::block_on(async move {
+            OsFs::default().tempdir().await
+        })
+        .expect("couldn't create tempdir");
         todo!();
     }
 
