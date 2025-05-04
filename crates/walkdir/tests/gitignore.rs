@@ -86,7 +86,8 @@ impl GitRepository for TempDir {
     }
 
     fn init(&self) {
-        std::process::Command::new("git")
+        use std::process::{Command, Stdio};
+        Command::new("git")
             .arg("init")
             .current_dir(self.path())
             // Ignore all global config files.
@@ -94,6 +95,8 @@ impl GitRepository for TempDir {
             // See https://stackoverflow.com/a/67512433 for more info.
             .env("GIT_CONFIG_GLOBAL", "/dev/null")
             .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .status()
             .expect("failed to `git init` directory");
     }
