@@ -19,7 +19,10 @@ fn gitignore_1() {
 
     repo.init();
 
-    assert_eq!(repo.non_ignored_paths(), paths(["/b.txt", "/.gitignore"]));
+    assert_eq!(
+        repo.non_ignored_paths().remove_git_dir(),
+        ["/b.txt", "/.gitignore"]
+    );
 }
 
 #[test]
@@ -31,10 +34,7 @@ fn gitignore_is_ignored_if_not_in_git_repo() {
         ".gitignore": "a.txt",
     });
 
-    assert_eq!(
-        repo.non_ignored_paths(),
-        paths(["/a.txt", "/b.txt", "/.gitignore"])
-    );
+    assert_eq!(repo.non_ignored_paths(), ["/a.txt", "/b.txt", "/.gitignore"]);
 }
 
 #[test]
@@ -46,19 +46,7 @@ fn gitignore_is_ignored_if_git_is_not_in_path() {
         ".gitignore": "a.txt",
     });
 
-    assert_eq!(
-        repo.non_ignored_paths(),
-        paths(["/a.txt", "/b.txt", "/.gitignore"])
-    );
-}
-
-fn paths(
-    paths: impl IntoIterator<Item = impl AsRef<str>>,
-) -> HashSet<AbsPathBuf> {
-    paths
-        .into_iter()
-        .map(|path| path.as_ref().parse::<AbsPathBuf>().unwrap())
-        .collect()
+    assert_eq!(repo.non_ignored_paths(), ["/a.txt", "/b.txt", "/.gitignore"]);
 }
 
 trait GitRepository {
@@ -71,9 +59,9 @@ trait GitRepository {
     /// `git init`s the repository.
     fn init(&self);
 
-    /// Returns a `HashSet` containing the paths of all non-gitignored files
-    /// and directories in the repository, relative to its root.
-    fn non_ignored_paths(&self) -> HashSet<AbsPathBuf>;
+    /// Returns the paths of all non-gitignored files and directories in the
+    /// repository, relative to its root.
+    fn non_ignored_paths(&self) -> NonIgnoredPaths;
 }
 
 impl GitRepository for OsDirectory {
@@ -94,19 +82,55 @@ impl GitRepository for OsDirectory {
             .expect("failed to `git init` directory");
     }
 
-    fn non_ignored_paths(&self) -> HashSet<AbsPathBuf> {
+    fn non_ignored_paths(&self) -> NonIgnoredPaths {
         use futures_util::StreamExt;
         use walkdir::FsExt;
 
-        futures_executor::block_on(async move {
-            OsFs::default()
-                .walk(self)
-                .filter(walkdir::GitIgnore::new(self.path().to_owned()))
-                .paths()
-                .map(Result::unwrap)
-                .map(|path| path.strip_prefix(self.path()).unwrap().to_owned())
-                .collect::<HashSet<_>>()
-                .await
-        })
+        NonIgnoredPaths {
+            inner: futures_executor::block_on(async move {
+                OsFs::default()
+                    .walk(self)
+                    .filter(walkdir::GitIgnore::new(self.path().to_owned()))
+                    .paths()
+                    .map(Result::unwrap)
+                    .map(|path| {
+                        path.strip_prefix(self.path()).unwrap().to_owned()
+                    })
+                    .collect::<HashSet<_>>()
+                    .await
+            }),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct NonIgnoredPaths {
+    inner: HashSet<AbsPathBuf>,
+}
+
+impl NonIgnoredPaths {
+    /// Removes all the paths of files and directories in the `/.git`
+    /// directory.
+    fn remove_git_dir(mut self) -> Self {
+        use abs_path::path;
+        self.inner.retain(|path| !path.starts_with(path!("/.git")));
+        self
+    }
+}
+
+impl<Paths, Path> PartialEq<Paths> for NonIgnoredPaths
+where
+    Paths: IntoIterator<Item = Path> + Clone,
+    Path: AsRef<str>,
+{
+    fn eq(&self, other: &Paths) -> bool {
+        let other = other
+            .clone()
+            .into_iter()
+            .map(|path| {
+                path.as_ref().parse::<AbsPathBuf>().expect("invalid path")
+            })
+            .collect::<HashSet<_>>();
+        self.inner == other
     }
 }
