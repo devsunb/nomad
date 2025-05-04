@@ -215,7 +215,7 @@ pub trait Directory: Send + Sync + Sized {
                 .map_err(ReplicateError::ListDirectory)?
                 .fuse();
 
-            let mut create_nodes = stream::FuturesUnordered::new();
+            let mut replicate_nodes = stream::FuturesUnordered::new();
 
             pin_mut!(list_nodes);
 
@@ -223,12 +223,12 @@ pub trait Directory: Send + Sync + Sized {
                 select_biased! {
                     node_res = list_nodes.select_next_some() => {
                         let node = node_res.map_err(ReplicateError::ReadNode)?;
-                        create_nodes.push(async move {
-                            create_node(self, &node).await
+                        replicate_nodes.push(async move {
+                            replicate_node(self, &node).await
                         });
                     },
-                    create_res = create_nodes.select_next_some() => {
-                        create_res?;
+                    replicate_res = replicate_nodes.select_next_some() => {
+                        replicate_res?;
                     },
                     complete => return Ok(()),
                 }
@@ -348,9 +348,9 @@ pub enum ReplicateError<Dst: Fs, Src: Fs> {
 }
 
 #[inline]
-async fn create_node<Dst: Directory, Src: fs::Fs>(
-    dst: &Dst,
-    node: &fs::FsNode<Src>,
+async fn replicate_node<Dst: Directory, Src: fs::Fs>(
+    dst_dir: &Dst,
+    src_node: &fs::FsNode<Src>,
 ) -> Result<(), ReplicateError<Dst::Fs, Src>>
 where
     <Dst::Fs as fs::Fs>::Directory: Directory<
@@ -360,11 +360,11 @@ where
         >,
     Src::Directory: AsRef<Src>,
 {
-    match node {
+    match src_node {
         fs::FsNode::Directory(src_dir) => {
             let src_dir_name = src_dir.name().expect("dir is not root");
 
-            let dst_dir = dst
+            let dst_dir = dst_dir
                 .create_directory(src_dir_name)
                 .await
                 .map_err(ReplicateError::CreateDirectory)?;
@@ -372,7 +372,7 @@ where
             dst_dir.replicate_from(src_dir).boxed().await?;
         },
         fs::FsNode::File(src_file) => {
-            let mut dst_file = dst
+            let mut dst_file = dst_dir
                 .create_file(src_file.name())
                 .await
                 .map_err(ReplicateError::CreateFile)?;
@@ -391,7 +391,8 @@ where
                 .await
                 .map_err(ReplicateError::ReadSymlink)?;
 
-            dst.create_symlink(src_symlink.name(), &src_target_path)
+            dst_dir
+                .create_symlink(src_symlink.name(), &src_target_path)
                 .await
                 .map_err(ReplicateError::CreateSymlink)?;
         },
