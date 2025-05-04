@@ -361,7 +361,9 @@ impl File for OsFile {
         new_contents: C,
     ) -> Result<(), Self::WriteError> {
         self.with_file_async(async move |file| {
-            file.write_all(new_contents.as_ref()).await
+            file.write_all(new_contents.as_ref()).await?;
+            file.sync_all().await?;
+            Ok(())
         })
         .await?
     }

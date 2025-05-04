@@ -49,7 +49,7 @@ struct GitIgnoreInner {
     last_refreshed_ignored_paths_at: Instant,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct IgnoredPaths {
     inner: Vec<CompactString>,
 }
