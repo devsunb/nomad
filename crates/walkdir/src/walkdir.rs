@@ -11,21 +11,21 @@ use crate::filter::{Filter, Filtered};
 /// TODO: docs.
 pub trait WalkDir<Fs: fs::Fs>: Sized {
     /// The type of error that can occur when reading a directory fails.
-    type ReadError: Error + Send;
+    type ListError: Error + Send;
 
     /// The type of error that can occur when reading a specific entry in a
     /// directory fails.
-    type ReadEntryError: Error + Send;
+    type ReadMetadataError: Error + Send;
 
     /// TODO: docs.
-    fn read_dir(
+    fn list_metas(
         &self,
         dir_path: &AbsPath,
     ) -> impl Future<
         Output = Result<
-            impl FusedStream<Item = Result<Fs::Metadata, Self::ReadEntryError>>
+            impl FusedStream<Item = Result<Fs::Metadata, Self::ReadMetadataError>>
             + Send,
-            Self::ReadError,
+            Self::ListError,
         >,
     > + Send;
 
@@ -68,16 +68,16 @@ pub trait WalkDir<Fs: fs::Fs>: Sized {
         {
             Box::pin(async move {
                 let entries = walkdir
-                    .read_dir(dir_path)
+                    .list_metas(dir_path)
                     .await
-                    .map_err(WalkError::ReadDir)?;
+                    .map_err(WalkError::ListDir)?;
                 let mut handle_entries = stream::FuturesUnordered::new();
                 let mut read_children = stream::FuturesUnordered::new();
                 pin_mut!(entries);
                 loop {
                     select! {
                         res = entries.select_next_some() => {
-                            let entry = res.map_err(WalkError::ReadEntry)?;
+                            let entry = res.map_err(WalkError::ReadMetadata)?;
                             let node_kind = entry.node_kind();
                             if node_kind.is_dir() {
                                 let dir_name = entry
@@ -172,16 +172,16 @@ where
     W: WalkDir<Fs>,
 {
     /// TODO: docs.
+    ListDir(W::ListError),
+
+    /// TODO: docs.
     Other(T),
 
     /// TODO: docs.
     NodeName(fs::MetadataNameError),
 
     /// TODO: docs.
-    ReadDir(W::ReadError),
-
-    /// TODO: docs.
-    ReadEntry(W::ReadEntryError),
+    ReadMetadata(W::ReadMetadataError),
 }
 
 /// TODO: docs.
@@ -191,14 +191,14 @@ where
 #[display("{_0}")]
 pub enum FsReadDirError<Fs: fs::Fs> {
     /// TODO: docs.
+    ListDir(<Fs::Directory as fs::Directory>::ListError),
+
+    /// TODO: docs.
     #[display("no node at path")]
     NoNodeAtPath,
 
     /// TODO: docs.
     NodeAtPath(Fs::NodeAtPathError),
-
-    /// TODO: docs.
-    ReadDir(<Fs::Directory as fs::Directory>::ReadError),
 
     /// TODO: docs.
     #[display("couldn't read file at path")]
@@ -210,17 +210,17 @@ pub enum FsReadDirError<Fs: fs::Fs> {
 }
 
 impl<Fs: fs::Fs> WalkDir<Self> for Fs {
-    type ReadError = FsReadDirError<Self>;
-    type ReadEntryError = <Fs::Directory as fs::Directory>::ReadEntryError;
+    type ListError = FsReadDirError<Self>;
+    type ReadMetadataError = <Fs::Directory as fs::Directory>::ReadMetadataError;
 
-    async fn read_dir(
+    async fn list_metas(
         &self,
         dir_path: &fs::AbsPath,
     ) -> Result<
         impl FusedStream<
-            Item = Result<<Self as fs::Fs>::Metadata, Self::ReadEntryError>,
+            Item = Result<<Self as fs::Fs>::Metadata, Self::ReadMetadataError>,
         > + Send,
-        Self::ReadError,
+        Self::ListError,
     > {
         let Some(node) = self
             .node_at_path(dir_path)
@@ -232,10 +232,10 @@ impl<Fs: fs::Fs> WalkDir<Self> for Fs {
 
         match node {
             fs::FsNode::Directory(dir) => dir
-                .read()
+                .list_metas()
                 .await
                 .map(StreamExt::fuse)
-                .map_err(FsReadDirError::ReadDir),
+                .map_err(FsReadDirError::ListDir),
             fs::FsNode::File(_) => Err(FsReadDirError::ReadFile),
             fs::FsNode::Symlink(_) => Err(FsReadDirError::ReadSymlink),
         }

@@ -7,22 +7,22 @@ use ed::fs;
 #[display("{_0}")]
 pub enum FindRootError<Fs: fs::Fs> {
     /// TODO: docs.
-    DirEntryName(fs::MetadataNameError),
-
-    /// TODO: docs.
     DirParent(<Fs::Directory as fs::Directory>::ParentError),
 
     /// TODO: docs.
     FileParent(<Fs::File as fs::File>::ParentError),
 
     /// TODO: docs.
+    ListDir(<Fs::Directory as fs::Directory>::ListError),
+
+    /// TODO: docs.
+    MetadataName(fs::MetadataNameError),
+
+    /// TODO: docs.
     NodeAtStartPath(Fs::NodeAtPathError),
 
     /// TODO: docs.
-    ReadDir(<Fs::Directory as fs::Directory>::ReadError),
-
-    /// TODO: docs.
-    ReadDirEntry(<Fs::Directory as fs::Directory>::ReadEntryError),
+    ReadMetadata(<Fs::Directory as fs::Directory>::ReadMetadataError),
 
     /// TODO: docs.
     #[display("the starting path does not exist")]

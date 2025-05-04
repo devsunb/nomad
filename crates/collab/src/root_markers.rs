@@ -30,20 +30,20 @@ pub trait RootMarker<Fs: fs::Fs> {
 
     fn matches(
         &self,
-        dir_entry: &Fs::Metadata,
+        metadata: &Fs::Metadata,
     ) -> impl Future<Output = Result<bool, Self::Error>>;
 }
 
 #[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
 #[display("{_0}")]
 pub enum FindRootError<Fs: fs::Fs, M: RootMarker<Fs>> {
-    DirEntry(DirEntryError<Fs>),
     DirParent(<Fs::Directory as fs::Directory>::ParentError),
     FileParent(<Fs::File as fs::File>::ParentError),
     FollowSymlink(<Fs::Symlink as fs::Symlink>::FollowError),
     Marker(M::Error),
     NodeAtStartPath(Fs::NodeAtPathError),
-    ReadDir(<Fs::Directory as fs::Directory>::ReadError),
+    ReadDir(<Fs::Directory as fs::Directory>::ListError),
+    ReadMetadata(ReadMetadataError<Fs>),
     #[display("no file or directory found at {_0:?}")]
     StartPathNotFound(AbsPathBuf),
     #[display("starting point at {_0:?} is a dangling symlink")]
@@ -54,8 +54,8 @@ pub enum FindRootError<Fs: fs::Fs, M: RootMarker<Fs>> {
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
 #[display("{_0}")]
-pub enum DirEntryError<Fs: fs::Fs> {
-    Access(<Fs::Directory as fs::Directory>::ReadEntryError),
+pub enum ReadMetadataError<Fs: fs::Fs> {
+    Access(<Fs::Directory as fs::Directory>::ReadMetadataError),
     Name(MetadataNameError),
 }
 
@@ -126,23 +126,23 @@ impl<M> FindRootArgs<'_, M> {
     where
         M: RootMarker<Fs>,
     {
-        let read_dir =
-            dir.read().await.map_err(FindRootError::ReadDir)?.fuse();
+        let metas =
+            dir.list_metas().await.map_err(FindRootError::ReadDir)?.fuse();
 
-        pin_mut!(read_dir);
+        pin_mut!(metas);
 
         let mut check_marker_matches = stream::FuturesUnordered::new();
 
         loop {
             select! {
-                read_res = read_dir.select_next_some() => {
-                    let dir_entry = read_res
-                        .map_err(DirEntryError::Access)
-                        .map_err(FindRootError::DirEntry)?;
+                meta_res = metas.select_next_some() => {
+                    let metadata = meta_res
+                        .map_err(ReadMetadataError::Access)
+                        .map_err(FindRootError::ReadMetadata)?;
 
                     let fut = async move {
                         self.marker
-                            .matches(&dir_entry)
+                            .matches(&metadata)
                             .await
                             .map_err(FindRootError::Marker)
                     };
@@ -164,15 +164,15 @@ impl<M> FindRootArgs<'_, M> {
 }
 
 impl<Fs: fs::Fs> RootMarker<Fs> for GitDirectory {
-    type Error = DirEntryError<Fs>;
+    type Error = ReadMetadataError<Fs>;
 
     async fn matches(
         &self,
-        dir_entry: &Fs::Metadata,
+        metadata: &Fs::Metadata,
     ) -> Result<bool, Self::Error> {
         use fs::Metadata;
-        Ok(dir_entry.name().map_err(DirEntryError::Name)? == ".git"
-            && dir_entry.node_kind().is_dir())
+        Ok(metadata.name().map_err(ReadMetadataError::Name)? == ".git"
+            && metadata.node_kind().is_dir())
     }
 }
 

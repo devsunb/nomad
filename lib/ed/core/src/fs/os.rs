@@ -167,9 +167,9 @@ impl Directory for OsDirectory {
     type CreateFileError = io::Error;
     type CreateSymlinkError = io::Error;
     type DeleteError = io::Error;
+    type ListError = io::Error;
     type ParentError = io::Error;
-    type ReadEntryError = io::Error;
-    type ReadError = io::Error;
+    type ReadMetadataError = io::Error;
 
     #[inline]
     async fn create_directory(
@@ -221,35 +221,11 @@ impl Directory for OsDirectory {
     }
 
     #[inline]
-    fn meta(&self) -> OsMetadata {
-        OsMetadata {
-            inner: self.metadata.clone(),
-            node_kind: NodeKind::Directory,
-            node_name: self
-                .name()
-                .map(|n| n.as_str().into())
-                .unwrap_or_default(),
-        }
-    }
-
-    #[inline]
-    async fn parent(&self) -> Result<Option<Self>, Self::ParentError> {
-        let Some(parent_path) = self.path().parent() else { return Ok(None) };
-        let metadata = async_fs::metadata(parent_path).await?;
-        Ok(Some(OsDirectory { path: parent_path.to_owned(), metadata }))
-    }
-
-    #[inline]
-    fn path(&self) -> &AbsPath {
-        &self.path
-    }
-
-    #[inline]
-    async fn read(
+    async fn list_metas(
         &self,
     ) -> Result<
-        impl Stream<Item = Result<OsMetadata, Self::ReadEntryError>> + use<>,
-        Self::ReadError,
+        impl Stream<Item = Result<OsMetadata, Self::ReadMetadataError>> + use<>,
+        Self::ListError,
     > {
         let read_dir = async_fs::read_dir(self.path()).await?.fuse();
         let get_metadata = stream::FuturesUnordered::new();
@@ -302,6 +278,30 @@ impl Directory for OsDirectory {
                 Some((metadata_res, (read_dir, get_metadata, dir_path)))
             },
         ))
+    }
+
+    #[inline]
+    fn meta(&self) -> OsMetadata {
+        OsMetadata {
+            inner: self.metadata.clone(),
+            node_kind: NodeKind::Directory,
+            node_name: self
+                .name()
+                .map(|n| n.as_str().into())
+                .unwrap_or_default(),
+        }
+    }
+
+    #[inline]
+    async fn parent(&self) -> Result<Option<Self>, Self::ParentError> {
+        let Some(parent_path) = self.path().parent() else { return Ok(None) };
+        let metadata = async_fs::metadata(parent_path).await?;
+        Ok(Some(OsDirectory { path: parent_path.to_owned(), metadata }))
+    }
+
+    #[inline]
+    fn path(&self) -> &AbsPath {
+        &self.path
     }
 
     #[inline]

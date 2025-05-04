@@ -611,9 +611,9 @@ impl fs::Directory for MockDirectory {
     type CreateSymlinkError = CreateNodeError;
     type ClearError = GetNodeError;
     type DeleteError = DeleteNodeError;
+    type ListError = ListDirError;
     type ParentError = GetNodeError;
-    type ReadEntryError = ReadDirNextError;
-    type ReadError = ReadDirError;
+    type ReadMetadataError = ReadMetadataError;
 
     async fn create_directory(
         &self,
@@ -668,20 +668,20 @@ impl fs::Directory for MockDirectory {
         self.fs.delete_node(&self.path)
     }
 
-    fn meta(&self) -> MockMetadata {
-        self.metadata.clone()
-    }
-
-    async fn read(&self) -> Result<ReadDir, Self::ReadError> {
+    async fn list_metas(&self) -> Result<ReadDir, Self::ListError> {
         let fs::FsNode::Directory(dir_handle) = self
             .fs
             .node_at_path(&*self.path)
             .await?
-            .ok_or(ReadDirError::NoNodeAtPath)?
+            .ok_or(ListDirError::NoNodeAtPath)?
         else {
-            return Err(ReadDirError::NoDirAtPath);
+            return Err(ListDirError::NoDirAtPath);
         };
         Ok(ReadDir { dir_handle, next_child_idx: 0 })
+    }
+
+    fn meta(&self) -> MockMetadata {
+        self.metadata.clone()
     }
 
     async fn parent(&self) -> Result<Option<Self>, Self::ParentError> {
@@ -885,7 +885,7 @@ impl fs::Metadata for MockMetadata {
 }
 
 impl Stream for ReadDir {
-    type Item = Result<MockMetadata, ReadDirNextError>;
+    type Item = Result<MockMetadata, ReadMetadataError>;
 
     fn poll_next(
         self: Pin<&mut Self>,
@@ -899,7 +899,7 @@ impl Stream for ReadDir {
                     Node::Directory(dir) => Some(dir),
                     _ => None,
                 })
-                .ok_or(ReadDirNextError::DirWasDeleted)?
+                .ok_or(ReadMetadataError::DirWasDeleted)?
                 .children
                 .get_index(*this.next_child_idx)
                 .map(|(_name, node)| node.metadata().clone()))
@@ -1021,7 +1021,7 @@ pub enum GetNodeError {
 }
 
 #[derive(Debug, derive_more::Display, cauchy::Error, PartialEq, Eq)]
-pub enum ReadDirError {
+pub enum ListDirError {
     #[display("no node at path")]
     NoNodeAtPath,
     #[display("no directory at path")]
@@ -1029,7 +1029,7 @@ pub enum ReadDirError {
 }
 
 #[derive(Debug, derive_more::Display, cauchy::Error, PartialEq, Eq)]
-pub enum ReadDirNextError {
+pub enum ReadMetadataError {
     #[display("directory has been deleted")]
     DirWasDeleted,
 }
@@ -1041,7 +1041,7 @@ pub struct NodeAlreadyExistsError {
     path: AbsPathBuf,
 }
 
-impl From<Infallible> for ReadDirError {
+impl From<Infallible> for ListDirError {
     fn from(_: Infallible) -> Self {
         unreachable!()
     }

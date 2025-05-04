@@ -72,7 +72,7 @@ where
     Filter(Fi::Error),
 
     /// TODO: docs.
-    Walker(W::ReadEntryError),
+    Walker(W::ReadMetadataError),
 }
 
 impl<F, W> Filtered<F, W> {
@@ -95,17 +95,17 @@ where
     Fi: Sync + Filter<Fs>,
     W: Sync + WalkDir<Fs>,
 {
-    type ReadError = W::ReadError;
-    type ReadEntryError = FilteredEntryError<Fi, Fs, W>;
+    type ListError = W::ListError;
+    type ReadMetadataError = FilteredEntryError<Fi, Fs, W>;
 
-    async fn read_dir(
+    async fn list_metas(
         &self,
         dir_path: &AbsPath,
     ) -> Result<
-        impl FusedStream<Item = Result<Fs::Metadata, Self::ReadEntryError>>,
-        Self::ReadError,
+        impl FusedStream<Item = Result<Fs::Metadata, Self::ReadMetadataError>>,
+        Self::ListError,
     > {
-        let entries = self.walker.read_dir(dir_path).await?;
+        let entries = self.walker.list_metas(dir_path).await?;
         let filters = stream::FuturesUnordered::new();
         Ok(stream::unfold(
             (Box::pin(entries), filters),

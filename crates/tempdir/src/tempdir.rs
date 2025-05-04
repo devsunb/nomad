@@ -30,8 +30,8 @@ impl Directory for TempDir {
     type ClearError = <os::OsDirectory as Directory>::ClearError;
     type DeleteError = <os::OsDirectory as Directory>::DeleteError;
     type ParentError = <os::OsDirectory as Directory>::ParentError;
-    type ReadEntryError = <os::OsDirectory as Directory>::ReadEntryError;
-    type ReadError = <os::OsDirectory as Directory>::ReadError;
+    type ReadMetadataError = <os::OsDirectory as Directory>::ReadMetadataError;
+    type ListError = <os::OsDirectory as Directory>::ListError;
 
     async fn create_directory(
         &self,
@@ -87,16 +87,16 @@ impl Directory for TempDir {
         <os::OsDirectory as Directory>::path(&self.os_dir)
     }
 
-    async fn read(
+    async fn list_metas(
         &self,
     ) -> Result<
         impl Stream<
-            Item = Result<<Self::Fs as Fs>::Metadata, Self::ReadEntryError>,
+            Item = Result<<Self::Fs as Fs>::Metadata, Self::ReadMetadataError>,
         > + Send
         + use<>,
-        Self::ReadError,
+        Self::ListError,
     > {
-        <os::OsDirectory as Directory>::read(&self.os_dir).await
+        <os::OsDirectory as Directory>::list_metas(&self.os_dir).await
     }
 
     fn watch(&self) -> Self::EventStream {

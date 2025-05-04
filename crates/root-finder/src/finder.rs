@@ -59,14 +59,14 @@ async fn contains_marker<Fs: fs::Fs>(
     dir: &Fs::Directory,
     marker: &impl Marker,
 ) -> Result<bool, FindRootError<Fs>> {
-    let entries = dir.read().await.map_err(FindRootError::ReadDir)?;
+    let metas = dir.list_metas().await.map_err(FindRootError::ListDir)?;
 
-    pin_mut!(entries);
+    pin_mut!(metas);
 
-    while let Some(res) = entries.next().await {
-        let entry = res.map_err(FindRootError::ReadDirEntry)?;
-        let node_name = entry.name().map_err(FindRootError::DirEntryName)?;
-        let node_kind = entry.node_kind();
+    while let Some(meta_res) = metas.next().await {
+        let meta = meta_res.map_err(FindRootError::ReadMetadata)?;
+        let node_name = meta.name().map_err(FindRootError::MetadataName)?;
+        let node_kind = meta.node_kind();
         if marker.matches(node_name, node_kind) {
             return Ok(true);
         }

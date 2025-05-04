@@ -30,13 +30,13 @@ pub trait Directory: Send + Sync + Sized {
     type DeleteError: Error + Send;
 
     /// TODO: docs.
+    type ListError: Error + Send;
+
+    /// TODO: docs.
     type ParentError: Error + Send;
 
     /// TODO: docs.
-    type ReadEntryError: Error + Send;
-
-    /// TODO: docs.
-    type ReadError: Error + Send;
+    type ReadMetadataError: Error + Send;
 
     /// TODO: docs.
     fn create_directory(
@@ -104,18 +104,18 @@ pub trait Directory: Send + Sync + Sized {
 
     /// TODO: docs.
     #[allow(clippy::type_complexity)]
-    fn read(
+    fn list_metas(
         &self,
     ) -> impl Future<
         Output = Result<
             impl Stream<
                 Item = Result<
                     <Self::Fs as Fs>::Metadata,
-                    Self::ReadEntryError,
+                    Self::ReadMetadataError,
                 >,
             > + Send
             + use<Self>,
-            Self::ReadError,
+            Self::ListError,
         >,
     > + Send;
 
@@ -127,8 +127,8 @@ pub trait Directory: Send + Sync + Sized {
     ) -> impl Future<Output = Result<(), ReplicateError<Self::Fs, Src::Fs>>> + Send
     where
         <Src::Fs as Fs>::Directory: Directory<
-                ReadEntryError = Src::ReadEntryError,
-                ReadError = Src::ReadError,
+                ReadMetadataError = Src::ReadMetadataError,
+                ListError = Src::ListError,
             >,
     {
         use fs::Metadata;
@@ -136,7 +136,7 @@ pub trait Directory: Send + Sync + Sized {
 
         async move {
             let metas =
-                src.read().await.map_err(ReplicateError::ReadDirectory)?;
+                src.list_metas().await.map_err(ReplicateError::ReadDirectory)?;
 
             pin_mut!(metas);
 
@@ -229,10 +229,10 @@ pub enum ReplicateError<Dst: Fs, Src: Fs> {
     MetadataName(#[from] fs::MetadataNameError),
 
     /// TODO: docs.
-    ReadDirectory(<Src::Directory as Directory>::ReadError),
+    ReadDirectory(<Src::Directory as Directory>::ListError),
 
     /// TODO: docs.
-    ReadEntry(<Src::Directory as Directory>::ReadEntryError),
+    ReadEntry(<Src::Directory as Directory>::ReadMetadataError),
 
     /// TODO: docs.
     ReadFile(<Src::File as fs::File>::ReadError),
