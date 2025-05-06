@@ -6,14 +6,25 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+collab = ["dep:collab"]
+neovim-repo = []
+
 [[bin]]
 name = "benches"
 path = "src/main.rs"
 bench = true
 
 [dependencies]
-collab = { workspace = true }
 criterion = "0.5"
+
+# Collab-related dependencies.
+collab = { workspace = true, optional = true }
+
+[build-dependencies]
+abs-path = { workspace = true, features = ["macros"] }
+anyhow = "1.0"
+git2 = { workspace = true }
 
 [lints]
 workspace = true

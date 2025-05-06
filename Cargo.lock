@@ -272,8 +272,11 @@ dependencies = [
 name = "benches"
 version = "0.1.0-dev"
 dependencies = [
+ "abs-path",
+ "anyhow",
  "collab",
  "criterion",
+ "git2",
 ]
 
 [[package]]

@@ -1,8 +1,12 @@
 #![allow(missing_docs)]
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_main};
 
-fn start(_c: &mut Criterion) {}
+fn benches() {
+    let mut criterion = Criterion::default().configure_from_args();
 
-criterion_group!(benches, start);
+    #[cfg(feature = "collab")]
+    benches::collab(&mut criterion);
+}
+
 criterion_main!(benches);
