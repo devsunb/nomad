@@ -43,7 +43,7 @@ fn setup_collab(out_dir: &AbsPath, generated_file: &mut String) {
         },
     }
 
-    generated_file.push('}');
+    generated_file.push_str("}\n");
 }
 
 /// Clones the Neovim repository into the `OUT_DIR` and checks out a specific
@@ -54,7 +54,7 @@ fn checkout_neovim_commit(out_dir: &AbsPath) -> anyhow::Result<String> {
     let repo = if Path::new(repo_path.as_str()).exists() {
         Repository::open(&repo_path)?
     } else {
-        Repository::clone("https://github.com/neovim/neovim.git", out_dir)?
+        Repository::clone("https://github.com/neovim/neovim.git", &repo_path)?
     };
 
     let commit_obj = repo.revparse_single(NEOVIM_COMMIT)?;
@@ -65,7 +65,7 @@ fn checkout_neovim_commit(out_dir: &AbsPath) -> anyhow::Result<String> {
         r#"
 #[cfg(feature = "neovim-repo")]
 pub(crate) const NEOVIM_REPO_PATH: &::abs_path::AbsPath =
-    unsafe {{ &::abs_path::AbsPath::from_str_unchecked({repo_path:?}) }};
-r"#
+    unsafe {{ &::abs_path::AbsPath::from_str_unchecked("{repo_path}") }};
+"#
     ))
 }
