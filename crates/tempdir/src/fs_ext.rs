@@ -32,8 +32,8 @@ pub enum TempDirError {
 
 impl FsExt for OsFs {
     async fn tempdir(&self) -> Result<TempDir, TempDirError> {
-        let temp_dir =
-            tempdir::TempDir::new("").map_err(TempDirError::CreateDir)?;
+        let temp_dir = tempdir_inner::TempDir::new("")
+            .map_err(TempDirError::CreateDir)?;
 
         let temp_dir_path = match <&AbsPath>::try_from(temp_dir.path()) {
             Ok(path) => path,

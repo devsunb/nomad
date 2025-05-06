@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use abs_path::{AbsPathBuf, path};
 use auth::Auth;
 use collab::Collab;

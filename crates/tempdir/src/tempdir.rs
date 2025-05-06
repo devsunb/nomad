@@ -6,13 +6,13 @@ use futures_util::Stream;
 pub struct TempDir {
     /// We need to keep the inner `TempDir` around so that the directory can
     /// be deleted when it is dropped.
-    _inner: tempdir::TempDir,
+    _inner: tempdir_inner::TempDir,
     os_dir: os::OsDirectory,
 }
 
 impl TempDir {
     pub(crate) fn new(
-        inner: tempdir::TempDir,
+        inner: tempdir_inner::TempDir,
         os_dir: os::OsDirectory,
     ) -> Self {
         Self { _inner: inner, os_dir }

@@ -1,6 +1,3 @@
-#![allow(missing_docs)]
-#![allow(clippy::unwrap_used)]
-
 use core::fmt;
 use std::collections::HashSet;
 
@@ -152,7 +149,7 @@ impl GitRepository for TempDir {
         &self,
         gitignore: &GitIgnore,
     ) -> NonIgnoredPaths {
-        use futures_util::StreamExt;
+        use futures_lite::StreamExt;
         use walkdir::FsExt;
 
         futures_executor::block_on(async move {

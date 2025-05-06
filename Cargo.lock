@@ -637,12 +637,10 @@ dependencies = [
  "ed",
  "fastrand",
  "flume",
- "futures-lite",
  "futures-util",
  "fxhash",
  "home",
  "indexmap",
- "mock",
  "neovim",
  "pin-project-lite",
  "serde",
@@ -2842,6 +2840,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "tests"
+version = "0.1.0-dev"
+dependencies = [
+ "abs-path",
+ "auth",
+ "collab",
+ "ed",
+ "flume",
+ "futures-executor",
+ "futures-lite",
+ "mock",
+ "tempdir 0.1.0-dev",
+ "walkdir 0.1.0-dev",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3027,11 +3041,8 @@ dependencies = [
  "derive_more",
  "ed",
  "flume",
- "futures-executor",
  "futures-util",
- "mock",
  "send-future",
- "tempdir 0.1.0-dev",
 ]
 
 [[package]]

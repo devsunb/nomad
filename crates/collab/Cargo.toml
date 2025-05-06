@@ -7,12 +7,7 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-mock = [
-  "dep:duplex-stream",
-  "auth/mock",
-  "collab-server/server",
-  "collab-server/test",
-]
+mock = ["dep:duplex-stream", "collab-server/server", "collab-server/test"]
 neovim = [
   "dep:async-net",
   "dep:clipboard",
@@ -53,17 +48,5 @@ clipboard = { workspace = true, optional = true }
 home = { version = "0.5", optional = true }
 neovim = { workspace = true, optional = true }
 
-[dev-dependencies]
-futures-lite = { workspace = true, features = ["default"] }
-mock = { workspace = true }
-
 [lints]
 workspace = true
-
-[[test]]
-name = "join"
-required-features = ["mock"]
-
-[[test]]
-name = "start"
-required-features = ["mock"]
