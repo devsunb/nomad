@@ -7,8 +7,18 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-collab = ["dep:collab", "dep:walkdir"]
-neovim-repo = ["ed/os-fs", "walkdir?/gitignore"]
+collab = [
+  "dep:collab",
+  "dep:walkdir",
+  # These are actually only needed when the `neovim-repo` feature is turned on,
+  # but since it's up to the build script to decide whether to turn it on, we
+  # need to eagerly enable them here.
+  #
+  # See https://github.com/rust-lang/cargo/issues/5499 for more infos.
+  "ed/os-fs",
+  "walkdir?/gitignore",
+]
+neovim-repo = []
 
 [[bin]]
 name = "benches"
