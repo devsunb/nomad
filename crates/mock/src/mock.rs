@@ -61,7 +61,7 @@ pub(crate) enum CallbackKind {
 }
 
 impl<Fs: fs::Fs> Mock<Fs> {
-    pub fn new(fs: impl Into<Fs>) -> Self {
+    pub fn new(fs: Fs) -> Self {
         let local_executor = Executor::default();
         Self {
             background_executor: local_executor.clone(),
@@ -69,7 +69,7 @@ impl<Fs: fs::Fs> Mock<Fs> {
             callbacks: Default::default(),
             current_buffer: None,
             emitter: Default::default(),
-            fs: fs.into(),
+            fs,
             local_executor,
             next_buffer_id: BufferId(1),
         }
