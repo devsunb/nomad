@@ -7,30 +7,22 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-collab = [
-  "dep:collab",
-  "dep:walkdir",
-  # These are actually only needed when the `neovim-repo` feature is turned on,
-  # but since it's up to the build script to decide whether to turn it on, we
-  # need to eagerly enable them here.
-  #
-  # See https://github.com/rust-lang/cargo/issues/5499 for more infos.
-  "ed/os-fs",
-  "walkdir?/gitignore",
-]
+collab = ["dep:collab", "dep:walkdir"]
+
+# Features that should only be enabled by the build script.
 neovim-repo = []
 
 [dependencies]
 abs-path = { workspace = true }
 criterion = "0.5"
-ed = { workspace = true }
+ed = { workspace = true, features = ["os-fs"] }
 futures-lite = { workspace = true }
 mock = { workspace = true }
 thread-pool = { workspace = true }
 
 # Collab-related dependencies.
 collab = { workspace = true, optional = true, features = ["benches", "mock"] }
-walkdir = { workspace = true, optional = true }
+walkdir = { workspace = true, optional = true, features = ["gitignore"] }
 
 [build-dependencies]
 abs-path = { workspace = true, features = ["macros"] }

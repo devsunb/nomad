@@ -9,8 +9,10 @@ publish.workspace = true
 [features]
 auth = ["dep:auth"]
 collab = ["dep:auth", "dep:collab", "dep:flume"]
-git-in-PATH = []
 walkdir = ["dep:futures-executor", "dep:tempdir", "dep:walkdir"]
+
+# Features that should only be enabled by the build script.
+git-in-PATH = []
 
 [dependencies]
 abs-path = { workspace = true, features = ["macros"] }
