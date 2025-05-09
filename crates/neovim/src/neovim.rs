@@ -1,13 +1,13 @@
 use ::serde::{Deserialize, Serialize};
-use ed::Shared;
-use ed::backend::{Backend, Buffer};
-use ed::fs::{self, AbsPath};
+use ed::backend::{Backend, BaseBackend, Buffer};
+use ed::fs::os::OsFs;
+use ed::fs::{self, AbsPath, Fs};
 use ed::notify::Namespace;
 use ed::plugin::Plugin;
-use nvim_oxi::api::Window;
+use ed::{AsyncCtx, Shared};
 use thread_pool::ThreadPool;
 
-use crate::buffer::{BufferId, NeovimBuffer};
+use crate::buffer::{BufferId, NeovimBuffer, Point};
 use crate::events::{self, EventHandle, Events};
 use crate::{api, executor, notify, oxi, serde, value};
 
@@ -17,6 +17,12 @@ pub struct Neovim {
     events: Shared<Events>,
     local_executor: executor::NeovimLocalExecutor,
     background_executor: ThreadPool,
+}
+
+/// TODO: docs.
+#[derive(Debug)]
+pub struct CreateBufferError {
+    inner: fs::ReadFileToStringError<OsFs>,
 }
 
 impl Neovim {
@@ -54,6 +60,7 @@ impl Backend for Neovim {
     type Selection<'a> = NeovimBuffer<'a>;
     type SelectionId = BufferId;
 
+    type CreateBufferError = CreateBufferError;
     type SerializeError = serde::NeovimSerializeError;
     type DeserializeError = serde::NeovimDeserializeError;
 
@@ -85,6 +92,14 @@ impl Backend for Neovim {
     }
 
     #[inline]
+    async fn create_buffer(
+        file_path: &AbsPath,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Self::BufferId, Self::CreateBufferError> {
+        <Self as BaseBackend>::create_buffer(file_path, ctx).await
+    }
+
+    #[inline]
     fn cursor(&mut self, buf_id: Self::CursorId) -> Option<Self::Cursor<'_>> {
         let buffer = self.buffer(buf_id)?;
         buffer.is_focused().then_some(buffer)
@@ -98,30 +113,6 @@ impl Backend for Neovim {
     #[inline]
     fn local_executor(&mut self) -> &mut Self::LocalExecutor {
         &mut self.local_executor
-    }
-
-    #[inline]
-    fn focus_buffer_at(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
-        let buf = oxi::api::call_function::<_, oxi::api::Buffer>(
-            "bufadd",
-            (path.as_str(),),
-        )
-        .ok()?;
-
-        if !buf.is_loaded() {
-            oxi::api::set_option_value(
-                "buflisted",
-                true,
-                &oxi::api::opts::OptionOpts::builder()
-                    .buffer(buf.clone())
-                    .build(),
-            )
-            .ok()?;
-        }
-
-        Window::current().set_buf(&buf).ok()?;
-
-        Some(NeovimBuffer::new(BufferId::new(buf), &self.events))
     }
 
     #[inline]
@@ -171,5 +162,55 @@ impl Backend for Neovim {
     ) {
         err.set_config_path(config_path.clone());
         self.emit_err(namespace, err);
+    }
+}
+
+impl BaseBackend for Neovim {
+    #[inline]
+    async fn create_buffer<B: Backend + AsMut<Self>>(
+        file_path: &AbsPath,
+        ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<Self::BufferId, Self::CreateBufferError> {
+        let contents = ctx
+            .with_backend(|b| b.as_mut().fs())
+            .read_to_string(file_path)
+            .await
+            .map_err(|inner| CreateBufferError { inner })?;
+
+        let buf_id: BufferId = oxi::api::create_buf(true, false)
+            .expect("couldn't create buf")
+            .into();
+
+        ctx.with_backend(|b| {
+            let buffer = NeovimBuffer::new(buf_id, &b.as_mut().events);
+
+            buffer.replace_text_in_point_range(
+                Point::zero()..Point::zero(),
+                &contents,
+            );
+
+            buffer.inner().set_name(file_path).expect("couldn't set name");
+
+            // TODO: do we have to set the buffer's filename?
+            // vim.filetype.match(buffer.inner())
+
+            Ok(buffer.id())
+        })
+    }
+}
+
+impl AsMut<Self> for Neovim {
+    #[inline]
+    fn as_mut(&mut self) -> &mut Self {
+        self
+    }
+}
+
+impl ed::notify::Error for CreateBufferError {
+    fn to_message(&self) -> (ed::notify::Level, ed::notify::Message) {
+        (
+            ed::notify::Level::Error,
+            ed::notify::Message::from_display(&self.inner),
+        )
     }
 }

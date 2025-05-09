@@ -11,7 +11,7 @@ use collab_server::message::PeerId;
 use collab_server::test::{TestConfig as InnerConfig, TestSessionId};
 use duplex_stream::{DuplexStream, duplex};
 use ed::AsyncCtx;
-use ed::backend::{ApiValue, Backend, Buffer, BufferId};
+use ed::backend::{ApiValue, Backend, BaseBackend, Buffer, BufferId};
 use ed::fs::{self, AbsPath, AbsPathBuf};
 use ed::notify::{self, MaybeResult};
 use serde::{Deserialize, Serialize};
@@ -213,7 +213,7 @@ impl AnyError {
 
 impl<B, F> CollabBackend for CollabMock<B, F>
 where
-    B: Backend,
+    B: BaseBackend,
     F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
 {
     type Io = DuplexStream;
@@ -307,7 +307,7 @@ where
 
 impl<B, F> Backend for CollabMock<B, F>
 where
-    B: Backend,
+    B: BaseBackend,
     F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
 {
     const REINSTATE_PANIC_HOOK: bool = B::REINSTATE_PANIC_HOOK;
@@ -324,6 +324,8 @@ where
     type EventHandle = <B as Backend>::EventHandle;
     type Selection<'a> = <B as Backend>::Selection<'a>;
     type SelectionId = <B as Backend>::SelectionId;
+
+    type CreateBufferError = <B as Backend>::CreateBufferError;
     type SerializeError = <B as Backend>::SerializeError;
     type DeserializeError = <B as Backend>::DeserializeError;
 
@@ -337,6 +339,12 @@ where
         &mut self,
     ) -> impl Iterator<Item = BufferId<Self>> + use<B, F> {
         self.inner.buffer_ids()
+    }
+    async fn create_buffer(
+        file_path: &AbsPath,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Self::BufferId, Self::CreateBufferError> {
+        <B as BaseBackend>::create_buffer(file_path, ctx).await
     }
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.inner.current_buffer()
@@ -352,9 +360,6 @@ where
     }
     fn local_executor(&mut self) -> &mut Self::LocalExecutor {
         self.inner.local_executor()
-    }
-    fn focus_buffer_at(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
-        self.inner.focus_buffer_at(path)
     }
     fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
         self.inner.background_executor()
@@ -388,6 +393,12 @@ where
         V: Deserialize<'de>,
     {
         self.inner.deserialize(value)
+    }
+}
+
+impl<B: Backend, F> AsMut<B> for CollabMock<B, F> {
+    fn as_mut(&mut self) -> &mut B {
+        &mut self.inner
     }
 }
 

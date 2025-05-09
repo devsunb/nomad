@@ -23,7 +23,7 @@ pub use directory::{
     ReplicateError,
 };
 pub use file::{File, FileEvent};
-pub use fs::Fs;
+pub use fs::{Fs, ReadFileError, ReadFileToStringError};
 pub use fs_event::{FsEvent, FsEventKind};
 pub use fs_node::{FsNode, NodeDeleteError};
 pub use metadata::{Metadata, MetadataNameError};

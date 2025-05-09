@@ -3,6 +3,7 @@
 mod agent_id;
 mod api;
 mod backend;
+mod base_backend;
 mod buffer;
 mod executor;
 mod value;
@@ -10,6 +11,7 @@ mod value;
 pub use agent_id::AgentId;
 pub use api::Api;
 pub use backend::Backend;
+pub use base_backend::BaseBackend;
 pub use buffer::{Buffer, Edit, Replacement};
 pub use executor::{
     BackgroundExecutor,

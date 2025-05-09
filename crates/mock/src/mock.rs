@@ -4,13 +4,13 @@ use ed::backend::{
     ApiValue,
     Backend,
     BackgroundExecutor,
-    Buffer as _,
+    BaseBackend,
     Edit,
     LocalExecutor,
 };
-use ed::fs::{self, File, FsNode};
-use ed::notify::MaybeResult;
+use ed::notify::{self, MaybeResult};
 use ed::shared::Shared;
+use ed::{AsyncCtx, fs};
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use slotmap::{DefaultKey, SlotMap};
@@ -47,6 +47,11 @@ pub struct EventHandle {
     callbacks: Callbacks,
 }
 
+#[derive(cauchy::Debug, cauchy::PartialEq, cauchy::Eq)]
+pub struct CreateBufferError<Fs: fs::Fs> {
+    inner: fs::ReadFileToStringError<Fs>,
+}
+
 #[derive(Default)]
 pub(crate) struct Callbacks {
     inner: Shared<SlotMap<DefaultKey, CallbackKind>>,
@@ -60,7 +65,7 @@ pub(crate) enum CallbackKind {
     OnBufferSaved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
 }
 
-impl<Fs: fs::Fs> Mock<Fs> {
+impl<Fs> Mock<Fs> {
     pub fn new(fs: Fs) -> Self {
         let local_executor = Executor::default();
         Self {
@@ -107,41 +112,8 @@ where
         Buffer {
             inner: self.buffers.get_mut(&id).expect("buffer exists"),
             callbacks: &self.callbacks,
+            current_buffer: &mut self.current_buffer,
         }
-    }
-
-    #[track_caller]
-    fn open_buffer(&mut self, path: &AbsPath) -> Buffer<'_> {
-        assert!(self.buffer_at(path).is_none());
-
-        let contents = futures_lite::future::block_on(async {
-            let file = match self
-                .fs()
-                .node_at_path(path)
-                .await
-                .expect("infallible")
-                .expect("no file at path")
-            {
-                FsNode::File(file) => file,
-                _ => todo!(),
-            };
-
-            str::from_utf8(&file.read().await.expect("just got file"))
-                .expect("file is not valid UTF-8")
-                .into()
-        });
-
-        let buffer = BufferInner::new(
-            self.next_buffer_id.post_inc(),
-            path.to_string(),
-            contents,
-        );
-
-        let buffer_id = buffer.id;
-
-        self.buffers.insert(buffer.id, buffer);
-
-        self.buffer_mut(buffer_id)
     }
 }
 
@@ -182,6 +154,7 @@ where
     type Selection<'a> = Selection<'a>;
     type SelectionId = SelectionId;
 
+    type CreateBufferError = CreateBufferError<Fs>;
     type SerializeError = SerializeError;
     type DeserializeError = DeserializeError;
 
@@ -199,6 +172,13 @@ where
         &mut self,
     ) -> impl Iterator<Item = BufferId> + use<Fs, LocalEx, BackgroundEx> {
         self.buffers.keys().copied().collect::<Vec<_>>().into_iter()
+    }
+
+    async fn create_buffer(
+        file_path: &AbsPath,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Self::BufferId, Self::CreateBufferError> {
+        <Self as BaseBackend>::create_buffer(file_path, ctx).await
     }
 
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
@@ -223,15 +203,6 @@ where
 
     fn local_executor(&mut self) -> &mut Self::LocalExecutor {
         &mut self.local_executor
-    }
-
-    fn focus_buffer_at(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
-        let buf_id = self
-            .buffer_at(path)
-            .map(|buf| buf.id)
-            .unwrap_or_else(|| self.open_buffer(path).id());
-        self.current_buffer = Some(buf_id);
-        Some(self.buffer_mut(buf_id))
     }
 
     fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
@@ -274,14 +245,59 @@ where
     }
 }
 
-impl<Fs: fs::Fs + Default> Default for Mock<Fs> {
+impl<Fs, LocalEx, BackgroundEx> BaseBackend for Mock<Fs, LocalEx, BackgroundEx>
+where
+    Fs: fs::Fs,
+    LocalEx: LocalExecutor + 'static,
+    BackgroundEx: BackgroundExecutor,
+{
+    async fn create_buffer<B: Backend + AsMut<Self>>(
+        file_path: &AbsPath,
+        ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<Self::BufferId, Self::CreateBufferError> {
+        let contents = ctx
+            .with_backend(|b| b.as_mut().fs())
+            .read_to_string(file_path)
+            .await
+            .map_err(|inner| CreateBufferError { inner })?;
+
+        ctx.with_backend(|backend| {
+            let this = backend.as_mut();
+
+            let buffer_id = this.next_buffer_id.post_inc();
+
+            this.buffers.insert(
+                buffer_id,
+                BufferInner::new(buffer_id, file_path.to_string(), contents),
+            );
+
+            Ok(buffer_id)
+        })
+    }
+}
+
+impl<Fs: Default> Default for Mock<Fs> {
     fn default() -> Self {
         Self::new(Fs::default())
+    }
+}
+
+impl<Fs, LocalEx, BackgroundEx> AsMut<Self>
+    for Mock<Fs, LocalEx, BackgroundEx>
+{
+    fn as_mut(&mut self) -> &mut Self {
+        self
     }
 }
 
 impl Drop for EventHandle {
     fn drop(&mut self) {
         self.callbacks.inner.with_mut(|map| map.remove(self.key));
+    }
+}
+
+impl<Fs: fs::Fs> notify::Error for CreateBufferError<Fs> {
+    fn to_message(&self) -> (notify::Level, notify::Message) {
+        (notify::Level::Error, notify::Message::from_display(&self.inner))
     }
 }

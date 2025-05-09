@@ -26,7 +26,7 @@ pub struct NeovimBuffer<'a> {
 pub struct BufferId(BufHandle);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-struct Point {
+pub(crate) struct Point {
     /// The index of the line in the buffer.
     line_idx: usize,
 
@@ -46,6 +46,12 @@ impl<'a> NeovimBuffer<'a> {
         self.inner().get_name().expect("buffer exists")
     }
 
+    #[inline]
+    pub(crate) fn inner(&self) -> api::Buffer {
+        debug_assert!(self.id.is_valid());
+        self.id.into()
+    }
+
     #[track_caller]
     #[inline]
     pub(crate) fn is_focused(self) -> bool {
@@ -57,6 +63,30 @@ impl<'a> NeovimBuffer<'a> {
     pub(crate) fn new(id: BufferId, events: &'a Shared<Events>) -> Self {
         debug_assert!(id.is_valid());
         Self { id, events }
+    }
+
+    /// Replaces the text in the given point range with the new text.
+    #[track_caller]
+    #[inline]
+    pub(crate) fn replace_text_in_point_range(
+        &self,
+        delete_range: Range<Point>,
+        insert_text: &str,
+    ) {
+        // If the text has a trailing newline, Neovim expects an additional
+        // empty line to be included.
+        let lines = insert_text
+            .lines()
+            .chain(insert_text.ends_with('\n').then_some(""));
+
+        self.inner()
+            .set_text(
+                delete_range.start.line_idx..delete_range.end.line_idx,
+                delete_range.start.byte_offset.into(),
+                delete_range.end.byte_offset.into(),
+                lines,
+            )
+            .expect("replacing text failed");
     }
 
     /// Converts the arguments given to the
@@ -182,12 +212,6 @@ impl<'a> NeovimBuffer<'a> {
         text
     }
 
-    #[inline]
-    fn inner(&self) -> api::Buffer {
-        debug_assert!(self.id.is_valid());
-        self.id.into()
-    }
-
     /// Converts the given [`ByteOffset`] to the corresponding [`Point`] in the
     /// buffer.
     #[track_caller]
@@ -239,30 +263,6 @@ impl<'a> NeovimBuffer<'a> {
 
         point_of_eof(self).expect("not deleted")
     }
-
-    /// Replaces the text in the given point range with the new text.
-    #[track_caller]
-    #[inline]
-    fn replace_text_in_point_range(
-        &self,
-        delete_range: Range<Point>,
-        insert_text: &str,
-    ) {
-        // If the text has a trailing newline, Neovim expects an additional
-        // empty line to be included.
-        let lines = insert_text
-            .lines()
-            .chain(insert_text.ends_with('\n').then_some(""));
-
-        self.inner()
-            .set_text(
-                delete_range.start.line_idx..delete_range.end.line_idx,
-                delete_range.start.byte_offset.into(),
-                delete_range.end.byte_offset.into(),
-                lines,
-            )
-            .expect("replacing text failed");
-    }
 }
 
 impl BufferId {
@@ -290,7 +290,7 @@ impl BufferId {
 
 impl Point {
     /// TODO: docs.
-    fn zero() -> Self {
+    pub(crate) fn zero() -> Self {
         Self { line_idx: 0, byte_offset: ByteOffset::new(0) }
     }
 }
@@ -330,6 +330,13 @@ impl Buffer for NeovimBuffer<'_> {
                 replacement.inserted_text(),
             );
         }
+    }
+
+    #[inline]
+    fn focus(&mut self) {
+        api::Window::current()
+            .set_buf(&self.inner())
+            .expect("buffer is valid");
     }
 
     #[inline]
@@ -378,6 +385,13 @@ impl From<NeovimBuffer<'_>> for api::Buffer {
     #[inline]
     fn from(buf: NeovimBuffer) -> Self {
         buf.id().into()
+    }
+}
+
+impl From<api::Buffer> for BufferId {
+    #[inline]
+    fn from(buf: api::Buffer) -> Self {
+        Self(buf.handle())
     }
 }
 

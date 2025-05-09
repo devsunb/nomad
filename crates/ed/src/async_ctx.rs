@@ -1,13 +1,15 @@
 use core::marker::PhantomData;
 
+use abs_path::AbsPath;
+
 use crate::backend::{
     AgentId,
     Backend,
     BackgroundExecutor,
+    Buffer,
     TaskBackground,
     TaskLocal,
 };
-use crate::fs::AbsPath;
 use crate::notify::{Namespace, NotificationId};
 use crate::plugin::PluginId;
 use crate::state::StateHandle;
@@ -30,6 +32,30 @@ impl<B: Backend> AsyncCtx<'_, B> {
 
     /// TODO: docs.
     #[inline]
+    pub async fn create_and_focus(
+        &mut self,
+        file_path: &AbsPath,
+    ) -> Result<B::BufferId, B::CreateBufferError> {
+        let buffer_id = self.create_buffer(file_path).await?;
+        self.with_backend(|backend| {
+            if let Some(mut buffer) = backend.buffer(buffer_id.clone()) {
+                buffer.focus()
+            }
+        });
+        Ok(buffer_id)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub async fn create_buffer(
+        &mut self,
+        file_path: &AbsPath,
+    ) -> Result<B::BufferId, B::CreateBufferError> {
+        B::create_buffer(file_path, self).await
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn emit_err<Err>(&self, err: Err) -> NotificationId
     where
         Err: notify::Error,
@@ -41,15 +67,6 @@ impl<B: Backend> AsyncCtx<'_, B> {
     #[inline]
     pub fn emit_info(&self, message: notify::Message) -> NotificationId {
         self.emit_message(notify::Level::Info, message)
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn focus_buffer_at(
-        &self,
-        path: &AbsPath,
-    ) -> Result<(), core::convert::Infallible> {
-        self.with_ctx(move |ctx| ctx.focus_buffer_at(path).map(|_| ()))
     }
 
     /// TODO: docs.

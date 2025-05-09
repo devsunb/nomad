@@ -1,7 +1,6 @@
 use core::ops::{Deref, DerefMut, Range};
 use std::borrow::Cow;
 
-use crop::Rope;
 use ed::ByteOffset;
 use ed::backend::{self, AgentId, Buffer as _, Edit, Replacement};
 use slotmap::SlotMap;
@@ -14,6 +13,7 @@ type AnnotationId = slotmap::DefaultKey;
 pub struct Buffer<'a> {
     pub(crate) inner: &'a mut BufferInner,
     pub(crate) callbacks: &'a Callbacks,
+    pub(crate) current_buffer: &'a mut Option<BufferId>,
 }
 
 /// TODO: docs.
@@ -50,7 +50,7 @@ pub struct SelectionId {
 #[doc(hidden)]
 pub struct BufferInner {
     pub(crate) cursors: SlotMap<AnnotationId, CursorInner>,
-    pub(crate) contents: Rope,
+    pub(crate) contents: String,
     pub(crate) id: BufferId,
     pub(crate) name: String,
     pub(crate) selections: SlotMap<AnnotationId, SelectionInner>,
@@ -113,7 +113,7 @@ impl SelectionId {
 }
 
 impl BufferInner {
-    pub(crate) fn new(id: BufferId, name: String, contents: Rope) -> Self {
+    pub(crate) fn new(id: BufferId, name: String, contents: String) -> Self {
         Self {
             cursors: Default::default(),
             contents,
@@ -188,7 +188,7 @@ impl backend::Buffer for Buffer<'_> {
     type EventHandle = mock::EventHandle;
 
     fn byte_len(&self) -> ByteOffset {
-        self.contents.byte_len().into()
+        self.contents.len().into()
     }
 
     fn id(&self) -> Self::Id {
@@ -206,7 +206,7 @@ impl backend::Buffer for Buffer<'_> {
 
         for replacement in &edit.replacements {
             let range = replacement.removed_range();
-            self.contents.replace(
+            self.contents.replace_range(
                 usize::from(range.start)..usize::from(range.end),
                 replacement.inserted_text(),
             );
@@ -227,6 +227,10 @@ impl backend::Buffer for Buffer<'_> {
                 }
             }
         });
+    }
+
+    fn focus(&mut self) {
+        *self.current_buffer = Some(self.id);
     }
 
     fn name(&self) -> Cow<'_, str> {

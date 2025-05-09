@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use ed::backend::{ApiValue, Backend, BufferId};
+use ed::backend::{ApiValue, Backend, BaseBackend, BufferId};
 use ed::fs::AbsPath;
 use ed::notify::MaybeResult;
 use ed::{AsyncCtx, EditorCtx};
@@ -8,17 +8,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::{AuthBackend, AuthInfos};
 
-pub struct AuthMock<B: Backend> {
+pub struct AuthMock<B> {
     inner: B,
 }
 
-impl<B: Backend> AuthMock<B> {
+impl<B> AuthMock<B> {
     pub fn new(inner: B) -> Self {
         Self { inner }
     }
 }
 
-impl<B: Backend> AuthBackend for AuthMock<B> {
+impl<B: BaseBackend> AuthBackend for AuthMock<B> {
     type LoginError = core::convert::Infallible;
 
     #[allow(clippy::manual_async_fn)]
@@ -36,7 +36,7 @@ impl<B: Backend> AuthBackend for AuthMock<B> {
     }
 }
 
-impl<B: Backend> Backend for AuthMock<B> {
+impl<B: BaseBackend> Backend for AuthMock<B> {
     const REINSTATE_PANIC_HOOK: bool = B::REINSTATE_PANIC_HOOK;
 
     type Api = <B as Backend>::Api;
@@ -51,6 +51,8 @@ impl<B: Backend> Backend for AuthMock<B> {
     type EventHandle = <B as Backend>::EventHandle;
     type Selection<'a> = <B as Backend>::Selection<'a>;
     type SelectionId = <B as Backend>::SelectionId;
+
+    type CreateBufferError = <B as Backend>::CreateBufferError;
     type SerializeError = <B as Backend>::SerializeError;
     type DeserializeError = <B as Backend>::DeserializeError;
 
@@ -62,6 +64,12 @@ impl<B: Backend> Backend for AuthMock<B> {
     }
     fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId<Self>> + use<B> {
         self.inner.buffer_ids()
+    }
+    async fn create_buffer(
+        file_path: &AbsPath,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> Result<Self::BufferId, Self::CreateBufferError> {
+        <B as BaseBackend>::create_buffer(file_path, ctx).await
     }
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.inner.current_buffer()
@@ -77,9 +85,6 @@ impl<B: Backend> Backend for AuthMock<B> {
     }
     fn local_executor(&mut self) -> &mut Self::LocalExecutor {
         self.inner.local_executor()
-    }
-    fn focus_buffer_at(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
-        self.inner.focus_buffer_at(path)
     }
     fn background_executor(&mut self) -> &mut Self::BackgroundExecutor {
         self.inner.background_executor()
@@ -113,5 +118,11 @@ impl<B: Backend> Backend for AuthMock<B> {
         V: Deserialize<'de>,
     {
         self.inner.deserialize(value)
+    }
+}
+
+impl<B> AsMut<B> for AuthMock<B> {
+    fn as_mut(&mut self) -> &mut B {
+        &mut self.inner
     }
 }

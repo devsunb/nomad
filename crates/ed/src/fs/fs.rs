@@ -3,6 +3,8 @@ use core::fmt::Debug;
 use core::future::Future;
 use core::hash::Hash;
 
+use abs_path::AbsPathBuf;
+
 use crate::fs::{AbsPath, Directory, File, FsNode, Metadata, Symlink};
 
 /// TODO: docs.
@@ -81,4 +83,79 @@ pub trait Fs: Clone + Send + Sync + 'static {
             })
         }
     }
+
+    /// TODO: docs.
+    #[inline]
+    fn read<P: AsRef<AbsPath> + Send>(
+        &self,
+        _path: P,
+    ) -> impl Future<Output = Result<Vec<u8>, ReadFileError<Self>>> + Send
+    {
+        async move {
+            todo!();
+        }
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn read_to_string<P: AsRef<AbsPath> + Send>(
+        &self,
+        _path: P,
+    ) -> impl Future<Output = Result<String, ReadFileToStringError<Self>>> + Send
+    {
+        async move {
+            todo!();
+        }
+    }
+}
+
+/// TODO: docs.
+#[derive(
+    cauchy::Debug,
+    derive_more::Display,
+    cauchy::Error,
+    cauchy::PartialEq,
+    cauchy::Eq,
+)]
+pub enum ReadFileError<Fs: self::Fs> {
+    /// TODO: docs.
+    #[display("{_0}")]
+    NodeAtPath(Fs::NodeAtPathError),
+
+    /// TODO: docs.
+    #[display("{_0}")]
+    ReadFile(<Fs::File as File>::ReadError),
+
+    /// TODO: docs.
+    #[display("{_0}")]
+    FollowSymlink(<Fs::Symlink as Symlink>::FollowError),
+
+    /// TODO: docs.
+    #[display("no file or directory at {_0}")]
+    NoNodeAtPath(AbsPathBuf),
+
+    /// TODO: docs.
+    #[display("node at {_0} is a directory, but expected a file")]
+    DirectoryAtPath(AbsPathBuf),
+}
+
+/// TODO: docs.
+#[derive(
+    cauchy::Debug,
+    derive_more::Display,
+    cauchy::Error,
+    cauchy::PartialEq,
+    cauchy::Eq,
+)]
+pub enum ReadFileToStringError<Fs: self::Fs> {
+    /// TODO: docs.
+    #[display("{_0}")]
+    ReadFile(ReadFileError<Fs>),
+
+    /// TODO: docs.
+    #[display(
+        "tried to read contents of file {_0} into a string, but it contains \
+         binary data"
+    )]
+    FileIsNotUtf8(AbsPathBuf),
 }

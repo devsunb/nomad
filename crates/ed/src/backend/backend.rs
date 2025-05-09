@@ -1,6 +1,7 @@
 use core::fmt::Debug;
 use core::hash::Hash;
 
+use abs_path::AbsPath;
 use serde::Serialize;
 use serde::de::Deserialize;
 
@@ -17,7 +18,7 @@ use crate::backend::{
 use crate::notify::{self, Emitter, MaybeResult};
 use crate::plugin::Plugin;
 use crate::state::StateHandle;
-use crate::{EditorCtx, fs};
+use crate::{AsyncCtx, EditorCtx, fs};
 
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
@@ -61,6 +62,9 @@ pub trait Backend: 'static + Sized {
     type SelectionId: Clone + Debug + Eq + Hash;
 
     /// TODO: docs.
+    type CreateBufferError: notify::Error;
+
+    /// TODO: docs.
     type SerializeError: notify::Error;
 
     /// TODO: docs.
@@ -70,15 +74,18 @@ pub trait Backend: 'static + Sized {
     fn buffer(&mut self, id: Self::BufferId) -> Option<Self::Buffer<'_>>;
 
     /// TODO: docs.
-    fn buffer_at_path(
-        &mut self,
-        path: &fs::AbsPath,
-    ) -> Option<Self::Buffer<'_>>;
+    fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>>;
 
     /// TODO: docs.
     fn buffer_ids(
         &mut self,
     ) -> impl Iterator<Item = Self::BufferId> + use<Self>;
+
+    /// TODO: docs.
+    fn create_buffer(
+        file_path: &AbsPath,
+        ctx: &mut AsyncCtx<'_, Self>,
+    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>;
 
     /// TODO: docs.
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>>;
@@ -91,12 +98,6 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     fn emitter(&mut self) -> Self::Emitter<'_>;
-
-    /// TODO: docs.
-    fn focus_buffer_at(
-        &mut self,
-        path: &fs::AbsPath,
-    ) -> Option<Self::Buffer<'_>>;
 
     /// TODO: docs.
     fn local_executor(&mut self) -> &mut Self::LocalExecutor;

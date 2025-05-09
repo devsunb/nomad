@@ -30,7 +30,7 @@ fn replicate_simple_project() {
 
     let run_peer1 = peer1.run_all(async move |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer1"));
-        ctx.focus_buffer_at(path!("/foo/mars.txt")).unwrap();
+        ctx.create_and_focus(path!("/foo/mars.txt")).await.unwrap();
         collab.start().call((), ctx).await.unwrap();
         started_tx.send(SessionId(1)).unwrap();
     });

@@ -64,15 +64,6 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
-    pub fn focus_buffer_at(
-        &mut self,
-        path: &AbsPath,
-    ) -> Result<Option<B::Buffer<'_>>, core::convert::Infallible> {
-        Ok(self.backend_mut().focus_buffer_at(path))
-    }
-
-    /// TODO: docs.
-    #[inline]
     pub fn for_each_buffer(&mut self, fun: impl FnMut(B::Buffer<'_>)) {
         self.backend_mut().for_each_buffer(fun);
     }

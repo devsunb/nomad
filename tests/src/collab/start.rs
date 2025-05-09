@@ -36,7 +36,7 @@ fn cannot_start_session_if_project_root_is_fs_root() {
 
     backend.block_on(async |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer1"));
-        ctx.focus_buffer_at(path!("/foo.txt")).unwrap();
+        ctx.create_and_focus(path!("/foo.txt")).await.unwrap();
         let err = collab.start().call((), ctx).await.unwrap_err();
         assert_eq!(err, StartError::ProjectRootIsFsRoot);
     });
@@ -65,13 +65,13 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
         let collab = Collab::from(&Auth::logged_in("peer1"));
 
         // Start session at "/a/b".
-        ctx.focus_buffer_at(path!("/a/b/bar.txt")).unwrap();
+        ctx.create_and_focus(path!("/a/b/bar.txt")).await.unwrap();
         collab.start().call((), ctx).await.unwrap();
         let project = collab.project(SessionId(1)).unwrap();
         assert_eq!(project.root(), "/a/b");
 
         // Can't start new session at "/a", it overlaps "/a/b".
-        ctx.focus_buffer_at(path!("/a/foo.txt")).unwrap();
+        ctx.create_and_focus(path!("/a/foo.txt")).await.unwrap();
         let err = match collab.start().call((), ctx).await.unwrap_err() {
             StartError::OverlappingProject(err) => err,
             other => panic!("unexpected error: {other:?}"),

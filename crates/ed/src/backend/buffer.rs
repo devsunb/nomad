@@ -31,6 +31,9 @@ pub trait Buffer {
         R: IntoIterator<Item = Replacement>;
 
     /// TODO: docs.
+    fn focus(&mut self);
+
+    /// TODO: docs.
     fn name(&self) -> Cow<'_, str>;
 
     /// TODO: docs.
