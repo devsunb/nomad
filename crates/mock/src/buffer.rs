@@ -30,7 +30,7 @@ pub struct CursorId {
 }
 
 pub struct Selection<'a> {
-    pub(crate) buffer: &'a mut BufferInner,
+    pub(crate) buffer: Buffer<'a>,
     pub(crate) selection_id: SelectionId,
 }
 
@@ -77,7 +77,7 @@ impl<'a> Buffer<'a> {
         debug_assert_eq!(selection_id.buffer_id(), self.id());
         self.selections
             .contains_key(selection_id.id_in_buffer)
-            .then_some(Selection { buffer: self.inner, selection_id })
+            .then_some(Selection { buffer: self, selection_id })
     }
 }
 
@@ -324,5 +324,25 @@ impl DerefMut for Cursor<'_> {
             .cursors
             .get_mut(self.cursor_id.id_in_buffer)
             .expect("cursor exists")
+    }
+}
+
+impl Deref for Selection<'_> {
+    type Target = SelectionInner;
+
+    fn deref(&self) -> &Self::Target {
+        self.buffer
+            .selections
+            .get(self.selection_id.id_in_buffer)
+            .expect("selection exists")
+    }
+}
+
+impl DerefMut for Selection<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.buffer
+            .selections
+            .get_mut(self.selection_id.id_in_buffer)
+            .expect("selection exists")
     }
 }
