@@ -232,7 +232,7 @@ impl backend::Buffer for Buffer<'_> {
         Cow::Borrowed(&self.name)
     }
 
-    fn on_edited<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_edited<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, &Edit) + 'static,
     {
@@ -240,7 +240,7 @@ impl backend::Buffer for Buffer<'_> {
         self.callbacks.insert(cb_kind)
     }
 
-    fn on_removed<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
     {
@@ -248,7 +248,7 @@ impl backend::Buffer for Buffer<'_> {
         self.callbacks.insert(cb_kind)
     }
 
-    fn on_saved<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_saved<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
     {

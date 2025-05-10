@@ -345,7 +345,7 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn on_edited<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
+    fn on_edited<Fun>(&self, mut fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&NeovimBuffer<'_>, &Edit) + 'static,
     {
@@ -357,7 +357,7 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn on_removed<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&self, mut fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&NeovimBuffer<'_>, AgentId) + 'static,
     {
@@ -369,7 +369,7 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn on_saved<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
+    fn on_saved<Fun>(&self, mut fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&NeovimBuffer<'_>, AgentId) + 'static,
     {

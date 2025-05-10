@@ -37,17 +37,17 @@ pub trait Buffer {
     fn name(&self) -> Cow<'_, str>;
 
     /// TODO: docs.
-    fn on_edited<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_edited<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, &Edit) + 'static;
 
     /// TODO: docs.
-    fn on_removed<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
 
     /// TODO: docs.
-    fn on_saved<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_saved<Fun>(&self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
 }
