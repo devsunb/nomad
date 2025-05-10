@@ -9,44 +9,37 @@ use crate::mock::{self, CallbackKind, Callbacks};
 
 type AnnotationId = slotmap::DefaultKey;
 
-/// TODO: docs.
 pub struct Buffer<'a> {
     pub(crate) inner: &'a mut BufferInner,
     pub(crate) callbacks: &'a Callbacks,
     pub(crate) current_buffer: &'a mut Option<BufferId>,
 }
 
-/// TODO: docs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct BufferId(pub(crate) u64);
 
-/// TODO: docs.
 pub struct Cursor<'a> {
     pub(crate) buffer: &'a mut BufferInner,
     pub(crate) cursor_id: CursorId,
 }
 
-/// TODO: docs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct CursorId {
     buffer_id: BufferId,
     id_in_buffer: AnnotationId,
 }
 
-/// TODO: docs.
 pub struct Selection<'a> {
     pub(crate) buffer: &'a mut BufferInner,
     pub(crate) selection_id: SelectionId,
 }
 
-/// TODO: docs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct SelectionId {
     buffer_id: BufferId,
     id_in_buffer: AnnotationId,
 }
 
-/// TODO: docs.
 #[doc(hidden)]
 pub struct BufferInner {
     pub(crate) cursors: SlotMap<AnnotationId, CursorInner>,
@@ -56,14 +49,12 @@ pub struct BufferInner {
     pub(crate) selections: SlotMap<AnnotationId, SelectionInner>,
 }
 
-/// TODO: docs.
 #[doc(hidden)]
 pub struct CursorInner {
     pub(crate) id_in_buffer: AnnotationId,
     pub(crate) offset: ByteOffset,
 }
 
-/// TODO: docs.
 #[doc(hidden)]
 pub struct SelectionInner {
     pub(crate) id_in_buffer: AnnotationId,
@@ -125,6 +116,8 @@ impl BufferInner {
 }
 
 impl CursorInner {
+    /// Updates the cursor's offset in the buffer in response to the given
+    /// replacement being applied to it.
     pub(crate) fn react_to_replacement(&mut self, replacement: &Replacement) {
         if replacement.removed_range().start <= self.offset {
             self.offset = if self.offset <= replacement.removed_range().end {
@@ -141,6 +134,8 @@ impl CursorInner {
 }
 
 impl SelectionInner {
+    /// Updates the selections's offset range in the buffer in response to the
+    /// given replacement being applied to it.
     pub(crate) fn react_to_replacement(&mut self, replacement: &Replacement) {
         if self.offset_range.end <= replacement.removed_range().start {
             // <selection><deletion>
