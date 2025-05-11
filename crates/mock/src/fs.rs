@@ -734,7 +734,10 @@ impl fs::Directory for MockDirectory {
     }
 
     fn watch(&self) -> Self::EventStream {
-        todo!()
+        self.with_inner(|inner| {
+            inner.event_tx.get_or_insert_with(DirectoryEventTx::new).to_recv()
+        })
+        .expect("directory was deleted")
     }
 }
 
