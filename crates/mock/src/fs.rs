@@ -11,7 +11,7 @@ use ed::shared::{MultiThreaded, Shared};
 use futures_lite::Stream;
 use indexmap::IndexMap;
 
-/// TODO: docs.
+/// An in-memory filesystem.
 #[derive(Clone, Default)]
 pub struct MockFs {
     inner: Shared<FsInner, MultiThreaded>,
@@ -120,6 +120,7 @@ impl MockFs {
         }
     }
 
+    /// Should only be used by the `fs!` macro.
     #[doc(hidden)]
     pub fn new(root: DirectoryInner) -> Self {
         Self { inner: Shared::new(FsInner::new(root)) }
@@ -145,6 +146,10 @@ impl MockFs {
 }
 
 impl MockDirectory {
+    /// Creates a new node in this directory.
+    ///
+    /// If the `node_kind` is [`Symlink`][NodeKind::Symlink], `target_path`
+    /// must be set to the path of the symlink's target.
     async fn create_node(
         &self,
         node_name: &NodeName,
@@ -184,6 +189,9 @@ impl MockDirectory {
         Ok(metadata)
     }
 
+    /// Calls the given function with a mutable reference to the
+    /// [`DirectoryInner`], returning an error if the directory has been
+    /// deleted or moved to a different path.
     fn with_inner<T>(
         &self,
         f: impl FnOnce(&mut DirectoryInner) -> T,
@@ -205,6 +213,9 @@ impl MockDirectory {
 }
 
 impl MockFile {
+    /// Calls the given function with a mutable reference to the [`FileInner`],
+    /// returning an error if the file has been deleted or moved to a different
+    /// path.
     fn with_inner<T>(
         &self,
         f: impl FnOnce(&mut FileInner) -> T,
@@ -234,6 +245,9 @@ impl MockSymlink {
         }
     }
 
+    /// Calls the given function with a mutable reference to the
+    /// [`SymlinkInner`], returning an error if the symlink has been deleted or
+    /// moved to a different path.
     fn with_inner<T>(
         &self,
         f: impl FnOnce(&mut SymlinkInner) -> T,
@@ -382,9 +396,11 @@ impl DirectoryInner {
                 byte_len: 0usize.into(),
                 created_at: MockTimestamp(0),
                 last_modified_at: MockTimestamp(0),
+                node_kind: NodeKind::Directory,
+                // Dummy values, they'll be updated to the correct ones when
+                // `FsInner::new` is called.
                 name: "temp".parse().expect("it's valid"),
                 node_id: MockNodeId(0),
-                node_kind: NodeKind::Directory,
             },
         }
     }
@@ -492,9 +508,11 @@ impl FileInner {
                 byte_len: contents.len().into(),
                 created_at: MockTimestamp(0),
                 last_modified_at: MockTimestamp(0),
+                node_kind: NodeKind::File,
+                // Dummy values, they'll be updated to the correct ones when
+                // `FsInner::new` is called.
                 name: "temp".parse().expect("it's valid"),
                 node_id: MockNodeId(0),
-                node_kind: NodeKind::File,
             },
         }
     }
@@ -515,9 +533,11 @@ impl SymlinkInner {
                 byte_len: target_path.len().into(),
                 created_at: MockTimestamp(0),
                 last_modified_at: MockTimestamp(0),
+                node_kind: NodeKind::Symlink,
+                // Dummy values, they'll be updated to the correct ones when
+                // `FsInner::new` is called.
                 name: "temp".parse().expect("it's valid"),
                 node_id: MockNodeId(0),
-                node_kind: NodeKind::Symlink,
             },
         }
     }
