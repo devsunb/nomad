@@ -340,16 +340,11 @@ async fn write_file<Fs: fs::Fs>(
             file.id()
         },
 
-        ProjectFile::Symlink(symlink) => {
-            let symlink = parent
-                .create_symlink(file_name, symlink.target_path())
-                .await
-                .map_err(WriteProjectError::CreateSymlink)?;
-
-            stream_builder.with_mut(|builder| builder.push_symlink(&symlink));
-
-            symlink.id()
-        },
+        ProjectFile::Symlink(symlink) => parent
+            .create_symlink(file_name, symlink.target_path())
+            .await
+            .map_err(WriteProjectError::CreateSymlink)?
+            .id(),
     };
 
     node_id_maps.with_mut(|maps| {

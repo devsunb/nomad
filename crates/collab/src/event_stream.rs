@@ -1,6 +1,6 @@
 use abs_path::{AbsPath, AbsPathBuf};
 use ed::backend::{AgentId, Buffer};
-use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
+use ed::fs::{self, Directory, File, Fs, FsNode, Metadata};
 use ed::{AsyncCtx, Shared};
 use futures_util::{StreamExt, select_biased};
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
@@ -66,8 +66,6 @@ struct FsStreams<Fs: fs::Fs> {
         FxIndexMap<Fs::NodeId, <Fs::Directory as Directory>::EventStream>,
     /// Map from a file's node ID to its event stream.
     files: FxIndexMap<Fs::NodeId, <Fs::File as File>::EventStream>,
-    /// Map from a symlink's node ID to its event stream.
-    symlinks: FxIndexMap<Fs::NodeId, <Fs::Symlink as Symlink>::EventStream>,
 }
 
 impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
@@ -84,17 +82,14 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             let mut file_stream = self.fs_streams.files.as_stream(0);
 
             return Ok(select_biased! {
-                event = dir_stream.select_next_some() => {
-                    match self.handle_dir_event(event, ctx).await? {
+                dir_event = dir_stream.select_next_some() => {
+                    match self.handle_dir_event(dir_event, ctx).await? {
                         Some(dir_event) => Event::Directory(dir_event),
                         None => continue,
                     }
                 },
-                event = file_stream.select_next_some() => {
-                    match self.handle_file_event(event) {
-                        Some(file_event) => Event::File(file_event),
-                        None => continue,
-                    }
+                file_event = file_stream.select_next_some() => {
+                    Event::File(file_event)
                 },
                 event = self.buffer_rx.select_next_some() => {
                     if let Event::Buffer(BufferEvent::Removed(id)) = &event {
@@ -163,6 +158,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn handle_dir_event(
         &mut self,
         event: fs::DirectoryEvent<B::Fs>,
@@ -189,10 +185,16 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             },
 
             fs::DirectoryEvent::Deletion(ref deletion) => {
+                if let Some(buf_id) =
+                    self.node_to_buf_ids.get(&deletion.node_id)
+                {
+                    self.buffer_handles.remove(buf_id);
+                }
+
                 if deletion.node_id != deletion.deletion_root_id {
-                    // This event was caused by an ancestor of the directory
-                    // being deleted. We should ignore it, unless it's about
-                    // the root.
+                    // This event was caused by an ancestor of the node being
+                    // deleted. We should ignore it, unless it's about the
+                    // root.
                     (deletion.node_id == self.root_id).then_some(event)
                 } else {
                     Some(event)
@@ -201,9 +203,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
             fs::DirectoryEvent::Move(r#move) => {
                 if r#move.node_id != r#move.move_root_id {
-                    // This event was caused by an ancestor of the directory
-                    // being moved. We should ignore it, unless it's about the
-                    // root.
+                    // This event was caused by an ancestor of the node being
+                    // moved. We should ignore it, unless it's about the root.
                     if r#move.node_id == self.root_id {
                         self.root_path = r#move.new_path.clone();
                         return Ok(Some(fs::DirectoryEvent::Move(r#move)));
@@ -215,9 +216,28 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                 if r#move.new_path.starts_with(&self.root_path) {
                     Some(fs::DirectoryEvent::Move(r#move))
                 } else {
-                    // The directory was moved outside the root's subtree,
-                    // which is effectively the same as it being deleted.
-                    self.fs_streams.directories.swap_remove(&r#move.node_id);
+                    // The node was moved outside the root's subtree, which is
+                    // effectively the same as it being deleted.
+
+                    // We don't know if the node was a file or a directory, so
+                    // try them both.
+                    if self
+                        .fs_streams
+                        .files
+                        .swap_remove(&r#move.node_id)
+                        .is_some()
+                    {
+                        if let Some(buf_id) =
+                            self.node_to_buf_ids.get(&r#move.node_id)
+                        {
+                            self.buffer_handles.remove(buf_id);
+                        }
+                    } else {
+                        self.fs_streams
+                            .directories
+                            .swap_remove(&r#move.node_id);
+                    }
+
                     Some(fs::DirectoryEvent::Deletion(fs::NodeDeletion {
                         node_id: r#move.node_id,
                         node_path: r#move.old_path,
@@ -226,67 +246,6 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                 }
             },
         })
-    }
-
-    fn handle_file_event(
-        &mut self,
-        event: fs::FileEvent<B::Fs>,
-    ) -> Option<fs::FileEvent<B::Fs>> {
-        match event {
-            fs::FileEvent::Deletion(ref deletion) => {
-                if let Some(buf_id) =
-                    self.node_to_buf_ids.get(&deletion.node_id)
-                {
-                    self.buffer_handles.remove(buf_id);
-                }
-
-                if deletion.node_id != deletion.deletion_root_id {
-                    // This event was caused by an ancestor of the file being
-                    // deleted. We should ignore it, unless it's about the
-                    // root.
-                    (deletion.node_id == self.root_id).then_some(event)
-                } else {
-                    Some(event)
-                }
-            },
-            fs::FileEvent::Move(r#move) => {
-                if r#move.node_id != r#move.move_root_id {
-                    // This event was caused by an ancestor of the file being
-                    // moved. We should ignore it, unless it's about the root.
-                    if r#move.node_id == self.root_id {
-                        self.root_path = r#move.new_path.clone();
-                        return Some(fs::FileEvent::Move(r#move));
-                    } else {
-                        return None;
-                    }
-                }
-
-                if r#move.new_path.starts_with(&self.root_path) {
-                    Some(fs::FileEvent::Move(r#move))
-                } else {
-                    // The file was moved outside the root's subtree, which is
-                    // effectively the same as it being deleted.
-                    self.fs_streams.files.swap_remove(&r#move.node_id);
-
-                    if let Some(buf_id) =
-                        self.node_to_buf_ids.get(&r#move.node_id)
-                    {
-                        self.buffer_handles.remove(buf_id);
-                    }
-
-                    Some(fs::FileEvent::Deletion(fs::NodeDeletion {
-                        node_id: r#move.node_id,
-                        node_path: r#move.old_path,
-                        deletion_root_id: r#move.move_root_id,
-                    }))
-                }
-            },
-            fs::FileEvent::Modification(_) => {
-                // TODO: should we deduplicate buffer saves here or should we
-                // let the Project handle that?
-                Some(event)
-            },
-        }
     }
 
     async fn handle_new_buffer(
@@ -366,10 +325,6 @@ impl<Fs: fs::Fs, State> EventStreamBuilder<Fs, State> {
     pub(crate) fn push_node(&mut self, node: &FsNode<Fs>) {
         self.fs_streams.watch_node(node);
     }
-
-    pub(crate) fn push_symlink(&mut self, symlink: &Fs::Symlink) {
-        self.fs_streams.watch_symlink(symlink);
-    }
 }
 
 impl<Fs: fs::Fs> EventStreamBuilder<Fs, NeedsProjectFilter> {
@@ -440,11 +395,7 @@ impl<Fs: fs::Fs> FsStreams<Fs> {
         match node {
             FsNode::Directory(dir) => self.watch_directory(dir),
             FsNode::File(file) => self.watch_file(file),
-            FsNode::Symlink(symlink) => self.watch_symlink(symlink),
+            FsNode::Symlink(_) => {},
         }
-    }
-
-    fn watch_symlink(&mut self, symlink: &Fs::Symlink) {
-        self.symlinks.insert(symlink.id(), symlink.watch());
     }
 }
