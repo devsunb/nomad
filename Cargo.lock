@@ -1806,7 +1806,6 @@ dependencies = [
  "ed",
  "flume",
  "futures-lite",
- "futures-util",
  "fxhash",
  "indexmap",
  "mock-macros",

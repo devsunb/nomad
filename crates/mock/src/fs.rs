@@ -14,7 +14,6 @@ use ed::fs::{
     Fs,
     FsEvent,
     NodeKind,
-    SymlinkEvent,
 };
 use ed::shared::{MultiThreaded, Shared};
 use futures_lite::Stream;
@@ -156,7 +155,10 @@ impl MockFs {
         Self { inner: Shared::new(FsInner::new(root)) }
     }
 
-    fn delete_node(&self, path: &AbsPath) -> Result<(), DeleteNodeError> {
+    fn delete_node(
+        &self,
+        path: &AbsPath,
+    ) -> Result<impl Future<Output = ()>, DeleteNodeError> {
         self.with_inner(|inner| inner.delete_node(path))
     }
 
@@ -206,8 +208,8 @@ impl MockDirectory {
             }),
         };
 
-        self.with_inner(|dir| dir.create_node(&self.path, node_name, node))?
-            .await?;
+        self.with_inner(|dir| dir.create_node(&self.path, node_name, node))??
+            .await;
 
         Ok(metadata)
     }
@@ -233,10 +235,6 @@ impl MockDirectory {
 }
 
 impl MockFile {
-    pub(crate) fn read_sync(&self) -> Result<Vec<u8>, GetNodeError> {
-        self.with_inner(|file| file.contents.to_vec())
-    }
-
     fn with_inner<T>(
         &self,
         f: impl FnOnce(&mut FileInner) -> T,
@@ -297,26 +295,21 @@ impl MockNodeId {
 }
 
 impl FsInner {
-    fn delete_node(&mut self, path: &AbsPath) -> Result<(), DeleteNodeError> {
+    fn delete_node(
+        &mut self,
+        path: &AbsPath,
+    ) -> Result<impl Future<Output = ()> + use<>, DeleteNodeError> {
         let parent_path = path.parent().ok_or(DeleteNodeError::NodeIsRoot)?;
 
         let node_name = path.node_name().expect("path is not root");
 
-        let parent = self
-            .node_at_path(parent_path)
+        self.node_at_path(parent_path)
             .and_then(|node| match node {
                 Node::Directory(dir) => Some(dir),
                 _ => None,
             })
-            .ok_or_else(|| {
-                DeleteNodeError::NodeDoesNotExist(path.to_owned())
-            })?;
-
-        if !parent.delete_child(node_name) {
-            return Err(DeleteNodeError::NodeDoesNotExist(path.to_owned()));
-        }
-
-        Ok(())
+            .ok_or_else(|| DeleteNodeError::NodeDoesNotExist(path.to_owned()))?
+            .delete_child(parent_path, node_name)
     }
 
     fn new(mut root: DirectoryInner) -> Self {
@@ -446,35 +439,58 @@ impl DirectoryInner {
         this_path: &AbsPath,
         name: &NodeName,
         node: Node,
-    ) -> impl Future<Output = Result<(), CreateNodeError>> + use<> {
+    ) -> Result<impl Future<Output = ()> + use<>, CreateNodeError> {
         if self.children.contains_key(name) {
-            futures_util::future::Either::Left(futures_lite::future::ready({
-                Err(CreateNodeError::AlreadyExists(NodeAlreadyExistsError {
+            return Err(CreateNodeError::AlreadyExists(
+                NodeAlreadyExistsError {
                     kind: node.kind(),
                     path: this_path.join(name),
-                }))
-            }))
-        } else {
-            let event = DirectoryEvent::Creation(fs::NodeCreation {
-                node_id: node.metadata().node_id,
-                node_path: this_path.join(name),
-                parent_id: self.metadata.node_id,
-            });
-            self.children.insert(name.to_owned(), node);
-            let event_tx = self.event_tx.clone();
-            futures_util::future::Either::Right(async move {
-                let Some(event_tx) = event_tx else { return Ok(()) };
+                },
+            ));
+        }
+
+        let event = DirectoryEvent::Creation(fs::NodeCreation {
+            node_id: node.metadata().node_id,
+            node_path: this_path.join(name),
+            parent_id: self.metadata.node_id,
+        });
+
+        self.children.insert(name.to_owned(), node);
+
+        let event_tx = self.event_tx.clone();
+
+        Ok(async move {
+            if let Some(tx) = event_tx {
                 // Sending will error if there aren't any active receivers. In
                 // that case we should probably drop the sender, but keeping it
                 // around is also fine.
-                let _ = event_tx.send(event).await;
-                Ok(())
-            })
-        }
+                let _ = tx.send(event).await;
+            }
+        })
     }
 
-    fn delete_child(&mut self, name: &NodeName) -> bool {
-        self.children.swap_remove(name).is_some()
+    fn delete_child(
+        &mut self,
+        this_path: &AbsPath,
+        name: &NodeName,
+    ) -> Result<impl Future<Output = ()> + use<>, DeleteNodeError> {
+        let node = self.children.swap_remove(name).ok_or_else(|| {
+            DeleteNodeError::NodeDoesNotExist(this_path.join(name))
+        })?;
+
+        let event = DirectoryEvent::Deletion(fs::NodeDeletion {
+            node_id: node.metadata().node_id,
+            node_path: this_path.join(name),
+            deletion_root_id: node.metadata().node_id,
+        });
+
+        let event_tx = self.event_tx.clone();
+
+        Ok(async move {
+            if let Some(tx) = event_tx {
+                let _ = tx.send(event).await;
+            }
+        })
     }
 }
 
@@ -711,7 +727,8 @@ impl fs::Directory for MockDirectory {
     }
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        self.fs.delete_node(&self.path)
+        self.fs.delete_node(&self.path)?.await;
+        Ok(())
     }
 
     async fn list_metas(&self) -> Result<ReadDir, Self::ListError> {
@@ -765,7 +782,8 @@ impl fs::File for MockFile {
     type WriteError = GetNodeError;
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        self.fs.delete_node(&self.path)
+        self.fs.delete_node(&self.path)?.await;
+        Ok(())
     }
 
     fn meta(&self) -> MockMetadata {
@@ -814,7 +832,8 @@ impl fs::Symlink for MockSymlink {
     type ReadError = GetNodeError;
 
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        self.fs.delete_node(&self.path)
+        self.fs.delete_node(&self.path)?.await;
+        Ok(())
     }
 
     async fn follow(

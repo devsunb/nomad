@@ -27,7 +27,6 @@ use crate::fs::{
     NodeKind,
     NodeName,
     Symlink,
-    SymlinkEvent,
 };
 
 /// TODO: docs.
