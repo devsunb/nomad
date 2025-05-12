@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use collab_project::PeerId;
 use collab_project::fs::{DirectoryId, FileId, FileMut as ProjectFileMut};
-use collab_project::text::TextFileMut;
+use collab_project::text::{self, CursorMut, TextFileMut};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::{AgentId, Backend};
 use ed::fs::{self, AbsPath, AbsPathBuf};
@@ -17,7 +17,7 @@ use smol_str::ToSmolStr;
 use crate::CollabBackend;
 use crate::backend::{ActionForSelectedSession, SessionId};
 use crate::convert::Convert;
-use crate::event::{BufferEvent, Event};
+use crate::event::{BufferEvent, CursorEvent, CursorEventKind, Event};
 
 /// TODO: docs.
 pub struct Project<B: CollabBackend> {
@@ -79,6 +79,13 @@ pub(crate) struct IdMaps<B: Backend> {
     pub(crate) file2buffer: FxHashMap<FileId, B::BufferId>,
     pub(crate) node2dir: FxHashMap<<B::Fs as fs::Fs>::NodeId, DirectoryId>,
     pub(crate) node2file: FxHashMap<<B::Fs as fs::Fs>::NodeId, FileId>,
+    cursor2cursor: FxHashMap<CursorId<B>, text::CursorId>,
+}
+
+#[derive(cauchy::Debug, cauchy::PartialEq, cauchy::Eq, cauchy::Hash)]
+struct CursorId<B: Backend> {
+    buffer_id: B::BufferId,
+    cursor_id: B::CursorId,
 }
 
 impl<B: CollabBackend> Project<B> {
@@ -96,10 +103,36 @@ impl<B: CollabBackend> Project<B> {
     pub(crate) fn synchronize(&mut self, event: Event<B>) -> Option<Message> {
         match event {
             Event::Buffer(event) => self.synchronize_buffer(event),
-            Event::Cursor(_event) => todo!(),
+            Event::Cursor(event) => Some(self.synchronize_cursor(event)),
             Event::Directory(_event) => todo!(),
             Event::File(_event) => todo!(),
             Event::Selection(_event) => todo!(),
+        }
+    }
+
+    /// Returns the [`CursorMut`] corresponding to the cursor with the given
+    /// ID.
+    #[track_caller]
+    fn cursor_of_cursor_id(
+        &mut self,
+        cursor_id: &CursorId<B>,
+    ) -> CursorMut<'_> {
+        let Some(&project_cursor_id) =
+            self.id_maps.cursor2cursor.get(cursor_id)
+        else {
+            panic!("unknown cursor ID: {cursor_id:?}");
+        };
+
+        let Ok(maybe_cursor) = self.project.cursor_mut(project_cursor_id)
+        else {
+            panic!("cursor ID {cursor_id:?} maps to a remote peer's cursor")
+        };
+
+        match maybe_cursor {
+            Some(cursor) => cursor,
+            None => {
+                panic!("cursor ID {cursor_id:?} maps to a deleted cursor")
+            },
         }
     }
 
@@ -110,7 +143,7 @@ impl<B: CollabBackend> Project<B> {
         match event {
             BufferEvent::Edited(buffer_id, replacements) => {
                 let text_edit = self
-                    .text_file_of_buffer(buffer_id)
+                    .text_file_of_buffer(&buffer_id)
                     .edit(replacements.into_iter().map(Convert::convert));
 
                 Some(Message::EditedText(text_edit))
@@ -126,9 +159,51 @@ impl<B: CollabBackend> Project<B> {
             },
             BufferEvent::Saved(buffer_id) => {
                 let file_id =
-                    self.text_file_of_buffer(buffer_id).as_file().global_id();
+                    self.text_file_of_buffer(&buffer_id).as_file().global_id();
 
                 Some(Message::SavedTextFile(file_id))
+            },
+        }
+    }
+
+    fn synchronize_cursor(&mut self, event: CursorEvent<B>) -> Message {
+        match event.kind {
+            CursorEventKind::Created(byte_offset) => {
+                let (cursor_id, creation) = self
+                    .text_file_of_buffer(&event.buffer_id)
+                    .create_cursor(byte_offset.into());
+
+                self.id_maps.cursor2cursor.insert(
+                    CursorId {
+                        buffer_id: event.buffer_id,
+                        cursor_id: event.cursor_id,
+                    },
+                    cursor_id,
+                );
+
+                Message::CreatedCursor(creation)
+            },
+            CursorEventKind::Moved(byte_offset) => {
+                let movement = self
+                    .cursor_of_cursor_id(&CursorId {
+                        buffer_id: event.buffer_id,
+                        cursor_id: event.cursor_id,
+                    })
+                    .r#move(byte_offset.into());
+
+                Message::MovedCursor(movement)
+            },
+            CursorEventKind::Removed => {
+                let cursor_id = CursorId {
+                    buffer_id: event.buffer_id,
+                    cursor_id: event.cursor_id,
+                };
+
+                let deletion = self.cursor_of_cursor_id(&cursor_id).delete();
+
+                self.id_maps.cursor2cursor.remove(&cursor_id);
+
+                Message::DeletedCursor(deletion)
             },
         }
     }
@@ -138,9 +213,9 @@ impl<B: CollabBackend> Project<B> {
     #[track_caller]
     fn text_file_of_buffer(
         &mut self,
-        buffer_id: B::BufferId,
+        buffer_id: &B::BufferId,
     ) -> TextFileMut<'_> {
-        let Some(&file_id) = self.id_maps.buffer2file.get(&buffer_id) else {
+        let Some(&file_id) = self.id_maps.buffer2file.get(buffer_id) else {
             panic!("unknown buffer ID: {buffer_id:?}");
         };
 

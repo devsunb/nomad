@@ -458,7 +458,7 @@ dependencies = [
 [[package]]
 name = "cauchy"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/cauchy.git#58624c13983138b3de688b798d0895d0b7100719"
+source = "git+ssh://git@github.com/nomad/cauchy.git#8611cf7181fdb781aedfe61bd4e726d8b9f6f4dc"
 dependencies = [
  "proc-macro2",
  "quote",

@@ -36,7 +36,7 @@ pub(crate) struct CursorEvent<B: Backend> {
 }
 
 pub(crate) enum CursorEventKind {
-    Created,
+    Created(ByteOffset),
     Moved(ByteOffset),
     Removed,
 }
@@ -48,7 +48,7 @@ pub(crate) struct SelectionEvent<B: Backend> {
 }
 
 pub(crate) enum SelectionEventKind {
-    Created,
-    Changed(Range<ByteOffset>),
+    Created(Range<ByteOffset>),
+    Moved(Range<ByteOffset>),
     Removed,
 }
