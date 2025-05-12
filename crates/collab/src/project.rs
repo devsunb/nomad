@@ -14,7 +14,8 @@ use collab_project::fs::{
 use collab_project::text::{self, CursorMut, SelectionMut, TextFileMut};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::{AgentId, Backend};
-use ed::{AsyncCtx, Shared, fs, notify};
+use ed::fs::{self, File as _, Fs as _, Symlink as _};
+use ed::{AsyncCtx, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
@@ -111,7 +112,20 @@ pub(crate) struct SelectionId<B: Backend> {
 #[derive(cauchy::Debug)]
 pub(crate) enum SynchronizeError<B: CollabBackend> {
     /// TODO: docs.
-    GetNode(<B::Fs as fs::Fs>::NodeAtPathError),
+    NodeAtPath(<B::Fs as fs::Fs>::NodeAtPathError),
+
+    /// TODO: docs.
+    ReadFile(<<B::Fs as fs::Fs>::File as fs::File>::ReadError),
+
+    /// TODO: docs.
+    ReadSymlink(<<B::Fs as fs::Fs>::Symlink as fs::Symlink>::ReadError),
+}
+
+enum NodeContents {
+    Directory,
+    Text(String),
+    Binary(Vec<u8>),
+    Symlink(String),
 }
 
 impl<B: CollabBackend> ProjectHandle<B> {
@@ -145,18 +159,15 @@ impl<B: CollabBackend> ProjectHandle<B> {
         event: Event<B>,
         ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Option<Message>, SynchronizeError<B>> {
-        Ok(match event {
-            Event::Directory(fs::DirectoryEvent::Creation(creation)) => self
-                .synchronize_node_creation(creation, ctx)
-                .await
-                .map(Some)?,
-
-            Event::File(fs::FileEvent::Modification(modification)) => {
-                self.synchronize_file_modification(modification, ctx).await?
+        match event {
+            Event::Directory(fs::DirectoryEvent::Creation(creation)) => {
+                self.synchronize_node_creation(creation, ctx).await
             },
-
-            other => self.with_mut(|proj| proj.synchronize(other)),
-        })
+            Event::File(fs::FileEvent::Modification(modification)) => {
+                self.synchronize_file_modification(modification, ctx).await
+            },
+            other => Ok(self.with_mut(|proj| proj.synchronize(other))),
+        }
     }
 
     async fn synchronize_file_modification(
@@ -169,10 +180,49 @@ impl<B: CollabBackend> ProjectHandle<B> {
 
     async fn synchronize_node_creation(
         &self,
-        _creation: fs::NodeCreation<B::Fs>,
-        _ctx: &mut AsyncCtx<'_, B>,
-    ) -> Result<Message, SynchronizeError<B>> {
-        todo!();
+        creation: fs::NodeCreation<B::Fs>,
+        ctx: &mut AsyncCtx<'_, B>,
+    ) -> Result<Option<Message>, SynchronizeError<B>> {
+        let Some(node) = ctx
+            .fs()
+            .node_at_path(&creation.node_path)
+            .await
+            .map_err(SynchronizeError::NodeAtPath)?
+        else {
+            // The node must've already been deleted or moved.
+            //
+            // FIXME: doing nothing can be problematic if we're about to
+            // receive deletions/moves for the node.
+            return Ok(None);
+        };
+
+        let node_contents = match &node {
+            fs::FsNode::Directory(_) => NodeContents::Directory,
+
+            fs::FsNode::File(file) => {
+                let contents =
+                    file.read().await.map_err(SynchronizeError::ReadFile)?;
+
+                match String::from_utf8(contents) {
+                    Ok(contents) => NodeContents::Text(contents),
+                    Err(err) => NodeContents::Binary(err.into_bytes()),
+                }
+            },
+
+            fs::FsNode::Symlink(symlink) => symlink
+                .read_path()
+                .await
+                .map(NodeContents::Symlink)
+                .map_err(SynchronizeError::ReadSymlink)?,
+        };
+
+        Ok(Some(self.with_mut(|proj| {
+            proj.synchronize_node_creation(
+                node.id(),
+                &creation.node_path,
+                node_contents,
+            )
+        })))
     }
 
     /// TODO: docs.
@@ -397,6 +447,64 @@ impl<B: CollabBackend> Project<B> {
                 panic!("unknown node ID: {:?}", id_change.old_id);
             },
         }
+    }
+
+    fn synchronize_node_creation(
+        &mut self,
+        node_id: <B::Fs as fs::Fs>::NodeId,
+        node_path: &AbsPath,
+        node_contents: NodeContents,
+    ) -> Message {
+        let mut components = node_path.components();
+
+        let node_name =
+            components.next_back().expect("root can't be created").to_owned();
+
+        let parent_path = components.as_path();
+
+        let parent_path_in_project = parent_path
+            .strip_prefix(&self.root_path)
+            .expect("the new parent has to be in the project");
+
+        let Some(parent) =
+            self.project.node_at_path_mut(parent_path_in_project)
+        else {
+            panic!(
+                "parent path {parent_path_in_project:?} doesn't exist in the \
+                 project"
+            );
+        };
+
+        let ProjectNodeMut::Directory(mut parent) = parent else {
+            panic!("parent is not a directory");
+        };
+
+        let (file_mut, creation) = match node_contents {
+            NodeContents::Directory => {
+                match parent.create_directory(node_name) {
+                    Ok((dir_mut, creation)) => {
+                        let dir_id = dir_mut.as_directory().id();
+                        self.id_maps.node2dir.insert(node_id, dir_id);
+                        return Message::CreatedDirectory(creation);
+                    },
+                    Err(err) => Err(err),
+                }
+            },
+            NodeContents::Text(text_contents) => {
+                parent.create_text_file(node_name, text_contents)
+            },
+            NodeContents::Binary(binary_contents) => {
+                parent.create_binary_file(node_name, binary_contents)
+            },
+            NodeContents::Symlink(target_path) => {
+                parent.create_symlink(node_name, target_path)
+            },
+        }
+        .expect("no duplicate node names");
+
+        let file_id = file_mut.as_file().id();
+        self.id_maps.node2file.insert(node_id, file_id);
+        Message::CreatedFile(creation)
     }
 
     fn synchronize_node_deletion(
