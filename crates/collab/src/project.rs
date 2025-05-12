@@ -110,7 +110,7 @@ impl<B: CollabBackend> Project<B> {
             Event::Buffer(event) => self.synchronize_buffer(event),
             Event::Cursor(event) => Some(self.synchronize_cursor(event)),
             Event::Directory(event) => Some(self.synchronize_directory(event)),
-            Event::File(_event) => todo!(),
+            Event::File(event) => self.synchronize_file(event),
             Event::Selection(_event) => todo!(),
         }
     }
@@ -248,6 +248,42 @@ impl<B: CollabBackend> Project<B> {
             },
             fs::DirectoryEvent::Move(r#move) => {
                 self.synchronize_node_move(r#move)
+            },
+        }
+    }
+
+    fn synchronize_file(
+        &mut self,
+        event: fs::FileEvent<B::Fs>,
+    ) -> Option<Message> {
+        match event {
+            fs::FileEvent::Modification(modification) => {
+                Some(self.synchronize_file_modification(modification))
+            },
+            fs::FileEvent::IdChange(id_change) => {
+                self.synchronize_file_id_change(id_change);
+                None
+            },
+        }
+    }
+
+    fn synchronize_file_modification(
+        &mut self,
+        _modification: fs::FileModification<B::Fs>,
+    ) -> Message {
+        todo!();
+    }
+
+    fn synchronize_file_id_change(
+        &mut self,
+        id_change: fs::FileIdChange<B::Fs>,
+    ) {
+        match self.id_maps.node2file.remove(&id_change.old_id) {
+            Some(file_id) => {
+                self.id_maps.node2file.insert(id_change.new_id, file_id);
+            },
+            None => {
+                panic!("unknown node ID: {:?}", id_change.old_id);
             },
         }
     }
