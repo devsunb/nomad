@@ -302,7 +302,6 @@ impl Point {
 
 impl Buffer for NeovimBuffer<'_> {
     type Backend = Neovim;
-    type EventHandle = EventHandle;
 
     #[inline]
     fn byte_len(&self) -> ByteOffset {
@@ -344,7 +343,7 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn on_edited<Fun>(&self, mut fun: Fun) -> Self::EventHandle
+    fn on_edited<Fun>(&self, mut fun: Fun) -> EventHandle
     where
         Fun: FnMut(&NeovimBuffer<'_>, &Edit) + 'static,
     {
@@ -356,7 +355,7 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn on_removed<Fun>(&self, mut fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&self, mut fun: Fun) -> EventHandle
     where
         Fun: FnMut(&NeovimBuffer<'_>, AgentId) + 'static,
     {
@@ -368,7 +367,7 @@ impl Buffer for NeovimBuffer<'_> {
     }
 
     #[inline]
-    fn on_saved<Fun>(&self, mut fun: Fun) -> Self::EventHandle
+    fn on_saved<Fun>(&self, mut fun: Fun) -> EventHandle
     where
         Fun: FnMut(&NeovimBuffer<'_>, AgentId) + 'static,
     {

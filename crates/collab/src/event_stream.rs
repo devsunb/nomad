@@ -446,7 +446,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
         if let FsNode::File(file) = node {
             ctx.with_ctx(|ctx| {
-                if let Some(buffer) = ctx.buffer_at_path(file.path()) {
+                if let Some(buffer) = ctx.buffer_at_path(&*file.path()) {
                     self.watch_buffer(file.id(), &buffer);
                 }
             });

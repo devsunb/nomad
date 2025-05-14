@@ -178,7 +178,6 @@ impl SelectionInner {
 
 impl backend::Buffer for Buffer<'_> {
     type Backend = mock::Mock;
-    type EventHandle = mock::EventHandle;
 
     fn byte_len(&self) -> ByteOffset {
         self.contents.len().into()
@@ -226,7 +225,7 @@ impl backend::Buffer for Buffer<'_> {
         *self.current_buffer = Some(self.id);
     }
 
-    fn on_edited<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_edited<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, &Edit) + 'static,
     {
@@ -234,7 +233,7 @@ impl backend::Buffer for Buffer<'_> {
         self.callbacks.insert(cb_kind)
     }
 
-    fn on_removed<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
     {
@@ -242,7 +241,7 @@ impl backend::Buffer for Buffer<'_> {
         self.callbacks.insert(cb_kind)
     }
 
-    fn on_saved<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_saved<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
         Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
     {

@@ -11,9 +11,6 @@ use crate::backend::{AgentId, Backend};
 /// TODO: docs.
 pub trait Buffer {
     /// TODO: docs.
-    type EventHandle;
-
-    /// TODO: docs.
     type Backend: Backend;
 
     /// TODO: docs.
@@ -31,17 +28,26 @@ pub trait Buffer {
     fn focus(&mut self);
 
     /// TODO: docs.
-    fn on_edited<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_edited<Fun>(
+        &self,
+        fun: Fun,
+    ) -> <Self::Backend as Backend>::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, &Edit) + 'static;
 
     /// TODO: docs.
-    fn on_removed<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_removed<Fun>(
+        &self,
+        fun: Fun,
+    ) -> <Self::Backend as Backend>::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
 
     /// TODO: docs.
-    fn on_saved<Fun>(&self, fun: Fun) -> Self::EventHandle
+    fn on_saved<Fun>(
+        &self,
+        fun: Fun,
+    ) -> <Self::Backend as Backend>::EventHandle
     where
         Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
 

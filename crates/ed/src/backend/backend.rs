@@ -33,9 +33,11 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     type Buffer<'a>: Buffer<
+        Backend: Backend<
+            BufferId = Self::BufferId,
             EventHandle = Self::EventHandle,
-            Backend: Backend<BufferId = Self::BufferId>,
-        >;
+        >,
+    >;
 
     /// TODO: docs.
     type BufferId: Clone + Debug + Eq + Hash;
