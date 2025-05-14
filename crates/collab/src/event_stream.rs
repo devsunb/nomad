@@ -2,12 +2,14 @@ use abs_path::AbsPathBuf;
 use ed::backend::{AgentId, Buffer, Cursor, Selection};
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata};
 use ed::{AsyncCtx, Shared};
+use futures_util::future::FusedFuture;
 use futures_util::{StreamExt, select_biased};
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use walkdir::Filter;
 
 use crate::backend::CollabBackend;
 use crate::event::{
+    self,
     BufferEvent,
     CursorEvent,
     CursorEventKind,
@@ -25,14 +27,8 @@ pub(crate) struct EventStream<
 > {
     /// The [`AgentId`] of the `Session` that owns `Self`.
     agent_id: AgentId,
-
     buffer_streams: BufferStreams<B>,
-
-    cursor_handles: FxHashMap<B::CursorId, [B::EventHandle; 2]>,
-    cursor_rx: flume::r#async::RecvStream<'static, CursorEvent<B>>,
-    cursor_tx: flume::Sender<CursorEvent<B>>,
-    #[allow(dead_code)]
-    new_cursors_handle: B::EventHandle,
+    cursor_streams: CursorStreams<B>,
 
     selection_handles: FxHashMap<B::SelectionId, [B::EventHandle; 2]>,
     selection_rx: flume::r#async::RecvStream<'static, SelectionEvent<B>>,
@@ -109,6 +105,22 @@ struct BufferStreams<B: CollabBackend> {
     saved_buffers: Shared<FxHashSet<B::BufferId>>,
 }
 
+struct CursorStreams<B: CollabBackend> {
+    /// The receiver of cursor events.
+    event_rx: flume::r#async::RecvStream<'static, event::CursorEvent<B>>,
+
+    /// The sender of cursor events.
+    event_tx: flume::Sender<event::CursorEvent<B>>,
+
+    /// Map from a cursor's ID to the event handles corresponding to the 2
+    /// types of cursor events we're interested in: moves and removals.
+    handles: FxHashMap<B::CursorId, [B::EventHandle; 2]>,
+
+    /// The event handle corresponding to cursor creations.
+    #[allow(dead_code)]
+    new_cursors_handle: B::EventHandle,
+}
+
 impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     pub(crate) fn agent_id(&self) -> AgentId {
         self.agent_id
@@ -123,8 +135,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             let mut file_stream = self.fs_streams.files.as_stream(0);
 
             return Ok(select_biased! {
-                event = self.buffer_streams.event_rx.select_next_some() => {
-                    match &event {
+                buffer_event = self.buffer_streams.select_next_some() => {
+                    match &buffer_event {
                         BufferEvent::Created(buffer_id, _) => {
                             if !self.handle_new_buffer(buffer_id.clone(), ctx).await? {
                                 continue;
@@ -135,9 +147,9 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                         },
                         _ => {},
                     }
-                    Event::Buffer(event)
+                    Event::Buffer(buffer_event)
                 },
-                cursor_event = self.cursor_rx.select_next_some() => {
+                cursor_event = self.cursor_streams.select_next_some() => {
                     match self.handle_cursor_event(cursor_event, ctx) {
                         Some(event) => Event::Cursor(event),
                         None => continue,
@@ -298,7 +310,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             },
             CursorEventKind::Moved(_) => Some(event),
             CursorEventKind::Removed => {
-                self.cursor_handles.remove(&event.cursor_id);
+                self.cursor_streams.remove(&event.cursor_id);
                 Some(event)
             },
         }
@@ -392,28 +404,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     }
 
     fn watch_cursor(&mut self, cursor: &B::Cursor<'_>) {
-        let tx = self.cursor_tx.clone();
-        let moved_handle = cursor.on_moved(move |cursor, _moved_by| {
-            let event = CursorEvent {
-                buffer_id: cursor.buffer_id(),
-                cursor_id: cursor.id(),
-                kind: CursorEventKind::Moved(cursor.byte_offset()),
-            };
-            let _ = tx.send(event);
-        });
-
-        let tx = self.cursor_tx.clone();
-        let removed_handle = cursor.on_removed(move |cursor, _removed_by| {
-            let event = CursorEvent {
-                buffer_id: cursor.buffer_id(),
-                cursor_id: cursor.id(),
-                kind: CursorEventKind::Removed,
-            };
-            let _ = tx.send(event);
-        });
-
-        self.cursor_handles
-            .insert(cursor.id(), [moved_handle, removed_handle]);
+        self.cursor_streams.insert(cursor);
     }
 
     fn watch_selection(&mut self, selection: &B::Selection<'_>) {
@@ -533,6 +524,79 @@ impl<B: CollabBackend> BufferStreams<B> {
     fn remove(&mut self, buffer_id: &B::BufferId) {
         self.handles.remove(buffer_id);
     }
+
+    fn select_next_some(
+        &mut self,
+    ) -> impl FusedFuture<Output = BufferEvent<B>> {
+        StreamExt::select_next_some(&mut self.event_rx)
+    }
+}
+
+impl<Ed: CollabBackend> CursorStreams<Ed> {
+    /// Starts receiving [`CursorEvent`]s on the given cursor.
+    fn insert(&mut self, cursor: &Ed::Cursor<'_>) {
+        let moved_handle = cursor.on_moved({
+            let event_tx = self.event_tx.clone();
+            move |cursor, _moved_by| {
+                let _ = event_tx.send(CursorEvent {
+                    buffer_id: cursor.buffer_id(),
+                    cursor_id: cursor.id(),
+                    kind: CursorEventKind::Moved(cursor.byte_offset()),
+                });
+            }
+        });
+
+        let removed_handle = cursor.on_removed({
+            let event_tx = self.event_tx.clone();
+            move |cursor, _removed_by| {
+                let event = CursorEvent {
+                    buffer_id: cursor.buffer_id(),
+                    cursor_id: cursor.id(),
+                    kind: CursorEventKind::Removed,
+                };
+                let _ = event_tx.send(event);
+            }
+        });
+
+        let cursor_handles = [moved_handle, removed_handle];
+
+        self.handles.insert(cursor.id(), cursor_handles);
+    }
+
+    fn new(ctx: &mut AsyncCtx<'_, Ed>) -> Self {
+        let (event_tx, event_rx) = flume::unbounded();
+
+        let new_cursors_handle = {
+            let event_tx = event_tx.clone();
+            ctx.with_ctx(|ctx| {
+                ctx.on_cursor_created(move |cursor, _created_by| {
+                    let _ = event_tx.send(CursorEvent {
+                        buffer_id: cursor.buffer_id(),
+                        cursor_id: cursor.id(),
+                        kind: CursorEventKind::Created(cursor.byte_offset()),
+                    });
+                })
+            })
+        };
+
+        Self {
+            event_rx: event_rx.into_stream(),
+            event_tx,
+            handles: Default::default(),
+            new_cursors_handle,
+        }
+    }
+
+    /// Removes the event handle corresponding to the cursor with the given ID.
+    fn remove(&mut self, cursor_id: &Ed::CursorId) {
+        self.handles.remove(cursor_id);
+    }
+
+    fn select_next_some(
+        &mut self,
+    ) -> impl FusedFuture<Output = CursorEvent<Ed>> {
+        StreamExt::select_next_some(&mut self.event_rx)
+    }
 }
 
 impl<Fs: fs::Fs, State> EventStreamBuilder<Fs, State> {
@@ -577,21 +641,6 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
     where
         B: CollabBackend<Fs = Fs>,
     {
-        let (cursor_tx, cursor_rx) = flume::unbounded();
-
-        let also_cursor_tx = cursor_tx.clone();
-
-        let new_cursors_handle = ctx.with_ctx(|ctx| {
-            ctx.on_cursor_created(move |cursor, _created_by| {
-                let event = CursorEvent {
-                    buffer_id: cursor.buffer_id(),
-                    cursor_id: cursor.id(),
-                    kind: CursorEventKind::Created(cursor.byte_offset()),
-                };
-                let _ = also_cursor_tx.send(event);
-            })
-        });
-
         let (selection_tx, selection_rx) = flume::unbounded();
 
         let also_selection_tx = selection_tx.clone();
@@ -611,11 +660,7 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
             agent_id: ctx.new_agent_id(),
 
             buffer_streams: BufferStreams::new(ctx),
-
-            cursor_handles: Default::default(),
-            cursor_rx: cursor_rx.into_stream(),
-            cursor_tx,
-            new_cursors_handle,
+            cursor_streams: CursorStreams::new(ctx),
 
             selection_handles: Default::default(),
             selection_rx: selection_rx.into_stream(),
