@@ -11,7 +11,7 @@ use collab_server::message::PeerId;
 use collab_server::test::{TestConfig as InnerConfig, TestSessionId};
 use duplex_stream::{DuplexStream, duplex};
 use ed::AsyncCtx;
-use ed::backend::{AgentId, ApiValue, Backend, BaseBackend, Buffer, BufferId};
+use ed::backend::{AgentId, ApiValue, Backend, BaseBackend, Buffer};
 use ed::fs::{self, AbsPath, AbsPathBuf};
 use ed::notify::{self, MaybeResult};
 use serde::{Deserialize, Serialize};
@@ -334,7 +334,7 @@ where
     }
     fn buffer_ids(
         &mut self,
-    ) -> impl Iterator<Item = BufferId<Self>> + use<B, F> {
+    ) -> impl Iterator<Item = Self::BufferId> + use<B, F> {
         self.inner.buffer_ids()
     }
     async fn create_buffer(

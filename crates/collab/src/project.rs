@@ -907,7 +907,7 @@ trait FsExt: fs::Fs {
 
 impl<Fs: fs::Fs> FsExt for Fs {}
 
-enum ContentsAtPathError<Fs: fs::Fs> {
+pub(crate) enum ContentsAtPathError<Fs: fs::Fs> {
     NodeAtPath(Fs::NodeAtPathError),
     ReadFile(<Fs::File as fs::File>::ReadError),
     ReadSymlink(<Fs::Symlink as fs::Symlink>::ReadError),

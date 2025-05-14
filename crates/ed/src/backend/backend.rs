@@ -32,13 +32,20 @@ pub trait Backend: 'static + Sized {
     type Api: Api;
 
     /// TODO: docs.
-    type Buffer<'a>: Buffer<EventHandle = Self::EventHandle>;
+    type Buffer<'a>: Buffer<
+            EventHandle = Self::EventHandle,
+            Backend: Backend<BufferId = Self::BufferId>,
+        >;
 
     /// TODO: docs.
     type BufferId: Clone + Debug + Eq + Hash;
 
     /// TODO: docs.
-    type Cursor<'a>: Cursor<Id = Self::CursorId, EventHandle = Self::EventHandle>;
+    type Cursor<'a>: Cursor<
+            Id = Self::CursorId,
+            EventHandle = Self::EventHandle,
+            Backend: Backend<BufferId = Self::BufferId>,
+        >;
 
     /// TODO: docs.
     type CursorId: Clone + Debug + Eq + Hash;

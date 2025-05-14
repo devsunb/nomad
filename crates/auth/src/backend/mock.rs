@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use ed::backend::{AgentId, ApiValue, Backend, BaseBackend, BufferId};
+use ed::backend::{AgentId, ApiValue, Backend, BaseBackend};
 use ed::fs::AbsPath;
 use ed::notify::MaybeResult;
 use ed::{AsyncCtx, EditorCtx};
@@ -56,13 +56,13 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
     type SerializeError = <B as Backend>::SerializeError;
     type DeserializeError = <B as Backend>::DeserializeError;
 
-    fn buffer(&mut self, id: BufferId<Self>) -> Option<Self::Buffer<'_>> {
+    fn buffer(&mut self, id: Self::BufferId) -> Option<Self::Buffer<'_>> {
         self.inner.buffer(id)
     }
     fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
         self.inner.buffer_at_path(path)
     }
-    fn buffer_ids(&mut self) -> impl Iterator<Item = BufferId<Self>> + use<B> {
+    fn buffer_ids(&mut self) -> impl Iterator<Item = Self::BufferId> + use<B> {
         self.inner.buffer_ids()
     }
     async fn create_buffer(
