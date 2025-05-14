@@ -126,6 +126,15 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
     }
 
     /// TODO: docs.
+    #[inline]
+    pub fn selection(
+        &mut self,
+        selection_id: B::SelectionId,
+    ) -> Option<B::Selection<'_>> {
+        self.backend_mut().selection(selection_id)
+    }
+
+    /// TODO: docs.
     #[must_use = "task handles do nothing unless awaited or detached"]
     #[inline]
     pub fn spawn_background<Fut>(

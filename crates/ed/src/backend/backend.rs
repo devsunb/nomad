@@ -66,7 +66,11 @@ pub trait Backend: 'static + Sized {
     type EventHandle;
 
     /// TODO: docs.
-    type Selection<'a>: Selection<Id = Self::SelectionId, EventHandle = Self::EventHandle>;
+    type Selection<'a>: Selection<
+            Id = Self::SelectionId,
+            EventHandle = Self::EventHandle,
+            Backend: Backend<BufferId = Self::BufferId>,
+        >;
 
     /// TODO: docs.
     type SelectionId: Clone + Debug + Eq + Hash;

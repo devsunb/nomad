@@ -14,6 +14,9 @@ pub trait Selection {
     /// TODO: docs.
     type Backend: Backend<SelectionId = Self::Id>;
 
+    /// TODO: docs.
+    fn buffer_id(&self) -> <Self::Backend as Backend>::BufferId;
+
     /// Returns the selection's byte range in the buffer.
     fn byte_range(&self) -> Range<ByteOffset>;
 

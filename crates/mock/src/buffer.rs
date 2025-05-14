@@ -329,6 +329,10 @@ impl backend::Selection for Selection<'_> {
     type EventHandle = mock::EventHandle;
     type Id = SelectionId;
 
+    fn buffer_id(&self) -> BufferId {
+        self.buffer.id()
+    }
+
     fn byte_range(&self) -> Range<ByteOffset> {
         self.offset_range.clone()
     }

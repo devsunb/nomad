@@ -1,5 +1,5 @@
 use abs_path::AbsPathBuf;
-use ed::backend::{AgentId, Buffer, Cursor};
+use ed::backend::{AgentId, Buffer, Cursor, Selection};
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata};
 use ed::{AsyncCtx, Shared};
 use futures_util::{StreamExt, select_biased};
@@ -8,7 +8,14 @@ use smallvec::{SmallVec, smallvec_inline};
 use walkdir::Filter;
 
 use crate::backend::CollabBackend;
-use crate::event::{BufferEvent, CursorEvent, CursorEventKind, Event};
+use crate::event::{
+    BufferEvent,
+    CursorEvent,
+    CursorEventKind,
+    Event,
+    SelectionEvent,
+    SelectionEventKind,
+};
 use crate::seq_ext::StreamableSeq;
 
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
@@ -31,6 +38,13 @@ pub(crate) struct EventStream<
     cursor_tx: flume::Sender<CursorEvent<B>>,
     #[allow(dead_code)]
     new_cursors_handle: B::EventHandle,
+
+    selection_handles:
+        FxHashMap<B::SelectionId, SmallVec<[B::EventHandle; 2]>>,
+    selection_rx: flume::r#async::RecvStream<'static, SelectionEvent<B>>,
+    selection_tx: flume::Sender<SelectionEvent<B>>,
+    #[allow(dead_code)]
+    new_selections_handle: B::EventHandle,
 
     /// TODO: docs.
     fs_streams: FsStreams<B::Fs>,
@@ -106,18 +120,24 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                 },
                 cursor_event = self.cursor_rx.select_next_some() => {
                     match self.handle_cursor_event(cursor_event, ctx) {
-                        Some(cursor_event) => Event::Cursor(cursor_event),
+                        Some(event) => Event::Cursor(event),
                         None => continue,
                     }
                 },
                 dir_event = dir_stream.select_next_some() => {
                     match self.handle_dir_event(dir_event, ctx).await? {
-                        Some(dir_event) => Event::Directory(dir_event),
+                        Some(event) => Event::Directory(event),
                         None => continue,
                     }
                 },
                 file_event = file_stream.select_next_some() => {
                     Event::File(file_event)
+                },
+                selection_event = self.selection_rx.select_next_some() => {
+                    match self.handle_selection_event(selection_event, ctx) {
+                        Some(event) => Event::Selection(event),
+                        None => continue,
+                    }
                 },
             });
         }
@@ -319,6 +339,32 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         }))
     }
 
+    fn handle_selection_event(
+        &mut self,
+        event: SelectionEvent<B>,
+        ctx: &AsyncCtx<'_, B>,
+    ) -> Option<SelectionEvent<B>> {
+        match &event.kind {
+            SelectionEventKind::Created(_) => {
+                if !self.buffer_handles.contains_key(&event.buffer_id) {
+                    ctx.with_ctx(|ctx| {
+                        let selection =
+                            ctx.selection(event.selection_id.clone())?;
+                        self.watch_selection(&selection);
+                        Some(event)
+                    })
+                } else {
+                    None
+                }
+            },
+            SelectionEventKind::Moved(_) => Some(event),
+            SelectionEventKind::Removed => {
+                self.selection_handles.remove(&event.selection_id);
+                Some(event)
+            },
+        }
+    }
+
     /// Returns whether this `EventRx` should watch the given `FsNode`.
     ///
     /// # Panics
@@ -363,6 +409,34 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
         self.cursor_handles.insert(
             cursor.id(),
+            smallvec_inline![moved_handle, removed_handle],
+        );
+    }
+
+    fn watch_selection(&mut self, selection: &B::Selection<'_>) {
+        let tx = self.selection_tx.clone();
+        let moved_handle = selection.on_moved(move |selection, _moved_by| {
+            let event = SelectionEvent {
+                buffer_id: selection.buffer_id(),
+                selection_id: selection.id(),
+                kind: SelectionEventKind::Moved(selection.byte_range()),
+            };
+            let _ = tx.send(event);
+        });
+
+        let tx = self.selection_tx.clone();
+        let removed_handle =
+            selection.on_removed(move |selection, _removed_by| {
+                let event = SelectionEvent {
+                    buffer_id: selection.buffer_id(),
+                    selection_id: selection.id(),
+                    kind: SelectionEventKind::Removed,
+                };
+                let _ = tx.send(event);
+            });
+
+        self.selection_handles.insert(
+            selection.id(),
             smallvec_inline![moved_handle, removed_handle],
         );
     }
@@ -449,16 +523,39 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
             })
         });
 
+        let (selection_tx, selection_rx) = flume::unbounded();
+
+        let also_selection_tx = selection_tx.clone();
+
+        let new_selections_handle = ctx.with_ctx(|ctx| {
+            ctx.on_selection_created(move |selection, _created_by| {
+                let event = SelectionEvent {
+                    buffer_id: selection.buffer_id(),
+                    selection_id: selection.id(),
+                    kind: SelectionEventKind::Created(selection.byte_range()),
+                };
+                let _ = also_selection_tx.send(event);
+            })
+        });
+
         EventStream {
             agent_id: ctx.new_agent_id(),
+
             buffer_handles: Default::default(),
             buffer_rx: buffer_rx.into_stream(),
             buffer_tx,
             new_buffers_handle,
+
             cursor_handles: Default::default(),
             cursor_rx: cursor_rx.into_stream(),
             cursor_tx,
             new_cursors_handle,
+
+            selection_handles: Default::default(),
+            selection_rx: selection_rx.into_stream(),
+            selection_tx,
+            new_selections_handle,
+
             fs_streams: self.fs_streams,
             project_filter: self.state.filter,
             node_to_buf_ids: Default::default(),

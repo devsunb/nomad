@@ -30,6 +30,11 @@ impl Selection for NeovimSelection<'_> {
     type Id = BufferId;
 
     #[inline]
+    fn buffer_id(&self) -> BufferId {
+        self.buffer.id()
+    }
+
+    #[inline]
     fn byte_range(&self) -> Range<ByteOffset> {
         self.buffer.selection().expect("buffer has a selection")
     }
