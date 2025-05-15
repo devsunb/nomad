@@ -7,7 +7,7 @@ use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};
 use walkdir::Filter;
 
 use crate::backend::{CollabBackend, MessageRx, MessageTx};
-use crate::event_stream::{EventRxError, EventStream};
+use crate::event_stream::{EventError, EventStream};
 use crate::leave::StopRequest;
 use crate::project::{ProjectHandle, SynchronizeError};
 
@@ -31,7 +31,7 @@ pub(crate) struct Session<B: CollabBackend, F: Filter<B::Fs>> {
 #[derive(cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::From)]
 #[display("{_0}")]
 pub(crate) enum SessionError<B: CollabBackend, F: Filter<B::Fs>> {
-    EventRx(#[from] EventRxError<B, F>),
+    EventRx(#[from] EventError<B::Fs, F>),
     MessageRx(#[from] ClientRxError),
     #[display("the server kicked this peer out of the session")]
     MessageRxExhausted,

@@ -67,12 +67,12 @@ pub(crate) struct Done<F> {
 /// The type of error that can occur when [`EventStream::next`] fails.
 #[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
 #[display("{_0}")]
-pub(crate) enum EventRxError<B: CollabBackend, F: Filter<B::Fs>> {
+pub(crate) enum EventError<Fs: fs::Fs, F: Filter<Fs>> {
     /// The project filter returned an error.
     Filter(F::Error),
 
     /// We couldn't get the node at the given path.
-    NodeAtPath(<B::Fs as Fs>::NodeAtPathError),
+    NodeAtPath(Fs::NodeAtPathError),
 }
 
 struct BufferStreams<Ed: CollabBackend> {
@@ -150,7 +150,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     pub(crate) async fn next(
         &mut self,
         ctx: &AsyncCtx<'_, B>,
-    ) -> Result<Event<B>, EventRxError<B, F>> {
+    ) -> Result<Event<B>, EventError<B::Fs, F>> {
         loop {
             let mut dir_streams = self.dir_streams.inner.as_stream(0);
             let mut file_streams = self.file_streams.inner.as_stream(0);
@@ -211,7 +211,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         &mut self,
         event: event::BufferEvent<B>,
         ctx: &AsyncCtx<'_, B>,
-    ) -> Result<Option<event::BufferEvent<B>>, EventRxError<B, F>> {
+    ) -> Result<Option<event::BufferEvent<B>>, EventError<B::Fs, F>> {
         match &event {
             event::BufferEvent::Created(buffer_id, _) => {
                 let Some(buffer_path) = ctx.with_ctx(|ctx| {
@@ -229,7 +229,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
                     .fs()
                     .node_at_path(buffer_path)
                     .await
-                    .map_err(EventRxError::NodeAtPath)?
+                    .map_err(EventError::NodeAtPath)?
                 else {
                     return Ok(None);
                 };
@@ -294,14 +294,14 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         &mut self,
         event: fs::DirectoryEvent<B::Fs>,
         ctx: &AsyncCtx<'_, B>,
-    ) -> Result<Option<fs::DirectoryEvent<B::Fs>>, EventRxError<B, F>> {
+    ) -> Result<Option<fs::DirectoryEvent<B::Fs>>, EventError<B::Fs, F>> {
         Ok(match event {
             fs::DirectoryEvent::Creation(ref creation) => {
                 let Some(node) = ctx
                     .fs()
                     .node_at_path(&creation.node_path)
                     .await
-                    .map_err(EventRxError::NodeAtPath)?
+                    .map_err(EventError::NodeAtPath)?
                 else {
                     // The node must've already been deleted.
                     return Ok(None);
@@ -421,7 +421,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     async fn should_watch_node(
         &self,
         node: &fs::FsNode<B::Fs>,
-    ) -> Result<bool, EventRxError<B, F>> {
+    ) -> Result<bool, EventError<B::Fs, F>> {
         debug_assert!(node.path().starts_with(&self.root_path));
 
         let Some(parent_path) = node.path().parent() else { return Ok(false) };
@@ -429,7 +429,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         self.project_filter
             .should_filter(parent_path, &node.meta())
             .await
-            .map_err(EventRxError::Filter)
+            .map_err(EventError::Filter)
     }
 
     fn watch_node(&mut self, node: &fs::FsNode<B::Fs>, ctx: &AsyncCtx<'_, B>) {
@@ -438,7 +438,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             fs::FsNode::File(file) => {
                 self.file_streams.insert(file);
                 ctx.with_ctx(|ctx| {
-                    if let Some(buffer) = ctx.buffer_at_path(&*file.path()) {
+                    if let Some(buffer) = ctx.buffer_at_path(file.path()) {
                         self.watch_buffer(&buffer, file.id());
                     }
                 });
