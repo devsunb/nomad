@@ -1,12 +1,13 @@
 use core::{any, mem};
 
 use ed::Shared;
-use ed::backend::{AgentId, Buffer, Edit};
+use ed::backend::{AgentId, Buffer, Cursor, Edit};
 use nohash::IntMap as NoHashMap;
 use slotmap::{DefaultKey, SlotMap};
 use smallvec::smallvec_inline;
 
 use crate::buffer::{BufferId, NeovimBuffer};
+use crate::cursor::NeovimCursor;
 use crate::oxi::api::{self, opts, types};
 
 type AugroupId = u32;
@@ -52,6 +53,7 @@ pub(crate) struct Events {
     on_buffer_removed: NoHashMap<BufferId, EventCallbacks<BufUnload>>,
     on_buffer_saved: NoHashMap<BufferId, EventCallbacks<BufWritePost>>,
     on_buffer_unfocused: NoHashMap<BufferId, EventCallbacks<BufLeave>>,
+    on_cursor_moved: NoHashMap<BufferId, EventCallbacks<CursorMoved>>,
 }
 
 #[derive(Default)]
@@ -90,6 +92,9 @@ pub(crate) struct BufUnload(pub(crate) BufferId);
 pub(crate) struct BufWritePost(pub(crate) BufferId);
 
 #[derive(Clone, Copy)]
+pub(crate) struct CursorMoved(pub(crate) BufferId);
+
+#[derive(Clone, Copy)]
 pub(crate) struct OnBytes(pub(crate) BufferId);
 
 #[derive(cauchy::From)]
@@ -99,6 +104,7 @@ pub(crate) enum EventKind {
     BufReadPost(#[from] BufReadPost),
     BufUnload(#[from] BufUnload),
     BufWritePost(#[from] BufWritePost),
+    CursorMoved(#[from] CursorMoved),
     OnBytes(#[from] OnBytes),
 }
 
@@ -119,6 +125,7 @@ impl Events {
             on_buffer_removed: Default::default(),
             on_buffer_saved: Default::default(),
             on_buffer_unfocused: Default::default(),
+            on_cursor_moved: Default::default(),
         }
     }
 
@@ -251,6 +258,7 @@ impl Event for BufLeave {
     fn register(&self, events: Shared<Events>) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
             .group(events.with(|events| events.augroup_id))
+            .buffer(self.0.into())
             .callback(move |args: types::AutocmdCallbackArgs| {
                 events.with_mut(|inner| {
                     let buffer =
@@ -468,6 +476,79 @@ impl Event for BufWritePost {
     }
 }
 
+impl Event for CursorMoved {
+    type Args<'a> = (&'a NeovimCursor<'a>, AgentId);
+    type RegisterOutput = (AutocmdId, AutocmdId);
+
+    #[inline]
+    fn get_or_insert_callbacks<'ev>(
+        &self,
+        events: &'ev mut Events,
+    ) -> &'ev mut EventCallbacks<Self> {
+        events.on_cursor_moved.entry(self.0).or_default()
+    }
+
+    #[inline]
+    fn register(&self, events: Shared<Events>) -> Self::RegisterOutput {
+        let opts = opts::CreateAutocmdOpts::builder()
+            .group(events.with(|events| events.augroup_id))
+            .buffer(self.0.into())
+            .callback(move |args: types::AutocmdCallbackArgs| {
+                events.with_mut(|inner| {
+                    let cursor = NeovimCursor::new(NeovimBuffer::new(
+                        BufferId::new(args.buffer),
+                        &events,
+                    ));
+
+                    let Some(callbacks) =
+                        inner.on_cursor_moved.get_mut(&cursor.buffer_id())
+                    else {
+                        return true;
+                    };
+
+                    for callback in callbacks.iter_mut() {
+                        callback((&cursor, AgentId::UNKNOWN));
+                    }
+
+                    false
+                })
+            })
+            .build();
+
+        // Neovim has 3 separate cursor-move-related autocommand events --
+        // CursorMoved, CursorMovedI and CursorMovedC -- which are triggered
+        // when the cursor is moved in Normal/Visual mode, Insert mode and in
+        // the command line, respectively.
+        //
+        // Since ed has no concept of modes, we register the callback on both
+        // CursorMoved and CursorMovedI.
+
+        let cursor_moved_id = api::create_autocmd(["CursorMoved"], &opts)
+            .expect("couldn't create autocmd");
+
+        let cursor_moved_i_id = api::create_autocmd(["CursorMovedI"], &opts)
+            .expect("couldn't create autocmd");
+
+        (cursor_moved_id, cursor_moved_i_id)
+    }
+
+    #[inline]
+    fn unregister((cursor_moved_id, cursor_moved_i_id): Self::RegisterOutput) {
+        let _ = api::del_autocmd(cursor_moved_id);
+        let _ = api::del_autocmd(cursor_moved_i_id);
+    }
+
+    #[inline]
+    fn cleanup(&self, event_key: DefaultKey, events: &mut Events) {
+        if let Some(callbacks) = events.on_cursor_moved.get_mut(&self.0) {
+            callbacks.remove(event_key);
+            if callbacks.is_empty() {
+                events.on_cursor_moved.remove(&self.0);
+            }
+        }
+    }
+}
+
 impl Event for OnBytes {
     type Args<'a> = (&'a NeovimBuffer<'a>, &'a Edit);
     type RegisterOutput = ();
@@ -546,6 +627,7 @@ impl Drop for EventHandle {
             EventKind::BufReadPost(event) => event.cleanup(key, events),
             EventKind::BufUnload(event) => event.cleanup(key, events),
             EventKind::BufWritePost(event) => event.cleanup(key, events),
+            EventKind::CursorMoved(event) => event.cleanup(key, events),
             EventKind::OnBytes(event) => event.cleanup(key, events),
         })
     }
