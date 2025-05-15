@@ -156,16 +156,20 @@ impl Backend for Neovim {
         Events::insert(
             self.events.clone(),
             events::BufReadPost,
-            move |(this, created_by)| fun(this, created_by),
+            move |(buf, created_by)| fun(buf, created_by),
         )
     }
 
     #[inline]
-    fn on_cursor_created<Fun>(&mut self, _fun: Fun) -> Self::EventHandle
+    fn on_cursor_created<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static,
     {
-        todo!();
+        Events::insert(
+            self.events.clone(),
+            events::BufEnter,
+            move |(&buf, focused_by)| fun(&NeovimCursor::new(buf), focused_by),
+        )
     }
 
     #[inline]

@@ -9,6 +9,9 @@ use smallvec::smallvec_inline;
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::oxi::api::{self, opts, types};
 
+type AugroupId = u32;
+type AutocmdId = u32;
+
 /// TODO: docs.
 pub struct EventHandle {
     event_key: DefaultKey,
@@ -42,9 +45,10 @@ pub(crate) trait Event: Clone + Into<EventKind> {
 
 pub(crate) struct Events {
     pub(crate) agent_ids: AgentIds,
-    augroup_id: u32,
+    augroup_id: AugroupId,
     on_buffer_created: EventCallbacks<BufReadPost>,
     on_buffer_edited: NoHashMap<BufferId, EventCallbacks<OnBytes>>,
+    on_buffer_focused: EventCallbacks<BufEnter>,
     on_buffer_removed: NoHashMap<BufferId, EventCallbacks<BufUnload>>,
     on_buffer_saved: NoHashMap<BufferId, EventCallbacks<BufWritePost>>,
 }
@@ -70,6 +74,9 @@ pub(crate) enum EventCallbacks<T: Event> {
 }
 
 #[derive(Clone, Copy)]
+pub(crate) struct BufEnter;
+
+#[derive(Clone, Copy)]
 pub(crate) struct BufReadPost;
 
 #[derive(Clone, Copy)]
@@ -83,6 +90,7 @@ pub(crate) struct OnBytes(pub(crate) BufferId);
 
 #[derive(cauchy::From)]
 pub(crate) enum EventKind {
+    BufEnter(#[from] BufEnter),
     BufReadPost(#[from] BufReadPost),
     BufUnload(#[from] BufUnload),
     BufWritePost(#[from] BufWritePost),
@@ -100,6 +108,7 @@ impl Events {
             agent_ids: Default::default(),
             on_buffer_created: Default::default(),
             on_buffer_edited: Default::default(),
+            on_buffer_focused: Default::default(),
             on_buffer_removed: Default::default(),
             on_buffer_saved: Default::default(),
         }
@@ -173,9 +182,54 @@ impl<T: Event> EventCallbacks<T> {
     }
 }
 
+impl Event for BufEnter {
+    type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
+    type RegisterOutput = AutocmdId;
+
+    #[inline]
+    fn get_or_insert_callbacks<'ev>(
+        &self,
+        events: &'ev mut Events,
+    ) -> &'ev mut EventCallbacks<Self> {
+        &mut events.on_buffer_focused
+    }
+
+    #[inline]
+    fn register(&self, events: Shared<Events>) -> AutocmdId {
+        let opts = opts::CreateAutocmdOpts::builder()
+            .group(events.with(|events| events.augroup_id))
+            .callback(move |args: types::AutocmdCallbackArgs| {
+                events.with_mut(|inner| {
+                    let buffer =
+                        NeovimBuffer::new(BufferId::new(args.buffer), &events);
+
+                    for callback in inner.on_buffer_focused.iter_mut() {
+                        callback((&buffer, AgentId::UNKNOWN));
+                    }
+
+                    false
+                })
+            })
+            .build();
+
+        api::create_autocmd(["BufEnter"], &opts)
+            .expect("couldn't create autocmd")
+    }
+
+    #[inline]
+    fn unregister(autocmd_id: Self::RegisterOutput) {
+        let _ = api::del_autocmd(autocmd_id);
+    }
+
+    #[inline]
+    fn cleanup(&self, event_key: DefaultKey, events: &mut Events) {
+        events.on_buffer_focused.remove(event_key);
+    }
+}
+
 impl Event for BufReadPost {
     type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
-    type RegisterOutput = u32;
+    type RegisterOutput = AutocmdId;
 
     #[inline]
     fn get_or_insert_callbacks<'ev>(
@@ -186,7 +240,7 @@ impl Event for BufReadPost {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> u32 {
+    fn register(&self, events: Shared<Events>) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
             .group(events.with(|events| events.augroup_id))
             .callback(move |args: types::AutocmdCallbackArgs| {
@@ -226,7 +280,7 @@ impl Event for BufReadPost {
 
 impl Event for BufUnload {
     type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
-    type RegisterOutput = u32;
+    type RegisterOutput = AutocmdId;
 
     #[inline]
     fn get_or_insert_callbacks<'ev>(
@@ -237,7 +291,7 @@ impl Event for BufUnload {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> u32 {
+    fn register(&self, events: Shared<Events>) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
             .group(events.with(|events| events.augroup_id))
             .buffer(self.0.into())
@@ -289,7 +343,7 @@ impl Event for BufUnload {
 
 impl Event for BufWritePost {
     type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
-    type RegisterOutput = u32;
+    type RegisterOutput = AutocmdId;
 
     #[inline]
     fn get_or_insert_callbacks<'ev>(
@@ -300,7 +354,7 @@ impl Event for BufWritePost {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> u32 {
+    fn register(&self, events: Shared<Events>) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
             .group(events.with(|events| events.augroup_id))
             .buffer(self.0.into())
@@ -423,6 +477,7 @@ impl Drop for EventHandle {
     fn drop(&mut self) {
         let key = self.event_key;
         self.events.with_mut(|events| match self.event_kind {
+            EventKind::BufEnter(event) => event.cleanup(key, events),
             EventKind::BufReadPost(event) => event.cleanup(key, events),
             EventKind::BufUnload(event) => event.cleanup(key, events),
             EventKind::BufWritePost(event) => event.cleanup(key, events),
