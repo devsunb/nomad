@@ -4,11 +4,13 @@ use serde::{Deserialize, Serialize};
 use crate::value::Value;
 
 /// TODO: docs.
+#[derive(Debug)]
 pub struct SerializeError {
     inner: serde_json::Error,
 }
 
 /// TODO: docs.
+#[derive(Debug)]
 pub struct DeserializeError {
     inner: serde_json::Error,
 }

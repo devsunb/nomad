@@ -82,13 +82,13 @@ pub trait Backend: 'static + Sized {
     type SelectionId: Clone + Debug + Eq + Hash;
 
     /// TODO: docs.
-    type CreateBufferError: notify::Error;
+    type CreateBufferError: Debug + notify::Error;
 
     /// TODO: docs.
-    type SerializeError: notify::Error;
+    type SerializeError: Debug + notify::Error;
 
     /// TODO: docs.
-    type DeserializeError: notify::Error;
+    type DeserializeError: Debug + notify::Error;
 
     /// TODO: docs.
     fn buffer(&mut self, id: Self::BufferId) -> Option<Self::Buffer<'_>>;
