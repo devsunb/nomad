@@ -3,7 +3,6 @@ use core::task::{Context, Poll};
 
 use async_task::Runnable;
 use ed::backend::{self, BackgroundExecutor, LocalExecutor};
-use flume::{Receiver, Sender};
 use futures_lite::future::{self, FutureExt};
 
 pub struct Executor {
@@ -18,18 +17,22 @@ pin_project_lite::pin_project! {
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct Spawner {
-    runnable_tx: Sender<Runnable>,
+pub(crate) struct Runner {
+    runnable_rx: flume::Receiver<Runnable>,
 }
 
-pub(crate) struct Runner {
-    runnable_rx: Receiver<Runnable>,
+#[derive(Clone)]
+pub(crate) struct Spawner {
+    runnable_tx: flume::Sender<Runnable>,
 }
 
 impl Executor {
-    pub(crate) fn take_runner(&mut self) -> Option<Runner> {
-        self.runner.take()
+    pub(crate) fn runner(&self) -> &Runner {
+        self.runner.as_ref().expect("runner has not been taken")
+    }
+
+    pub(crate) fn take_runner(&mut self) -> Runner {
+        self.runner.take().expect("runner has not been taken")
     }
 }
 
@@ -89,6 +92,10 @@ impl Spawner {
 
 impl LocalExecutor for Executor {
     type Task<T> = Task<T>;
+
+    async fn run<T>(&mut self, future: impl Future<Output = T>) -> T {
+        self.runner().run(future, false).await
+    }
 
     fn spawn<Fut>(&mut self, fut: Fut) -> Self::Task<Fut::Output>
     where

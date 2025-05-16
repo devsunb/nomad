@@ -141,6 +141,10 @@ impl RunnableQueue {
 impl LocalExecutor for NeovimLocalExecutor {
     type Task<T> = NeovimLocalTask<T>;
 
+    async fn run<T>(&mut self, _future: impl Future<Output = T>) -> T {
+        todo!();
+    }
+
     #[inline]
     fn spawn<Fut>(&mut self, future: Fut) -> Self::Task<Fut::Output>
     where

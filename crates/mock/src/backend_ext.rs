@@ -133,17 +133,15 @@ pub trait BackendExt: Backend<LocalExecutor: AsMut<Executor>> {
     #[inline]
     #[doc(hidden)]
     fn run_inner<R: 'static>(
-        mut self,
+        self,
         fun: impl AsyncFnOnce(&mut AsyncCtx<Self>) -> R + 'static,
         run_all: bool,
     ) -> impl Future<Output = R> {
-        let runner = self
-            .local_executor()
-            .as_mut()
-            .take_runner()
-            .expect("runner has not been taken");
-
-        let task = self.with_ctx(move |ctx| ctx.spawn_local_unprotected(fun));
+        let (runner, task) = Backend::with_ctx(self, move |ctx| {
+            let task = ctx.spawn_local_unprotected(fun);
+            let ex = ctx.backend_mut().local_executor().as_mut();
+            (ex.take_runner(), task)
+        });
 
         async move { runner.run(task, run_all).await }
     }

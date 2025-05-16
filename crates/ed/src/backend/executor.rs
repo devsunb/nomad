@@ -11,6 +11,12 @@ pub trait LocalExecutor {
     type Task<T>: Task<T>;
 
     /// TODO: docs.
+    fn run<T>(
+        &mut self,
+        future: impl Future<Output = T>,
+    ) -> impl Future<Output = T>;
+
+    /// TODO: docs.
     fn spawn<Fut>(&mut self, f: Fut) -> Self::Task<Fut::Output>
     where
         Fut: Future + 'static,

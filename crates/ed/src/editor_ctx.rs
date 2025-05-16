@@ -1,6 +1,6 @@
 use core::panic;
 
-use futures_lite::FutureExt;
+use futures_lite::future::{self, FutureExt};
 
 use crate::AsyncCtx;
 use crate::backend::{
@@ -29,6 +29,12 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
     #[inline]
     pub fn backend_mut(&mut self) -> &mut B {
         &mut self.state
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn block_on<T>(&mut self, fut: impl Future<Output = T>) -> T {
+        future::block_on(self.run(fut))
     }
 
     /// TODO: docs.
@@ -127,11 +133,28 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
 
     /// TODO: docs.
     #[inline]
+    pub async fn run<T>(&mut self, fut: impl Future<Output = T>) -> T {
+        self.backend_mut().local_executor().run(fut).await
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn selection(
         &mut self,
         selection_id: B::SelectionId,
     ) -> Option<B::Selection<'_>> {
         self.backend_mut().selection(selection_id)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn spawn_and_block_on<T: 'static>(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> T + 'static,
+    ) -> T {
+        let task = self.spawn_local_unprotected(fun);
+        let fut = self.run(task);
+        future::block_on(fut)
     }
 
     /// TODO: docs.
