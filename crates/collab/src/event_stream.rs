@@ -149,7 +149,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
     pub(crate) async fn next(
         &mut self,
-        ctx: &AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Event<B>, EventError<B::Fs, F>> {
         loop {
             let mut dir_streams = self.dir_streams.inner.as_stream(0);
@@ -210,7 +210,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     async fn handle_buffer_event(
         &mut self,
         event: event::BufferEvent<B>,
-        ctx: &AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Option<event::BufferEvent<B>>, EventError<B::Fs, F>> {
         match &event {
             event::BufferEvent::Created(buffer_id, _) => {
@@ -267,7 +267,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     fn handle_cursor_event(
         &mut self,
         event: event::CursorEvent<B>,
-        ctx: &AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Option<event::CursorEvent<B>> {
         match &event.kind {
             event::CursorEventKind::Created(_) => {
@@ -293,7 +293,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     async fn handle_dir_event(
         &mut self,
         event: fs::DirectoryEvent<B::Fs>,
-        ctx: &AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Result<Option<fs::DirectoryEvent<B::Fs>>, EventError<B::Fs, F>> {
         Ok(match event {
             fs::DirectoryEvent::Creation(ref creation) => {
@@ -390,7 +390,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     fn handle_selection_event(
         &mut self,
         event: event::SelectionEvent<B>,
-        ctx: &AsyncCtx<'_, B>,
+        ctx: &mut AsyncCtx<'_, B>,
     ) -> Option<event::SelectionEvent<B>> {
         match &event.kind {
             event::SelectionEventKind::Created(_) => {
@@ -432,7 +432,11 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             .map_err(EventError::Filter)
     }
 
-    fn watch_node(&mut self, node: &fs::FsNode<B::Fs>, ctx: &AsyncCtx<'_, B>) {
+    fn watch_node(
+        &mut self,
+        node: &fs::FsNode<B::Fs>,
+        ctx: &mut AsyncCtx<'_, B>,
+    ) {
         match node {
             fs::FsNode::Directory(dir) => self.dir_streams.insert(dir),
             fs::FsNode::File(file) => {
