@@ -7,7 +7,7 @@ use async_task::Builder;
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
 use ed::backend::{LocalExecutor, Task};
 
-use crate::oxi::{self, libuv};
+use crate::oxi;
 
 type Runnable = async_task::Runnable<()>;
 
@@ -15,10 +15,10 @@ type Runnable = async_task::Runnable<()>;
 #[derive(Clone)]
 pub struct NeovimLocalExecutor {
     /// TODO: docs
-    async_handle: libuv::AsyncHandle,
+    async_handle: oxi::libuv::AsyncHandle,
 
     /// TODO: docs
-    state: Rc<ExecutorState>,
+    runnable_queue: Rc<RunnableQueue>,
 }
 
 pin_project_lite::pin_project! {
@@ -29,51 +29,96 @@ pin_project_lite::pin_project! {
     }
 }
 
-struct ExecutorState {
-    woken_queue: RunnableQueue,
-}
-
 /// The queue of runnables that are ready to be polled.
 struct RunnableQueue {
-    queue: ConcurrentQueue<Runnable>,
+    inner: ConcurrentQueue<Runnable>,
 }
 
 impl NeovimLocalExecutor {
     /// TODO: docs
     #[inline]
     pub fn init() -> Self {
-        let state = Rc::new(ExecutorState::new());
-
-        let also_state = Rc::clone(&state);
+        let runnable_queue = Rc::new(RunnableQueue::new());
 
         // This callback will be registered to be executed on the next tick of
         // the libuv event loop everytime a future wakes its `Waker`.
-        let async_handle = libuv::AsyncHandle::new(move || {
-            let state = Rc::clone(&also_state);
+        let async_handle = {
+            let runnable_queue = Rc::clone(&runnable_queue);
 
-            // We schedule the poll to avoid `textlock` and other
-            // synchronization issues.
-            oxi::schedule(move |()| state.tick_all());
-        })
+            oxi::libuv::AsyncHandle::new(move || {
+                let runnable_queue = Rc::clone(&runnable_queue);
+
+                // We schedule the poll to avoid `textlock` and other
+                // synchronization issues.
+                oxi::schedule(move |()| {
+                    for _ in 0..runnable_queue.len() {
+                        runnable_queue
+                            .pop_front()
+                            .expect("checked queue length")
+                            .run();
+                    }
+                });
+            })
+        }
         .expect("creating an async handle never fails");
 
-        Self { async_handle, state }
+        Self { async_handle, runnable_queue }
+    }
+}
+
+impl RunnableQueue {
+    #[inline]
+    fn len(&self) -> usize {
+        self.inner.len()
     }
 
     #[inline]
-    fn spawn_inner<F>(&self, future: F) -> NeovimLocalTask<F::Output>
+    fn new() -> Self {
+        Self { inner: ConcurrentQueue::unbounded() }
+    }
+
+    #[inline]
+    fn pop_front(&self) -> Option<Runnable> {
+        match self.inner.pop() {
+            Ok(runnable) => Some(runnable),
+            Err(PopError::Empty) => None,
+            Err(PopError::Closed) => unreachable!(),
+        }
+    }
+
+    #[inline]
+    fn push_back(&self, runnable: Runnable) {
+        match self.inner.push(runnable) {
+            Ok(()) => {},
+            Err(PushError::Full(_)) => unreachable!("queue is unbounded"),
+            Err(PushError::Closed(_)) => unreachable!("queue is never closed"),
+        }
+    }
+}
+
+impl LocalExecutor for NeovimLocalExecutor {
+    type Task<T> = NeovimLocalTask<T>;
+
+    #[inline]
+    async fn run<T>(&mut self, future: impl Future<Output = T>) -> T {
+        // Scheduling a task also notifies the libuv event loop, so we don't
+        // have to do anything else here.
+        future.await
+    }
+
+    #[inline]
+    fn spawn<Fut>(&mut self, future: Fut) -> Self::Task<Fut::Output>
     where
-        F: Future + 'static,
-        F::Output: 'static,
+        Fut: Future + 'static,
+        Fut::Output: 'static,
     {
         let builder = Builder::new().propagate_panic(true);
 
         let schedule = {
-            let async_handle = self.async_handle.clone();
-            let state = Rc::clone(&self.state);
+            let this = self.clone();
             move |runnable| {
-                state.woken_queue.push_back(runnable);
-                async_handle
+                this.runnable_queue.push_back(runnable);
+                this.async_handle
                     .send()
                     .expect("sending an async handle never fails");
             }
@@ -90,68 +135,6 @@ impl NeovimLocalExecutor {
         runnable.run();
 
         NeovimLocalTask { inner: task }
-    }
-}
-
-impl ExecutorState {
-    #[inline]
-    fn new() -> Self {
-        Self { woken_queue: RunnableQueue::new() }
-    }
-
-    /// Polls all the runnables in the queue.
-    #[inline]
-    fn tick_all(&self) {
-        for _ in 0..self.woken_queue.len() {
-            self.woken_queue.pop_front().expect("checked queue length").run();
-        }
-    }
-}
-
-impl RunnableQueue {
-    #[inline]
-    fn len(&self) -> usize {
-        self.queue.len()
-    }
-
-    #[inline]
-    fn new() -> Self {
-        Self { queue: ConcurrentQueue::unbounded() }
-    }
-
-    #[inline]
-    fn pop_front(&self) -> Option<Runnable> {
-        match self.queue.pop() {
-            Ok(runnable) => Some(runnable),
-            Err(PopError::Empty) => None,
-            Err(PopError::Closed) => unreachable!(),
-        }
-    }
-
-    #[inline]
-    fn push_back(&self, runnable: Runnable) {
-        match self.queue.push(runnable) {
-            Ok(()) => {},
-            Err(PushError::Full(_)) => unreachable!("queue is unbounded"),
-            Err(PushError::Closed(_)) => unreachable!("queue is never closed"),
-        }
-    }
-}
-
-impl LocalExecutor for NeovimLocalExecutor {
-    type Task<T> = NeovimLocalTask<T>;
-
-    async fn run<T>(&mut self, _future: impl Future<Output = T>) -> T {
-        todo!();
-    }
-
-    #[inline]
-    fn spawn<Fut>(&mut self, future: Fut) -> Self::Task<Fut::Output>
-    where
-        Fut: Future + 'static,
-        Fut::Output: 'static,
-    {
-        self.spawn_inner(future)
     }
 }
 
