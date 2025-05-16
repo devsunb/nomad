@@ -94,9 +94,9 @@ pub(crate) fn on_cursor_moved_1<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
     // any offsets yet.
     assert!(offsets.with(|vec| vec.is_empty()));
 
-    let mut foo = ctx.buffer(foo_id).unwrap();
+    let mut foo_txt = ctx.buffer(foo_id).unwrap();
 
-    foo.edit(
+    foo_txt.edit(
         [Replacement::new(0usize.into()..0usize.into(), "Hello world")],
         agent_id,
     );
@@ -110,9 +110,9 @@ pub(crate) fn on_cursor_moved_1<Ed: Backend>(ctx: &mut EditorCtx<'_, Ed>) {
     // Moving the cursor shouldn't cause a new one to be created.
     assert_eq!(num_created.copied(), 1);
 
-    assert_eq!(foo.num_cursors(), 1);
+    assert_eq!(foo_txt.num_cursors(), 1);
 
-    foo.for_each_cursor(|mut cursor| {
+    foo_txt.for_each_cursor(|mut cursor| {
         cursor.r#move(5usize.into(), agent_id);
 
         offsets.with(|vec| {

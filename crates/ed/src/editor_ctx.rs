@@ -153,8 +153,7 @@ impl<'a, B: Backend> EditorCtx<'a, B> {
         fun: impl AsyncFnOnce(&mut AsyncCtx<B>) -> T + 'static,
     ) -> T {
         let task = self.spawn_local_unprotected(fun);
-        let fut = self.run(task);
-        future::block_on(fut)
+        self.block_on(task)
     }
 
     /// TODO: docs.

@@ -15,12 +15,12 @@ mod read_neovim {
     use collab::CollabBackend;
     use collab::mock::CollabMock;
     use criterion::BenchmarkId;
-    use ed::AsyncCtx;
     use ed::fs::os::{OsDirectory, OsFs};
     use ed::fs::{Directory, Fs};
+    use ed::{Backend, EditorCtx};
     use futures_lite::future;
+    use mock::Mock;
     use mock::fs::MockFs;
-    use mock::{BackendExt, Mock};
     use thread_pool::ThreadPool;
     use walkdir::GitIgnore;
 
@@ -31,9 +31,12 @@ mod read_neovim {
             Mock::<MockFs>::default()
                 .with_background_executor(ThreadPool::new()),
         )
-        .block_on(async |ctx| {
+        .with_ctx(|ctx| {
             // Replicate the Neovim repo into the root of the mock filesystem.
-            ctx.fs().root().replicate_from(&neovim_repo()).await.unwrap();
+            ctx.spawn_and_block_on(async |ctx| {
+                ctx.fs().root().replicate_from(&neovim_repo()).await.unwrap();
+            });
+
             bench_read_project(ctx.fs().root(), "mock_fs", ctx, group);
         });
     }
@@ -46,7 +49,7 @@ mod read_neovim {
         .with_project_filter(|project_root| {
             GitIgnore::new(project_root.path().to_owned())
         })
-        .block_on(async |ctx| {
+        .with_ctx(|ctx| {
             bench_read_project(neovim_repo(), "real_fs", ctx, group);
         });
     }
@@ -66,7 +69,7 @@ mod read_neovim {
     fn bench_read_project<B: CollabBackend>(
         project_root: <B::Fs as Fs>::Directory,
         fs_name: &str,
-        ctx: &mut AsyncCtx<'_, B>,
+        ctx: &mut EditorCtx<B>,
         group: &mut BenchmarkGroup<'_, WallTime>,
     ) where
         <B::Fs as Fs>::Directory: Clone,
@@ -78,11 +81,13 @@ mod read_neovim {
 
         group.bench_function(bench_id, |b| {
             b.iter(|| {
-                future::block_on(collab::start::benches::read_project(
-                    project_root.clone(),
-                    ctx,
-                ))
-                .unwrap()
+                let project_root = project_root.clone();
+
+                ctx.spawn_and_block_on(async move |ctx| {
+                    collab::start::benches::read_project(project_root, ctx)
+                        .await
+                        .unwrap()
+                });
             });
         });
     }

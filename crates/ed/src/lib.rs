@@ -17,6 +17,7 @@ mod state;
 mod util;
 
 pub use async_ctx::AsyncCtx;
+pub use backend::Backend;
 pub use byte_offset::ByteOffset;
 pub use editor_ctx::EditorCtx;
 pub use shared::Shared;
