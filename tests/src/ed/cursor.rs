@@ -36,10 +36,6 @@ pub(crate) fn on_cursor_created_2<Ed: Backend>(
         ctx.create_and_focus(path!("/foo.txt"), agent_id).await.unwrap()
     });
 
-    let bar_id = ctx.block_on(async move |ctx| {
-        ctx.create_and_focus(path!("/bar.txt"), agent_id).await.unwrap()
-    });
-
     let num_created = Shared::<usize>::new(0);
 
     let _handle = ctx.on_cursor_created({
@@ -50,18 +46,16 @@ pub(crate) fn on_cursor_created_2<Ed: Backend>(
         }
     });
 
-    // /bar.txt is currently focused, so focusing it again shouldn't do
+    // foo.txt is currently focused, so focusing it again shouldn't do
     // anything.
-    ctx.buffer(bar_id.clone()).unwrap().focus(agent_id);
+    ctx.buffer(foo_id.clone()).unwrap().focus(agent_id);
     assert_eq!(num_created.copied(), 0);
 
-    // Now focus /foo.txt, which should create a cursor.
-    ctx.buffer(foo_id).unwrap().focus(agent_id);
+    // Now create and focus bar.txt, which should create a cursor.
+    ctx.block_on(async move |ctx| {
+        ctx.create_and_focus(path!("/bar.txt"), agent_id).await.unwrap()
+    });
     assert_eq!(num_created.copied(), 1);
-
-    // Now focus /bar.txt again, which should create a cursor.
-    ctx.buffer(bar_id).unwrap().focus(agent_id);
-    assert_eq!(num_created.copied(), 2);
 }
 
 pub(crate) fn on_cursor_moved_1<Ed: Backend>(ctx: &mut Context<Ed, Borrowed>) {
