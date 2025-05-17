@@ -274,11 +274,19 @@ where
         agent_id: AgentId,
         ctx: &mut Context<impl AsMut<Self> + Backend, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        let contents = ctx
+        let contents = match ctx
             .with_editor(|ed| ed.as_mut().fs())
             .read_to_string(file_path)
             .await
-            .map_err(|inner| CreateBufferError { inner })?;
+        {
+            Ok(contents) => contents,
+
+            Err(fs::ReadFileToStringError::ReadFile(
+                fs::ReadFileError::NoNodeAtPath(_),
+            )) => String::default(),
+
+            Err(other) => return Err(CreateBufferError { inner: other }),
+        };
 
         ctx.with_editor(|ed| {
             let this = ed.as_mut();
