@@ -3,11 +3,11 @@
 
 #[cfg(all(test, feature = "collab"))]
 mod collab;
-#[cfg(all(test, any(feature = "mock", feature = "neovim")))]
+#[cfg(any(all(test, feature = "mock"), feature = "neovim"))]
 mod ed;
 #[cfg(all(test, feature = "mock"))]
 mod mock;
-#[cfg(all(test, feature = "neovim"))]
+#[cfg(feature = "neovim")]
 mod neovim;
 #[cfg(all(test, feature = "walkdir"))]
 mod walkdir;
