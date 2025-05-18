@@ -146,8 +146,6 @@ where
     Fs: fs::Fs,
     BgSpawner: BackgroundSpawner,
 {
-    const REINSTATE_PANIC_HOOK: bool = true;
-
     type Api = Api;
     type Buffer<'a> = Buffer<'a>;
     type BufferId = BufferId;
@@ -233,6 +231,10 @@ where
     {
         let cb_kind = CallbackKind::SelectionCreated(Box::new(fun));
         self.callbacks.insert(cb_kind)
+    }
+
+    fn reinstate_panic_hook(&self) -> bool {
+        true
     }
 
     fn selection(

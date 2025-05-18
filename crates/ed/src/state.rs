@@ -120,6 +120,7 @@ impl<B: Backend> State<B> {
     pub(crate) fn new(backend: B) -> Self {
         const RESUME_UNWINDING: &ResumeUnwinding = &ResumeUnwinding;
         Self {
+            panic_hook: PanicHook::set(&backend),
             backend,
             modules: FxHashMap::default(),
             next_agent_id: AgentId::default(),
@@ -127,7 +128,6 @@ impl<B: Backend> State<B> {
                 <ResumeUnwinding as Plugin<B>>::id(),
                 RESUME_UNWINDING as &'static dyn PanicHandler<B>,
             ))),
-            panic_hook: PanicHook::set(),
         }
     }
 
@@ -188,7 +188,7 @@ impl<B: Backend> StateMut<'_, B> {
     }
 }
 
-impl<B: Backend> PanicHook<B> {
+impl<Ed: Backend> PanicHook<Ed> {
     thread_local! {
         static BACKTRACE: Cell<Option<Backtrace>> = const { Cell::new(None) };
         static LOCATION: Cell<Option<PanicLocation>> = const { Cell::new(None) };
@@ -202,8 +202,8 @@ impl<B: Backend> PanicHook<B> {
     }
 
     #[inline]
-    fn set() -> Self {
-        let prev_hook = B::REINSTATE_PANIC_HOOK.then(panic::take_hook);
+    fn set(ed: &Ed) -> Self {
+        let prev_hook = ed.reinstate_panic_hook().then(panic::take_hook);
         panic::set_hook({
             Box::new(move |info| {
                 if let Some(prev) = &prev_hook {

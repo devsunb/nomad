@@ -37,8 +37,6 @@ impl<B: BaseBackend> AuthBackend for AuthMock<B> {
 }
 
 impl<B: BaseBackend> Backend for AuthMock<B> {
-    const REINSTATE_PANIC_HOOK: bool = B::REINSTATE_PANIC_HOOK;
-
     type Api = <B as Backend>::Api;
     type Buffer<'a> = <B as Backend>::Buffer<'a>;
     type BufferId = <B as Backend>::BufferId;
@@ -103,6 +101,9 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
     {
         self.inner.on_selection_created(fun)
+    }
+    fn reinstate_panic_hook(&self) -> bool {
+        self.inner.reinstate_panic_hook()
     }
     fn selection(
         &mut self,

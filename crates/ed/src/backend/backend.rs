@@ -24,9 +24,6 @@ use crate::{BorrowState, Context, fs};
 /// TODO: docs.
 pub trait Backend: 'static + Sized {
     /// TODO: docs.
-    const REINSTATE_PANIC_HOOK: bool;
-
-    /// TODO: docs.
     type Api: Api;
 
     /// TODO: docs.
@@ -132,6 +129,9 @@ pub trait Backend: 'static + Sized {
     fn on_selection_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static;
+
+    /// TODO: docs.
+    fn reinstate_panic_hook(&self) -> bool;
 
     /// TODO: docs.
     fn selection(

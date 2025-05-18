@@ -59,8 +59,6 @@ impl Neovim {
 }
 
 impl Backend for Neovim {
-    const REINSTATE_PANIC_HOOK: bool = false;
-
     type Api = api::NeovimApi;
     type Buffer<'a> = NeovimBuffer<'a>;
     type BufferId = BufferId;
@@ -184,6 +182,11 @@ impl Backend for Neovim {
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
     {
         todo!();
+    }
+
+    #[inline]
+    fn reinstate_panic_hook(&self) -> bool {
+        self.reinstate_panic_hook
     }
 
     #[inline]
