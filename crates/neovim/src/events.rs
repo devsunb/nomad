@@ -1,3 +1,4 @@
+use core::ops::{Deref, DerefMut};
 use core::{any, mem};
 
 use ed::Shared;
@@ -35,13 +36,18 @@ pub(crate) trait Event: Clone + Into<EventKind> {
     ) -> &'ev mut EventCallbacks<Self>;
 
     /// TODO: docs.
-    fn register(&self, events: Shared<Events>) -> Self::RegisterOutput;
+    fn register(&self, events: EventsBorrow) -> Self::RegisterOutput;
 
     /// TODO: docs.
     fn unregister(out: Self::RegisterOutput);
 
     /// TODO: docs.
     fn cleanup(&self, event_key: DefaultKey, events: &mut Events);
+}
+
+pub(crate) struct EventsBorrow<'a> {
+    pub(crate) borrow: &'a mut Events,
+    pub(crate) handle: Shared<Events>,
 }
 
 pub(crate) struct Events {
@@ -137,20 +143,25 @@ impl Events {
         let event_kind = event.clone().into();
 
         let event_key = events.with_mut(|this| {
-            match event.get_or_insert_callbacks(this) {
-                callbacks @ EventCallbacks::Unregistered => {
-                    let mut slotmap = SlotMap::new();
-                    let event_key = slotmap.insert(Box::new(fun) as Box<_>);
-                    *callbacks = EventCallbacks::Registered {
-                        callbacks: slotmap,
-                        output: event.register(events.clone()),
-                    };
-                    event_key
-                },
-                EventCallbacks::Registered { callbacks, .. } => {
-                    callbacks.insert(Box::new(fun))
-                },
+            if let EventCallbacks::Registered { callbacks, .. } =
+                event.get_or_insert_callbacks(this)
+            {
+                return callbacks.insert(Box::new(fun));
             }
+
+            let output = event.register(EventsBorrow {
+                borrow: this,
+                handle: events.clone(),
+            });
+
+            let mut callbacks = SlotMap::new();
+
+            let event_key = callbacks.insert(Box::new(fun) as Box<_>);
+
+            *event.get_or_insert_callbacks(this) =
+                EventCallbacks::Registered { callbacks, output };
+
+            event_key
         });
 
         EventHandle { event_key, event_kind, events }
@@ -197,6 +208,22 @@ impl<T: Event> EventCallbacks<T> {
     }
 }
 
+impl Deref for EventsBorrow<'_> {
+    type Target = Events;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.borrow
+    }
+}
+
+impl DerefMut for EventsBorrow<'_> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.borrow
+    }
+}
+
 impl Event for BufEnter {
     type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
     type RegisterOutput = AutocmdId;
@@ -210,20 +237,25 @@ impl Event for BufEnter {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> AutocmdId {
+    fn register(&self, events: EventsBorrow) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
-            .group(events.with(|events| events.augroup_id))
-            .callback(move |args: types::AutocmdCallbackArgs| {
-                events.with_mut(|inner| {
-                    let buffer =
-                        NeovimBuffer::new(BufferId::new(args.buffer), &events);
+            .group(events.augroup_id)
+            .callback({
+                let events = events.handle;
+                move |args: types::AutocmdCallbackArgs| {
+                    events.with_mut(|inner| {
+                        let buffer = NeovimBuffer::new(
+                            BufferId::new(args.buffer),
+                            &events,
+                        );
 
-                    for callback in inner.on_buffer_focused.iter_mut() {
-                        callback((&buffer, AgentId::UNKNOWN));
-                    }
+                        for callback in inner.on_buffer_focused.iter_mut() {
+                            callback((&buffer, AgentId::UNKNOWN));
+                        }
 
-                    false
-                })
+                        false
+                    })
+                }
             })
             .build();
 
@@ -255,27 +287,32 @@ impl Event for BufLeave {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> AutocmdId {
+    fn register(&self, events: EventsBorrow) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
-            .group(events.with(|events| events.augroup_id))
+            .group(events.augroup_id)
             .buffer(self.0.into())
-            .callback(move |args: types::AutocmdCallbackArgs| {
-                events.with_mut(|inner| {
-                    let buffer =
-                        NeovimBuffer::new(BufferId::new(args.buffer), &events);
+            .callback({
+                let events = events.handle;
+                move |args: types::AutocmdCallbackArgs| {
+                    events.with_mut(|inner| {
+                        let buffer = NeovimBuffer::new(
+                            BufferId::new(args.buffer),
+                            &events,
+                        );
 
-                    let Some(callbacks) =
-                        inner.on_buffer_unfocused.get_mut(&buffer.id())
-                    else {
-                        return true;
-                    };
+                        let Some(callbacks) =
+                            inner.on_buffer_unfocused.get_mut(&buffer.id())
+                        else {
+                            return true;
+                        };
 
-                    for callback in callbacks.iter_mut() {
-                        callback((&buffer, AgentId::UNKNOWN));
-                    }
+                        for callback in callbacks.iter_mut() {
+                            callback((&buffer, AgentId::UNKNOWN));
+                        }
 
-                    false
-                })
+                        false
+                    })
+                }
             })
             .build();
 
@@ -312,26 +349,31 @@ impl Event for BufReadPost {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> AutocmdId {
+    fn register(&self, events: EventsBorrow) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
-            .group(events.with(|events| events.augroup_id))
-            .callback(move |args: types::AutocmdCallbackArgs| {
-                events.with_mut(|inner| {
-                    let buffer =
-                        NeovimBuffer::new(BufferId::new(args.buffer), &events);
+            .group(events.augroup_id)
+            .callback({
+                let events = events.handle;
+                move |args: types::AutocmdCallbackArgs| {
+                    events.with_mut(|inner| {
+                        let buffer = NeovimBuffer::new(
+                            BufferId::new(args.buffer),
+                            &events,
+                        );
 
-                    let created_by = inner
-                        .agent_ids
-                        .created_buffer
-                        .remove(&buffer.id())
-                        .unwrap_or(AgentId::UNKNOWN);
+                        let created_by = inner
+                            .agent_ids
+                            .created_buffer
+                            .remove(&buffer.id())
+                            .unwrap_or(AgentId::UNKNOWN);
 
-                    for callback in inner.on_buffer_created.iter_mut() {
-                        callback((&buffer, created_by));
-                    }
+                        for callback in inner.on_buffer_created.iter_mut() {
+                            callback((&buffer, created_by));
+                        }
 
-                    false
-                })
+                        false
+                    })
+                }
             })
             .build();
 
@@ -363,33 +405,38 @@ impl Event for BufUnload {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> AutocmdId {
+    fn register(&self, events: EventsBorrow) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
-            .group(events.with(|events| events.augroup_id))
+            .group(events.augroup_id)
             .buffer(self.0.into())
-            .callback(move |args: types::AutocmdCallbackArgs| {
-                events.with_mut(|inner| {
-                    let buffer =
-                        NeovimBuffer::new(BufferId::new(args.buffer), &events);
+            .callback({
+                let events = events.handle;
+                move |args: types::AutocmdCallbackArgs| {
+                    events.with_mut(|inner| {
+                        let buffer = NeovimBuffer::new(
+                            BufferId::new(args.buffer),
+                            &events,
+                        );
 
-                    let Some(callbacks) =
-                        inner.on_buffer_saved.get_mut(&buffer.id())
-                    else {
-                        return true;
-                    };
+                        let Some(callbacks) =
+                            inner.on_buffer_saved.get_mut(&buffer.id())
+                        else {
+                            return true;
+                        };
 
-                    let removed_by = inner
-                        .agent_ids
-                        .removed_buffer
-                        .remove(&buffer.id())
-                        .unwrap_or(AgentId::UNKNOWN);
+                        let removed_by = inner
+                            .agent_ids
+                            .removed_buffer
+                            .remove(&buffer.id())
+                            .unwrap_or(AgentId::UNKNOWN);
 
-                    for callback in callbacks.iter_mut() {
-                        callback((&buffer, removed_by));
-                    }
+                        for callback in callbacks.iter_mut() {
+                            callback((&buffer, removed_by));
+                        }
 
-                    false
-                })
+                        false
+                    })
+                }
             })
             .build();
 
@@ -426,33 +473,38 @@ impl Event for BufWritePost {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> AutocmdId {
+    fn register(&self, events: EventsBorrow) -> AutocmdId {
         let opts = opts::CreateAutocmdOpts::builder()
-            .group(events.with(|events| events.augroup_id))
+            .group(events.augroup_id)
             .buffer(self.0.into())
-            .callback(move |args: types::AutocmdCallbackArgs| {
-                events.with_mut(|inner| {
-                    let buffer =
-                        NeovimBuffer::new(BufferId::new(args.buffer), &events);
+            .callback({
+                let events = events.handle;
+                move |args: types::AutocmdCallbackArgs| {
+                    events.with_mut(|inner| {
+                        let buffer = NeovimBuffer::new(
+                            BufferId::new(args.buffer),
+                            &events,
+                        );
 
-                    let Some(callbacks) =
-                        inner.on_buffer_saved.get_mut(&buffer.id())
-                    else {
-                        return true;
-                    };
+                        let Some(callbacks) =
+                            inner.on_buffer_saved.get_mut(&buffer.id())
+                        else {
+                            return true;
+                        };
 
-                    let saved_by = inner
-                        .agent_ids
-                        .saved_buffer
-                        .remove(&buffer.id())
-                        .unwrap_or(AgentId::UNKNOWN);
+                        let saved_by = inner
+                            .agent_ids
+                            .saved_buffer
+                            .remove(&buffer.id())
+                            .unwrap_or(AgentId::UNKNOWN);
 
-                    for callback in callbacks.iter_mut() {
-                        callback((&buffer, saved_by));
-                    }
+                        for callback in callbacks.iter_mut() {
+                            callback((&buffer, saved_by));
+                        }
 
-                    false
-                })
+                        false
+                    })
+                }
             })
             .build();
 
@@ -489,29 +541,32 @@ impl Event for CursorMoved {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) -> Self::RegisterOutput {
+    fn register(&self, events: EventsBorrow) -> Self::RegisterOutput {
         let opts = opts::CreateAutocmdOpts::builder()
-            .group(events.with(|events| events.augroup_id))
+            .group(events.augroup_id)
             .buffer(self.0.into())
-            .callback(move |args: types::AutocmdCallbackArgs| {
-                events.with_mut(|inner| {
-                    let cursor = NeovimCursor::new(NeovimBuffer::new(
-                        BufferId::new(args.buffer),
-                        &events,
-                    ));
+            .callback({
+                let events = events.handle;
+                move |args: types::AutocmdCallbackArgs| {
+                    events.with_mut(|inner| {
+                        let cursor = NeovimCursor::new(NeovimBuffer::new(
+                            BufferId::new(args.buffer),
+                            &events,
+                        ));
 
-                    let Some(callbacks) =
-                        inner.on_cursor_moved.get_mut(&cursor.buffer_id())
-                    else {
-                        return true;
-                    };
+                        let Some(callbacks) =
+                            inner.on_cursor_moved.get_mut(&cursor.buffer_id())
+                        else {
+                            return true;
+                        };
 
-                    for callback in callbacks.iter_mut() {
-                        callback((&cursor, AgentId::UNKNOWN));
-                    }
+                        for callback in callbacks.iter_mut() {
+                            callback((&cursor, AgentId::UNKNOWN));
+                        }
 
-                    false
-                })
+                        false
+                    })
+                }
             })
             .build();
 
@@ -562,39 +617,42 @@ impl Event for OnBytes {
     }
 
     #[inline]
-    fn register(&self, events: Shared<Events>) {
+    fn register(&self, events: EventsBorrow) {
         let buffer_id = self.0;
 
         let opts = opts::BufAttachOpts::builder()
-            .on_bytes(move |args: opts::OnBytesArgs| {
-                events.with_mut(|inner| {
-                    let buffer = NeovimBuffer::new(buffer_id, &events);
+            .on_bytes({
+                let events = events.handle;
+                move |args: opts::OnBytesArgs| {
+                    events.with_mut(|inner| {
+                        let buffer = NeovimBuffer::new(buffer_id, &events);
 
-                    let Some(callbacks) =
-                        inner.on_buffer_edited.get_mut(&buffer.id())
-                    else {
-                        return true;
-                    };
+                        let Some(callbacks) =
+                            inner.on_buffer_edited.get_mut(&buffer.id())
+                        else {
+                            return true;
+                        };
 
-                    let edited_by = inner
-                        .agent_ids
-                        .edited_buffer
-                        .remove(&buffer.id())
-                        .unwrap_or(AgentId::UNKNOWN);
+                        let edited_by = inner
+                            .agent_ids
+                            .edited_buffer
+                            .remove(&buffer.id())
+                            .unwrap_or(AgentId::UNKNOWN);
 
-                    let edit = Edit {
-                        made_by: edited_by,
-                        replacements: smallvec_inline![
-                            buffer.replacement_of_on_bytes(args)
-                        ],
-                    };
+                        let edit = Edit {
+                            made_by: edited_by,
+                            replacements: smallvec_inline![
+                                buffer.replacement_of_on_bytes(args)
+                            ],
+                        };
 
-                    for callback in callbacks.iter_mut() {
-                        callback((&buffer, &edit));
-                    }
+                        for callback in callbacks.iter_mut() {
+                            callback((&buffer, &edit));
+                        }
 
-                    false
-                })
+                        false
+                    })
+                }
             })
             .build();
 
