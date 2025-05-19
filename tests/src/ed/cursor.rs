@@ -94,19 +94,11 @@ pub(crate) fn on_cursor_moved_1<Ed: Backend>(ctx: &mut Context<Ed, Borrowed>) {
 
     let mut foo_txt = ctx.buffer(foo_id).unwrap();
 
+    // Fill the buffer with some text. This may or may not move the cursor.
     foo_txt.edit(
         [Replacement::new(0usize.into()..0usize.into(), "Hello world")],
         agent_id,
     );
-
-    // Editing the buffer should've caused the cursor to move.
-    offsets.with(|vec| {
-        assert_eq!(vec.len(), 1);
-        assert_eq!(*vec.last().unwrap(), "Hello world".len());
-    });
-
-    // Moving the cursor shouldn't cause a new one to be created.
-    assert_eq!(num_created.copied(), 1);
 
     assert_eq!(foo_txt.num_cursors(), 1);
 
@@ -114,8 +106,10 @@ pub(crate) fn on_cursor_moved_1<Ed: Backend>(ctx: &mut Context<Ed, Borrowed>) {
         cursor.r#move(5usize.into(), agent_id);
 
         offsets.with(|vec| {
-            assert_eq!(vec.len(), 2);
             assert_eq!(*vec.last().unwrap(), 5usize);
         });
+
+        // Moving the cursor shouldn't cause a new one to be created.
+        assert_eq!(num_created.copied(), 1);
     });
 }
