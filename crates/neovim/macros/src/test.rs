@@ -19,6 +19,7 @@ pub(crate) fn test(
     }
 
     let asyncness = &item.sig.asyncness;
+    let test_attrs = &item.attrs;
     let test_name = &item.sig.ident;
     let test_body = &item.block;
     let test_output = &item.sig.output;
@@ -62,6 +63,7 @@ pub(crate) fn test(
 
     Ok(quote! {
         #[::neovim::oxi::test(nvim_oxi = ::neovim::oxi)]
+        #(#test_attrs)*
         #asyncness fn #test_name() #test_output {
             #[inline]
             #asyncness fn inner(#ctx_name: #ctx_ty) #test_output {
