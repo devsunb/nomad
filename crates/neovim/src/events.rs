@@ -285,7 +285,7 @@ impl Event for BufEnter {
             .build();
 
         api::create_autocmd(["BufEnter"], &opts)
-            .expect("couldn't create autocmd")
+            .expect("couldn't create autocmd on BufEnter")
     }
 
     #[inline]
@@ -339,7 +339,7 @@ impl Event for BufLeave {
             .build();
 
         api::create_autocmd(["BufLeave"], &opts)
-            .expect("couldn't create autocmd")
+            .expect("couldn't create autocmd on BufLeave")
     }
 
     #[inline]
@@ -397,7 +397,7 @@ impl Event for BufReadPost {
             .build();
 
         api::create_autocmd(["BufReadPost"], &opts)
-            .expect("couldn't create autocmd")
+            .expect("couldn't create autocmd on BufReadPost")
     }
 
     #[inline]
@@ -457,8 +457,8 @@ impl Event for BufUnload {
             })
             .build();
 
-        api::create_autocmd(["BufWritePost"], &opts)
-            .expect("couldn't create autocmd")
+        api::create_autocmd(["BufUnload"], &opts)
+            .expect("couldn't create autocmd on BufUnload")
     }
 
     #[inline]
@@ -519,7 +519,7 @@ impl Event for BufWritePost {
             .build();
 
         api::create_autocmd(["BufWritePost"], &opts)
-            .expect("couldn't create autocmd")
+            .expect("couldn't create autocmd on BufWritePost")
     }
 
     #[inline]
@@ -549,28 +549,30 @@ impl Event for CursorMoved {
 
         let events = events.handle;
 
+        let callback = move |args: types::AutocmdCallbackArgs| {
+            let buffer_id = BufferId::new(args.buffer);
+
+            let Some((callbacks, moved_by)) = events.with_mut(|ev| {
+                let callbacks = ev.on_cursor_moved.get(&buffer_id)?;
+                Some((callbacks.cloned(), AgentId::UNKNOWN))
+            }) else {
+                return true;
+            };
+
+            let cursor =
+                NeovimCursor::new(NeovimBuffer::new(buffer_id, &events));
+
+            for callback in callbacks {
+                callback((&cursor, moved_by));
+            }
+
+            false
+        };
+
         let opts = opts::CreateAutocmdOpts::builder()
             .group(augroup_id)
             .buffer(self.0.into())
-            .callback(move |args: types::AutocmdCallbackArgs| {
-                let buffer_id = BufferId::new(args.buffer);
-
-                let Some((callbacks, moved_by)) = events.with_mut(|ev| {
-                    let callbacks = ev.on_cursor_moved.get(&buffer_id)?;
-                    Some((callbacks.cloned(), AgentId::UNKNOWN))
-                }) else {
-                    return true;
-                };
-
-                let cursor =
-                    NeovimCursor::new(NeovimBuffer::new(buffer_id, &events));
-
-                for callback in callbacks {
-                    callback((&cursor, moved_by));
-                }
-
-                false
-            })
+            .callback(callback.clone())
             .build();
 
         // Neovim has 3 separate cursor-move-related autocommand events --
@@ -582,10 +584,16 @@ impl Event for CursorMoved {
         // CursorMoved and CursorMovedI.
 
         let cursor_moved_id = api::create_autocmd(["CursorMoved"], &opts)
-            .expect("couldn't create autocmd");
+            .expect("couldn't create autocmd on CursorMoved");
+
+        let opts = opts::CreateAutocmdOpts::builder()
+            .group(augroup_id)
+            .buffer(self.0.into())
+            .callback(callback)
+            .build();
 
         let cursor_moved_i_id = api::create_autocmd(["CursorMovedI"], &opts)
-            .expect("couldn't create autocmd");
+            .expect("couldn't create autocmd on CursorMovedI");
 
         (cursor_moved_id, cursor_moved_i_id)
     }
