@@ -276,17 +276,18 @@ impl<'a> NeovimBuffer<'a> {
             return None;
         }
 
+        // NOTE: get_mark() returns (0, 0) if the mark is not set.
         let (anchor_row, anchor_col) = self.inner().get_mark('<').ok()?;
 
-        let (head_row, head_col) = self.inner().get_mark('>').ok()?;
-
         let anchor = self.byte_offset_of_point(Point {
-            line_idx: anchor_row - 1,
+            line_idx: anchor_row.checked_sub(1)?,
             byte_offset: ByteOffset::new(anchor_col),
         });
 
+        let (head_row, head_col) = self.inner().get_mark('>').ok()?;
+
         let head = self.byte_offset_of_point(Point {
-            line_idx: head_row - 1,
+            line_idx: head_row.checked_sub(1)?,
             byte_offset: ByteOffset::new(head_col),
         });
 
