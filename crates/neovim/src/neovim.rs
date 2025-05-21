@@ -177,11 +177,27 @@ impl Backend for Neovim {
     }
 
     #[inline]
-    fn on_selection_created<Fun>(&mut self, _fun: Fun) -> Self::EventHandle
+    fn on_selection_created<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
     {
-        todo!();
+        Events::insert(
+            self.events.clone(),
+            events::ModeChanged,
+            move |(buf, old_mode, new_mode, changed_by)| {
+                if new_mode.is_select_or_visual()
+                    // We don't yet support visual block mode because the
+                    // corresponding selection could span several disjoint byte
+                    // ranges.
+                    && !new_mode.is_visual_blockwise()
+                    // A selection is only created if the old mode wasn't
+                    // already displaying a selected range.
+                    && !old_mode.is_select_or_visual()
+                {
+                    fun(&NeovimSelection::new(buf), changed_by);
+                }
+            },
+        )
     }
 
     #[inline]

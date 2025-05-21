@@ -7,9 +7,65 @@ pub(crate) struct ModeStr<'a>(&'a str);
 
 impl<'a> ModeStr<'a> {
     #[inline]
+    pub(crate) fn is_select_or_visual(&self) -> bool {
+        self.is_select() || self.is_visual()
+    }
+
+    #[inline]
+    pub(crate) fn is_select(&self) -> bool {
+        self.is_select_blockwise()
+            || self.is_select_by_character()
+            || self.is_select_by_line()
+    }
+
+    #[inline]
+    pub(crate) fn is_select_blockwise(&self) -> bool {
+        todo!();
+    }
+
+    #[inline]
+    pub(crate) fn is_select_by_character(&self) -> bool {
+        self.first_char() == 's'
+    }
+
+    #[inline]
+    pub(crate) fn is_select_by_line(&self) -> bool {
+        self.first_char() == 'S'
+    }
+
+    #[inline]
+    pub(crate) fn is_visual(&self) -> bool {
+        self.is_visual_blockwise()
+            || self.is_visual_by_character()
+            || self.is_visual_by_line()
+    }
+
+    #[inline]
+    pub(crate) fn is_visual_blockwise(&self) -> bool {
+        todo!();
+    }
+
+    #[inline]
+    pub(crate) fn is_visual_by_character(&self) -> bool {
+        self.first_char() == 'v'
+    }
+
+    #[inline]
+    pub(crate) fn is_visual_by_line(&self) -> bool {
+        self.first_char() == 'V'
+    }
+
+    #[track_caller]
+    #[inline]
     pub(crate) fn new(mode: &'a str) -> Self {
+        debug_assert!(!mode.is_empty());
         // FIXME: panic if `mode` is not valid.
         Self(mode)
+    }
+
+    #[inline]
+    fn first_char(&self) -> char {
+        self.as_bytes().first().copied().expect("mode is not empty") as char
     }
 }
 
