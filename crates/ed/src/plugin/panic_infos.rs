@@ -19,6 +19,7 @@ pub struct PanicInfo {
 }
 
 /// TODO: docs.
+#[derive(Debug)]
 pub struct PanicLocation {
     column: u32,
     file: SmolStr,
@@ -53,6 +54,17 @@ impl PanicLocation {
     #[inline]
     pub fn line(&self) -> u32 {
         self.line
+    }
+}
+
+impl fmt::Debug for PanicInfo {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PanicInfo")
+            .field("backtrace", &self.backtrace)
+            .field("location", &self.location)
+            .field("payload", &self.payload_as_str().unwrap_or("??"))
+            .finish()
     }
 }
 
