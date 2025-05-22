@@ -51,7 +51,7 @@ impl Selection for NeovimSelection<'_> {
     #[inline]
     fn on_moved<Fun>(&self, mut fun: Fun) -> EventHandle
     where
-        Fun: FnMut(&NeovimSelection<'_>, AgentId) + 'static,
+        Fun: FnMut(&NeovimSelection, AgentId) + 'static,
     {
         let is_selection_alive = Shared::<bool>::new(true);
 

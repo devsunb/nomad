@@ -374,7 +374,7 @@ impl Buffer for NeovimBuffer<'_> {
     #[inline]
     fn for_each_cursor<Fun>(&mut self, mut fun: Fun)
     where
-        Fun: FnMut(NeovimCursor<'_>),
+        Fun: FnMut(NeovimCursor),
     {
         if self.is_focused() {
             fun(NeovimCursor::new(*self));
@@ -384,7 +384,7 @@ impl Buffer for NeovimBuffer<'_> {
     #[inline]
     fn on_edited<Fun>(&self, mut fun: Fun) -> EventHandle
     where
-        Fun: FnMut(&NeovimBuffer<'_>, &Edit) + 'static,
+        Fun: FnMut(&NeovimBuffer, &Edit) + 'static,
     {
         Events::insert(
             self.events.clone(),
@@ -408,7 +408,7 @@ impl Buffer for NeovimBuffer<'_> {
     #[inline]
     fn on_saved<Fun>(&self, mut fun: Fun) -> EventHandle
     where
-        Fun: FnMut(&NeovimBuffer<'_>, AgentId) + 'static,
+        Fun: FnMut(&NeovimBuffer, AgentId) + 'static,
     {
         Events::insert(
             self.events.clone(),

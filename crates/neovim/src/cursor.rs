@@ -65,7 +65,7 @@ impl Cursor for NeovimCursor<'_> {
     #[inline]
     fn on_moved<Fun>(&self, mut fun: Fun) -> EventHandle
     where
-        Fun: FnMut(&NeovimCursor<'_>, AgentId) + 'static,
+        Fun: FnMut(&NeovimCursor, AgentId) + 'static,
     {
         Events::insert(
             self.buffer().events(),
