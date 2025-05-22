@@ -12,7 +12,7 @@ use crate::{Neovim, events};
 /// TODO: docs.
 #[derive(Clone)]
 pub struct NeovimSelection<'a> {
-    pub(crate) buffer: NeovimBuffer<'a>,
+    buffer: NeovimBuffer<'a>,
 }
 
 impl<'a> NeovimSelection<'a> {
@@ -22,6 +22,12 @@ impl<'a> NeovimSelection<'a> {
         debug_assert!(buffer.selection().is_some());
         Self { buffer }
     }
+
+    /// Returns the [`NeovimBuffer`] this selection is in.
+    #[inline]
+    pub(crate) fn buffer(&self) -> NeovimBuffer<'a> {
+        self.buffer
+    }
 }
 
 impl Selection for NeovimSelection<'_> {
@@ -29,17 +35,17 @@ impl Selection for NeovimSelection<'_> {
 
     #[inline]
     fn buffer_id(&self) -> BufferId {
-        self.buffer.id()
+        self.buffer().id()
     }
 
     #[inline]
     fn byte_range(&self) -> Range<ByteOffset> {
-        self.buffer.selection().expect("buffer has a selection")
+        self.buffer().selection().expect("buffer has a selection")
     }
 
     #[inline]
     fn id(&self) -> BufferId {
-        self.buffer.id()
+        self.buffer().id()
     }
 
     #[inline]
@@ -50,7 +56,7 @@ impl Selection for NeovimSelection<'_> {
         let is_selection_alive = Shared::<bool>::new(true);
 
         let cursor_moved_handle = Events::insert(
-            self.buffer.events().clone(),
+            self.buffer().events(),
             events::CursorMoved(self.buffer_id()),
             {
                 let is_selection_alive = is_selection_alive.clone();
@@ -67,7 +73,7 @@ impl Selection for NeovimSelection<'_> {
         let buffer_id = self.buffer_id();
 
         let mode_changed_handle = Events::insert(
-            self.buffer.events().clone(),
+            self.buffer().events(),
             events::ModeChanged,
             move |(buf, old_mode, new_mode, _changed_by)| {
                 if buf.id() == buffer_id

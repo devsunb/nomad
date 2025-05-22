@@ -56,8 +56,8 @@ impl<'a> NeovimBuffer<'a> {
     }
 
     #[inline]
-    pub(crate) fn events(&self) -> &Shared<Events> {
-        self.events
+    pub(crate) fn events(&self) -> Shared<Events> {
+        self.events.clone()
     }
 
     #[track_caller]

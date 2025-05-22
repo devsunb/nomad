@@ -15,7 +15,12 @@ pub struct NeovimCursor<'a> {
 }
 
 impl<'a> NeovimCursor<'a> {
-    /// TODO: docs.
+    /// Returns the [`NeovimBuffer`] this cursor is in.
+    #[inline]
+    pub(crate) fn buffer(&self) -> NeovimBuffer<'a> {
+        self.buffer
+    }
+
     #[inline]
     pub(crate) fn new(buffer: NeovimBuffer<'a>) -> Self {
         debug_assert!(buffer.is_focused());
@@ -35,22 +40,22 @@ impl Cursor for NeovimCursor<'_> {
 
     #[inline]
     fn buffer_id(&self) -> BufferId {
-        self.buffer.id()
+        self.buffer().id()
     }
 
     #[inline]
     fn byte_offset(&self) -> ByteOffset {
-        self.buffer.byte_offset_of_point(self.point())
+        self.buffer().byte_offset_of_point(self.point())
     }
 
     #[inline]
     fn id(&self) -> BufferId {
-        self.buffer.id()
+        self.buffer().id()
     }
 
     #[inline]
     fn r#move(&mut self, offset: ByteOffset, _agent_id: AgentId) {
-        let point = self.buffer.point_of_byte_offset(offset);
+        let point = self.buffer().point_of_byte_offset(offset);
 
         api::Window::current()
             .set_cursor(point.line_idx + 1, point.byte_offset.into())
@@ -63,8 +68,8 @@ impl Cursor for NeovimCursor<'_> {
         Fun: FnMut(&NeovimCursor<'_>, AgentId) + 'static,
     {
         Events::insert(
-            self.buffer.events().clone(),
-            events::CursorMoved(self.buffer.id()),
+            self.buffer().events(),
+            events::CursorMoved(self.buffer_id()),
             move |(this, moved_by)| fun(this, moved_by),
         )
     }
@@ -75,8 +80,8 @@ impl Cursor for NeovimCursor<'_> {
         Fun: FnMut(&NeovimCursor<'_>, AgentId) + 'static,
     {
         Events::insert(
-            self.buffer.events().clone(),
-            events::BufLeave(self.buffer.id()),
+            self.buffer().events(),
+            events::BufLeave(self.buffer_id()),
             move |(&buf, unfocused_by)| {
                 fun(&NeovimCursor::new(buf), unfocused_by)
             },
