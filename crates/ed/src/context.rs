@@ -270,9 +270,24 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
             state_handle: self.borrow.state_handle(),
         });
         LocalTask::new(self.with_editor(move |ed| {
-            ed.executor()
-                .local_spawner()
-                .spawn(async move { fun(&mut ctx).await })
+            ed.executor().local_spawner().spawn(async move {
+                // Yielding prevents a panic that would occur when:
+                //
+                // - the local executor immediately polls the future when a new
+                //   task is spawned, and
+                // - Context::with_borrowed() is called before the first .await
+                //   point is reached
+                //
+                // In that case, with_borrowed() would panic because the state
+                // is already mutably borrowed by Self.
+                //
+                // Yielding guarantees that by the time with_borrowed() is
+                // called, the synchronous code containing Self will have
+                // already finished running.
+                future::yield_now().await;
+
+                fun(&mut ctx).await
+            })
         }))
     }
 }
@@ -400,25 +415,7 @@ impl<Ed: Backend> Context<Ed, Borrowed<'_>> {
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) + 'static,
     ) {
-        self.spawn_local_inner(async move |ctx| {
-            // Yielding prevents a panic that would occur when:
-            //
-            // - the local executor immediately polls the future when a new
-            //   task is spawned, and
-            // - Context::with_borrowed() is called before the first .await
-            //   point is reached
-            //
-            // In that case, with_borrowed() would panic because the state is
-            // already mutably borrowed by Self.
-            //
-            // Yielding guarantees that by the time with_borrowed() is called,
-            // the synchronous code containing Self will have already finished
-            // running.
-            future::yield_now().await;
-
-            fun(ctx).await
-        })
-        .detach();
+        self.spawn_local_inner(async move |ctx| fun(ctx).await).detach();
     }
 
     #[inline]
