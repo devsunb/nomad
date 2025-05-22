@@ -55,14 +55,14 @@ pub(crate) enum CallbackKind {
     BufferCreated(Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
     BufferEdited(BufferId, Box<dyn FnMut(&Buffer<'_>, &Edit) + 'static>),
     #[allow(dead_code)]
-    BufferRemoved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
+    BufferRemoved(BufferId, Box<dyn FnMut(BufferId, AgentId) + 'static>),
     #[allow(dead_code)]
     BufferSaved(BufferId, Box<dyn FnMut(&Buffer<'_>, AgentId) + 'static>),
     #[allow(dead_code)]
     CursorCreated(Box<dyn FnMut(&Cursor<'_>, AgentId) + 'static>),
     CursorMoved(CursorId, Box<dyn FnMut(&Cursor<'_>, AgentId) + 'static>),
     #[allow(dead_code)]
-    CursorRemoved(CursorId, Box<dyn FnMut(&Cursor<'_>, AgentId) + 'static>),
+    CursorRemoved(CursorId, Box<dyn FnMut(CursorId, AgentId) + 'static>),
     #[allow(dead_code)]
     SelectionCreated(Box<dyn FnMut(&Selection<'_>, AgentId) + 'static>),
     #[allow(dead_code)]
@@ -73,7 +73,7 @@ pub(crate) enum CallbackKind {
     #[allow(dead_code)]
     SelectionRemoved(
         SelectionId,
-        Box<dyn FnMut(&Selection<'_>, AgentId) + 'static>,
+        Box<dyn FnMut(SelectionId, AgentId) + 'static>,
     ),
 }
 

@@ -20,7 +20,7 @@ pub trait Selection {
     /// Registers the given callback to be executed everytime the selection is
     /// moved, i.e. every time its start or end offset is changed.
     ///
-    /// The callback is provided with a reference to this selection, plus the
+    /// The callback is given a reference to this selection, plus the
     /// [`AgentId`] of the agent that moved it.
     fn on_moved<Fun>(
         &self,
@@ -33,13 +33,12 @@ pub trait Selection {
     /// Registers the given callback to be executed just before the selection
     /// is removed.
     ///
-    /// The callback is provided with a reference to this selection, plus the
-    /// [`AgentId`] of the agent that removed it.
+    /// The callback is given this selection's ID, plus the [`AgentId`] of the
+    /// agent that removed it.
     fn on_removed<Fun>(
         &self,
         fun: Fun,
     ) -> <Self::Backend as Backend>::EventHandle
     where
-        Fun: FnMut(&<Self::Backend as Backend>::Selection<'_>, AgentId)
-            + 'static;
+        Fun: FnMut(<Self::Backend as Backend>::SelectionId, AgentId) + 'static;
 }

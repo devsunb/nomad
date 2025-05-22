@@ -32,25 +32,23 @@ pub(crate) enum BufferEvent<B: Backend> {
 }
 
 pub(crate) struct CursorEvent<B: Backend> {
-    pub(crate) buffer_id: B::BufferId,
     pub(crate) cursor_id: B::CursorId,
-    pub(crate) kind: CursorEventKind,
+    pub(crate) kind: CursorEventKind<B>,
 }
 
-pub(crate) enum CursorEventKind {
-    Created(ByteOffset),
+pub(crate) enum CursorEventKind<B: Backend> {
+    Created(B::BufferId, ByteOffset),
     Moved(ByteOffset),
     Removed,
 }
 
 pub(crate) struct SelectionEvent<B: Backend> {
-    pub(crate) buffer_id: B::BufferId,
     pub(crate) selection_id: B::SelectionId,
-    pub(crate) kind: SelectionEventKind,
+    pub(crate) kind: SelectionEventKind<B>,
 }
 
-pub(crate) enum SelectionEventKind {
-    Created(Range<ByteOffset>),
+pub(crate) enum SelectionEventKind<B: Backend> {
+    Created(B::BufferId, Range<ByteOffset>),
     Moved(Range<ByteOffset>),
     Removed,
 }

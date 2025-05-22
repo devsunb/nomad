@@ -287,7 +287,7 @@ impl backend::Buffer for Buffer<'_> {
 
     fn on_removed<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
-        Fun: FnMut(&Buffer<'_>, AgentId) + 'static,
+        Fun: FnMut(BufferId, AgentId) + 'static,
     {
         let cb_kind = CallbackKind::BufferRemoved(self.id(), Box::new(fun));
         self.callbacks.insert(cb_kind)
@@ -360,7 +360,7 @@ impl backend::Cursor for Cursor<'_> {
 
     fn on_removed<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
-        Fun: FnMut(&Cursor<'_>, AgentId) + 'static,
+        Fun: FnMut(CursorId, AgentId) + 'static,
     {
         let cb_kind = CallbackKind::CursorRemoved(self.id(), Box::new(fun));
         self.buffer.callbacks.insert(cb_kind)
@@ -412,7 +412,7 @@ impl backend::Selection for Selection<'_> {
 
     fn on_removed<Fun>(&self, fun: Fun) -> mock::EventHandle
     where
-        Fun: FnMut(&Selection<'_>, AgentId) + 'static,
+        Fun: FnMut(SelectionId, AgentId) + 'static,
     {
         let cb_kind = CallbackKind::SelectionRemoved(self.id(), Box::new(fun));
         self.buffer.callbacks.insert(cb_kind)

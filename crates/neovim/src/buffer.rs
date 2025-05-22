@@ -396,12 +396,12 @@ impl Buffer for NeovimBuffer<'_> {
     #[inline]
     fn on_removed<Fun>(&self, mut fun: Fun) -> EventHandle
     where
-        Fun: FnMut(&NeovimBuffer<'_>, AgentId) + 'static,
+        Fun: FnMut(BufferId, AgentId) + 'static,
     {
         Events::insert(
             self.events.clone(),
             events::BufUnload(self.id()),
-            move |(this, removed_by)| fun(this, removed_by),
+            move |(this, removed_by)| fun(this.id(), removed_by),
         )
     }
 

@@ -84,24 +84,12 @@ pub(crate) struct NewProjectArgs<B: CollabBackend> {
 #[derive(cauchy::Default)]
 pub(crate) struct IdMaps<B: Backend> {
     pub(crate) buffer2file: FxHashMap<B::BufferId, FileId>,
-    pub(crate) cursor2cursor: FxHashMap<CursorId<B>, text::CursorId>,
+    pub(crate) cursor2cursor: FxHashMap<B::CursorId, text::CursorId>,
     pub(crate) file2buffer: FxHashMap<FileId, B::BufferId>,
     pub(crate) node2dir: FxHashMap<<B::Fs as fs::Fs>::NodeId, DirectoryId>,
     pub(crate) node2file: FxHashMap<<B::Fs as fs::Fs>::NodeId, FileId>,
     pub(crate) selection2selection:
-        FxHashMap<SelectionId<B>, text::SelectionId>,
-}
-
-#[derive(cauchy::Debug, cauchy::PartialEq, cauchy::Eq, cauchy::Hash)]
-pub(crate) struct CursorId<B: Backend> {
-    buffer_id: B::BufferId,
-    cursor_id: B::CursorId,
-}
-
-#[derive(cauchy::Debug, cauchy::PartialEq, cauchy::Eq, cauchy::Hash)]
-pub(crate) struct SelectionId<B: Backend> {
-    buffer_id: B::BufferId,
-    selection_id: B::SelectionId,
+        FxHashMap<B::SelectionId, text::SelectionId>,
 }
 
 #[derive(cauchy::Debug)]
@@ -295,7 +283,7 @@ impl<B: CollabBackend> Project<B> {
     #[track_caller]
     fn cursor_of_cursor_id(
         &mut self,
-        cursor_id: &CursorId<B>,
+        cursor_id: &B::CursorId,
     ) -> text::CursorMut<'_> {
         let Some(&project_cursor_id) =
             self.id_maps.cursor2cursor.get(cursor_id)
@@ -347,7 +335,7 @@ impl<B: CollabBackend> Project<B> {
     #[track_caller]
     fn selection_of_selection_id(
         &mut self,
-        selection_id: &SelectionId<B>,
+        selection_id: &B::SelectionId,
     ) -> text::SelectionMut<'_> {
         let Some(&project_selection_id) =
             self.id_maps.selection2selection.get(selection_id)
@@ -421,40 +409,27 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_cursor(&mut self, event: CursorEvent<B>) -> Message {
         match event.kind {
-            CursorEventKind::Created(byte_offset) => {
+            CursorEventKind::Created(buffer_id, byte_offset) => {
                 let (cursor_id, creation) = self
-                    .text_file_of_buffer(&event.buffer_id)
+                    .text_file_of_buffer(&buffer_id)
                     .create_cursor(byte_offset.into());
 
-                self.id_maps.cursor2cursor.insert(
-                    CursorId {
-                        buffer_id: event.buffer_id,
-                        cursor_id: event.cursor_id,
-                    },
-                    cursor_id,
-                );
+                self.id_maps.cursor2cursor.insert(event.cursor_id, cursor_id);
 
                 Message::CreatedCursor(creation)
             },
             CursorEventKind::Moved(byte_offset) => {
                 let movement = self
-                    .cursor_of_cursor_id(&CursorId {
-                        buffer_id: event.buffer_id,
-                        cursor_id: event.cursor_id,
-                    })
+                    .cursor_of_cursor_id(&event.cursor_id)
                     .r#move(byte_offset.into());
 
                 Message::MovedCursor(movement)
             },
             CursorEventKind::Removed => {
-                let cursor_id = CursorId {
-                    buffer_id: event.buffer_id,
-                    cursor_id: event.cursor_id,
-                };
+                let deletion =
+                    self.cursor_of_cursor_id(&event.cursor_id).delete();
 
-                let deletion = self.cursor_of_cursor_id(&cursor_id).delete();
-
-                self.id_maps.cursor2cursor.remove(&cursor_id);
+                self.id_maps.cursor2cursor.remove(&event.cursor_id);
 
                 Message::DeletedCursor(deletion)
             },
@@ -626,41 +601,30 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_selection(&mut self, event: SelectionEvent<B>) -> Message {
         match event.kind {
-            SelectionEventKind::Created(byte_range) => {
+            SelectionEventKind::Created(buffer_id, byte_range) => {
                 let (selection_id, creation) = self
-                    .text_file_of_buffer(&event.buffer_id)
+                    .text_file_of_buffer(&buffer_id)
                     .create_selection(byte_range.convert());
 
-                self.id_maps.selection2selection.insert(
-                    SelectionId {
-                        buffer_id: event.buffer_id,
-                        selection_id: event.selection_id,
-                    },
-                    selection_id,
-                );
+                self.id_maps
+                    .selection2selection
+                    .insert(event.selection_id, selection_id);
 
                 Message::CreatedSelection(creation)
             },
             SelectionEventKind::Moved(byte_range) => {
                 let movement = self
-                    .selection_of_selection_id(&SelectionId {
-                        buffer_id: event.buffer_id,
-                        selection_id: event.selection_id,
-                    })
+                    .selection_of_selection_id(&event.selection_id)
                     .r#move(byte_range.convert());
 
                 Message::MovedSelection(movement)
             },
             SelectionEventKind::Removed => {
-                let selection_id = SelectionId {
-                    buffer_id: event.buffer_id,
-                    selection_id: event.selection_id,
-                };
+                let deletion = self
+                    .selection_of_selection_id(&event.selection_id)
+                    .delete();
 
-                let deletion =
-                    self.selection_of_selection_id(&selection_id).delete();
-
-                self.id_maps.selection2selection.remove(&selection_id);
+                self.id_maps.selection2selection.remove(&event.selection_id);
 
                 Message::DeletedSelection(deletion)
             },

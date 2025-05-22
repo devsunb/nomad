@@ -53,7 +53,7 @@ pub trait Buffer {
         fun: Fun,
     ) -> <Self::Backend as Backend>::EventHandle
     where
-        Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
+        Fun: FnMut(<Self::Backend as Backend>::BufferId, AgentId) + 'static;
 
     /// TODO: docs.
     fn on_saved<Fun>(

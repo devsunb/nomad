@@ -77,14 +77,12 @@ impl Cursor for NeovimCursor<'_> {
     #[inline]
     fn on_removed<Fun>(&self, mut fun: Fun) -> EventHandle
     where
-        Fun: FnMut(&NeovimCursor<'_>, AgentId) + 'static,
+        Fun: FnMut(BufferId, AgentId) + 'static,
     {
         Events::insert(
             self.buffer().events(),
             events::BufLeave(self.buffer_id()),
-            move |(&buf, unfocused_by)| {
-                fun(&NeovimCursor::new(buf), unfocused_by)
-            },
+            move |(&buf, unfocused_by)| fun(buf.id(), unfocused_by),
         )
     }
 }

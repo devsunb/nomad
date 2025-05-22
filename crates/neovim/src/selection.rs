@@ -93,7 +93,7 @@ impl Selection for NeovimSelection<'_> {
     #[inline]
     fn on_removed<Fun>(&self, _fun: Fun) -> EventHandle
     where
-        Fun: FnMut(&NeovimSelection<'_>, AgentId) + 'static,
+        Fun: FnMut(BufferId, AgentId) + 'static,
     {
         todo!()
     }

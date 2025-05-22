@@ -270,8 +270,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         ctx: &mut Context<B>,
     ) -> Option<event::CursorEvent<B>> {
         match &event.kind {
-            event::CursorEventKind::Created(_) => {
-                if self.buffer_streams.is_watched(&event.buffer_id) {
+            event::CursorEventKind::Created(buffer_id, _) => {
+                if self.buffer_streams.is_watched(buffer_id) {
                     ctx.with_borrowed(|ctx| {
                         let cursor = ctx.cursor(event.cursor_id.clone())?;
                         self.watch_cursor(&cursor);
@@ -392,8 +392,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
         ctx: &mut Context<B>,
     ) -> Option<event::SelectionEvent<B>> {
         match &event.kind {
-            event::SelectionEventKind::Created(_) => {
-                if self.buffer_streams.is_watched(&event.buffer_id) {
+            event::SelectionEventKind::Created(buffer_id, _) => {
+                if self.buffer_streams.is_watched(buffer_id) {
                     ctx.with_borrowed(|ctx| {
                         let selection =
                             ctx.selection(event.selection_id.clone())?;
@@ -520,8 +520,8 @@ impl<B: CollabBackend> BufferStreams<B> {
 
         let removed_handle = buffer.on_removed({
             let event_tx = self.event_tx.clone();
-            move |buf, _removed_by| {
-                let _ = event_tx.send(event::BufferEvent::Removed(buf.id()));
+            move |buf_id, _removed_by| {
+                let _ = event_tx.send(event::BufferEvent::Removed(buf_id));
             }
         });
 
@@ -593,7 +593,6 @@ impl<Ed: CollabBackend> CursorStreams<Ed> {
             let event_tx = self.event_tx.clone();
             move |cursor, _moved_by| {
                 let _ = event_tx.send(event::CursorEvent {
-                    buffer_id: cursor.buffer_id(),
                     cursor_id: cursor.id(),
                     kind: event::CursorEventKind::Moved(cursor.byte_offset()),
                 });
@@ -602,10 +601,9 @@ impl<Ed: CollabBackend> CursorStreams<Ed> {
 
         let removed_handle = cursor.on_removed({
             let event_tx = self.event_tx.clone();
-            move |cursor, _removed_by| {
+            move |cursor_id, _removed_by| {
                 let event = event::CursorEvent {
-                    buffer_id: cursor.buffer_id(),
-                    cursor_id: cursor.id(),
+                    cursor_id,
                     kind: event::CursorEventKind::Removed,
                 };
                 let _ = event_tx.send(event);
@@ -624,9 +622,9 @@ impl<Ed: CollabBackend> CursorStreams<Ed> {
             let event_tx = event_tx.clone();
             ctx.on_cursor_created(move |cursor, _created_by| {
                 let _ = event_tx.send(event::CursorEvent {
-                    buffer_id: cursor.buffer_id(),
                     cursor_id: cursor.id(),
                     kind: event::CursorEventKind::Created(
+                        cursor.buffer_id(),
                         cursor.byte_offset(),
                     ),
                 });
@@ -686,7 +684,6 @@ impl<Ed: CollabBackend> SelectionStreams<Ed> {
             let event_tx = self.event_tx.clone();
             move |selection, _moved_by| {
                 let _ = event_tx.send(event::SelectionEvent {
-                    buffer_id: selection.buffer_id(),
                     selection_id: selection.id(),
                     kind: event::SelectionEventKind::Moved(
                         selection.byte_range(),
@@ -697,10 +694,9 @@ impl<Ed: CollabBackend> SelectionStreams<Ed> {
 
         let removed_handle = selection.on_removed({
             let event_tx = self.event_tx.clone();
-            move |selection, _removed_by| {
+            move |selection_id, _removed_by| {
                 let event = event::SelectionEvent {
-                    buffer_id: selection.buffer_id(),
-                    selection_id: selection.id(),
+                    selection_id,
                     kind: event::SelectionEventKind::Removed,
                 };
                 let _ = event_tx.send(event);
@@ -719,9 +715,9 @@ impl<Ed: CollabBackend> SelectionStreams<Ed> {
             let event_tx = event_tx.clone();
             ctx.on_selection_created(move |selection, _created_by| {
                 let _ = event_tx.send(event::SelectionEvent {
-                    buffer_id: selection.buffer_id(),
                     selection_id: selection.id(),
                     kind: event::SelectionEventKind::Created(
+                        selection.buffer_id(),
                         selection.byte_range(),
                     ),
                 });
