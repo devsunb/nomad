@@ -20,7 +20,7 @@ impl SelectionEvent {
     #[track_caller]
     pub(crate) fn new_stream<Ed: Backend>(
         ctx: &mut Context<Ed>,
-    ) -> impl Stream<Item = Self> + use<Ed> {
+    ) -> impl Stream<Item = Self> + Unpin + use<Ed> {
         let (tx, rx) = flume::unbounded();
 
         let buffer_id = ctx.with_borrowed(|ctx| {
