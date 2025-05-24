@@ -14,7 +14,7 @@ use ed::{ByteOffset, Shared};
 use crate::Neovim;
 use crate::cursor::NeovimCursor;
 use crate::events::{self, EventHandle, Events};
-use crate::oxi::{BufHandle, api, mlua};
+use crate::oxi::{self, BufHandle, String as NvimString, api, mlua};
 
 /// TODO: docs.
 #[derive(Copy, Clone)]
@@ -278,40 +278,85 @@ impl<'a> NeovimBuffer<'a> {
     #[track_caller]
     #[inline]
     pub(crate) fn selection(&self) -> Option<Range<ByteOffset>> {
-        if !self.is_focused() || !api::get_mode().mode.is_select_or_visual() {
+        if !self.is_focused() {
             return None;
         }
 
-        let (start, mut end) = {
-            let (_bufnum, anchor_row, anchor_col) =
-                api::call_function::<_, (u32, usize, usize)>("getpos", ('v',))
-                    .expect("couldn't call getpos");
+        let mode = api::get_mode().mode;
 
-            let (_bufnum, head_row, head_col) =
-                api::call_function::<_, (u32, usize, usize)>("getpos", ('.',))
-                    .expect("couldn't call getpos");
+        if mode.is_select_by_character() || mode.is_visual_by_character() {
+            Some(self.selection_by_character())
+        } else if mode.is_select_by_line() || mode.is_visual_by_line() {
+            Some(self.selection_by_line())
+        } else {
+            None
+        }
+    }
 
-            let mut anchor = Point {
-                line_idx: anchor_row - 1,
-                byte_offset: ByteOffset::new(anchor_col),
-            };
+    /// Returns the contents of the line at the given index, *without* any
+    /// trailing newline character.
+    #[inline]
+    fn get_line(&self, line_idx: usize) -> NvimString {
+        api::call_function(
+            "getbufoneline",
+            (self.id(), (line_idx + 1) as oxi::Integer),
+        )
+        .expect("could not call getbufoneline()")
+    }
 
-            let mut head = Point {
-                line_idx: head_row - 1,
-                byte_offset: ByteOffset::new(head_col),
-            };
+    /// Returns the selected byte range in the buffer, assuming:
+    ///
+    /// - `Self` is focused;
+    /// - the user is in character-wise visual or select mode;
+    ///
+    /// # Panics
+    ///
+    /// Panics if either one of those assumptions is not true.
+    #[inline]
+    fn selection_by_character(&self) -> Range<ByteOffset> {
+        debug_assert!(self.is_focused());
+        debug_assert!({
+            let mode = api::get_mode().mode;
+            mode.is_select_by_character() || mode.is_visual_by_character()
+        });
 
-            // The column of the side of the selection that comes first
-            // seems to always be off by one, even if it's surrounded by
-            // multi-byte characters.
-            if anchor <= head {
-                anchor.byte_offset -= 1;
-                (anchor, head)
-            } else {
-                head.byte_offset -= 1;
-                (head, anchor)
-            }
+        let (_bufnum, anchor_row, anchor_col) =
+            api::call_function::<_, (u32, usize, usize)>("getpos", ('v',))
+                .expect("couldn't call getpos");
+
+        let (_bufnum, head_row, head_col) =
+            api::call_function::<_, (u32, usize, usize)>("getpos", ('.',))
+                .expect("couldn't call getpos");
+
+        let anchor = Point {
+            line_idx: anchor_row - 1,
+            byte_offset: ByteOffset::new(anchor_col - 1),
         };
+
+        let head = Point {
+            line_idx: head_row - 1,
+            byte_offset: ByteOffset::new(head_col - 1),
+        };
+
+        let (start, mut end) =
+            if anchor <= head { (anchor, head) } else { (head, anchor) };
+
+        // The length of the last selected grapheme is never included in the
+        // coordinates returned by getpos(), so we need to add it ourselves.
+        let final_grapheme_len = {
+            let end_line = self.get_line(end.line_idx);
+            let cursor_to_eol = &end_line.as_bytes()[end.byte_offset.into()..];
+            String::from_utf8_lossy(cursor_to_eol)
+                // FIXME: use graphemes.
+                .chars()
+                .next()
+                .map(char::len_utf8)
+                // The cursor is already at EOL, so the next grapheme must
+                // be a \n.
+                .unwrap_or(1)
+        };
+
+        end.byte_offset += final_grapheme_len;
 
         // Neovim always allows you to select one more character past the end
         // of the line, which is usually interpreted as having selected the
@@ -320,7 +365,26 @@ impl<'a> NeovimBuffer<'a> {
         // Clearly that doesn't work if you're already at the end of the file.
         end = end.min(self.point_of_eof());
 
-        Some(self.byte_offset_of_point(start)..self.byte_offset_of_point(end))
+        self.byte_offset_of_point(start)..self.byte_offset_of_point(end)
+    }
+
+    /// Returns the selected byte range in the buffer, assuming:
+    ///
+    /// - `Self` is focused;
+    /// - the user is in line-wise visual or select mode;
+    ///
+    /// # Panics
+    ///
+    /// Panics if either one of those assumptions in not true.
+    #[inline]
+    fn selection_by_line(&self) -> Range<ByteOffset> {
+        debug_assert!(self.is_focused());
+        debug_assert!({
+            let mode = api::get_mode().mode;
+            mode.is_select_by_line() || mode.is_visual_by_line()
+        });
+
+        todo!();
     }
 }
 
@@ -464,6 +528,13 @@ impl From<api::Buffer> for BufferId {
 }
 
 impl From<BufferId> for api::Buffer {
+    #[inline]
+    fn from(buf_id: BufferId) -> Self {
+        buf_id.0.into()
+    }
+}
+
+impl From<BufferId> for oxi::Object {
     #[inline]
     fn from(buf_id: BufferId) -> Self {
         buf_id.0.into()

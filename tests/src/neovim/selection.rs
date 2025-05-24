@@ -38,7 +38,6 @@ async fn charwise_past_eof(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("<Right>");
 
     ctx.feedkeys("<Esc>");
-
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
 }
 
@@ -61,6 +60,28 @@ async fn charwise_past_eol(ctx: &mut Context<Neovim>) {
 
     ctx.feedkeys("<Down>");
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..11));
+
+    ctx.feedkeys("<Esc>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
+}
+
+#[neovim::test]
+async fn charwise_multibyte(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("i🦀ƒoo🐤<Esc>0");
+
+    let mut events = SelectionEvent::new_stream(ctx);
+
+    ctx.feedkeys("v");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Created(0..4));
+
+    ctx.feedkeys("<Right>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..6));
+    ctx.feedkeys("<Right>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..7));
+    ctx.feedkeys("<Right>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..8));
+    ctx.feedkeys("<Right>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..12));
 
     ctx.feedkeys("<Esc>");
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
