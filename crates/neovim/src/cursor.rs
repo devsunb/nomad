@@ -45,7 +45,7 @@ impl Cursor for NeovimCursor<'_> {
 
     #[inline]
     fn byte_offset(&self) -> ByteOffset {
-        self.buffer().byte_offset_of_point(self.point())
+        self.buffer().byte_of_point(self.point())
     }
 
     #[inline]
@@ -55,7 +55,7 @@ impl Cursor for NeovimCursor<'_> {
 
     #[inline]
     fn r#move(&mut self, offset: ByteOffset, _agent_id: AgentId) {
-        let point = self.buffer().point_of_byte_offset(offset);
+        let point = self.buffer().point_of_byte(offset);
 
         api::Window::current()
             .set_cursor(point.line_idx + 1, point.byte_offset.into())

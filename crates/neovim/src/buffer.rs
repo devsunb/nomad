@@ -41,7 +41,7 @@ impl<'a> NeovimBuffer<'a> {
     /// buffer.
     #[track_caller]
     #[inline]
-    pub(crate) fn byte_offset_of_point(self, point: Point) -> ByteOffset {
+    pub(crate) fn byte_of_point(self, point: Point) -> ByteOffset {
         let line_offset: ByteOffset = self
             .inner()
             .get_offset(point.line_idx)
@@ -139,10 +139,7 @@ impl<'a> NeovimBuffer<'a> {
     /// buffer.
     #[track_caller]
     #[inline]
-    pub(crate) fn point_of_byte_offset(
-        self,
-        byte_offset: ByteOffset,
-    ) -> Point {
+    pub(crate) fn point_of_byte(self, byte_offset: ByteOffset) -> Point {
         if byte_offset == 0 {
             // byte2line can't handle 0.
             return Point::zero();
@@ -178,30 +175,17 @@ impl<'a> NeovimBuffer<'a> {
     #[track_caller]
     #[inline]
     pub(crate) fn point_of_eof(self) -> Point {
-        fn point_of_eof(buffer: NeovimBuffer) -> Result<Point, api::Error> {
-            let nvim_buf = buffer.inner();
+        let line_len = self.line_len();
 
-            let num_lines = nvim_buf.line_count()?;
-
-            if num_lines == 0 {
-                return Ok(Point::zero());
+        if line_len == 0 {
+            Point::zero()
+        } else {
+            Point {
+                line_idx: line_len - 1,
+                byte_offset: self.byte_of_line(line_len)
+                    - self.byte_of_line(line_len - 1),
             }
-
-            let last_line_len = nvim_buf.get_offset(num_lines)?
-            // `get_offset(line_count)` seems to always include the trailing
-            // newline, even when `eol` is turned off.
-            //
-            // TODO: shouldn't we only correct this if `eol` is turned off?
-            - 1
-            - nvim_buf.get_offset(num_lines - 1)?;
-
-            Ok(Point {
-                line_idx: num_lines - 1,
-                byte_offset: ByteOffset::new(last_line_len),
-            })
         }
-
-        point_of_eof(self).expect("not deleted")
     }
 
     /// Replaces the text in the given point range with the new text.
@@ -293,6 +277,22 @@ impl<'a> NeovimBuffer<'a> {
         }
     }
 
+    /// Returns the [`ByteOffset`] of start of the line at the given index.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the line index is out of bounds (i.e. greater than
+    /// [`line_len()`](Self::line_len)).
+    #[inline]
+    fn byte_of_line(&self, line_idx: usize) -> ByteOffset {
+        // get_offset() already takes care of only counting the final newline
+        // if `eol` is enabled.
+        self.inner()
+            .get_offset(line_idx)
+            .expect("line index out of bounds")
+            .into()
+    }
+
     /// Returns the contents of the line at the given index, *without* any
     /// trailing newline character.
     #[inline]
@@ -302,6 +302,12 @@ impl<'a> NeovimBuffer<'a> {
             (self.id(), (line_idx + 1) as oxi::Integer),
         )
         .expect("could not call getbufoneline()")
+    }
+
+    /// Returns the number of lines in the buffer.
+    #[inline]
+    fn line_len(&self) -> usize {
+        self.inner().line_count().expect("buffer is valid")
     }
 
     /// Returns the selected byte range in the buffer, assuming:
@@ -365,7 +371,7 @@ impl<'a> NeovimBuffer<'a> {
         // Clearly that doesn't work if you're already at the end of the file.
         end = end.min(self.point_of_eof());
 
-        self.byte_offset_of_point(start)..self.byte_offset_of_point(end)
+        self.byte_of_point(start)..self.byte_of_point(end)
     }
 
     /// Returns the selected byte range in the buffer, assuming:
@@ -384,7 +390,28 @@ impl<'a> NeovimBuffer<'a> {
             mode.is_select_by_line() || mode.is_visual_by_line()
         });
 
-        todo!();
+        let anchor_row = api::call_function::<_, usize>("line", ('v',))
+            .expect("couldn't call line()");
+
+        let head_row = api::call_function::<_, usize>("line", ('.',))
+            .expect("couldn't call line()");
+
+        let (start_row, end_row) = if anchor_row <= head_row {
+            (anchor_row, head_row)
+        } else {
+            (head_row, anchor_row)
+        };
+
+        let start_offset = self.byte_of_line(start_row - 1);
+
+        // Neovim always allows you to select one more character past the end
+        // of the line, which is usually interpreted as having selected the
+        // following newline.
+        //
+        // Clearly that doesn't work if you're already at the end of the file.
+        let end_offset = self.byte_of_line(end_row).min(self.byte_len());
+
+        start_offset..end_offset
     }
 }
 
@@ -423,7 +450,7 @@ impl Buffer for NeovimBuffer<'_> {
 
     #[inline]
     fn byte_len(&self) -> ByteOffset {
-        self.byte_offset_of_point(self.point_of_eof())
+        self.byte_of_line(self.line_len())
     }
 
     #[inline]
@@ -439,8 +466,8 @@ impl Buffer for NeovimBuffer<'_> {
             });
 
             let range = replacement.removed_range();
-            let deletion_start = self.point_of_byte_offset(range.start);
-            let deletion_end = self.point_of_byte_offset(range.end);
+            let deletion_start = self.point_of_byte(range.start);
+            let deletion_end = self.point_of_byte(range.end);
             self.replace_text_in_point_range(
                 deletion_start..deletion_end,
                 replacement.inserted_text(),

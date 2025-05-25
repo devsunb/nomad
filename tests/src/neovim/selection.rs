@@ -30,8 +30,8 @@ async fn charwise_past_eof(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("v");
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Created(0..1));
 
-    ctx.feedkeys("w");
-    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..5));
+    ctx.feedkeys("W");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..6));
 
     // We're already at EOF, so trying to select one more character shouldn't
     // do anything.
@@ -59,7 +59,7 @@ async fn charwise_past_eol(ctx: &mut Context<Neovim>) {
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..6));
 
     ctx.feedkeys("<Down>");
-    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..11));
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..12));
 
     ctx.feedkeys("<Esc>");
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
@@ -82,6 +82,19 @@ async fn charwise_multibyte(ctx: &mut Context<Neovim>) {
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..8));
     ctx.feedkeys("<Right>");
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Moved(0..12));
+
+    ctx.feedkeys("<Esc>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
+}
+
+#[neovim::test]
+async fn linewise_simple(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("iHello<Esc>2<Left>");
+
+    let mut events = SelectionEvent::new_stream(ctx);
+
+    ctx.feedkeys("<S-v>");
+    assert_eq!(events.next().await.unwrap(), SelectionEvent::Created(0..6));
 
     ctx.feedkeys("<Esc>");
     assert_eq!(events.next().await.unwrap(), SelectionEvent::Removed);
