@@ -41,12 +41,20 @@ async fn normal_to_insert_with_a(ctx: &mut Context<Neovim>) {
 
 #[neovim::test]
 async fn insert_to_normal(ctx: &mut Context<Neovim>) {
-    ctx.feedkeys("ihello<Left><Left>");
+    ctx.feedkeys("ihello");
+
+    // feedkeys() always exits insert mode, so we need to re-enter it.
+    //
+    // Note that this will be as if we typed "i", so the cursor is now between
+    // the second "l" and the "o".
+    ctx.cmd("startinsert");
 
     let mut offsets = ByteOffset::new_stream(ctx);
 
+    // The cursor is now on top of the second "l".
     ctx.feedkeys("<Esc>");
-    assert_eq!(offsets.next().await.unwrap(), 2usize);
+
+    assert_eq!(offsets.next().await.unwrap(), 3usize);
 }
 
 trait ByteOffsetExt {

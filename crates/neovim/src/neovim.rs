@@ -33,13 +33,6 @@ impl Neovim {
         self.emitter = emitter.into();
     }
 
-    /// TODO: docs.
-    #[cfg(feature = "test")]
-    pub fn feedkeys(&self, keys: &str) {
-        let keys = oxi::api::replace_termcodes(keys, true, false, true);
-        oxi::api::feedkeys(&keys, c"x", false);
-    }
-
     /// Should only be called by the `#[neovim::plugin]` macro.
     #[doc(hidden)]
     #[inline]

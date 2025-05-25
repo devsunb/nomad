@@ -21,6 +21,12 @@ impl<'a> ModeStr<'a> {
 
     #[allow(dead_code)]
     #[inline]
+    pub(crate) fn is_insert(&self) -> bool {
+        self.first_char() == 'i'
+    }
+
+    #[allow(dead_code)]
+    #[inline]
     pub(crate) fn is_select(&self) -> bool {
         self.is_select_blockwise()
             || self.is_select_by_character()

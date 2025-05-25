@@ -1,20 +1,25 @@
 //! TODO: docs.
 
-use ed::Context;
+use ed::{BorrowState, Context};
 
 use crate::Neovim;
+use crate::oxi::api;
 
 /// TODO: docs.
 pub trait ContextExt {
     /// TODO: docs.
-    fn feedkeys(&mut self, keys: &str);
-}
+    fn cmd(&mut self, cmd: &str) {
+        api::command(cmd).expect("couldn't execute command");
+    }
 
-impl ContextExt for ed::Context<Neovim, ed::NotBorrowed> {
+    /// TODO: docs.
     fn feedkeys(&mut self, keys: &str) {
-        self.with_borrowed(|ctx| ctx.feedkeys(keys))
+        let keys = api::replace_termcodes(keys, true, false, true);
+        api::feedkeys(&keys, c"x", false);
     }
 }
+
+impl<S: BorrowState> ContextExt for ed::Context<Neovim, S> {}
 
 #[doc(hidden)]
 pub mod test_macro {
