@@ -36,6 +36,8 @@ flume = { workspace = true }
 futures-lite = { workspace = true, features = ["default"] }
 futures-util = { workspace = true, features = ["default"] }
 mock = { workspace = true }
+rand = "0.9"
+rand_chacha = "0.9"
 
 # Auth-related dependencies.
 auth = { workspace = true, optional = true, features = ["mock"] }

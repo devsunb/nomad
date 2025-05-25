@@ -78,7 +78,7 @@ pub struct Edit {
 }
 
 /// TODO: docs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Replacement {
     removed_range: Range<ByteOffset>,
     inserted_text: SmolStr,

@@ -2866,6 +2866,8 @@ dependencies = [
  "futures-util",
  "mock",
  "neovim",
+ "rand 0.9.1",
+ "rand_chacha 0.9.0",
  "tempdir 0.1.0-dev",
  "walkdir 0.1.0-dev",
 ]
