@@ -2,22 +2,27 @@ use ed::backend::Backend;
 use mock::Mock;
 use mock::fs::MockFs;
 
-use crate::ed::cursor;
+mod ed_cursor {
+    //! Contains the editor-agnostic cursor tests.
 
-#[test]
-fn on_cursor_created_1() {
-    Mock::<MockFs>::default()
-        .with_ctx(|ctx| ctx.block_on(cursor::on_cursor_created_1));
-}
+    use super::*;
+    use crate::ed::cursor;
 
-#[test]
-fn on_cursor_created_2() {
-    Mock::<MockFs>::default()
-        .with_ctx(|ctx| ctx.block_on(cursor::on_cursor_created_2));
-}
+    #[test]
+    fn on_cursor_created_1() {
+        Mock::<MockFs>::default()
+            .with_ctx(|ctx| ctx.block_on(cursor::on_cursor_created_1));
+    }
 
-#[test]
-fn on_cursor_moved_1() {
-    Mock::<MockFs>::default()
-        .with_ctx(|ctx| ctx.block_on(cursor::on_cursor_moved_1));
+    #[test]
+    fn on_cursor_created_2() {
+        Mock::<MockFs>::default()
+            .with_ctx(|ctx| ctx.block_on(cursor::on_cursor_created_2));
+    }
+
+    #[test]
+    fn on_cursor_moved_1() {
+        Mock::<MockFs>::default()
+            .with_ctx(|ctx| ctx.block_on(cursor::on_cursor_moved_1));
+    }
 }
