@@ -1,6 +1,6 @@
 use ed::backend::Backend;
-use mock::Mock;
 use mock::fs::MockFs;
+use mock::{ContextExt, Mock};
 
 mod ed_cursor {
     //! Contains the editor-agnostic cursor tests.

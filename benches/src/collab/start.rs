@@ -15,12 +15,13 @@ mod read_neovim {
     use collab::CollabBackend;
     use collab::mock::CollabMock;
     use criterion::BenchmarkId;
+    use ed::executor::Executor;
     use ed::fs::os::{OsDirectory, OsFs};
     use ed::fs::{Directory, Fs};
     use ed::{Backend, Context};
     use futures_lite::future;
-    use mock::Mock;
     use mock::fs::MockFs;
+    use mock::{ContextExt, Mock};
     use thread_pool::ThreadPool;
     use walkdir::GitIgnore;
 
@@ -72,6 +73,7 @@ mod read_neovim {
         ctx: &mut Context<B>,
         group: &mut BenchmarkGroup<'_, WallTime>,
     ) where
+        B::Executor: Executor<Runner = mock::executor::Runner>,
         <B::Fs as Fs>::Directory: Clone,
     {
         let bench_id = BenchmarkId::new(

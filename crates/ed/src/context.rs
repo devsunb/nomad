@@ -82,12 +82,6 @@ pub struct BorrowedInner<'a, Ed: Backend> {
 impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     /// TODO: docs.
     #[inline]
-    pub fn block_on<T>(&mut self, fun: impl AsyncFnOnce(&mut Self) -> T) -> T {
-        future::block_on(self.run(fun))
-    }
-
-    /// TODO: docs.
-    #[inline]
     pub async fn create_and_focus(
         &mut self,
         file_path: &AbsPath,
