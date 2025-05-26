@@ -84,25 +84,22 @@ async fn fuzz_edits(num_epochs: u32, ctx: &mut Context<impl Backend>) {
 /// guaranteed to be valid char boundaries in the string.
 fn gen_replacement(s: &str, rng: &mut impl Rng) -> Replacement {
     // Taken from u8::is_utf8_char_boundary(), which is not public.
-    let is_byte_char_boundary = |byte: u8| (byte as i8) >= -0x40;
+    let is_char_boundary = |byte: u8| (byte as i8) >= -0x40;
 
     let clip_to_char_boundary = |offset| {
         if offset >= s.len() {
             return s.len();
-        } else if s.is_char_boundary(offset) {
-            return offset;
         }
 
-        let num_bytes_to_prev_boundary = s.as_bytes()[..offset]
+        let num_bytes_to_prev_boundary = s.as_bytes()[..offset + 1]
             .iter()
-            .copied()
-            .rposition(is_byte_char_boundary)
+            .rev()
+            .position(|&byte| is_char_boundary(byte))
             .unwrap();
 
         let num_bytes_to_next_boundary = s.as_bytes()[offset..]
             .iter()
-            .copied()
-            .position(is_byte_char_boundary)
+            .position(|&byte| is_char_boundary(byte))
             .unwrap();
 
         if num_bytes_to_prev_boundary <= num_bytes_to_next_boundary {
