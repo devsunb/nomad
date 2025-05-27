@@ -2,6 +2,7 @@
 
 use core::fmt;
 use core::marker::PhantomData;
+use std::collections::hash_map;
 use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
@@ -150,11 +151,21 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
                 self.integrate_fs_op(movement, ctx).await
             },
             Message::MovedSelection(selection_movement) => todo!(),
-            Message::PeerDisconnected(peer_id) => {},
-            Message::PeerJoined(peer) => todo!(),
-            Message::PeerLeft(peer_id) => todo!(),
-            Message::ProjectRequest(project_request) => todo!(),
-            Message::ProjectResponse(project_response) => todo!(),
+            Message::PeerDisconnected(peer_id) => {
+                self.integrate_peer_left(peer_id, ctx).await
+            },
+            Message::PeerJoined(peer) => {
+                self.integrate_peer_joined(peer, ctx).await
+            },
+            Message::PeerLeft(peer_id) => {
+                self.integrate_peer_left(peer_id, ctx).await
+            },
+            Message::ProjectRequest(_) => todo!(),
+            Message::ProjectResponse(_) => {
+                ctx.emit_error(notify::Message::from_display(
+                    "received unexpected ProjectResponse message",
+                ));
+            },
             Message::SavedTextFile(global_file_id) => todo!(),
         }
     }
@@ -195,6 +206,30 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
             Ed::create_peer_tooltip(owner, offset.into(), buf_id, ctx).await;
 
         todo!("store peer")
+    }
+
+    async fn integrate_peer_joined(&self, peer: Peer, _ctx: &mut Context<Ed>) {
+        self.with_project(|proj| match proj.remote_peers.entry(peer.id) {
+            hash_map::Entry::Occupied(_) => {
+                panic!("peer ID {:?} already exists", peer.id);
+            },
+            hash_map::Entry::Vacant(entry) => {
+                entry.insert(peer);
+            },
+        });
+    }
+
+    async fn integrate_peer_left(
+        &self,
+        peer_id: PeerId,
+        _ctx: &mut Context<Ed>,
+    ) {
+        self.with_project(|proj| match proj.remote_peers.remove(&peer_id) {
+            Some(_peer) => {},
+            None => panic!("peer ID {:?} doesn't exist", peer_id),
+        });
+
+        todo!("remove peer tooltips")
     }
 
     async fn integrate_fs_op<T: FsOp>(&self, _op: T, _ctx: &mut Context<Ed>) {
