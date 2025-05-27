@@ -6,10 +6,11 @@ mod neovim;
 use core::fmt::Debug;
 
 use collab_server::Authenticator;
+use collab_server::message::Peer;
 use ed::backend::Backend;
 use ed::command::CommandArgs;
 use ed::fs::{self, AbsPath, AbsPathBuf};
-use ed::{Context, notify};
+use ed::{ByteOffset, Context, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::config;
@@ -19,6 +20,9 @@ use crate::config;
 pub trait CollabBackend: Backend {
     /// TODO: docs.
     type Io: AsyncRead + AsyncWrite + Unpin;
+
+    /// TODO: docs.
+    type PeerTooltip;
 
     /// TODO: docs.
     type ProjectFilter: walkdir::Filter<Self::Fs, Error: Send> + Send + Sync;
@@ -65,6 +69,14 @@ pub trait CollabBackend: Backend {
         session_id: SessionId<Self>,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = Result<(), Self::CopySessionIdError>>;
+
+    /// TODO: docs.
+    fn create_peer_tooltip(
+        remote_peer: Peer,
+        tooltip_offset: ByteOffset,
+        buffer_id: Self::BufferId,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = Self::PeerTooltip>;
 
     /// TODO: docs.
     fn default_dir_for_remote_projects(

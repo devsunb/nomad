@@ -7,13 +7,13 @@ use core::num::NonZeroU32;
 use core::str::FromStr;
 
 use collab_server::Config;
-use collab_server::message::PeerId;
+use collab_server::message::{Peer, PeerId};
 use collab_server::test::{TestConfig as InnerConfig, TestSessionId};
 use duplex_stream::{DuplexStream, duplex};
 use ed::backend::{AgentId, ApiValue, Backend, BaseBackend};
 use ed::fs::{self, AbsPath, AbsPathBuf};
 use ed::notify::{self, MaybeResult};
-use ed::{BorrowState, Context};
+use ed::{BorrowState, ByteOffset, Context};
 use serde::{Deserialize, Serialize};
 
 use crate::backend::{ActionForSelectedSession, CollabBackend};
@@ -214,6 +214,7 @@ where
     F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
 {
     type Io = DuplexStream;
+    type PeerTooltip = ();
     type ProjectFilter = F;
     type ServerConfig = ServerConfig;
 
@@ -254,6 +255,14 @@ where
     ) -> Result<(), Self::CopySessionIdError> {
         ctx.with_editor(|this| this.clipboard = Some(session_id));
         Ok(())
+    }
+
+    async fn create_peer_tooltip(
+        _remote_peer: Peer,
+        _tooltip_offset: ByteOffset,
+        _buffer_id: Self::BufferId,
+        _ctx: &mut Context<Self>,
+    ) -> Self::PeerTooltip {
     }
 
     async fn default_dir_for_remote_projects(

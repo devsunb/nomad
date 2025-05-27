@@ -6,11 +6,11 @@ use std::{env, io};
 
 use abs_path::{AbsPath, AbsPathBuf, node};
 use collab_server::Config;
-use collab_server::message::PeerId;
+use collab_server::message::{Peer, PeerId};
 use collab_server::nomad::{NomadConfig, NomadSessionId};
 use ed::command::{CommandArgs, Parse};
 use ed::fs::{self, Directory};
-use ed::{Context, notify};
+use ed::{ByteOffset, Context, notify};
 use mlua::{Function, Table};
 use neovim::buffer::BufferId;
 use neovim::{Neovim, mlua, oxi};
@@ -73,6 +73,7 @@ struct TildePath<'a> {
 
 impl CollabBackend for Neovim {
     type Io = async_net::TcpStream;
+    type PeerTooltip = ();
     type ProjectFilter = walkdir::GitIgnore;
     type ServerConfig = ServerConfig;
 
@@ -125,6 +126,14 @@ impl CollabBackend for Neovim {
     ) -> Result<(), Self::CopySessionIdError> {
         clipboard::set(session_id)
             .map_err(|inner| NeovimCopySessionIdError { inner, session_id })
+    }
+
+    async fn create_peer_tooltip(
+        _remote_peer: Peer,
+        _tooltip_offset: ByteOffset,
+        _buffer_id: Self::BufferId,
+        _ctx: &mut Context<Self>,
+    ) -> Self::PeerTooltip {
     }
 
     async fn default_dir_for_remote_projects(

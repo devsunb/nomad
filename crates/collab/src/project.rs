@@ -5,12 +5,12 @@ use core::marker::PhantomData;
 use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use collab_project::fs::{DirectoryId, FileId, FileMut, Node, NodeMut};
+use collab_project::fs::{DirectoryId, FileId, FileMut, FsOp, Node, NodeMut};
 use collab_project::{PeerId, text};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::backend::{AgentId, Backend};
 use ed::fs::{self, File as _, Symlink as _};
-use ed::{Context, Shared, notify};
+use ed::{Borrowed, Context, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
@@ -55,7 +55,7 @@ pub(crate) struct Project<B: CollabBackend> {
     id_maps: IdMaps<B>,
     local_peer: Peer,
     project: collab_project::Project,
-    _remote_peers: Peers,
+    remote_peers: FxHashMap<PeerId, Peer>,
     root_path: AbsPathBuf,
     session_id: SessionId<B>,
 }
@@ -105,7 +105,7 @@ enum FsNodeContents {
     Symlink(String),
 }
 
-impl<B: CollabBackend> ProjectHandle<B> {
+impl<Ed: CollabBackend> ProjectHandle<Ed> {
     /// TODO: docs.
     pub fn is_host(&self) -> bool {
         self.with(|proj| proj.is_host())
@@ -117,25 +117,54 @@ impl<B: CollabBackend> ProjectHandle<B> {
     }
 
     /// TODO: docs.
-    pub fn session_id(&self) -> SessionId<B> {
+    pub fn session_id(&self) -> SessionId<Ed> {
         self.with(|proj| proj.session_id)
     }
 
     /// TODO: docs.
     pub(crate) async fn integrate(
         &self,
-        _message: Message,
-        _ctx: &mut Context<B>,
+        message: Message,
+        ctx: &mut Context<Ed>,
     ) {
-        todo!();
+        match message {
+            Message::CreatedCursor(cursor_creation) => {
+                self.integrate_cursor_creation(cursor_creation, ctx).await
+            },
+            Message::CreatedDirectory(directory_creation) => {
+                self.integrate_fs_op(directory_creation, ctx).await
+            },
+            Message::CreatedFile(file_creation) => {
+                self.integrate_fs_op(file_creation, ctx).await
+            },
+            Message::CreatedSelection(selection_creation) => todo!(),
+            Message::DeletedCursor(cursor_deletion) => todo!(),
+            Message::DeletedFsNode(deletion) => {
+                self.integrate_fs_op(deletion, ctx).await
+            },
+            Message::DeletedSelection(selection_deletion) => todo!(),
+            Message::EditedBinary(binary_edit) => todo!(),
+            Message::EditedText(text_edit) => todo!(),
+            Message::MovedCursor(cursor_movement) => todo!(),
+            Message::MovedFsNode(movement) => {
+                self.integrate_fs_op(movement, ctx).await
+            },
+            Message::MovedSelection(selection_movement) => todo!(),
+            Message::PeerDisconnected(peer_id) => {},
+            Message::PeerJoined(peer) => todo!(),
+            Message::PeerLeft(peer_id) => todo!(),
+            Message::ProjectRequest(project_request) => todo!(),
+            Message::ProjectResponse(project_response) => todo!(),
+            Message::SavedTextFile(global_file_id) => todo!(),
+        }
     }
 
     /// TODO: docs.
     pub(crate) async fn synchronize(
         &self,
-        event: Event<B>,
-        ctx: &mut Context<B>,
-    ) -> Result<Option<Message>, SynchronizeError<B>> {
+        event: Event<Ed>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<Option<Message>, SynchronizeError<Ed>> {
         match event {
             Event::Directory(fs::DirectoryEvent::Creation(creation)) => {
                 self.synchronize_node_creation(creation, ctx).await
@@ -143,16 +172,41 @@ impl<B: CollabBackend> ProjectHandle<B> {
             Event::File(fs::FileEvent::Modification(modification)) => {
                 self.synchronize_file_modification(modification, ctx).await
             },
-            other => Ok(self.with_mut(|proj| proj.synchronize(other))),
+            other => Ok(self.with_project(|proj| proj.synchronize(other))),
         }
+    }
+
+    async fn integrate_cursor_creation(
+        &self,
+        creation: text::CursorCreation,
+        ctx: &mut Context<Ed>,
+    ) {
+        let Some((owner, offset, buf_id)) = self.with_project(|proj| {
+            let cursor = proj.project.integrate_cursor_creation(creation)?;
+            let cursor_file = cursor.file()?;
+            let cursor_owner = proj.remote_peers.get(&cursor.owner())?;
+            let buf_id = proj.id_maps.file2buffer.get(&cursor_file.id())?;
+            Some((cursor_owner.clone(), cursor.offset(), buf_id.clone()))
+        }) else {
+            return;
+        };
+
+        let _peer_tooltip =
+            Ed::create_peer_tooltip(owner, offset.into(), buf_id, ctx).await;
+
+        todo!("store peer")
+    }
+
+    async fn integrate_fs_op<T: FsOp>(&self, _op: T, _ctx: &mut Context<Ed>) {
+        todo!();
     }
 
     #[allow(clippy::too_many_lines)]
     async fn synchronize_file_modification(
         &self,
-        modification: fs::FileModification<B::Fs>,
-        ctx: &mut Context<B>,
-    ) -> Result<Option<Message>, SynchronizeError<B>> {
+        modification: fs::FileModification<Ed::Fs>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<Option<Message>, SynchronizeError<Ed>> {
         enum FileContents {
             Binary(Arc<[u8]>),
             Text(text::crop::Rope),
@@ -164,7 +218,7 @@ impl<B: CollabBackend> ProjectHandle<B> {
         }
 
         // Get the file's contents before the modification.
-        let (file_id, file_path, file_contents) = self.with_mut(|proj| {
+        let (file_id, file_path, file_contents) = self.with_project(|proj| {
             let root_path = proj.root_path.clone();
 
             match proj.project_node(&modification.file_id) {
@@ -214,7 +268,7 @@ impl<B: CollabBackend> ProjectHandle<B> {
         };
 
         // Apply the diff.
-        Ok(self.with_mut(|proj| {
+        Ok(self.with_project(|proj| {
             let file = proj.project.file_mut(file_id)?;
 
             Some(match (file, file_diff) {
@@ -231,11 +285,11 @@ impl<B: CollabBackend> ProjectHandle<B> {
 
     async fn synchronize_node_creation(
         &self,
-        creation: fs::NodeCreation<B::Fs>,
-        ctx: &mut Context<B>,
-    ) -> Result<Option<Message>, SynchronizeError<B>> {
+        creation: fs::NodeCreation<Ed::Fs>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<Option<Message>, SynchronizeError<Ed>> {
         match ctx.fs().contents_at_path(&creation.node_path).await {
-            Ok(Some(node_contents)) => Ok(Some(self.with_mut(|proj| {
+            Ok(Some(node_contents)) => Ok(Some(self.with_project(|proj| {
                 proj.synchronize_node_creation(
                     creation.node_id,
                     &creation.node_path,
@@ -254,18 +308,18 @@ impl<B: CollabBackend> ProjectHandle<B> {
     }
 
     /// TODO: docs.
-    fn with<R>(&self, fun: impl FnOnce(&Project<B>) -> R) -> R {
+    fn with<R>(&self, fun: impl FnOnce(&Project<Ed>) -> R) -> R {
         self.inner.with(fun)
     }
 
     /// TODO: docs.
-    fn with_mut<R>(&self, fun: impl FnOnce(&mut Project<B>) -> R) -> R {
+    fn with_project<R>(&self, fun: impl FnOnce(&mut Project<Ed>) -> R) -> R {
         self.inner.with_mut(fun)
     }
 }
 
-impl<B: CollabBackend> Project<B> {
-    fn synchronize(&mut self, event: Event<B>) -> Option<Message> {
+impl<Ed: CollabBackend> Project<Ed> {
+    fn synchronize(&mut self, event: Event<Ed>) -> Option<Message> {
         match event {
             Event::Buffer(event) => self.synchronize_buffer(event),
             Event::Cursor(event) => Some(self.synchronize_cursor(event)),
@@ -283,7 +337,7 @@ impl<B: CollabBackend> Project<B> {
     #[track_caller]
     fn cursor_of_cursor_id(
         &mut self,
-        cursor_id: &B::CursorId,
+        cursor_id: &Ed::CursorId,
     ) -> text::CursorMut<'_> {
         let Some(&project_cursor_id) =
             self.id_maps.cursor2cursor.get(cursor_id)
@@ -313,7 +367,7 @@ impl<B: CollabBackend> Project<B> {
     #[track_caller]
     fn project_node(
         &mut self,
-        node_id: &<B::Fs as fs::Fs>::NodeId,
+        node_id: &<Ed::Fs as fs::Fs>::NodeId,
     ) -> NodeMut<'_> {
         if let Some(&dir_id) = self.id_maps.node2dir.get(node_id) {
             let Some(dir) = self.project.directory_mut(dir_id) else {
@@ -335,7 +389,7 @@ impl<B: CollabBackend> Project<B> {
     #[track_caller]
     fn selection_of_selection_id(
         &mut self,
-        selection_id: &B::SelectionId,
+        selection_id: &Ed::SelectionId,
     ) -> text::SelectionMut<'_> {
         let Some(&project_selection_id) =
             self.id_maps.selection2selection.get(selection_id)
@@ -365,7 +419,7 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_buffer(
         &mut self,
-        event: BufferEvent<B>,
+        event: BufferEvent<Ed>,
     ) -> Option<Message> {
         match event {
             BufferEvent::Created(buffer_id, file_path) => {
@@ -407,7 +461,7 @@ impl<B: CollabBackend> Project<B> {
         }
     }
 
-    fn synchronize_cursor(&mut self, event: CursorEvent<B>) -> Message {
+    fn synchronize_cursor(&mut self, event: CursorEvent<Ed>) -> Message {
         match event.kind {
             CursorEventKind::Created(buffer_id, byte_offset) => {
                 let (cursor_id, creation) = self
@@ -438,7 +492,7 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_directory(
         &mut self,
-        event: fs::DirectoryEvent<B::Fs>,
+        event: fs::DirectoryEvent<Ed::Fs>,
     ) -> Message {
         match event {
             fs::DirectoryEvent::Creation(_creation) => {
@@ -453,7 +507,7 @@ impl<B: CollabBackend> Project<B> {
         }
     }
 
-    fn synchronize_file(&mut self, event: fs::FileEvent<B::Fs>) {
+    fn synchronize_file(&mut self, event: fs::FileEvent<Ed::Fs>) {
         match event {
             fs::FileEvent::Modification(_modification) => {
                 unreachable!("already handled by ProjectHandle::synchronize()")
@@ -466,7 +520,7 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_file_id_change(
         &mut self,
-        id_change: fs::FileIdChange<B::Fs>,
+        id_change: fs::FileIdChange<Ed::Fs>,
     ) {
         match self.id_maps.node2file.remove(&id_change.old_id) {
             Some(file_id) => {
@@ -480,7 +534,7 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_node_creation(
         &mut self,
-        node_id: <B::Fs as fs::Fs>::NodeId,
+        node_id: <Ed::Fs as fs::Fs>::NodeId,
         node_path: &AbsPath,
         node_contents: FsNodeContents,
     ) -> Message {
@@ -538,7 +592,7 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_node_deletion(
         &mut self,
-        deletion: fs::NodeDeletion<B::Fs>,
+        deletion: fs::NodeDeletion<Ed::Fs>,
     ) -> Message {
         let node_id = deletion.node_id;
         let deletion = match self.project_node(&node_id) {
@@ -562,7 +616,7 @@ impl<B: CollabBackend> Project<B> {
 
     fn synchronize_node_move(
         &mut self,
-        r#move: fs::NodeMove<B::Fs>,
+        r#move: fs::NodeMove<Ed::Fs>,
     ) -> Message {
         let parent_path =
             r#move.new_path.parent().expect("root can't be moved");
@@ -599,7 +653,7 @@ impl<B: CollabBackend> Project<B> {
         Message::MovedFsNode(movement)
     }
 
-    fn synchronize_selection(&mut self, event: SelectionEvent<B>) -> Message {
+    fn synchronize_selection(&mut self, event: SelectionEvent<Ed>) -> Message {
         match event.kind {
             SelectionEventKind::Created(buffer_id, byte_range) => {
                 let (selection_id, creation) = self
@@ -636,7 +690,7 @@ impl<B: CollabBackend> Project<B> {
     #[track_caller]
     fn text_file_of_buffer(
         &mut self,
-        buffer_id: &B::BufferId,
+        buffer_id: &Ed::BufferId,
     ) -> text::TextFileMut<'_> {
         let Some(&file_id) = self.id_maps.buffer2file.get(buffer_id) else {
             panic!("unknown buffer ID: {buffer_id:?}");
@@ -760,12 +814,18 @@ impl<B: CollabBackend> ProjectGuard<B> {
             assert!(set.remove(&self.root));
         });
 
+        let remote_peers = args
+            .remote_peers
+            .into_iter()
+            .map(|peer| (peer.id, peer))
+            .collect();
+
         self.projects.insert(Project {
             agent_id: args.agent_id,
             host_id: args.host_id,
             id_maps: args.id_maps,
             local_peer: args.local_peer,
-            _remote_peers: args.remote_peers,
+            remote_peers,
             project: args.project,
             root_path: self.root.clone(),
             session_id: args.session_id,
