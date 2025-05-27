@@ -380,7 +380,7 @@ impl<'a> NeovimBuffer<'a> {
             .expect("buffer is valid")
         };
 
-        bool_opt("fixeol") && (bool_opt("eol") || !bool_opt("binary"))
+        bool_opt("eol") || (bool_opt("fixeol") && !bool_opt("binary"))
     }
 
     /// Returns the selected byte range in the buffer, assuming:
