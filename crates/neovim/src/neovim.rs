@@ -47,6 +47,17 @@ impl Neovim {
         Self::new_inner(augroup_name, true)
     }
 
+    /// Same as [`buffer`](Self::buffer), but it doesn't need an exclusive
+    /// reference.
+    #[inline]
+    fn buffer_inner(&self, buf_id: BufferId) -> Option<NeovimBuffer<'_>> {
+        buf_id.is_valid().then_some(NeovimBuffer::new(
+            buf_id,
+            // &self.decoration_provider,
+            &self.events,
+        ))
+    }
+
     #[inline]
     fn new_inner(augroup_name: &str, reinstate_panic_hook: bool) -> Self {
         Self {
@@ -78,13 +89,13 @@ impl Backend for Neovim {
 
     #[inline]
     fn buffer(&mut self, buf_id: Self::BufferId) -> Option<Self::Buffer<'_>> {
-        buf_id.is_valid().then_some(NeovimBuffer::new(buf_id, &self.events))
+        self.buffer_inner(buf_id)
     }
 
     #[inline]
     fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
         self.buffer_ids()
-            .map(|buf_id| NeovimBuffer::new(buf_id, &self.events))
+            .flat_map(|buf_id| self.buffer_inner(buf_id))
             .find(|buf| &*buf.path() == path)
     }
 
@@ -100,7 +111,7 @@ impl Backend for Neovim {
 
     #[inline]
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
-        Some(NeovimBuffer::current(&self.events))
+        self.buffer(BufferId::of_focused())
     }
 
     #[inline]
@@ -251,7 +262,7 @@ impl BaseBackend for Neovim {
                 }
             });
 
-            let buffer = NeovimBuffer::new(buf_id, &this.events);
+            let buffer = this.buffer_inner(buf_id).expect("just created");
 
             buffer.replace_text_in_point_range(
                 Point::zero()..Point::zero(),

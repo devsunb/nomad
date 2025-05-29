@@ -14,12 +14,14 @@ use ed::{ByteOffset, Shared};
 
 use crate::Neovim;
 use crate::cursor::NeovimCursor;
+use crate::decoration_provider::{self, DecorationProvider};
 use crate::events::{self, EventHandle, Events};
 use crate::oxi::{self, BufHandle, String as NvimString, api, mlua};
 
 /// TODO: docs.
 #[derive(Copy, Clone)]
 pub struct NeovimBuffer<'a> {
+    decoration_provider: &'a DecorationProvider,
     events: &'a Shared<Events>,
     id: BufferId,
 }
@@ -27,6 +29,17 @@ pub struct NeovimBuffer<'a> {
 /// TODO: docs.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BufferId(BufHandle);
+
+/// TODO: docs.
+pub struct HighlightRange<'a> {
+    buffer: NeovimBuffer<'a>,
+    handle: &'a HighlightRangeHandle,
+}
+
+/// TODO: docs.
+pub struct HighlightRangeHandle {
+    inner: decoration_provider::HighlightRange,
+}
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub(crate) struct Point {
@@ -38,6 +51,27 @@ pub(crate) struct Point {
 }
 
 impl<'a> NeovimBuffer<'a> {
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn highlight_range(
+        &self,
+        byte_range: Range<ByteOffset>,
+        highlight_group_name: &str,
+    ) -> HighlightRangeHandle {
+        debug_assert!(byte_range.start <= byte_range.end);
+        debug_assert!(byte_range.end <= self.byte_len());
+        let start = self.point_of_byte(byte_range.start);
+        let end = self.point_of_byte(byte_range.end);
+        HighlightRangeHandle {
+            inner: self.decoration_provider.highlight_range(
+                self.id(),
+                start..end,
+                highlight_group_name,
+            ),
+        }
+    }
+
     /// Converts the given [`Point`] to the corresponding [`ByteOffset`] in the
     /// buffer.
     #[track_caller]
@@ -66,11 +100,6 @@ impl<'a> NeovimBuffer<'a> {
             })
             .expect("couldn't call function in buffer");
         out.with_mut(Option::take).expect("function wasn't called")
-    }
-
-    #[inline]
-    pub(crate) fn current(events: &'a Shared<Events>) -> Self {
-        Self::new(BufferId::of_focused(), events)
     }
 
     #[inline]
@@ -154,9 +183,13 @@ impl<'a> NeovimBuffer<'a> {
     }
 
     #[inline]
-    pub(crate) fn new(id: BufferId, events: &'a Shared<Events>) -> Self {
+    pub(crate) fn new(
+        id: BufferId,
+        // decoration_provider: &'a DecorationProvider,
+        events: &'a Shared<Events>,
+    ) -> Self {
         debug_assert!(id.is_valid());
-        Self { id, events }
+        Self { id, decoration_provider: todo!(), events }
     }
 
     /// Converts the given [`ByteOffset`] to the corresponding [`Point`] in the
@@ -523,6 +556,31 @@ impl BufferId {
     #[inline]
     pub(crate) fn new(inner: api::Buffer) -> Self {
         Self(inner.handle())
+    }
+}
+
+impl HighlightRange<'_> {
+    /// TODO: docs.
+    #[inline]
+    pub fn buffer(&self) -> NeovimBuffer<'_> {
+        self.buffer
+    }
+
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn r#move(&self, byte_range: Range<ByteOffset>) {
+        debug_assert!(byte_range.start <= byte_range.end);
+        debug_assert!(byte_range.end <= self.buffer().byte_len());
+        let start = self.buffer().point_of_byte(byte_range.start);
+        let end = self.buffer().point_of_byte(byte_range.end);
+        self.handle.inner.r#move(start..end);
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub fn set_highlight_group(&self, highlight_group_name: &str) {
+        self.handle.inner.set_hl_group(highlight_group_name);
     }
 }
 
