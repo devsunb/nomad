@@ -10,6 +10,7 @@ pub mod executor;
 mod mode;
 mod neovim;
 pub mod notify;
+mod option;
 pub mod selection;
 pub mod serde;
 #[cfg(feature = "test")]
