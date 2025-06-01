@@ -386,7 +386,7 @@ impl<'a> NeovimBuffer<'a> {
         // intent.
         let should_unset_eol_fixeol = needs_to_clamp_end;
 
-        if should_unset_eol_fixeol {
+        if should_unset_eol_fixeol && !delete_range.is_empty() {
             // If someone is receiving edit events for this buffer, we need to
             // mark this buffer's ID as the one that just had their trailing
             // newline deleted so that:
@@ -558,10 +558,10 @@ impl<'a> NeovimBuffer<'a> {
 
         let col = api::call_function::<_, usize>(
             "col",
-            oxi::Array::from_iter([
+            (oxi::Array::from_iter([
                 oxi::Object::from(row),
                 oxi::Object::from("$"),
-            ]),
+            ]),),
         )
         .expect("could not call col()");
 

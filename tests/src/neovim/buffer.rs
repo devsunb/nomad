@@ -53,7 +53,7 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
 
     let edit = edit_stream.next().await.unwrap();
 
-    assert_eq!(edit.made_by, AgentId::UNKNOWN);
+    assert!(edit.made_by.is_unknown());
     assert_eq!(
         &*edit.replacements,
         &[Replacement::removal(0usize.into()..1usize.into())]
@@ -76,7 +76,7 @@ async fn setting_eol_is_like_inserting_trailing_newline(
 
     let edit = edit_stream.next().await.unwrap();
 
-    assert_eq!(edit.made_by, AgentId::UNKNOWN);
+    assert!(edit.made_by.is_unknown());
     assert_eq!(&*edit.replacements, &[Replacement::insertion(0usize, "\n")]);
 }
 
