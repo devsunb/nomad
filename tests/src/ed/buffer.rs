@@ -98,7 +98,7 @@ fn random_replacement(s: &str, rng: &mut impl Rng) -> Replacement {
         let num_bytes_to_next_boundary = s.as_bytes()[offset..]
             .iter()
             .position(|&byte| is_char_boundary(byte))
-            .unwrap();
+            .unwrap_or(s.len() - offset);
 
         if num_bytes_to_prev_boundary <= num_bytes_to_next_boundary {
             offset - num_bytes_to_prev_boundary
