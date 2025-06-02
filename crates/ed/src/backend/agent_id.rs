@@ -31,7 +31,9 @@ impl AgentId {
 
 impl fmt::Debug for AgentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("AgentId").field(&format_args!("UNKNOWN")).finish()
+        let field: &dyn fmt::Debug =
+            if self.is_unknown() { &format_args!("UNKNOWN") } else { &self.0 };
+        f.debug_tuple("AgentId").field(field).finish()
     }
 }
 
