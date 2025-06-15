@@ -37,7 +37,7 @@ pub trait ContextExt {
     }
 }
 
-impl<S: BorrowState> ContextExt for ed::Context<Neovim, S> {}
+impl<Bs: BorrowState> ContextExt for ed::Context<Neovim, Bs> {}
 
 #[doc(hidden)]
 pub mod test_macro {
@@ -50,7 +50,7 @@ pub mod test_macro {
     use std::panic;
     use std::sync::Arc;
 
-    use ed::Backend;
+    use ed::Editor;
 
     use super::*;
     use crate::oxi;

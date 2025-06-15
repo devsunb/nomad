@@ -3,7 +3,7 @@
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
-use ed::{Backend, Context, Shared};
+use ed::{Context, Editor, Shared};
 
 use crate::credential_store::{self, CredentialStore};
 use crate::{Auth, AuthInfos};
@@ -15,7 +15,7 @@ pub struct Logout {
     infos: Shared<Option<AuthInfos>>,
 }
 
-impl<B: Backend> AsyncAction<B> for Logout {
+impl<Ed: Editor> AsyncAction<Ed> for Logout {
     const NAME: Name = "logout";
 
     type Args = ();
@@ -23,7 +23,7 @@ impl<B: Backend> AsyncAction<B> for Logout {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut Context<B>,
+        ctx: &mut Context<Ed>,
     ) -> Result<(), LogoutError> {
         self.infos.with_mut(|maybe_infos| {
             if maybe_infos.is_some() {
@@ -63,7 +63,7 @@ impl From<&Auth> for Logout {
     }
 }
 
-impl<B: Backend> ToCompletionFn<B> for Logout {
+impl<Ed: Editor> ToCompletionFn<Ed> for Logout {
     fn to_completion_fn(&self) {}
 }
 

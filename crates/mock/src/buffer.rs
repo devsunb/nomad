@@ -208,7 +208,7 @@ impl SelectionInner {
 }
 
 impl ed::Buffer for Buffer<'_> {
-    type Backend = mock::Mock;
+    type Editor = mock::Mock;
 
     fn byte_len(&self) -> ByteOffset {
         self.contents.len().into()
@@ -326,7 +326,7 @@ impl DerefMut for Buffer<'_> {
 }
 
 impl ed::Cursor for Cursor<'_> {
-    type Backend = mock::Mock;
+    type Editor = mock::Mock;
 
     fn buffer_id(&self) -> BufferId {
         self.buffer.id()
@@ -392,7 +392,7 @@ impl DerefMut for Cursor<'_> {
 }
 
 impl ed::Selection for Selection<'_> {
-    type Backend = mock::Mock;
+    type Editor = mock::Mock;
 
     fn buffer_id(&self) -> BufferId {
         self.buffer.id()

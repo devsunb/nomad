@@ -2,7 +2,7 @@ use ed::module::{ApiCtx, Module};
 use ed::notify::Name;
 use ed::{Borrowed, Context, Shared};
 
-use crate::AuthBackend;
+use crate::AuthEditor;
 use crate::auth_infos::AuthInfos;
 use crate::credential_store::CredentialStore;
 use crate::login::Login;
@@ -47,17 +47,17 @@ impl Auth {
     }
 }
 
-impl<B: AuthBackend> Module<B> for Auth {
+impl<Ed: AuthEditor> Module<Ed> for Auth {
     const NAME: Name = "auth";
 
     type Config = ();
 
-    fn api(&self, ctx: &mut ApiCtx<B>) {
+    fn api(&self, ctx: &mut ApiCtx<Ed>) {
         ctx.with_function(self.login()).with_function(self.logout());
     }
 
-    fn on_init(&self, ctx: &mut Context<B, Borrowed>) {
-        let credential_builder = B::credential_builder(ctx);
+    fn on_init(&self, ctx: &mut Context<Ed, Borrowed>) {
+        let credential_builder = Ed::credential_builder(ctx);
         let store = self.credential_store.clone();
         ctx.spawn_background(async move {
             store.set_builder(credential_builder.await);
@@ -80,5 +80,5 @@ impl<B: AuthBackend> Module<B> for Auth {
         });
     }
 
-    fn on_new_config(&self, _: Self::Config, _: &mut Context<B, Borrowed>) {}
+    fn on_new_config(&self, _: Self::Config, _: &mut Context<Ed, Borrowed>) {}
 }

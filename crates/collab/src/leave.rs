@@ -9,27 +9,27 @@ use ed::{Context, Shared};
 use flume::{Receiver, Sender};
 use fxhash::FxHashMap;
 
-use crate::backend::{ActionForSelectedSession, CollabBackend, SessionId};
+use crate::editors::{ActionForSelectedSession, CollabEditor, SessionId};
 use crate::collab::Collab;
 use crate::project::{NoActiveSessionError, Projects};
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub struct Leave<B: CollabBackend> {
-    channels: StopChannels<B>,
-    projects: Projects<B>,
+pub struct Leave<Ed: CollabEditor> {
+    channels: StopChannels<Ed>,
+    projects: Projects<Ed>,
 }
 
 #[derive(cauchy::Clone, cauchy::Default)]
-pub(crate) struct StopChannels<B: CollabBackend> {
-    inner: Shared<FxHashMap<SessionId<B>, Sender<StopRequest>>>,
+pub(crate) struct StopChannels<Ed: CollabEditor> {
+    inner: Shared<FxHashMap<SessionId<Ed>, Sender<StopRequest>>>,
 }
 
 pub(crate) struct StopRequest {
     stopped_tx: Sender<()>,
 }
 
-impl<B: CollabBackend> AsyncAction<B> for Leave<B> {
+impl<Ed: CollabEditor> AsyncAction<Ed> for Leave<Ed> {
     const NAME: Name = "leave";
 
     type Args = ();
@@ -37,8 +37,8 @@ impl<B: CollabBackend> AsyncAction<B> for Leave<B> {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut Context<B>,
-    ) -> Result<(), NoActiveSessionError<B>> {
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), NoActiveSessionError<Ed>> {
         let Some(stop_sender) = self
             .projects
             .select(ActionForSelectedSession::Leave, ctx)
@@ -59,11 +59,11 @@ impl<B: CollabBackend> AsyncAction<B> for Leave<B> {
     }
 }
 
-impl<B: CollabBackend> StopChannels<B> {
+impl<Ed: CollabEditor> StopChannels<Ed> {
     #[track_caller]
     pub(crate) fn insert(
         &self,
-        session_id: SessionId<B>,
+        session_id: SessionId<Ed>,
     ) -> Receiver<StopRequest> {
         let (tx, rx) = flume::bounded(1);
         self.inner.with_mut(move |inner| match inner.entry(session_id) {
@@ -77,7 +77,7 @@ impl<B: CollabBackend> StopChannels<B> {
         rx
     }
 
-    fn take(&self, session_id: SessionId<B>) -> Option<Sender<StopRequest>> {
+    fn take(&self, session_id: SessionId<Ed>) -> Option<Sender<StopRequest>> {
         self.inner.with_mut(|inner| inner.remove(&session_id))
     }
 }
@@ -88,8 +88,8 @@ impl StopRequest {
     }
 }
 
-impl<B: CollabBackend> From<&Collab<B>> for Leave<B> {
-    fn from(collab: &Collab<B>) -> Self {
+impl<Ed: CollabEditor> From<&Collab<Ed>> for Leave<Ed> {
+    fn from(collab: &Collab<Ed>) -> Self {
         Self {
             channels: collab.stop_channels.clone(),
             projects: collab.projects.clone(),
@@ -97,6 +97,6 @@ impl<B: CollabBackend> From<&Collab<B>> for Leave<B> {
     }
 }
 
-impl<B: CollabBackend> ToCompletionFn<B> for Leave<B> {
+impl<Ed: CollabEditor> ToCompletionFn<Ed> for Leave<Ed> {
     fn to_completion_fn(&self) {}
 }

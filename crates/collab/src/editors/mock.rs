@@ -15,26 +15,26 @@ use ed::notify::{self, MaybeResult};
 use ed::{
     AgentId,
     ApiValue,
-    Backend,
-    BaseBackend,
+    BaseEditor,
     BorrowState,
     ByteOffset,
     Context,
+    Editor,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::backend::{ActionForSelectedSession, CollabBackend};
 use crate::config;
+use crate::editors::{ActionForSelectedSession, CollabEditor};
 
 #[allow(clippy::type_complexity)]
-pub struct CollabMock<B: Backend, F = ()> {
-    inner: B,
+pub struct CollabMock<Ed: Editor, F = ()> {
+    inner: Ed,
     confirm_start_with: Option<Box<dyn FnMut(&AbsPath) -> bool>>,
     clipboard: Option<SessionId>,
     default_dir_for_remote_projects: Option<AbsPathBuf>,
     home_dir: Option<AbsPathBuf>,
-    lsp_root_with: Option<Box<dyn FnMut(B::BufferId) -> Option<AbsPathBuf>>>,
-    project_filter_with: Box<dyn FnMut(&<B::Fs as fs::Fs>::Directory) -> F>,
+    lsp_root_with: Option<Box<dyn FnMut(Ed::BufferId) -> Option<AbsPathBuf>>>,
+    project_filter_with: Box<dyn FnMut(&<Ed::Fs as fs::Fs>::Directory) -> F>,
     select_session_with: Option<
         Box<
             dyn FnMut(
@@ -81,8 +81,8 @@ pub struct AnyError {
 #[derive(Debug)]
 pub struct NoDefaultDirForRemoteProjectsError;
 
-impl<B: Backend> CollabMock<B, ()> {
-    pub fn new(inner: B) -> Self {
+impl<Ed: Editor> CollabMock<Ed, ()> {
+    pub fn new(inner: Ed) -> Self {
         Self {
             clipboard: None,
             confirm_start_with: None,
@@ -97,10 +97,10 @@ impl<B: Backend> CollabMock<B, ()> {
     }
 }
 
-impl<B, F> CollabMock<B, F>
+impl<Ed, F> CollabMock<Ed, F>
 where
-    B: Backend,
-    F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
+    Ed: Editor,
+    F: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
 {
     pub fn confirm_start_with(
         mut self,
@@ -112,7 +112,7 @@ where
 
     pub fn lsp_root_with(
         mut self,
-        fun: impl FnMut(B::BufferId) -> Option<AbsPathBuf> + 'static,
+        fun: impl FnMut(Ed::BufferId) -> Option<AbsPathBuf> + 'static,
     ) -> Self {
         self.lsp_root_with = Some(Box::new(fun) as _);
         self
@@ -147,10 +147,10 @@ where
     pub fn with_project_filter<Fun, NewF>(
         self,
         project_filter: Fun,
-    ) -> CollabMock<B, NewF>
+    ) -> CollabMock<Ed, NewF>
     where
-        Fun: FnMut(&<B::Fs as fs::Fs>::Directory) -> NewF + 'static,
-        NewF: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
+        Fun: FnMut(&<Ed::Fs as fs::Fs>::Directory) -> NewF + 'static,
+        NewF: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
     {
         CollabMock {
             inner: self.inner,
@@ -215,10 +215,10 @@ impl AnyError {
     }
 }
 
-impl<B, F> CollabBackend for CollabMock<B, F>
+impl<Ed, F> CollabEditor for CollabMock<Ed, F>
 where
-    B: BaseBackend,
-    F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
+    Ed: BaseEditor,
+    F: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
 {
     type Io = DuplexStream;
     type PeerTooltip = ();
@@ -302,7 +302,7 @@ where
         _tooltip: &mut Self::PeerTooltip,
         _tooltip_offset: ByteOffset,
         _ctx: &'ctx mut Context<Self>,
-    ) -> impl Future<Output = ()> + use<'ctx, B, F> {
+    ) -> impl Future<Output = ()> + use<'ctx, Ed, F> {
         async move {}
     }
 
@@ -330,26 +330,26 @@ where
     }
 }
 
-impl<B, F> Backend for CollabMock<B, F>
+impl<Ed, F> Editor for CollabMock<Ed, F>
 where
-    B: BaseBackend,
-    F: walkdir::Filter<B::Fs, Error: Send> + Send + Sync + 'static,
+    Ed: BaseEditor,
+    F: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
 {
-    type Api = <B as Backend>::Api;
-    type Buffer<'a> = <B as Backend>::Buffer<'a>;
-    type BufferId = <B as Backend>::BufferId;
-    type Cursor<'a> = <B as Backend>::Cursor<'a>;
-    type CursorId = <B as Backend>::CursorId;
-    type Fs = <B as Backend>::Fs;
-    type Emitter<'this> = <B as Backend>::Emitter<'this>;
-    type Executor = <B as Backend>::Executor;
-    type EventHandle = <B as Backend>::EventHandle;
-    type Selection<'a> = <B as Backend>::Selection<'a>;
-    type SelectionId = <B as Backend>::SelectionId;
+    type Api = <Ed as Editor>::Api;
+    type Buffer<'a> = <Ed as Editor>::Buffer<'a>;
+    type BufferId = <Ed as Editor>::BufferId;
+    type Cursor<'a> = <Ed as Editor>::Cursor<'a>;
+    type CursorId = <Ed as Editor>::CursorId;
+    type Fs = <Ed as Editor>::Fs;
+    type Emitter<'this> = <Ed as Editor>::Emitter<'this>;
+    type Executor = <Ed as Editor>::Executor;
+    type EventHandle = <Ed as Editor>::EventHandle;
+    type Selection<'a> = <Ed as Editor>::Selection<'a>;
+    type SelectionId = <Ed as Editor>::SelectionId;
 
-    type CreateBufferError = <B as Backend>::CreateBufferError;
-    type SerializeError = <B as Backend>::SerializeError;
-    type DeserializeError = <B as Backend>::DeserializeError;
+    type CreateBufferError = <Ed as Editor>::CreateBufferError;
+    type SerializeError = <Ed as Editor>::SerializeError;
+    type DeserializeError = <Ed as Editor>::DeserializeError;
 
     fn buffer(&mut self, id: Self::BufferId) -> Option<Self::Buffer<'_>> {
         self.inner.buffer(id)
@@ -359,7 +359,7 @@ where
     }
     fn buffer_ids(
         &mut self,
-    ) -> impl Iterator<Item = Self::BufferId> + use<B, F> {
+    ) -> impl Iterator<Item = Self::BufferId> + use<Ed, F> {
         self.inner.buffer_ids()
     }
     async fn create_buffer(
@@ -367,7 +367,7 @@ where
         agent_id: AgentId,
         ctx: &mut Context<Self, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <B as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
+        <Ed as BaseEditor>::create_buffer(file_path, agent_id, ctx).await
     }
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.inner.current_buffer()
@@ -431,8 +431,8 @@ where
     }
 }
 
-impl<B: Backend, F> AsMut<B> for CollabMock<B, F> {
-    fn as_mut(&mut self) -> &mut B {
+impl<Ed: Editor, F> AsMut<Ed> for CollabMock<Ed, F> {
+    fn as_mut(&mut self) -> &mut Ed {
         &mut self.inner
     }
 }
@@ -463,9 +463,9 @@ impl Default for CollabServer {
     }
 }
 
-impl<B: Backend + Default> Default for CollabMock<B, ()> {
+impl<Ed: Editor + Default> Default for CollabMock<Ed, ()> {
     fn default() -> Self {
-        Self::new(B::default())
+        Self::new(Ed::default())
     }
 }
 

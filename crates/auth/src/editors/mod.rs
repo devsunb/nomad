@@ -5,12 +5,12 @@ mod neovim;
 
 use core::fmt::Debug;
 
-use ed::{Backend, Borrowed, Context, notify};
+use ed::{Borrowed, Context, Editor, notify};
 
 use crate::AuthInfos;
 
 /// TODO: docs.
-pub trait AuthBackend: Backend {
+pub trait AuthEditor: Editor {
     /// TODO: docs.
     type LoginError: Debug + notify::Error;
 

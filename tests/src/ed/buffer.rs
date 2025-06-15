@@ -1,6 +1,6 @@
 use core::{fmt, iter, mem};
 
-use ed::{Backend, Buffer, Context, Edit, Replacement};
+use ed::{Editor, Buffer, Context, Edit, Replacement};
 use futures_util::stream::{FusedStream, StreamExt};
 use rand::Rng;
 
@@ -123,7 +123,7 @@ fn random_replacement(s: &str, rng: &mut impl Rng) -> Replacement {
 pub(crate) trait EditExt {
     /// Returns a never-ending stream of [`Edit`]s on the buffer with the given
     /// ID.
-    fn new_stream<Ed: Backend>(
+    fn new_stream<Ed: Editor>(
         buf_id: Ed::BufferId,
         ctx: &mut Context<Ed>,
     ) -> impl FusedStream<Item = Edit> + Unpin + use<Self, Ed> {

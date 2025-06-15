@@ -7,7 +7,7 @@ use ed::notify::{self, Name};
 use ed::{Context, Shared};
 
 use crate::credential_store::{self, CredentialStore};
-use crate::{Auth, AuthBackend, AuthInfos};
+use crate::{Auth, AuthEditor, AuthInfos};
 
 /// TODO: docs.
 #[derive(Clone, Default)]
@@ -16,7 +16,7 @@ pub struct Login {
     infos: Shared<Option<AuthInfos>>,
 }
 
-impl<B: AuthBackend> AsyncAction<B> for Login {
+impl<Ed: AuthEditor> AsyncAction<Ed> for Login {
     const NAME: Name = "login";
 
     type Args = ();
@@ -24,15 +24,15 @@ impl<B: AuthBackend> AsyncAction<B> for Login {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut Context<B>,
-    ) -> Result<(), LoginError<B>> {
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), LoginError<Ed>> {
         if let Some(handle) = self.infos.with(|maybe_infos| {
             maybe_infos.as_ref().map(|infos| infos.handle().clone())
         }) {
             return Err(LoginError::AlreadyLoggedIn(handle));
         }
 
-        let auth_infos = B::login(ctx).await.map_err(LoginError::Login)?;
+        let auth_infos = Ed::login(ctx).await.map_err(LoginError::Login)?;
 
         self.infos.set(Some(auth_infos.clone()));
 
@@ -47,7 +47,7 @@ impl<B: AuthBackend> AsyncAction<B> for Login {
 }
 
 /// TODO: docs.
-pub enum LoginError<B: AuthBackend> {
+pub enum LoginError<Ed: AuthEditor> {
     /// TODO: docs.
     AlreadyLoggedIn(GitHubHandle),
 
@@ -55,7 +55,7 @@ pub enum LoginError<B: AuthBackend> {
     GetCredential(keyring::Error),
 
     /// TODO: docs.
-    Login(B::LoginError),
+    Login(Ed::LoginError),
 
     /// TODO: docs.
     PersistAuthInfos(keyring::Error),
@@ -70,11 +70,11 @@ impl From<&Auth> for Login {
     }
 }
 
-impl<B: AuthBackend> ToCompletionFn<B> for Login {
+impl<Ed: AuthEditor> ToCompletionFn<Ed> for Login {
     fn to_completion_fn(&self) {}
 }
 
-impl<B: AuthBackend> From<credential_store::Error> for LoginError<B> {
+impl<Ed: AuthEditor> From<credential_store::Error> for LoginError<Ed> {
     fn from(err: credential_store::Error) -> Self {
         use credential_store::Error::*;
         match err {
@@ -84,7 +84,7 @@ impl<B: AuthBackend> From<credential_store::Error> for LoginError<B> {
     }
 }
 
-impl<B: AuthBackend> notify::Error for LoginError<B> {
+impl<Ed: AuthEditor> notify::Error for LoginError<Ed> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         let mut msg = notify::Message::new();
         match self {

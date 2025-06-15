@@ -7,7 +7,7 @@ use futures_util::stream::StreamExt;
 use fxhash::{FxBuildHasher, FxHashMap, FxHashSet};
 use walkdir::Filter;
 
-use crate::backend::CollabBackend;
+use crate::editors::CollabEditor;
 use crate::event::{self, Event};
 use crate::seq_ext::StreamableSeq;
 
@@ -15,36 +15,36 @@ type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
 /// TODO: docs.
 pub(crate) struct EventStream<
-    B: CollabBackend,
-    F = <B as CollabBackend>::ProjectFilter,
+    Ed: CollabEditor,
+    F = <Ed as CollabEditor>::ProjectFilter,
 > {
     /// The [`AgentId`] of the `Session` that owns `Self`.
     agent_id: AgentId,
     /// Map from a file's node ID to the ID of the corresponding buffer.
-    buf_id_of_file_id: FxHashMap<<B::Fs as Fs>::NodeId, B::BufferId>,
+    buf_id_of_file_id: FxHashMap<<Ed::Fs as Fs>::NodeId, Ed::BufferId>,
     /// Streams for buffer events.
-    buffer_streams: BufferStreams<B>,
+    buffer_streams: BufferStreams<Ed>,
     /// Streams for cursor events.
-    cursor_streams: CursorStreams<B>,
+    cursor_streams: CursorStreams<Ed>,
     /// Streams for directory events.
-    dir_streams: DirectoryStreams<B::Fs>,
+    dir_streams: DirectoryStreams<Ed::Fs>,
     /// Streams for file events.
-    file_streams: FileStreams<B::Fs>,
+    file_streams: FileStreams<Ed::Fs>,
     /// A filter used to check if [`fs::FsNode`]s created under the project root
     /// should be part of the project.
     project_filter: F,
     /// The ID of the project root.
-    root_id: <B::Fs as Fs>::NodeId,
+    root_id: <Ed::Fs as Fs>::NodeId,
     /// The path to the project root.
     root_path: AbsPathBuf,
     /// Streams for selection events.
-    selection_streams: SelectionStreams<B>,
+    selection_streams: SelectionStreams<Ed>,
 }
 
 /// A builder for [`EventStream`]s.
 ///
 /// Unlike the [`EventStream`] it'll be built into, this type is *not* generic
-/// over any [`CollabBackend`], which allows it to be `Send`.
+/// over any [`CollabEditor`], which allows it to be `Send`.
 pub(crate) struct EventStreamBuilder<Fs: fs::Fs, State = NeedsProjectFilter> {
     dir_streams: DirectoryStreams<Fs>,
     file_streams: FileStreams<Fs>,
@@ -74,7 +74,7 @@ pub(crate) enum EventError<Fs: fs::Fs, F: Filter<Fs>> {
     NodeAtPath(Fs::NodeAtPathError),
 }
 
-struct BufferStreams<Ed: CollabBackend> {
+struct BufferStreams<Ed: CollabEditor> {
     /// The receiver of buffer events.
     event_rx: flume::r#async::RecvStream<'static, event::BufferEvent<Ed>>,
 
@@ -97,7 +97,7 @@ struct BufferStreams<Ed: CollabBackend> {
     saved_buffers: Shared<FxHashSet<Ed::BufferId>>,
 }
 
-struct CursorStreams<Ed: CollabBackend> {
+struct CursorStreams<Ed: CollabEditor> {
     /// The receiver of cursor events.
     event_rx: flume::r#async::RecvStream<'static, event::CursorEvent<Ed>>,
 
@@ -125,7 +125,7 @@ struct FileStreams<Fs: fs::Fs> {
     inner: FxIndexMap<Fs::NodeId, <Fs::File as File>::EventStream>,
 }
 
-struct SelectionStreams<Ed: CollabBackend> {
+struct SelectionStreams<Ed: CollabEditor> {
     /// The receiver of selection events.
     event_rx: flume::r#async::RecvStream<'static, event::SelectionEvent<Ed>>,
 
@@ -141,15 +141,15 @@ struct SelectionStreams<Ed: CollabBackend> {
     new_selections_handle: Ed::EventHandle,
 }
 
-impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
+impl<Ed: CollabEditor, F: Filter<Ed::Fs>> EventStream<Ed, F> {
     pub(crate) fn agent_id(&self) -> AgentId {
         self.agent_id
     }
 
     pub(crate) async fn next(
         &mut self,
-        ctx: &mut Context<B>,
-    ) -> Result<Event<B>, EventError<B::Fs, F>> {
+        ctx: &mut Context<Ed>,
+    ) -> Result<Event<Ed>, EventError<Ed::Fs, F>> {
         loop {
             let mut dir_streams = self.dir_streams.inner.as_stream(0);
             let mut file_streams = self.file_streams.inner.as_stream(0);
@@ -191,26 +191,26 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
     pub(crate) fn watch_buffer(
         &mut self,
-        buffer: &B::Buffer<'_>,
-        file_id: <B::Fs as fs::Fs>::NodeId,
+        buffer: &Ed::Buffer<'_>,
+        file_id: <Ed::Fs as fs::Fs>::NodeId,
     ) {
         self.buffer_streams.insert(buffer, self.agent_id);
         self.buf_id_of_file_id.insert(file_id, buffer.id());
     }
 
-    pub(crate) fn watch_cursor(&mut self, cursor: &B::Cursor<'_>) {
+    pub(crate) fn watch_cursor(&mut self, cursor: &Ed::Cursor<'_>) {
         self.cursor_streams.insert(cursor);
     }
 
-    pub(crate) fn watch_selection(&mut self, selection: &B::Selection<'_>) {
+    pub(crate) fn watch_selection(&mut self, selection: &Ed::Selection<'_>) {
         self.selection_streams.insert(selection);
     }
 
     async fn handle_buffer_event(
         &mut self,
-        event: event::BufferEvent<B>,
-        ctx: &mut Context<B>,
-    ) -> Result<Option<event::BufferEvent<B>>, EventError<B::Fs, F>> {
+        event: event::BufferEvent<Ed>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<Option<event::BufferEvent<Ed>>, EventError<Ed::Fs, F>> {
         match &event {
             event::BufferEvent::Created(buffer_id, _) => {
                 let Some(buffer_path) = ctx.with_borrowed(|ctx| {
@@ -265,9 +265,9 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
     fn handle_cursor_event(
         &mut self,
-        event: event::CursorEvent<B>,
-        ctx: &mut Context<B>,
-    ) -> Option<event::CursorEvent<B>> {
+        event: event::CursorEvent<Ed>,
+        ctx: &mut Context<Ed>,
+    ) -> Option<event::CursorEvent<Ed>> {
         match &event.kind {
             event::CursorEventKind::Created(buffer_id, _) => {
                 if self.buffer_streams.is_watched(buffer_id) {
@@ -291,9 +291,9 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     #[allow(clippy::too_many_lines)]
     async fn handle_dir_event(
         &mut self,
-        event: fs::DirectoryEvent<B::Fs>,
-        ctx: &mut Context<B>,
-    ) -> Result<Option<fs::DirectoryEvent<B::Fs>>, EventError<B::Fs, F>> {
+        event: fs::DirectoryEvent<Ed::Fs>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<Option<fs::DirectoryEvent<Ed::Fs>>, EventError<Ed::Fs, F>> {
         Ok(match event {
             fs::DirectoryEvent::Creation(ref creation) => {
                 let Some(node) = ctx
@@ -373,8 +373,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
     fn handle_file_event(
         &self,
-        event: fs::FileEvent<B::Fs>,
-    ) -> Option<fs::FileEvent<B::Fs>> {
+        event: fs::FileEvent<Ed::Fs>,
+    ) -> Option<fs::FileEvent<Ed::Fs>> {
         if let fs::FileEvent::Modification(modif) = &event
             && let Some(buf_id) = self.buf_id_of_file_id.get(&modif.file_id)
             && self.buffer_streams.has_buffer_been_saved(buf_id)
@@ -387,9 +387,9 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
 
     fn handle_selection_event(
         &mut self,
-        event: event::SelectionEvent<B>,
-        ctx: &mut Context<B>,
-    ) -> Option<event::SelectionEvent<B>> {
+        event: event::SelectionEvent<Ed>,
+        ctx: &mut Context<Ed>,
+    ) -> Option<event::SelectionEvent<Ed>> {
         match &event.kind {
             event::SelectionEventKind::Created(buffer_id, _) => {
                 if self.buffer_streams.is_watched(buffer_id) {
@@ -418,8 +418,8 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
     /// Panics if the node is not in the root's subtree.
     async fn should_watch_node(
         &self,
-        node: &fs::FsNode<B::Fs>,
-    ) -> Result<bool, EventError<B::Fs, F>> {
+        node: &fs::FsNode<Ed::Fs>,
+    ) -> Result<bool, EventError<Ed::Fs, F>> {
         debug_assert!(node.path().starts_with(&self.root_path));
 
         let Some(parent_path) = node.path().parent() else { return Ok(false) };
@@ -430,7 +430,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> EventStream<B, F> {
             .map_err(EventError::Filter)
     }
 
-    fn watch_node(&mut self, node: &fs::FsNode<B::Fs>, ctx: &mut Context<B>) {
+    fn watch_node(&mut self, node: &fs::FsNode<Ed::Fs>, ctx: &mut Context<Ed>) {
         match node {
             fs::FsNode::Directory(dir) => self.dir_streams.insert(dir),
             fs::FsNode::File(file) => {
@@ -482,9 +482,9 @@ impl<Fs: fs::Fs> EventStreamBuilder<Fs, NeedsProjectFilter> {
 }
 
 impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
-    pub(crate) fn build<B>(self, ctx: &mut Context<B>) -> EventStream<B, F>
+    pub(crate) fn build<Ed>(self, ctx: &mut Context<Ed>) -> EventStream<Ed, F>
     where
-        B: CollabBackend<Fs = Fs>,
+        Ed: CollabEditor<Fs = Fs>,
     {
         EventStream {
             agent_id: ctx.new_agent_id(),
@@ -501,9 +501,9 @@ impl<Fs: fs::Fs, F: Filter<Fs>> EventStreamBuilder<Fs, Done<F>> {
     }
 }
 
-impl<B: CollabBackend> BufferStreams<B> {
+impl<Edd: CollabEditor> BufferStreamsEdEd> {
     /// Starts receiving [`event::BufferEvent`]s on the given buffer.
-    fn insert(&mut self, buffer: &B::Buffer<'_>, agent_id: AgentId) {
+    fn insert(&mut self, buffer: &Edd::Buffer<'_>, agent_id: AgentId) {
         let edits_handle = buffer.on_edited({
             let event_tx = self.event_tx.clone();
             move |buf, edit| {
@@ -542,16 +542,16 @@ impl<B: CollabBackend> BufferStreams<B> {
 
     /// Returns whether the buffer with the given ID is currently being
     /// watched.
-    fn is_watched(&self, buffer_id: &B::BufferId) -> bool {
+    fn is_watched(&self, buffer_id: &Edd::BufferId) -> bool {
         self.handles.contains_key(buffer_id)
     }
 
     /// Returns whether the buffer with the given ID has just been saved.
-    fn has_buffer_been_saved(&self, buffer_id: &B::BufferId) -> bool {
+    fn has_buffer_been_saved(&self, buffer_id: &Edd::BufferId) -> bool {
         self.saved_buffers.with_mut(|buffer_ids| buffer_ids.remove(buffer_id))
     }
 
-    fn new(ctx: &mut Context<B>) -> Self {
+    fn new(ctx: &mut Context<Edd>) -> Self {
         let (event_tx, event_rx) = flume::unbounded();
 
         let new_buffers_handle = {
@@ -574,18 +574,18 @@ impl<B: CollabBackend> BufferStreams<B> {
     }
 
     /// Removes the event handle corresponding to the buffer with the given ID.
-    fn remove(&mut self, buffer_id: &B::BufferId) {
+    fn remove(&mut self, buffer_id: &Edd::BufferId) {
         self.handles.remove(buffer_id);
     }
 
     fn select_next_some(
         &mut self,
-    ) -> impl FusedFuture<Output = event::BufferEvent<B>> {
+    ) -> impl FusedFuture<Output = event::BufferEvent<Edd>> {
         StreamExt::select_next_some(&mut self.event_rx)
     }
 }
 
-impl<Ed: CollabBackend> CursorStreams<Ed> {
+impl<Ed: CollabEditor> CursorStreams<Ed> {
     /// Starts receiving [`event::CursorEvent`]s on the given cursor.
     fn insert(&mut self, cursor: &Ed::Cursor<'_>) {
         let moved_handle = cursor.on_moved({
@@ -676,7 +676,7 @@ impl<Fs: fs::Fs> FileStreams<Fs> {
     }
 }
 
-impl<Ed: CollabBackend> SelectionStreams<Ed> {
+impl<Ed: CollabEditor> SelectionStreams<Ed> {
     /// Starts receiving [`event::SelectionEvent`]s on the given selection.
     fn insert(&mut self, selection: &Ed::Selection<'_>) {
         let moved_handle = selection.on_moved({

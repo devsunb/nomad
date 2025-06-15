@@ -1,18 +1,18 @@
-use crate::{AgentId, Backend, ByteOffset};
+use crate::{AgentId, ByteOffset, Editor};
 
 /// TODO: docs.
 pub trait Cursor {
     /// TODO: docs.
-    type Backend: Backend;
+    type Editor: Editor;
 
     /// TODO: docs.
-    fn buffer_id(&self) -> <Self::Backend as Backend>::BufferId;
+    fn buffer_id(&self) -> <Self::Editor as Editor>::BufferId;
 
     /// Returns the cursor's offset in the buffer.
     fn byte_offset(&self) -> ByteOffset;
 
     /// Returns the cursor's ID.
-    fn id(&self) -> <Self::Backend as Backend>::CursorId;
+    fn id(&self) -> <Self::Editor as Editor>::CursorId;
 
     /// TODO: docs.
     fn r#move(&mut self, offset: ByteOffset, agent_id: AgentId);
@@ -22,12 +22,9 @@ pub trait Cursor {
     ///
     /// The callback is given a reference to this cursor, plus the [`AgentId`]
     /// of the agent that moved it.
-    fn on_moved<Fun>(
-        &self,
-        fun: Fun,
-    ) -> <Self::Backend as Backend>::EventHandle
+    fn on_moved<Fun>(&self, fun: Fun) -> <Self::Editor as Editor>::EventHandle
     where
-        Fun: FnMut(&<Self::Backend as Backend>::Cursor<'_>, AgentId) + 'static;
+        Fun: FnMut(&<Self::Editor as Editor>::Cursor<'_>, AgentId) + 'static;
 
     /// Registers the given callback to be executed just before the cursor is
     /// removed.
@@ -37,7 +34,7 @@ pub trait Cursor {
     fn on_removed<Fun>(
         &self,
         fun: Fun,
-    ) -> <Self::Backend as Backend>::EventHandle
+    ) -> <Self::Editor as Editor>::EventHandle
     where
-        Fun: FnMut(<Self::Backend as Backend>::CursorId, AgentId) + 'static;
+        Fun: FnMut(<Self::Editor as Editor>::CursorId, AgentId) + 'static;
 }

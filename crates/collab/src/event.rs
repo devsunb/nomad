@@ -2,52 +2,52 @@ use core::ops::Range;
 
 use abs_path::AbsPathBuf;
 use ed::fs::{DirectoryEvent, FileEvent};
-use ed::{Backend, ByteOffset, Replacement};
+use ed::{ByteOffset, Editor, Replacement};
 use smallvec::SmallVec;
 
 /// TODO: docs.
-pub(crate) enum Event<B: Backend> {
+pub(crate) enum Event<Ed: Editor> {
     /// TODO: docs.
-    Buffer(BufferEvent<B>),
+    Buffer(BufferEvent<Ed>),
 
     /// TODO: docs.
-    Cursor(CursorEvent<B>),
+    Cursor(CursorEvent<Ed>),
 
     /// TODO: docs.
-    Directory(DirectoryEvent<B::Fs>),
+    Directory(DirectoryEvent<Ed::Fs>),
 
     /// TODO: docs.
-    File(FileEvent<B::Fs>),
+    File(FileEvent<Ed::Fs>),
 
     /// TODO: docs.
-    Selection(SelectionEvent<B>),
+    Selection(SelectionEvent<Ed>),
 }
 
-pub(crate) enum BufferEvent<B: Backend> {
-    Created(B::BufferId, AbsPathBuf),
-    Edited(B::BufferId, SmallVec<[Replacement; 1]>),
-    Removed(B::BufferId),
-    Saved(B::BufferId),
+pub(crate) enum BufferEvent<Ed: Editor> {
+    Created(Ed::BufferId, AbsPathBuf),
+    Edited(Ed::BufferId, SmallVec<[Replacement; 1]>),
+    Removed(Ed::BufferId),
+    Saved(Ed::BufferId),
 }
 
-pub(crate) struct CursorEvent<B: Backend> {
-    pub(crate) cursor_id: B::CursorId,
-    pub(crate) kind: CursorEventKind<B>,
+pub(crate) struct CursorEvent<Ed: Editor> {
+    pub(crate) cursor_id: Ed::CursorId,
+    pub(crate) kind: CursorEventKind<Ed>,
 }
 
-pub(crate) enum CursorEventKind<B: Backend> {
-    Created(B::BufferId, ByteOffset),
+pub(crate) enum CursorEventKind<Ed: Editor> {
+    Created(Ed::BufferId, ByteOffset),
     Moved(ByteOffset),
     Removed,
 }
 
-pub(crate) struct SelectionEvent<B: Backend> {
-    pub(crate) selection_id: B::SelectionId,
-    pub(crate) kind: SelectionEventKind<B>,
+pub(crate) struct SelectionEvent<Ed: Editor> {
+    pub(crate) selection_id: Ed::SelectionId,
+    pub(crate) kind: SelectionEventKind<Ed>,
 }
 
-pub(crate) enum SelectionEventKind<B: Backend> {
-    Created(B::BufferId, Range<ByteOffset>),
+pub(crate) enum SelectionEventKind<Ed: Editor> {
+    Created(Ed::BufferId, Range<ByteOffset>),
     Moved(Range<ByteOffset>),
     Removed,
 }

@@ -1,20 +1,20 @@
 use core::ops::Range;
 
-use crate::{AgentId, Backend, ByteOffset};
+use crate::{AgentId, Editor, ByteOffset};
 
 /// TODO: docs.
 pub trait Selection {
     /// TODO: docs.
-    type Backend: Backend;
+    type Editor: Editor;
 
     /// TODO: docs.
-    fn buffer_id(&self) -> <Self::Backend as Backend>::BufferId;
+    fn buffer_id(&self) -> <Self::Editor as Editor>::BufferId;
 
     /// Returns the selection's byte range in the buffer.
     fn byte_range(&self) -> Range<ByteOffset>;
 
     /// Returns the selection's ID.
-    fn id(&self) -> <Self::Backend as Backend>::SelectionId;
+    fn id(&self) -> <Self::Editor as Editor>::SelectionId;
 
     /// Registers the given callback to be executed everytime the selection is
     /// moved, i.e. every time its start or end offset is changed.
@@ -24,9 +24,9 @@ pub trait Selection {
     fn on_moved<Fun>(
         &self,
         fun: Fun,
-    ) -> <Self::Backend as Backend>::EventHandle
+    ) -> <Self::Editor as Editor>::EventHandle
     where
-        Fun: FnMut(&<Self::Backend as Backend>::Selection<'_>, AgentId)
+        Fun: FnMut(&<Self::Editor as Editor>::Selection<'_>, AgentId)
             + 'static;
 
     /// Registers the given callback to be executed just before the selection
@@ -37,7 +37,7 @@ pub trait Selection {
     fn on_removed<Fun>(
         &self,
         fun: Fun,
-    ) -> <Self::Backend as Backend>::EventHandle
+    ) -> <Self::Editor as Editor>::EventHandle
     where
-        Fun: FnMut(<Self::Backend as Backend>::SelectionId, AgentId) + 'static;
+        Fun: FnMut(<Self::Editor as Editor>::SelectionId, AgentId) + 'static;
 }

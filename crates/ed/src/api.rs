@@ -5,10 +5,10 @@ use core::fmt;
 
 use crate::command::{CommandArgs, CommandCompletion};
 use crate::notify::{self, Name};
-use crate::{Backend, ByteOffset};
+use crate::{Editor, ByteOffset};
 
 /// TODO: docs.
-pub type ApiValue<B> = <<B as Backend>::Api as Api>::Value;
+pub type ApiValue<B> = <<B as Editor>::Api as Api>::Value;
 
 /// TODO: docs.
 pub trait Api: 'static + Sized {

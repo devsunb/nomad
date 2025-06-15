@@ -12,13 +12,13 @@ pub(crate) fn run(group: &mut BenchmarkGroup<'_, WallTime>) {
 
 #[cfg(feature = "neovim-repo")]
 mod read_neovim {
-    use collab::CollabBackend;
+    use collab::CollabEditor;
     use collab::mock::CollabMock;
     use criterion::BenchmarkId;
     use ed::executor::Executor;
     use ed::fs::os::{OsDirectory, OsFs};
     use ed::fs::{Directory, Fs};
-    use ed::{Backend, Context};
+    use ed::{Editor, Context};
     use futures_lite::future;
     use mock::fs::MockFs;
     use mock::{ContextExt, Mock};
@@ -67,14 +67,14 @@ mod read_neovim {
     }
 
     /// Benchmarks reading the project under the given root.
-    fn bench_read_project<B: CollabBackend>(
-        project_root: <B::Fs as Fs>::Directory,
+    fn bench_read_project<Ed: CollabEditor>(
+        project_root: <Ed::Fs as Fs>::Directory,
         fs_name: &str,
-        ctx: &mut Context<B>,
+        ctx: &mut Context<Ed>,
         group: &mut BenchmarkGroup<'_, WallTime>,
     ) where
-        B::Executor: Executor<Runner = mock::executor::Runner>,
-        <B::Fs as Fs>::Directory: Clone,
+        Ed::Executor: Executor<Runner = mock::executor::Runner>,
+        <Ed::Fs as Fs>::Directory: Clone,
     {
         let bench_id = BenchmarkId::new(
             "start",

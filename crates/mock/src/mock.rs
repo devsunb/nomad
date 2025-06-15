@@ -5,8 +5,8 @@ use ed::shared::Shared;
 use ed::{
     AgentId,
     ApiValue,
-    Backend,
-    BaseBackend,
+    Editor,
+    BaseEditor,
     BorrowState,
     Context,
     Edit,
@@ -149,7 +149,7 @@ impl Callbacks {
     }
 }
 
-impl<Fs, BgSpawner> Backend for Mock<Fs, BgSpawner>
+impl<Fs, BgSpawner> Editor for Mock<Fs, BgSpawner>
 where
     Fs: fs::Fs,
     BgSpawner: BackgroundSpawner,
@@ -191,7 +191,7 @@ where
         agent_id: AgentId,
         ctx: &mut Context<Self, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <Self as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
+        <Self as BaseEditor>::create_buffer(file_path, agent_id, ctx).await
     }
 
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
@@ -274,7 +274,7 @@ where
     }
 }
 
-impl<Fs, BgSpawner> BaseBackend for Mock<Fs, BgSpawner>
+impl<Fs, BgSpawner> BaseEditor for Mock<Fs, BgSpawner>
 where
     Fs: fs::Fs,
     BgSpawner: BackgroundSpawner,
@@ -282,7 +282,7 @@ where
     async fn create_buffer(
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut Context<impl AsMut<Self> + Backend, impl BorrowState>,
+        ctx: &mut Context<impl AsMut<Self> + Editor, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         let contents = match ctx
             .with_editor(|ed| ed.as_mut().fs())

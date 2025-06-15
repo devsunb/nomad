@@ -3,7 +3,7 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
-use crate::Backend;
+use crate::Editor;
 
 /// TODO: docs.
 pub trait Executor {
@@ -67,21 +67,21 @@ pub trait Task<T>: Future<Output = T> {
 
 pin_project_lite::pin_project! {
     /// TODO: docs.
-    pub struct LocalTask<T, Ed: Backend> {
+    pub struct LocalTask<T, Ed: Editor> {
         #[pin]
-        inner: <<<Ed as Backend>::Executor as Executor>::LocalSpawner as LocalSpawner>::Task<T>,
+        inner: <<<Ed as Editor>::Executor as Executor>::LocalSpawner as LocalSpawner>::Task<T>,
     }
 }
 
 pin_project_lite::pin_project! {
     /// TODO: docs.
-    pub struct BackgroundTask<T, Ed: Backend> where T: 'static, T: Send {
+    pub struct BackgroundTask<T, Ed: Editor> where T: 'static, T: Send {
         #[pin]
-        inner: <<<Ed as Backend>::Executor as Executor>::BackgroundSpawner as BackgroundSpawner>::Task<T>,
+        inner: <<<Ed as Editor>::Executor as Executor>::BackgroundSpawner as BackgroundSpawner>::Task<T>,
     }
 }
 
-impl<T, Ed: Backend> LocalTask<T, Ed> {
+impl<T, Ed: Editor> LocalTask<T, Ed> {
     /// TODO: docs.
     #[inline]
     pub fn detach(self) {
@@ -90,13 +90,13 @@ impl<T, Ed: Backend> LocalTask<T, Ed> {
 
     #[inline]
     pub(crate) fn new(
-        inner: <<<Ed as Backend>::Executor as Executor>::LocalSpawner as LocalSpawner>::Task<T>,
+        inner: <<<Ed as Editor>::Executor as Executor>::LocalSpawner as LocalSpawner>::Task<T>,
     ) -> Self {
         Self { inner }
     }
 }
 
-impl<T: Send + 'static, Ed: Backend> BackgroundTask<T, Ed> {
+impl<T: Send + 'static, Ed: Editor> BackgroundTask<T, Ed> {
     /// TODO: docs.
     #[inline]
     pub fn detach(self) {
@@ -105,13 +105,13 @@ impl<T: Send + 'static, Ed: Backend> BackgroundTask<T, Ed> {
 
     #[inline]
     pub(crate) fn new(
-        inner: <<<Ed as Backend>::Executor as Executor>::BackgroundSpawner as BackgroundSpawner>::Task<T>,
+        inner: <<<Ed as Editor>::Executor as Executor>::BackgroundSpawner as BackgroundSpawner>::Task<T>,
     ) -> Self {
         Self { inner }
     }
 }
 
-impl<T, Ed: Backend> Future for LocalTask<T, Ed> {
+impl<T, Ed: Editor> Future for LocalTask<T, Ed> {
     type Output = T;
 
     #[inline]
@@ -120,7 +120,7 @@ impl<T, Ed: Backend> Future for LocalTask<T, Ed> {
     }
 }
 
-impl<T: Send + 'static, Ed: Backend> Future for BackgroundTask<T, Ed> {
+impl<T: Send + 'static, Ed: Editor> Future for BackgroundTask<T, Ed> {
     type Output = T;
 
     #[inline]

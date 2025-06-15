@@ -13,37 +13,37 @@ use crate::context::BorrowedInner;
 use crate::module::{Module, ModuleId};
 use crate::notify::{Name, Namespace};
 use crate::plugin::{PanicInfo, PanicLocation, Plugin, PluginId};
-use crate::{AgentId, Backend, Borrowed, Context, Shared};
+use crate::{AgentId, Editor, Borrowed, Context, Shared};
 
 /// TODO: docs.
 #[doc(hidden)]
-pub struct State<B: Backend> {
-    backend: B,
+pub struct State<Ed: Editor> {
+    editor: Ed,
     modules: FxHashMap<ModuleId, &'static dyn Any>,
     next_agent_id: AgentId,
-    panic_handlers: FxHashMap<PluginId, &'static dyn PanicHandler<B>>,
-    panic_hook: PanicHook<B>,
+    panic_handlers: FxHashMap<PluginId, &'static dyn PanicHandler<Ed>>,
+    panic_hook: PanicHook<Ed>,
 }
 
 /// TODO: docs.
-pub(crate) struct StateHandle<B: Backend> {
-    inner: Shared<State<B>>,
+pub(crate) struct StateHandle<Ed: Editor> {
+    inner: Shared<State<Ed>>,
 }
 
 /// TODO: docs.
-pub(crate) struct StateMut<'a, B: Backend> {
-    state: &'a mut State<B>,
-    handle: &'a StateHandle<B>,
+pub(crate) struct StateMut<'a, Ed: Editor> {
+    state: &'a mut State<Ed>,
+    handle: &'a StateHandle<Ed>,
 }
 
 /// A `PanicHandler` that handles panics by resuming to unwind the stack.
 pub(crate) struct ResumeUnwinding;
 
-struct PanicHook<B: Backend> {
-    backend: PhantomData<B>,
+struct PanicHook<Ed: Editor> {
+    editor: PhantomData<Ed>,
 }
 
-trait PanicHandler<Ed: Backend> {
+trait PanicHandler<Ed: Editor> {
     fn handle_panic(
         &self,
         info: PanicInfo,
@@ -51,12 +51,12 @@ trait PanicHandler<Ed: Backend> {
     );
 }
 
-impl<B: Backend> State<B> {
+impl<Ed: Editor> State<Ed> {
     #[track_caller]
     #[inline]
     pub(crate) fn add_module<M>(&mut self, module: M) -> &'static M
     where
-        M: Module<B>,
+        M: Module<Ed>,
     {
         match self.modules.entry(M::id()) {
             Entry::Vacant(entry) => {
@@ -75,7 +75,7 @@ impl<B: Backend> State<B> {
     #[inline]
     pub(crate) fn add_plugin<P>(&mut self, plugin: P) -> &'static P
     where
-        P: Plugin<B>,
+        P: Plugin<Ed>,
     {
         let vacancy = match self.modules.entry(<P as Plugin<_>>::id().into()) {
             Entry::Vacant(entry) => entry,
@@ -93,7 +93,7 @@ impl<B: Backend> State<B> {
     #[inline]
     pub(crate) fn get_module<M>(&self) -> Option<&'static M>
     where
-        M: Module<B>,
+        M: Module<Ed>,
     {
         self.modules.get(&M::id()).map(|module| {
             // SAFETY: the ModuleId matched.
@@ -104,7 +104,7 @@ impl<B: Backend> State<B> {
     #[inline]
     pub(crate) fn handle_panic(
         payload: Box<dyn Any + Send>,
-        ctx: &mut Context<B, Borrowed<'_>>,
+        ctx: &mut Context<Ed, Borrowed<'_>>,
     ) {
         let plugin_id = ctx.plugin_id();
         let this = ctx.state_mut();
@@ -117,16 +117,16 @@ impl<B: Backend> State<B> {
     }
 
     #[inline]
-    pub(crate) fn new(backend: B) -> Self {
+    pub(crate) fn new(editor: Ed) -> Self {
         const RESUME_UNWINDING: &ResumeUnwinding = &ResumeUnwinding;
         Self {
-            panic_hook: PanicHook::set(&backend),
-            backend,
+            panic_hook: PanicHook::set(&editor),
+            editor,
             modules: FxHashMap::default(),
             next_agent_id: AgentId::new(NonZeroU64::new(1).expect("not zero")),
             panic_handlers: FxHashMap::from_iter(core::iter::once((
-                <ResumeUnwinding as Plugin<B>>::id(),
-                RESUME_UNWINDING as &'static dyn PanicHandler<B>,
+                <ResumeUnwinding as Plugin<Ed>>::id(),
+                RESUME_UNWINDING as &'static dyn PanicHandler<Ed>,
             ))),
         }
     }
@@ -137,30 +137,30 @@ impl<B: Backend> State<B> {
     }
 }
 
-impl<B: Backend> StateHandle<B> {
+impl<Ed: Editor> StateHandle<Ed> {
     #[inline]
-    pub(crate) fn new(backend: B) -> Self {
-        Self { inner: Shared::new(State::new(backend)) }
+    pub(crate) fn new(editor: Ed) -> Self {
+        Self { inner: Shared::new(State::new(editor)) }
     }
 
     #[track_caller]
     #[inline]
     pub(crate) fn with_mut<R>(
         &self,
-        f: impl FnOnce(StateMut<'_, B>) -> R,
+        f: impl FnOnce(StateMut<'_, Ed>) -> R,
     ) -> R {
         self.inner.with_mut(|state| f(StateMut { state, handle: self }))
     }
 }
 
-impl<B: Backend> StateMut<'_, B> {
+impl<Ed: Editor> StateMut<'_, Ed> {
     #[inline]
-    pub(crate) fn as_mut(&mut self) -> StateMut<'_, B> {
+    pub(crate) fn as_mut(&mut self) -> StateMut<'_, Ed> {
         StateMut { state: self.state, handle: self.handle }
     }
 
     #[inline]
-    pub(crate) fn handle(&self) -> StateHandle<B> {
+    pub(crate) fn handle(&self) -> StateHandle<Ed> {
         self.handle.clone()
     }
 
@@ -170,7 +170,7 @@ impl<B: Backend> StateMut<'_, B> {
         &mut self,
         namespace: &Namespace,
         plugin_id: PluginId,
-        fun: impl FnOnce(&mut Context<B, Borrowed<'_>>) -> R,
+        fun: impl FnOnce(&mut Context<Ed, Borrowed<'_>>) -> R,
     ) -> Option<R> {
         let mut ctx = Context::new(BorrowedInner {
             namespace,
@@ -188,7 +188,7 @@ impl<B: Backend> StateMut<'_, B> {
     }
 }
 
-impl<Ed: Backend> PanicHook<Ed> {
+impl<Ed: Editor> PanicHook<Ed> {
     thread_local! {
         static BACKTRACE: Cell<Option<Backtrace>> = const { Cell::new(None) };
         static LOCATION: Cell<Option<PanicLocation>> = const { Cell::new(None) };
@@ -215,7 +215,7 @@ impl<Ed: Backend> PanicHook<Ed> {
                 Self::LOCATION.with(move |l| l.set(location));
             })
         });
-        Self { backend: PhantomData }
+        Self { editor: PhantomData }
     }
 }
 
@@ -227,31 +227,31 @@ unsafe fn downcast_ref_unchecked<T: Any>(value: &dyn Any) -> &T {
     unsafe { &*(value as *const dyn Any as *const T) }
 }
 
-impl<B: Backend> Clone for StateHandle<B> {
+impl<Ed: Editor> Clone for StateHandle<Ed> {
     #[inline]
     fn clone(&self) -> Self {
         Self { inner: self.inner.clone() }
     }
 }
 
-impl<B: Backend> Deref for State<B> {
-    type Target = B;
+impl<Ed: Editor> Deref for State<Ed> {
+    type Target = Ed;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        &self.backend
+        &self.editor
     }
 }
 
-impl<B: Backend> DerefMut for State<B> {
+impl<Ed: Editor> DerefMut for State<Ed> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.backend
+        &mut self.editor
     }
 }
 
-impl<B: Backend> Deref for StateMut<'_, B> {
-    type Target = State<B>;
+impl<Ed: Editor> Deref for StateMut<'_, Ed> {
+    type Target = State<Ed>;
 
     #[inline]
     fn deref(&self) -> &Self::Target {
@@ -259,7 +259,7 @@ impl<B: Backend> Deref for StateMut<'_, B> {
     }
 }
 
-impl<B: Backend> DerefMut for StateMut<'_, B> {
+impl<Ed: Editor> DerefMut for StateMut<'_, Ed> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.state
@@ -269,7 +269,7 @@ impl<B: Backend> DerefMut for StateMut<'_, B> {
 impl<P, Ed> PanicHandler<Ed> for P
 where
     P: Plugin<Ed>,
-    Ed: Backend,
+    Ed: Editor,
 {
     #[inline]
     fn handle_panic(
@@ -281,7 +281,7 @@ where
     }
 }
 
-impl<Ed: Backend> Module<Ed> for ResumeUnwinding {
+impl<Ed: Editor> Module<Ed> for ResumeUnwinding {
     const NAME: Name = "";
     type Config = ();
 
@@ -297,7 +297,7 @@ impl<Ed: Backend> Module<Ed> for ResumeUnwinding {
     }
 }
 
-impl<Ed: Backend> Plugin<Ed> for ResumeUnwinding {
+impl<Ed: Editor> Plugin<Ed> for ResumeUnwinding {
     #[inline]
     fn handle_panic(
         &self,

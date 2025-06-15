@@ -1,5 +1,5 @@
 use ed::executor::Executor;
-use ed::{Backend, BorrowState, Context};
+use ed::{Editor, BorrowState, Context};
 
 /// TODO: docs.
 pub trait ContextExt {
@@ -7,9 +7,9 @@ pub trait ContextExt {
     fn block_on<T>(&mut self, fun: impl AsyncFnOnce(&mut Self) -> T) -> T;
 }
 
-impl<Ed, S: BorrowState> ContextExt for Context<Ed, S>
+impl<Ed, Bs: BorrowState> ContextExt for Context<Ed, Bs>
 where
-    Ed: Backend<Executor: Executor<Runner = crate::executor::Runner>>,
+    Ed: Editor<Executor: Executor<Runner = crate::executor::Runner>>,
 {
     #[inline]
     fn block_on<T>(&mut self, fun: impl AsyncFnOnce(&mut Self) -> T) -> T {

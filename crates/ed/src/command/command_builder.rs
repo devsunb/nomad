@@ -12,7 +12,7 @@ use crate::notify::{self, MaybeResult, Name, Namespace};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
-use crate::{Backend, Borrowed, ByteOffset, Context};
+use crate::{Borrowed, ByteOffset, Context, Editor};
 
 type CommandHandler<B> =
     Box<dyn FnMut(CommandArgs, &mut Context<B, Borrowed<'_>>)>;
@@ -20,10 +20,10 @@ type CommandHandler<B> =
 type CommandCompletionFn =
     Box<dyn FnMut(CommandArgs, ByteOffset) -> Vec<CommandCompletion>>;
 
-pub(crate) struct CommandBuilder<B: Backend> {
+pub(crate) struct CommandBuilder<Ed: Editor> {
     plugin_id: PluginId,
     /// Map from command name to the handler for that command.
-    handlers: OrderedMap<Name, CommandHandler<B>>,
+    handlers: OrderedMap<Name, CommandHandler<Ed>>,
     module_name: Name,
     submodules: OrderedMap<Name, Self>,
 }
@@ -35,19 +35,19 @@ pub(crate) struct CommandCompletionsBuilder {
     submodules: OrderedMap<Name, Self>,
 }
 
-struct MissingCommandError<'a, B: Backend>(&'a CommandBuilder<B>);
+struct MissingCommandError<'a, Ed: Editor>(&'a CommandBuilder<Ed>);
 
-struct InvalidCommandError<'a, B: Backend>(
-    &'a CommandBuilder<B>,
+struct InvalidCommandError<'a, Ed: Editor>(
+    &'a CommandBuilder<Ed>,
     CommandArg<'a>,
 );
 
-impl<B: Backend> CommandBuilder<B> {
+impl<Ed: Editor> CommandBuilder<Ed> {
     #[track_caller]
     #[inline]
-    pub(crate) fn add_command<Cmd: Command<B>>(&mut self, mut command: Cmd) {
+    pub(crate) fn add_command<Cmd: Command<Ed>>(&mut self, mut command: Cmd) {
         self.assert_namespace_is_available(Cmd::NAME);
-        let handler: CommandHandler<B> = Box::new(move |args, ctx| {
+        let handler: CommandHandler<Ed> = Box::new(move |args, ctx| {
             let args = match Cmd::Args::try_from(args) {
                 Ok(args) => args,
                 Err(err) => {
@@ -64,7 +64,7 @@ impl<B: Backend> CommandBuilder<B> {
 
     #[track_caller]
     #[inline]
-    pub(crate) fn add_module<M: Module<B>>(&mut self) -> &mut Self {
+    pub(crate) fn add_module<M: Module<Ed>>(&mut self) -> &mut Self {
         self.assert_namespace_is_available(M::NAME);
         let builder = self.new_for::<M>();
         self.submodules.insert(M::NAME, builder)
@@ -73,7 +73,7 @@ impl<B: Backend> CommandBuilder<B> {
     #[inline]
     pub(crate) fn build(
         mut self,
-        state: StateHandle<B>,
+        state: StateHandle<Ed>,
     ) -> impl FnMut(CommandArgs) {
         self.remove_empty_modules();
         move |args: CommandArgs| {
@@ -90,7 +90,7 @@ impl<B: Backend> CommandBuilder<B> {
     }
 
     #[inline]
-    pub(crate) fn new<P: Plugin<B>>() -> Self {
+    pub(crate) fn new<P: Plugin<Ed>>() -> Self {
         Self {
             plugin_id: <P as Plugin<_>>::id(),
             module_name: P::NAME,
@@ -122,7 +122,7 @@ impl<B: Backend> CommandBuilder<B> {
         &mut self,
         mut args: CommandArgs,
         namespace: &mut Namespace,
-        mut state: StateMut<B>,
+        mut state: StateMut<Ed>,
     ) {
         let Some(arg) = args.pop_front() else {
             let err = MissingCommandError(self);
@@ -147,7 +147,7 @@ impl<B: Backend> CommandBuilder<B> {
     }
 
     #[inline]
-    fn new_for<M: Module<B>>(&self) -> Self {
+    fn new_for<M: Module<Ed>>(&self) -> Self {
         Self {
             plugin_id: self.plugin_id,
             module_name: M::NAME,
@@ -207,10 +207,10 @@ impl<B: Backend> CommandBuilder<B> {
 
 impl CommandCompletionsBuilder {
     #[inline]
-    pub(crate) fn add_command<Cmd, B>(&mut self, command: &Cmd)
+    pub(crate) fn add_command<Cmd, Ed>(&mut self, command: &Cmd)
     where
-        Cmd: Command<B>,
-        B: Backend,
+        Cmd: Command<Ed>,
+        Ed: Editor,
     {
         let mut completion_fn = command.to_completion_fn();
         let completion_fn: CommandCompletionFn =
@@ -221,10 +221,10 @@ impl CommandCompletionsBuilder {
     }
 
     #[inline]
-    pub(crate) fn add_module<M, B>(&mut self) -> &mut Self
+    pub(crate) fn add_module<M, Ed>(&mut self) -> &mut Self
     where
-        M: Module<B>,
-        B: Backend,
+        M: Module<Ed>,
+        Ed: Editor,
     {
         self.submodules.insert(M::NAME, Default::default())
     }
@@ -309,7 +309,7 @@ impl CommandCompletionsBuilder {
     }
 }
 
-impl<B: Backend> notify::Error for MissingCommandError<'_, B> {
+impl<Ed: Editor> notify::Error for MissingCommandError<'_, Ed> {
     #[inline]
     fn to_message(&self) -> (notify::Level, notify::Message) {
         let Self(handlers) = self;
@@ -332,7 +332,7 @@ impl<B: Backend> notify::Error for MissingCommandError<'_, B> {
     }
 }
 
-impl<B: Backend> notify::Error for InvalidCommandError<'_, B> {
+impl<Ed: Editor> notify::Error for InvalidCommandError<'_, Ed> {
     #[inline]
     fn to_message(&self) -> (notify::Level, notify::Message) {
         let Self(handlers, arg) = self;

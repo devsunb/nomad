@@ -1,7 +1,7 @@
 use core::mem;
 use core::ops::Range;
 
-use ed::{Backend, Buffer, Context, Selection};
+use ed::{Editor, Buffer, Context, Selection};
 use futures_util::stream::FusedStream;
 
 use crate::utils::Convert;
@@ -17,7 +17,7 @@ impl SelectionEvent {
     /// Returns a never-ending [`Stream`] of [`SelectionEvent`]s on the current
     /// buffer.
     #[track_caller]
-    pub(crate) fn new_stream<Ed: Backend>(
+    pub(crate) fn new_stream<Ed: Editor>(
         ctx: &mut Context<Ed>,
     ) -> impl FusedStream<Item = Self> + Unpin + use<Ed> {
         let (tx, rx) = flume::unbounded();

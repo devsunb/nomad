@@ -5,7 +5,7 @@ use collab::mock::{CollabMock, CollabServer, SessionId};
 use collab::start::StartError;
 use ed::action::AsyncAction;
 use futures_lite::future::{self, FutureExt};
-use mock::{BackendExt, Mock};
+use mock::{EditorExt, Mock};
 
 #[test]
 fn cannot_start_session_if_not_logged_in() {
@@ -31,10 +31,10 @@ fn cannot_start_session_if_project_root_is_fs_root() {
         "foo.txt": "",
     };
 
-    let backend =
+    let editor =
         CollabMock::new(Mock::new(fs)).with_home_dir(AbsPathBuf::root());
 
-    backend.block_on(async |ctx| {
+    editor.block_on(async |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer1"));
         let agent_id = ctx.new_agent_id();
         ctx.create_and_focus(path!("/foo.txt"), agent_id).await.unwrap();
@@ -58,11 +58,11 @@ fn cannot_start_session_if_root_overlaps_existing_project() {
 
     let server = CollabServer::default();
 
-    let backend = CollabMock::new(Mock::new(fs))
+    let editor = CollabMock::new(Mock::new(fs))
         .with_home_dir(AbsPathBuf::root())
         .with_server(&server);
 
-    let run_test = backend.run(async |ctx| {
+    let run_test = editor.run(async |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer1"));
         let agent_id = ctx.new_agent_id();
 

@@ -1,22 +1,22 @@
 use core::mem;
 
 use ed::executor::Executor;
-use ed::{Backend, Context};
+use ed::{Context, Editor};
 use futures_lite::future;
 
-/// A [`Backend`] extension trait used to run async closures with an
+/// An [`Editor`] extension trait used to run async closures with an
 /// `Context<Self>`.
-pub trait BackendExt:
-    Backend<Executor: Executor<Runner: AsMut<crate::executor::Runner>>>
+pub trait EditorExt:
+    Editor<Executor: Executor<Runner: AsMut<crate::executor::Runner>>>
 {
-    /// Same as [`run`](BackendExt::run), but it blocks the current thread
+    /// Same as [`run`](EditorExt::run), but it blocks the current thread
     /// until the future returned by it completes.
     #[inline]
     fn block_on<T>(self, fun: impl AsyncFnOnce(&mut Context<Self>) -> T) -> T {
         self.block_on_inner(fun, false)
     }
 
-    /// Same as [`run_all`](BackendExt::run_all), but it blocks the
+    /// Same as [`run_all`](EditorExt::run_all), but it blocks the
     /// current thread until the future returned by it completes.
     #[inline]
     fn block_on_all<T>(
@@ -29,7 +29,7 @@ pub trait BackendExt:
     /// Turns the given async closure into a future that resolves to the
     /// closure's output.
     ///
-    /// Unlike [`run_all`](BackendExt::run_all), the returned future will
+    /// Unlike [`run_all`](EditorExt::run_all), the returned future will
     /// complete at the same time as the future obtained by calling the
     /// closure, without waiting for any detached task spawned in the closure's
     /// body.
@@ -38,7 +38,7 @@ pub trait BackendExt:
     ///
     /// ```
     /// # use std::time::{Duration, Instant};
-    /// # use mock::{BackendExt, Mock};
+    /// # use mock::{EditorExt, Mock};
     /// # use mock::fs::MockFs;
     /// #
     /// # futures_lite::future::block_on(async {
@@ -69,14 +69,14 @@ pub trait BackendExt:
     /// Turns the given async closure into a future that resolves to the
     /// closure's output.
     ///
-    /// Unlike [`run`](BackendExt::run), the returned future will only complete
+    /// Unlike [`run`](EditorExt::run), the returned future will only complete
     /// once *all* the detached tasks spawned in the closure's body are done.
     ///
     /// # Examples
     ///
     /// ```
     /// # use std::time::{Duration, Instant};
-    /// # use mock::{BackendExt, Mock};
+    /// # use mock::{EditorExt, Mock};
     /// # use mock::fs::MockFs;
     /// #
     /// # futures_lite::future::block_on(async {
@@ -134,7 +134,7 @@ pub trait BackendExt:
         fun: impl AsyncFnOnce(&mut Context<Self>) -> T + 'static,
         run_all: bool,
     ) -> impl Future<Output = T> {
-        let (runner, task) = Backend::with_ctx(self, move |ctx| {
+        let (runner, task) = Editor::with_ctx(self, move |ctx| {
             let task = ctx.spawn_local_unprotected(fun);
             let runner =
                 ctx.with_editor(|ed| ed.executor().runner().as_mut().clone());
@@ -145,9 +145,9 @@ pub trait BackendExt:
     }
 }
 
-unsafe fn extend_lifetime<B: Backend, T: 'static>(
-    fun: impl for<'a> AsyncFnOnce(&'a mut Context<B>) -> T,
-) -> impl for<'a> AsyncFnOnce(&'a mut Context<B>) -> T + 'static {
+unsafe fn extend_lifetime<Ed: Editor, T: 'static>(
+    fun: impl for<'a> AsyncFnOnce(&'a mut Context<Ed>) -> T,
+) -> impl for<'a> AsyncFnOnce(&'a mut Context<Ed>) -> T + 'static {
     use core::marker::PhantomData;
     use core::pin::Pin;
 
@@ -198,7 +198,7 @@ unsafe fn extend_lifetime<B: Backend, T: 'static>(
         async move |args: *mut ()| {
             // SAFETY: the pointer points to a Context<T>, we just cast it
             // to `*mut ()` to type-erase the async closure's input.
-            let args = unsafe { &mut *(args as *mut Context<B>) };
+            let args = unsafe { &mut *(args as *mut Context<Ed>) };
             fun(args).await
         },
         PhantomData,
@@ -212,12 +212,12 @@ unsafe fn extend_lifetime<B: Backend, T: 'static>(
         >(TypeErased(Box::new(boxed)))
     };
 
-    async move |args: &mut Context<B>| {
-        erased(args as *mut Context<B> as *mut ()).await
+    async move |args: &mut Context<Ed>| {
+        erased(args as *mut Context<Ed> as *mut ()).await
     }
 }
 
-impl<B> BackendExt for B where
-    B: Backend<Executor: Executor<Runner: AsMut<crate::executor::Runner>>>
+impl<Ed> EditorExt for Ed where
+    Ed: Editor<Executor: Executor<Runner: AsMut<crate::executor::Runner>>>
 {
 }

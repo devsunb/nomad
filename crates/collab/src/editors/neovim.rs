@@ -16,7 +16,7 @@ use neovim::buffer::BufferId;
 use neovim::{Neovim, mlua, oxi};
 use smol_str::ToSmolStr;
 
-use crate::backend::{ActionForSelectedSession, CollabBackend};
+use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::config;
 
 pub struct ServerConfig;
@@ -71,7 +71,7 @@ struct TildePath<'a> {
     home_dir: Option<&'a AbsPath>,
 }
 
-impl CollabBackend for Neovim {
+impl CollabEditor for Neovim {
     type Io = async_net::TcpStream;
     type PeerTooltip = ();
     type ProjectFilter = walkdir::GitIgnore;

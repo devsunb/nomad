@@ -1,9 +1,26 @@
+//! TODO: docs.
+
 use core::fmt;
 use core::ops::Deref;
 use std::rc::Rc;
 
+use ed::fs::AbsPathBuf;
 use serde::de::{Deserialize, Deserializer};
 
+/// TODO: docs.
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(default)]
+#[serde(deny_unknown_fields)]
+pub struct Config {
+    /// The address of the server to connect to when starting or joining an
+    /// editing session.
+    pub(crate) server_address: ServerAddress,
+
+    /// TODO: docs.
+    pub(crate) store_remote_projects_under: Option<AbsPathBuf>,
+}
+
+/// TODO: docs.
 #[derive(Clone)]
 pub struct ServerAddress {
     inner: Rc<str>,

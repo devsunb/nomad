@@ -6,12 +6,12 @@ use crate::module::{self, Module};
 use crate::notify::{self, Name};
 use crate::plugin::PanicInfo;
 use crate::state::StateHandle;
-use crate::{Backend, Borrowed, Context};
+use crate::{Borrowed, Context, Editor};
 
 pub(crate) const NO_COMMAND_NAME: &str = "�";
 
 /// TODO: docs.
-pub trait Plugin<B: Backend>: Module<B> {
+pub trait Plugin<Ed: Editor>: Module<Ed> {
     /// TODO: docs.
     const COMMAND_NAME: Name = NO_COMMAND_NAME;
 
@@ -22,7 +22,7 @@ pub trait Plugin<B: Backend>: Module<B> {
     fn handle_panic(
         &self,
         panic_info: PanicInfo,
-        ctx: &mut Context<B, Borrowed<'_>>,
+        ctx: &mut Context<Ed, Borrowed<'_>>,
     ) {
         let mut message = notify::Message::from_str("panicked");
 
@@ -38,8 +38,8 @@ pub trait Plugin<B: Backend>: Module<B> {
 
     #[doc(hidden)]
     #[track_caller]
-    fn api(self, backend: B) -> B::Api {
-        StateHandle::new(backend).with_mut(|s| module::build_api(self, s))
+    fn api(self, editor: Ed) -> Ed::Api {
+        StateHandle::new(editor).with_mut(|s| module::build_api(self, s))
     }
 
     #[inline]

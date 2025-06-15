@@ -6,23 +6,23 @@ use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};
 use walkdir::Filter;
 
-use crate::backend::{CollabBackend, MessageRx, MessageTx};
+use crate::editors::{CollabEditor, MessageRx, MessageTx};
 use crate::event_stream::{EventError, EventStream};
 use crate::leave::StopRequest;
 use crate::project::{ProjectHandle, SynchronizeError};
 
-pub(crate) struct Session<B: CollabBackend, F: Filter<B::Fs>> {
+pub(crate) struct Session<Ed: CollabEditor, F: Filter<Ed::Fs>> {
     /// TODO: docs..
-    pub(crate) event_stream: EventStream<B, F>,
+    pub(crate) event_stream: EventStream<Ed, F>,
 
     /// TODO: docs..
-    pub(crate) message_rx: MessageRx<B>,
+    pub(crate) message_rx: MessageRx<Ed>,
 
     /// TODO: docs..
-    pub(crate) message_tx: MessageTx<B>,
+    pub(crate) message_tx: MessageTx<Ed>,
 
     /// TODO: docs.
-    pub(crate) project_handle: ProjectHandle<B>,
+    pub(crate) project_handle: ProjectHandle<Ed>,
 
     /// TODO: docs.
     pub(crate) stop_rx: Receiver<StopRequest>,
@@ -30,20 +30,20 @@ pub(crate) struct Session<B: CollabBackend, F: Filter<B::Fs>> {
 
 #[derive(cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::From)]
 #[display("{_0}")]
-pub(crate) enum SessionError<B: CollabBackend, F: Filter<B::Fs>> {
-    EventRx(#[from] EventError<B::Fs, F>),
+pub(crate) enum SessionError<Ed: CollabEditor, F: Filter<Ed::Fs>> {
+    EventRx(#[from] EventError<Ed::Fs, F>),
     MessageRx(#[from] ClientRxError),
     #[display("the server kicked this peer out of the session")]
     MessageRxExhausted,
     MessageTx(#[from] io::Error),
-    Synchronize(#[from] SynchronizeError<B>),
+    Synchronize(#[from] SynchronizeError<Ed>),
 }
 
-impl<B: CollabBackend, F: Filter<B::Fs>> Session<B, F> {
+impl<Ed: CollabEditor, F: Filter<Ed::Fs>> Session<Ed, F> {
     pub(crate) async fn run(
         self,
-        ctx: &mut Context<B>,
-    ) -> Result<(), SessionError<B, F>> {
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), SessionError<Ed, F>> {
         let Self {
             mut event_stream,
             message_rx,
@@ -81,7 +81,7 @@ impl<B: CollabBackend, F: Filter<B::Fs>> Session<B, F> {
     }
 }
 
-impl<B: CollabBackend, F: Filter<B::Fs>> notify::Error for SessionError<B, F> {
+impl<Ed: CollabEditor, F: Filter<Ed::Fs>> notify::Error for SessionError<Ed, F> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         todo!();
     }

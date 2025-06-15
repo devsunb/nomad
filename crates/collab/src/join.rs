@@ -26,7 +26,7 @@ use ed::shared::{MultiThreaded, Shared};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
 use fxhash::FxHashMap;
 
-use crate::backend::{CollabBackend, SessionId, Welcome};
+use crate::editors::{CollabEditor, SessionId, Welcome};
 use crate::collab::Collab;
 use crate::config::Config;
 use crate::event_stream::{EventStream, EventStreamBuilder};
@@ -42,37 +42,37 @@ use crate::start::UserNotLoggedInError;
 
 /// The `Action` used to join an existing collaborative editing session.
 #[derive(cauchy::Clone)]
-pub struct Join<B: CollabBackend> {
+pub struct Join<Ed: CollabEditor> {
     auth_infos: Shared<Option<AuthInfos>>,
     config: Shared<Config>,
-    projects: Projects<B>,
-    stop_channels: StopChannels<B>,
+    projects: Projects<Ed>,
+    stop_channels: StopChannels<Ed>,
 }
 
-impl<B: CollabBackend> AsyncAction<B> for Join<B> {
+impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
     const NAME: Name = "join";
 
-    type Args = SessionId<B>;
+    type Args = SessionId<Ed>;
 
     #[allow(clippy::too_many_lines)]
     async fn call(
         &mut self,
         session_id: Self::Args,
-        ctx: &mut Context<B>,
-    ) -> Result<(), JoinError<B>> {
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), JoinError<Ed>> {
         let auth_infos =
             self.auth_infos.cloned().ok_or(JoinError::UserNotLoggedIn)?;
 
         let server_addr = self.config.with(|c| c.server_address.clone());
 
-        let (reader, writer) = B::connect_to_server(server_addr, ctx)
+        let (reader, writer) = Ed::connect_to_server(server_addr, ctx)
             .await
             .map_err(JoinError::ConnectToServer)?
             .split();
 
         let github_handle = auth_infos.handle().clone();
 
-        let knock = collab_server::Knock::<B::ServerConfig> {
+        let knock = collab_server::Knock::<Ed::ServerConfig> {
             auth_infos: auth_infos.into(),
             session_intent: SessionIntent::JoinExisting(session_id),
         };
@@ -87,7 +87,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
             .with(|c| c.store_remote_projects_under.clone())
         {
             Some(remote_dir) => remote_dir,
-            None => B::default_dir_for_remote_projects(ctx)
+            None => Ed::default_dir_for_remote_projects(ctx)
                 .await
                 .map_err(JoinError::DefaultDirForRemoteProjects)?,
         }
@@ -101,7 +101,7 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
         let local_peer = Peer { id: welcome.peer_id, github_handle };
 
         let (project, buffered) =
-            request_project::<B>(local_peer.clone(), &mut welcome)
+            request_project::<Ed>(local_peer.clone(), &mut welcome)
                 .await
                 .map_err(JoinError::RequestProject)?;
 
@@ -143,8 +143,8 @@ impl<B: CollabBackend> AsyncAction<B> for Join<B> {
     }
 }
 
-impl<B: CollabBackend> From<&Collab<B>> for Join<B> {
-    fn from(collab: &Collab<B>) -> Self {
+impl<Ed: CollabEditor> From<&Collab<Ed>> for Join<Ed> {
+    fn from(collab: &Collab<Ed>) -> Self {
         Self {
             auth_infos: collab.auth_infos.clone(),
             config: collab.config.clone(),
@@ -154,14 +154,14 @@ impl<B: CollabBackend> From<&Collab<B>> for Join<B> {
     }
 }
 
-impl<B: CollabBackend> ToCompletionFn<B> for Join<B> {
+impl<Ed: CollabEditor> ToCompletionFn<Ed> for Join<Ed> {
     fn to_completion_fn(&self) {}
 }
 
 /// TODO: docs.
-async fn request_project<B: CollabBackend>(
+async fn request_project<Ed: CollabEditor>(
     local_peer: Peer,
-    welcome: &mut Welcome<B>,
+    welcome: &mut Welcome<Ed>,
 ) -> Result<(Project, Vec<Message>), RequestProjectError> {
     let local_id = local_peer.id;
 
@@ -202,11 +202,11 @@ async fn request_project<B: CollabBackend>(
 }
 
 /// TODO: docs.
-async fn write_project<B: CollabBackend>(
+async fn write_project<Ed: CollabEditor>(
     project: &Project,
     root_path: AbsPathBuf,
-    ctx: &mut Context<B>,
-) -> Result<(EventStream<B>, IdMaps<B>), WriteProjectError<B::Fs>> {
+    ctx: &mut Context<Ed>,
+) -> Result<(EventStream<Ed>, IdMaps<Ed>), WriteProjectError<Ed::Fs>> {
     let fs = ctx.fs();
 
     // SAFETY: we're awaiting on the following background task and not
@@ -249,7 +249,7 @@ async fn write_project<B: CollabBackend>(
         })
         .await?;
 
-    let project_filter = B::project_filter(&project_root, ctx);
+    let project_filter = Ed::project_filter(&project_root, ctx);
 
     Ok((
         stream_builder.push_filter(project_filter).build(ctx),
@@ -354,15 +354,15 @@ async fn write_file<Fs: fs::Fs>(
 
 /// The type of error that can occur when [`Join`]ing a session fails.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum JoinError<B: CollabBackend> {
+pub enum JoinError<Ed: CollabEditor> {
     /// TODO: docs.
-    ConnectToServer(B::ConnectToServerError),
+    ConnectToServer(Ed::ConnectToServerError),
 
     /// TODO: docs.
-    DefaultDirForRemoteProjects(B::DefaultDirForRemoteProjectsError),
+    DefaultDirForRemoteProjects(Ed::DefaultDirForRemoteProjectsError),
 
     /// TODO: docs.
-    Knock(client::KnockError<B::ServerConfig>),
+    Knock(client::KnockError<Ed::ServerConfig>),
 
     /// TODO: docs.
     OverlappingProject(OverlappingProjectError),
@@ -374,7 +374,7 @@ pub enum JoinError<B: CollabBackend> {
     UserNotLoggedIn,
 
     /// TODO: docs.
-    WriteProject(WriteProjectError<B::Fs>),
+    WriteProject(WriteProjectError<Ed::Fs>),
 }
 
 /// The type of error that can occur when requesting the state of the project
@@ -436,8 +436,8 @@ impl ProjectPtr {
     }
 }
 
-impl<B: CollabBackend> From<NodeIdMaps<B::Fs>> for IdMaps<B> {
-    fn from(node_id_maps: NodeIdMaps<B::Fs>) -> Self {
+impl<Ed: CollabEditor> From<NodeIdMaps<Ed::Fs>> for IdMaps<Ed> {
+    fn from(node_id_maps: NodeIdMaps<Ed::Fs>) -> Self {
         Self {
             node2dir: node_id_maps.node2dir,
             node2file: node_id_maps.node2file,
@@ -458,7 +458,7 @@ impl Deref for ProjectPtr {
 /// SAFETY: `&Project` is not aliased.
 unsafe impl Send for ProjectPtr {}
 
-impl<B: CollabBackend> notify::Error for JoinError<B> {
+impl<Ed: CollabEditor> notify::Error for JoinError<Ed> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
             Self::ConnectToServer(err) => err.to_message(),
@@ -468,7 +468,7 @@ impl<B: CollabBackend> notify::Error for JoinError<B> {
             Self::OverlappingProject(err) => err.to_message(),
             Self::RequestProject(err) => err.to_message(),
             Self::UserNotLoggedIn => {
-                UserNotLoggedInError::<B>::new().to_message()
+                UserNotLoggedInError::<Ed>::new().to_message()
             },
         }
     }

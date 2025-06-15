@@ -4,9 +4,9 @@ use ed::{Borrowed, Context};
 use neovim::Neovim;
 
 use crate::AuthInfos;
-use crate::backend::AuthBackend;
+use crate::editors::AuthEditor;
 
-impl AuthBackend for Neovim {
+impl AuthEditor for Neovim {
     type LoginError = core::convert::Infallible;
 
     #[allow(clippy::manual_async_fn)]

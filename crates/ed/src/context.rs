@@ -18,17 +18,17 @@ use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
-use crate::{AgentId, Backend, Buffer, Shared};
+use crate::{AgentId, Editor, Buffer, Shared};
 
 /// TODO: docs.
 pub trait BorrowState {
     #[doc(hidden)]
-    type Borrow<Ed: Backend>: Borrow<Ed>;
+    type Borrow<Ed: Editor>: Borrow<Ed>;
 }
 
 /// TODO: docs.
-pub struct Context<Ed: Backend, B: BorrowState = NotBorrowed> {
-    borrow: B::Borrow<Ed>,
+pub struct Context<Ed: Editor, Bs: BorrowState = NotBorrowed> {
+    borrow: Bs::Borrow<Ed>,
 }
 
 /// TODO: docs.
@@ -41,7 +41,7 @@ pub struct Borrowed<'a> {
 
 /// TODO: docs.
 #[doc(hidden)]
-pub trait Borrow<Ed: Backend> {
+pub trait Borrow<Ed: Editor> {
     /// TODO: docs.
     fn namespace(&self) -> &Namespace;
 
@@ -57,7 +57,7 @@ pub trait Borrow<Ed: Backend> {
 
 /// TODO: docs.
 #[doc(hidden)]
-pub struct NotBorrowedInner<Ed: Backend> {
+pub struct NotBorrowedInner<Ed: Editor> {
     namespace: Namespace,
     plugin_id: PluginId,
     state_handle: Shared<State<Ed>>,
@@ -65,14 +65,14 @@ pub struct NotBorrowedInner<Ed: Backend> {
 
 /// TODO: docs.
 #[doc(hidden)]
-pub struct BorrowedInner<'a, Ed: Backend> {
+pub struct BorrowedInner<'a, Ed: Editor> {
     pub(crate) namespace: &'a Namespace,
     pub(crate) plugin_id: PluginId,
     pub(crate) state_handle: &'a Shared<State<Ed>>,
     pub(crate) state: &'a mut State<Ed>,
 }
 
-impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
+impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     /// TODO: docs.
     #[inline]
     pub async fn create_and_focus(
@@ -216,7 +216,7 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     }
 
     #[inline]
-    pub(crate) fn new(borrow: B::Borrow<Ed>) -> Self {
+    pub(crate) fn new(borrow: Bs::Borrow<Ed>) -> Self {
         Self { borrow }
     }
 
@@ -279,9 +279,9 @@ impl<Ed: Backend, B: BorrowState> Context<Ed, B> {
     }
 }
 
-impl<Ed: Backend, B: BorrowState> Context<Ed, B>
+impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs>
 where
-    B::Borrow<Ed>: DerefMut<Target = State<Ed>>,
+    Bs::Borrow<Ed>: DerefMut<Target = State<Ed>>,
 {
     /// TODO: docs.
     #[inline]
@@ -348,7 +348,7 @@ where
     }
 }
 
-impl<Ed: Backend> Context<Ed, NotBorrowed> {
+impl<Ed: Editor> Context<Ed, NotBorrowed> {
     /// TODO: docs.
     #[inline]
     pub fn spawn_local<T: 'static>(
@@ -395,7 +395,7 @@ impl<Ed: Backend> Context<Ed, NotBorrowed> {
     }
 }
 
-impl<Ed: Backend> Context<Ed, Borrowed<'_>> {
+impl<Ed: Editor> Context<Ed, Borrowed<'_>> {
     /// TODO: docs.
     #[inline]
     pub fn spawn_and_detach(
@@ -416,9 +416,9 @@ impl<Ed: Backend> Context<Ed, Borrowed<'_>> {
     }
 }
 
-impl<Ed: Backend, B: BorrowState> Deref for Context<Ed, B>
+impl<Ed: Editor, Bs: BorrowState> Deref for Context<Ed, Bs>
 where
-    B::Borrow<Ed>: Deref<Target = State<Ed>>,
+    Bs::Borrow<Ed>: Deref<Target = State<Ed>>,
 {
     type Target = Ed;
 
@@ -428,9 +428,9 @@ where
     }
 }
 
-impl<Ed: Backend, B: BorrowState> DerefMut for Context<Ed, B>
+impl<Ed: Editor, Bs: BorrowState> DerefMut for Context<Ed, Bs>
 where
-    B::Borrow<Ed>: DerefMut<Target = State<Ed>>,
+    Bs::Borrow<Ed>: DerefMut<Target = State<Ed>>,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -439,14 +439,14 @@ where
 }
 
 impl BorrowState for NotBorrowed {
-    type Borrow<Ed: Backend> = NotBorrowedInner<Ed>;
+    type Borrow<Ed: Editor> = NotBorrowedInner<Ed>;
 }
 
 impl<'a> BorrowState for Borrowed<'a> {
-    type Borrow<Ed: Backend> = BorrowedInner<'a, Ed>;
+    type Borrow<Ed: Editor> = BorrowedInner<'a, Ed>;
 }
 
-impl<Ed: Backend> Borrow<Ed> for NotBorrowedInner<Ed> {
+impl<Ed: Editor> Borrow<Ed> for NotBorrowedInner<Ed> {
     #[inline]
     fn namespace(&self) -> &Namespace {
         &self.namespace
@@ -468,7 +468,7 @@ impl<Ed: Backend> Borrow<Ed> for NotBorrowedInner<Ed> {
     }
 }
 
-impl<Ed: Backend> Borrow<Ed> for BorrowedInner<'_, Ed> {
+impl<Ed: Editor> Borrow<Ed> for BorrowedInner<'_, Ed> {
     #[inline]
     fn namespace(&self) -> &Namespace {
         self.namespace
@@ -490,7 +490,7 @@ impl<Ed: Backend> Borrow<Ed> for BorrowedInner<'_, Ed> {
     }
 }
 
-impl<Ed: Backend> Deref for BorrowedInner<'_, Ed> {
+impl<Ed: Editor> Deref for BorrowedInner<'_, Ed> {
     type Target = State<Ed>;
 
     #[inline]
@@ -499,7 +499,7 @@ impl<Ed: Backend> Deref for BorrowedInner<'_, Ed> {
     }
 }
 
-impl<Ed: Backend> DerefMut for BorrowedInner<'_, Ed> {
+impl<Ed: Editor> DerefMut for BorrowedInner<'_, Ed> {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.state

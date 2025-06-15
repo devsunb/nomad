@@ -5,27 +5,27 @@ use ed::notify::MaybeResult;
 use ed::{
     AgentId,
     ApiValue,
-    Backend,
-    BaseBackend,
+    BaseEditor,
     BorrowState,
     Borrowed,
     Context,
+    Editor,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{AuthBackend, AuthInfos};
+use crate::{AuthEditor, AuthInfos};
 
-pub struct AuthMock<B> {
-    inner: B,
+pub struct AuthMock<Ed> {
+    inner: Ed,
 }
 
-impl<B> AuthMock<B> {
-    pub fn new(inner: B) -> Self {
+impl<Ed> AuthMock<Ed> {
+    pub fn new(inner: Ed) -> Self {
         Self { inner }
     }
 }
 
-impl<B: BaseBackend> AuthBackend for AuthMock<B> {
+impl<Ed: BaseEditor> AuthEditor for AuthMock<Ed> {
     type LoginError = core::convert::Infallible;
 
     #[allow(clippy::manual_async_fn)]
@@ -43,22 +43,22 @@ impl<B: BaseBackend> AuthBackend for AuthMock<B> {
     }
 }
 
-impl<B: BaseBackend> Backend for AuthMock<B> {
-    type Api = <B as Backend>::Api;
-    type Buffer<'a> = <B as Backend>::Buffer<'a>;
-    type BufferId = <B as Backend>::BufferId;
-    type Cursor<'a> = <B as Backend>::Cursor<'a>;
-    type CursorId = <B as Backend>::CursorId;
-    type Fs = <B as Backend>::Fs;
-    type Emitter<'this> = <B as Backend>::Emitter<'this>;
-    type Executor = <B as Backend>::Executor;
-    type EventHandle = <B as Backend>::EventHandle;
-    type Selection<'a> = <B as Backend>::Selection<'a>;
-    type SelectionId = <B as Backend>::SelectionId;
+impl<Ed: BaseEditor> Editor for AuthMock<Ed> {
+    type Api = <Ed as Editor>::Api;
+    type Buffer<'a> = <Ed as Editor>::Buffer<'a>;
+    type BufferId = <Ed as Editor>::BufferId;
+    type Cursor<'a> = <Ed as Editor>::Cursor<'a>;
+    type CursorId = <Ed as Editor>::CursorId;
+    type Fs = <Ed as Editor>::Fs;
+    type Emitter<'this> = <Ed as Editor>::Emitter<'this>;
+    type Executor = <Ed as Editor>::Executor;
+    type EventHandle = <Ed as Editor>::EventHandle;
+    type Selection<'a> = <Ed as Editor>::Selection<'a>;
+    type SelectionId = <Ed as Editor>::SelectionId;
 
-    type CreateBufferError = <B as Backend>::CreateBufferError;
-    type SerializeError = <B as Backend>::SerializeError;
-    type DeserializeError = <B as Backend>::DeserializeError;
+    type CreateBufferError = <Ed as Editor>::CreateBufferError;
+    type SerializeError = <Ed as Editor>::SerializeError;
+    type DeserializeError = <Ed as Editor>::DeserializeError;
 
     fn buffer(&mut self, id: Self::BufferId) -> Option<Self::Buffer<'_>> {
         self.inner.buffer(id)
@@ -66,7 +66,9 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
     fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
         self.inner.buffer_at_path(path)
     }
-    fn buffer_ids(&mut self) -> impl Iterator<Item = Self::BufferId> + use<B> {
+    fn buffer_ids(
+        &mut self,
+    ) -> impl Iterator<Item = Self::BufferId> + use<Ed> {
         self.inner.buffer_ids()
     }
     async fn create_buffer(
@@ -74,7 +76,7 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
         agent_id: AgentId,
         ctx: &mut Context<Self, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <B as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
+        <Ed as BaseEditor>::create_buffer(file_path, agent_id, ctx).await
     }
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
         self.inner.current_buffer()
@@ -138,8 +140,8 @@ impl<B: BaseBackend> Backend for AuthMock<B> {
     }
 }
 
-impl<B> AsMut<B> for AuthMock<B> {
-    fn as_mut(&mut self) -> &mut B {
+impl<Ed> AsMut<Ed> for AuthMock<Ed> {
+    fn as_mut(&mut self) -> &mut Ed {
         &mut self.inner
     }
 }

@@ -36,7 +36,7 @@ impl<'a> NeovimCursor<'a> {
 }
 
 impl Cursor for NeovimCursor<'_> {
-    type Backend = Neovim;
+    type Editor = Neovim;
 
     #[inline]
     fn buffer_id(&self) -> BufferId {

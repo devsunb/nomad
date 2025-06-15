@@ -6,12 +6,12 @@ use abs_path::AbsPath;
 use smallvec::SmallVec;
 use smol_str::SmolStr;
 
-use crate::{AgentId, Backend, ByteOffset};
+use crate::{AgentId, Editor, ByteOffset};
 
 /// TODO: docs.
 pub trait Buffer {
     /// TODO: docs.
-    type Backend: Backend;
+    type Editor: Editor;
 
     /// TODO: docs.
     fn byte_len(&self) -> ByteOffset;
@@ -25,7 +25,7 @@ pub trait Buffer {
     fn get_text(&self, byte_range: Range<ByteOffset>) -> impl Chunks;
 
     /// TODO: docs.
-    fn id(&self) -> <Self::Backend as Backend>::BufferId;
+    fn id(&self) -> <Self::Editor as Editor>::BufferId;
 
     /// Whether the buffer is empty, i.e. whether `byte_len()` is 0.
     #[inline]
@@ -39,7 +39,7 @@ pub trait Buffer {
     /// TODO: docs.
     fn for_each_cursor<Fun>(&mut self, fun: Fun)
     where
-        Fun: FnMut(<Self::Backend as Backend>::Cursor<'_>);
+        Fun: FnMut(<Self::Editor as Editor>::Cursor<'_>);
 
     /// TODO: docs.
     fn num_cursors(&mut self) -> u32 {
@@ -52,25 +52,25 @@ pub trait Buffer {
     fn on_edited<Fun>(
         &self,
         fun: Fun,
-    ) -> <Self::Backend as Backend>::EventHandle
+    ) -> <Self::Editor as Editor>::EventHandle
     where
-        Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, &Edit) + 'static;
+        Fun: FnMut(&<Self::Editor as Editor>::Buffer<'_>, &Edit) + 'static;
 
     /// TODO: docs.
     fn on_removed<Fun>(
         &self,
         fun: Fun,
-    ) -> <Self::Backend as Backend>::EventHandle
+    ) -> <Self::Editor as Editor>::EventHandle
     where
-        Fun: FnMut(<Self::Backend as Backend>::BufferId, AgentId) + 'static;
+        Fun: FnMut(<Self::Editor as Editor>::BufferId, AgentId) + 'static;
 
     /// TODO: docs.
     fn on_saved<Fun>(
         &self,
         fun: Fun,
-    ) -> <Self::Backend as Backend>::EventHandle
+    ) -> <Self::Editor as Editor>::EventHandle
     where
-        Fun: FnMut(&<Self::Backend as Backend>::Buffer<'_>, AgentId) + 'static;
+        Fun: FnMut(&<Self::Editor as Editor>::Buffer<'_>, AgentId) + 'static;
 
     /// TODO: docs.
     fn path(&self) -> Cow<'_, AbsPath>;

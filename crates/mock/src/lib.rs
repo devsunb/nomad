@@ -5,9 +5,9 @@
 #![feature(unboxed_closures)]
 
 pub mod api;
-mod backend_ext;
 pub mod buffer;
 mod context_ext;
+mod editor_ext;
 pub mod emitter;
 pub mod executor;
 pub mod fs;
@@ -15,7 +15,7 @@ mod mock;
 pub mod serde;
 pub mod value;
 
-pub use backend_ext::BackendExt;
 pub use context_ext::ContextExt;
+pub use editor_ext::EditorExt;
 pub use mock::Mock;
 pub use mock_macros::fs;

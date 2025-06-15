@@ -3,10 +3,10 @@ use smol_str::SmolStr;
 use crate::action::Action;
 use crate::command::CommandArgs;
 use crate::notify::{self, MaybeResult, Name};
-use crate::{Backend, Borrowed, ByteOffset, Context};
+use crate::{Borrowed, ByteOffset, Context, Editor};
 
 /// TODO: docs.
-pub trait Command<B: Backend>: 'static {
+pub trait Command<Ed: Editor>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -17,8 +17,8 @@ pub trait Command<B: Backend>: 'static {
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut Context<B, Borrowed<'_>>,
-    ) -> impl MaybeResult<()> + use<'this, 'args, Self, B>;
+        ctx: &mut Context<Ed, Borrowed<'_>>,
+    ) -> impl MaybeResult<()> + use<'this, 'args, Self, Ed>;
 
     /// TODO: docs.
     fn to_completion_fn(&self) -> impl CompletionFn + 'static {}
@@ -35,7 +35,7 @@ pub trait CompletionFn {
 }
 
 /// TODO: docs.
-pub trait ToCompletionFn<B: Backend> {
+pub trait ToCompletionFn<Ed: Editor> {
     /// TODO: docs.
     fn to_completion_fn(&self) -> impl CompletionFn + 'static;
 }
@@ -76,11 +76,11 @@ impl CommandCompletion {
     }
 }
 
-impl<A, B> Command<B> for A
+impl<A, Ed> Command<Ed> for A
 where
-    A: Action<B, Return = ()> + ToCompletionFn<B>,
+    A: Action<Ed, Return = ()> + ToCompletionFn<Ed>,
     for<'a> A::Args<'a>: TryFrom<CommandArgs<'a>, Error: notify::Error>,
-    B: Backend,
+    Ed: Editor,
 {
     const NAME: Name = A::NAME;
 
@@ -90,8 +90,8 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut Context<B, Borrowed<'_>>,
-    ) -> impl MaybeResult<()> + use<'this, 'args, A, B> {
+        ctx: &mut Context<Ed, Borrowed<'_>>,
+    ) -> impl MaybeResult<()> + use<'this, 'args, A, Ed> {
         A::call(self, args, ctx)
     }
 

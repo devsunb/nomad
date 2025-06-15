@@ -1,6 +1,6 @@
-use ed::{AgentId, Backend, BorrowState, Buffer, Context};
+use ed::{AgentId, Editor, BorrowState, Buffer, Context};
 
-pub(crate) trait TestEditor: Backend {
+pub(crate) trait TestEditor: Editor {
     fn create_scratch_buffer(
         agent_id: AgentId,
         ctx: &mut Context<Self, impl BorrowState>,

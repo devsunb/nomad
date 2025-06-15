@@ -5,10 +5,10 @@ use serde::de::DeserializeOwned;
 use crate::module::ApiCtx;
 use crate::notify::Name;
 use crate::plugin::PluginId;
-use crate::{Backend, Borrowed, Context};
+use crate::{Editor, Borrowed, Context};
 
 /// TODO: docs.
-pub trait Module<B: Backend>: 'static + Sized {
+pub trait Module<Ed: Editor>: 'static + Sized {
     /// TODO: docs.
     const NAME: Name;
 
@@ -16,18 +16,18 @@ pub trait Module<B: Backend>: 'static + Sized {
     type Config: DeserializeOwned;
 
     /// TODO: docs.
-    fn api(&self, ctx: &mut ApiCtx<B>);
+    fn api(&self, ctx: &mut ApiCtx<Ed>);
 
     /// TODO: docs.
     fn on_new_config(
         &self,
         new_config: Self::Config,
-        ctx: &mut Context<B, Borrowed<'_>>,
+        ctx: &mut Context<Ed, Borrowed<'_>>,
     );
 
     /// TODO: docs.
     #[allow(unused_variables)]
-    fn on_init(&self, ctx: &mut Context<B, Borrowed<'_>>) {}
+    fn on_init(&self, ctx: &mut Context<Ed, Borrowed<'_>>) {}
 
     #[inline]
     #[doc(hidden)]

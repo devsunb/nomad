@@ -5,8 +5,8 @@ use ed::notify::Namespace;
 use ed::plugin::Plugin;
 use ed::{
     AgentId,
-    Backend,
-    BaseBackend,
+    Editor,
+    BaseEditor,
     BorrowState,
     Buffer,
     Context,
@@ -121,7 +121,7 @@ impl Neovim {
     }
 }
 
-impl Backend for Neovim {
+impl Editor for Neovim {
     type Api = api::NeovimApi;
     type Buffer<'a> = NeovimBuffer<'a>;
     type BufferId = BufferId;
@@ -171,7 +171,7 @@ impl Backend for Neovim {
         agent_id: AgentId,
         ctx: &mut Context<Self, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <Self as BaseBackend>::create_buffer(file_path, agent_id, ctx).await
+        <Self as BaseEditor>::create_buffer(file_path, agent_id, ctx).await
     }
 
     #[inline]
@@ -276,12 +276,12 @@ impl Backend for Neovim {
     }
 }
 
-impl BaseBackend for Neovim {
+impl BaseEditor for Neovim {
     #[inline]
     async fn create_buffer(
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut Context<impl AsMut<Self> + Backend, impl BorrowState>,
+        ctx: &mut Context<impl AsMut<Self> + Editor, impl BorrowState>,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
         let contents = match ctx
             .with_editor(|ed| ed.as_mut().fs())

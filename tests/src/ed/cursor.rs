@@ -1,7 +1,7 @@
 use core::mem;
 use core::time::Duration;
 
-use ed::{AgentId, Backend, Buffer, ByteOffset, Context, Cursor, Replacement};
+use ed::{AgentId, Editor, Buffer, ByteOffset, Context, Cursor, Replacement};
 use futures_util::stream::{FusedStream, StreamExt};
 use futures_util::{FutureExt, select_biased};
 
@@ -83,27 +83,27 @@ pub(crate) async fn on_cursor_moved_1(ctx: &mut Context<impl TestEditor>) {
 }
 
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub(crate) enum CursorEvent<Ed: Backend> {
+pub(crate) enum CursorEvent<Ed: Editor> {
     Created(CursorCreation<Ed>),
     Moved(CursorMovement<Ed>),
     Removed(AgentId),
 }
 
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub(crate) struct CursorCreation<Ed: Backend> {
+pub(crate) struct CursorCreation<Ed: Editor> {
     pub(crate) buffer_id: Ed::BufferId,
     pub(crate) byte_offset: ByteOffset,
     pub(crate) created_by: AgentId,
 }
 
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub(crate) struct CursorMovement<Ed: Backend> {
+pub(crate) struct CursorMovement<Ed: Editor> {
     pub(crate) buffer_id: Ed::BufferId,
     pub(crate) byte_offset: ByteOffset,
     pub(crate) moved_by: AgentId,
 }
 
-impl<Ed: Backend> CursorEvent<Ed> {
+impl<Ed: Editor> CursorEvent<Ed> {
     /// Returns a never-ending [`Stream`] of [`CursorEvent`]s on the current
     /// buffer.
     #[track_caller]

@@ -10,14 +10,14 @@ use collab_project::fs::{DirectoryId, FileId, FileMut, FsOp, Node, NodeMut};
 use collab_project::{PeerId, text};
 use collab_server::message::{GitHubHandle, Message, Peer, Peers};
 use ed::fs::{self, File as _, Symlink as _};
-use ed::{AgentId, Backend, Borrowed, Context, Shared, notify};
+use ed::{AgentId, Borrowed, Context, Editor, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use smol_str::ToSmolStr;
 
-use crate::CollabBackend;
-use crate::backend::{ActionForSelectedSession, SessionId};
+use crate::CollabEditor;
 use crate::convert::Convert;
+use crate::editors::{ActionForSelectedSession, SessionId};
 use crate::event::{
     BufferEvent,
     CursorEvent,
@@ -29,10 +29,10 @@ use crate::event::{
 
 /// TODO: docs.
 #[derive(cauchy::Clone)]
-pub struct ProjectHandle<B: CollabBackend> {
-    inner: Shared<Project<B>>,
+pub struct ProjectHandle<Ed: CollabEditor> {
+    inner: Shared<Project<Ed>>,
     is_dropping_last_instance: Shared<bool>,
-    projects: Projects<B>,
+    projects: Projects<Ed>,
 }
 
 /// TODO: docs.
@@ -49,7 +49,7 @@ pub struct OverlappingProjectError {
 pub struct NoActiveSessionError<B>(PhantomData<B>);
 
 /// TODO: docs.
-pub(crate) struct Project<Ed: CollabBackend> {
+pub(crate) struct Project<Ed: CollabEditor> {
     agent_id: AgentId,
     host_id: PeerId,
     id_maps: IdMaps<Ed>,
@@ -62,41 +62,41 @@ pub(crate) struct Project<Ed: CollabBackend> {
 }
 
 #[derive(cauchy::Clone, cauchy::Default)]
-pub(crate) struct Projects<B: CollabBackend> {
-    active: Shared<FxHashMap<SessionId<B>, ProjectHandle<B>>>,
+pub(crate) struct Projects<Ed: CollabEditor> {
+    active: Shared<FxHashMap<SessionId<Ed>, ProjectHandle<Ed>>>,
     starting: Shared<FxHashSet<AbsPathBuf>>,
 }
 
-pub(crate) struct ProjectGuard<B: CollabBackend> {
+pub(crate) struct ProjectGuard<Ed: CollabEditor> {
     root: AbsPathBuf,
-    projects: Projects<B>,
+    projects: Projects<Ed>,
 }
 
-pub(crate) struct NewProjectArgs<B: CollabBackend> {
+pub(crate) struct NewProjectArgs<Ed: CollabEditor> {
     pub(crate) agent_id: AgentId,
     pub(crate) host_id: PeerId,
-    pub(crate) id_maps: IdMaps<B>,
+    pub(crate) id_maps: IdMaps<Ed>,
     pub(crate) local_peer: Peer,
     pub(crate) remote_peers: Peers,
     pub(crate) project: collab_project::Project,
-    pub(crate) session_id: SessionId<B>,
+    pub(crate) session_id: SessionId<Ed>,
 }
 
 #[derive(cauchy::Default)]
-pub(crate) struct IdMaps<B: Backend> {
-    pub(crate) buffer2file: FxHashMap<B::BufferId, FileId>,
-    pub(crate) cursor2cursor: FxHashMap<B::CursorId, text::CursorId>,
-    pub(crate) file2buffer: FxHashMap<FileId, B::BufferId>,
-    pub(crate) node2dir: FxHashMap<<B::Fs as fs::Fs>::NodeId, DirectoryId>,
-    pub(crate) node2file: FxHashMap<<B::Fs as fs::Fs>::NodeId, FileId>,
+pub(crate) struct IdMaps<Edd: Editor> {
+    pub(crate) buffer2file: FxHashMap<Edd::BufferId, FileId>,
+    pub(crate) cursor2cursor: FxHashMap<Edd::CursorId, text::CursorId>,
+    pub(crate) file2buffer: FxHashMap<FileId, Edd::BufferId>,
+    pub(crate) node2dir: FxHashMap<<Edd::Fs as fs::Fs>::NodeId, DirectoryId>,
+    pub(crate) node2file: FxHashMap<<Edd::Fs as fs::Fs>::NodeId, FileId>,
     pub(crate) selection2selection:
-        FxHashMap<B::SelectionId, text::SelectionId>,
+        FxHashMap<Edd::SelectionId, text::SelectionId>,
 }
 
 #[derive(cauchy::Debug)]
-pub(crate) enum SynchronizeError<B: CollabBackend> {
+pub(crate) enum SynchronizeError<Ed: CollabEditor> {
     /// TODO: docs.
-    ContentsAtPath(ContentsAtPathError<B::Fs>),
+    ContentsAtPath(ContentsAtPathError<Ed::Fs>),
 }
 
 enum FsNodeContents {
@@ -106,7 +106,7 @@ enum FsNodeContents {
     Symlink(String),
 }
 
-impl<Ed: CollabBackend> ProjectHandle<Ed> {
+impl<Ed: CollabEditor> ProjectHandle<Ed> {
     /// TODO: docs.
     pub fn is_host(&self) -> bool {
         self.with(|proj| proj.is_host())
@@ -410,7 +410,7 @@ impl<Ed: CollabBackend> ProjectHandle<Ed> {
     }
 }
 
-impl<Ed: CollabBackend> Project<Ed> {
+impl<Ed: CollabEditor> Project<Ed> {
     fn synchronize(&mut self, event: Event<Ed>) -> Option<Message> {
         match event {
             Event::Buffer(event) => self.synchronize_buffer(event),
@@ -804,18 +804,18 @@ impl<Ed: CollabBackend> Project<Ed> {
     }
 }
 
-impl<B: CollabBackend> Projects<B> {
+impl<Ed: CollabEditor> Projects<Ed> {
     pub(crate) fn get(
         &self,
-        session_id: SessionId<B>,
-    ) -> Option<ProjectHandle<B>> {
+        session_id: SessionId<Ed>,
+    ) -> Option<ProjectHandle<Ed>> {
         self.active.with(|map| map.get(&session_id).cloned())
     }
 
     pub(crate) fn new_guard(
         &self,
         project_root: AbsPathBuf,
-    ) -> Result<ProjectGuard<B>, OverlappingProjectError> {
+    ) -> Result<ProjectGuard<Ed>, OverlappingProjectError> {
         fn overlaps(l: &AbsPath, r: &AbsPath) -> bool {
             l.starts_with(r) || r.starts_with(l)
         }
@@ -861,8 +861,8 @@ impl<B: CollabBackend> Projects<B> {
     pub(crate) async fn select(
         &self,
         action: ActionForSelectedSession,
-        ctx: &mut Context<B>,
-    ) -> Result<Option<(AbsPathBuf, SessionId<B>)>, NoActiveSessionError<B>>
+        ctx: &mut Context<Ed>,
+    ) -> Result<Option<(AbsPathBuf, SessionId<Ed>)>, NoActiveSessionError<Ed>>
     {
         let active_sessions = self.active.with(|map| {
             map.iter()
@@ -876,7 +876,7 @@ impl<B: CollabBackend> Projects<B> {
         let session = match &*active_sessions {
             [] => return Err(NoActiveSessionError::new()),
             [single] => single,
-            sessions => match B::select_session(sessions, action, ctx).await {
+            sessions => match Ed::select_session(sessions, action, ctx).await {
                 Some(session) => session,
                 None => return Ok(None),
             },
@@ -885,7 +885,7 @@ impl<B: CollabBackend> Projects<B> {
         Ok(Some(session.clone()))
     }
 
-    fn insert(&self, project: Project<B>) -> ProjectHandle<B> {
+    fn insert(&self, project: Project<Ed>) -> ProjectHandle<Ed> {
         let session_id = project.session_id;
         let handle = ProjectHandle {
             inner: Shared::new(project),
@@ -900,8 +900,8 @@ impl<B: CollabBackend> Projects<B> {
     }
 }
 
-impl<B: CollabBackend> ProjectGuard<B> {
-    pub(crate) fn activate(self, args: NewProjectArgs<B>) -> ProjectHandle<B> {
+impl<Ed: CollabEditor> ProjectGuard<Ed> {
+    pub(crate) fn activate(self, args: NewProjectArgs<Ed>) -> ProjectHandle<Ed> {
         self.projects.starting.with_mut(|set| {
             assert!(set.remove(&self.root));
         });
@@ -936,7 +936,7 @@ impl<B> NoActiveSessionError<B> {
     }
 }
 
-impl<B: CollabBackend> Drop for ProjectHandle<B> {
+impl<Ed: CollabEditor> Drop for ProjectHandle<Ed> {
     fn drop(&mut self) {
         if self.inner.strong_count() == 2
             && !self.is_dropping_last_instance.copied()
@@ -950,7 +950,7 @@ impl<B: CollabBackend> Drop for ProjectHandle<B> {
     }
 }
 
-impl<B: CollabBackend> Drop for ProjectGuard<B> {
+impl<Ed: CollabEditor> Drop for ProjectGuard<Ed> {
     fn drop(&mut self) {
         self.projects.starting.with_mut(|set| {
             set.remove(&self.root);

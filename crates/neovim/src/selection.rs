@@ -30,7 +30,7 @@ impl<'a> NeovimSelection<'a> {
 }
 
 impl Selection for NeovimSelection<'_> {
-    type Backend = Neovim;
+    type Editor = Neovim;
 
     #[inline]
     fn buffer_id(&self) -> BufferId {

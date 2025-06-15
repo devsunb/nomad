@@ -1,7 +1,7 @@
 use ed::action::Action;
 use ed::command::ToCompletionFn;
 use ed::notify::{Message, Name};
-use ed::{Backend, Borrowed, Context};
+use ed::{Editor, Borrowed, Context};
 
 use crate::VERSION;
 
@@ -16,7 +16,7 @@ impl EmitVersion {
     }
 }
 
-impl<B: Backend> Action<B> for EmitVersion {
+impl<Ed: Editor> Action<Ed> for EmitVersion {
     const NAME: Name = "version";
 
     type Args<'args> = ();
@@ -25,12 +25,12 @@ impl<B: Backend> Action<B> for EmitVersion {
     fn call<'s: 's, 'a: 'a>(
         &mut self,
         _: Self::Args<'_>,
-        ctx: &mut Context<B, Borrowed>,
+        ctx: &mut Context<Ed, Borrowed>,
     ) {
         ctx.emit_info(Message::from_display(VERSION));
     }
 }
 
-impl<B: Backend> ToCompletionFn<B> for EmitVersion {
+impl<Ed: Editor> ToCompletionFn<Ed> for EmitVersion {
     fn to_completion_fn(&self) {}
 }

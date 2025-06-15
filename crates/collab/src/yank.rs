@@ -5,18 +5,18 @@ use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
 
-use crate::backend::{ActionForSelectedSession, CollabBackend};
+use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::collab::Collab;
 use crate::project::{NoActiveSessionError, Projects};
 
 /// An `Action` that pastes the [`SessionId`] of any active session to the
 /// user's clipboard.
 #[derive(cauchy::Clone)]
-pub struct Yank<B: CollabBackend> {
-    projects: Projects<B>,
+pub struct Yank<Ed: CollabEditor> {
+    projects: Projects<Ed>,
 }
 
-impl<B: CollabBackend> AsyncAction<B> for Yank<B> {
+impl<Ed: CollabEditor> AsyncAction<Ed> for Yank<Ed> {
     const NAME: Name = "yank";
 
     type Args = ();
@@ -24,8 +24,8 @@ impl<B: CollabBackend> AsyncAction<B> for Yank<B> {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut Context<B>,
-    ) -> Result<(), YankError<B>> {
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), YankError<Ed>> {
         let Some((_, session_id)) = self
             .projects
             .select(ActionForSelectedSession::CopySessionId, ctx)
@@ -35,32 +35,32 @@ impl<B: CollabBackend> AsyncAction<B> for Yank<B> {
             return Ok(());
         };
 
-        B::copy_session_id(session_id, ctx)
+        Ed::copy_session_id(session_id, ctx)
             .await
             .map_err(YankError::PasteSessionId)
     }
 }
 
 /// The type of error that can occur when [`Yank`]ing fails.
-pub enum YankError<B: CollabBackend> {
+pub enum YankError<Ed: CollabEditor> {
     /// TODO: docs.
-    NoActiveSession(NoActiveSessionError<B>),
+    NoActiveSession(NoActiveSessionError<Ed>),
 
     /// TODO: docs.
-    PasteSessionId(B::CopySessionIdError),
+    PasteSessionId(Ed::CopySessionIdError),
 }
 
-impl<B: CollabBackend> From<&Collab<B>> for Yank<B> {
-    fn from(collab: &Collab<B>) -> Self {
+impl<Ed: CollabEditor> From<&Collab<Ed>> for Yank<Ed> {
+    fn from(collab: &Collab<Ed>) -> Self {
         Self { projects: collab.projects.clone() }
     }
 }
 
-impl<B: CollabBackend> ToCompletionFn<B> for Yank<B> {
+impl<Ed: CollabEditor> ToCompletionFn<Ed> for Yank<Ed> {
     fn to_completion_fn(&self) {}
 }
 
-impl<B: CollabBackend> notify::Error for YankError<B> {
+impl<Ed: CollabEditor> notify::Error for YankError<Ed> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
             YankError::NoActiveSession(err) => err.to_message(),

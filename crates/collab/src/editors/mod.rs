@@ -9,14 +9,14 @@ use collab_server::Authenticator;
 use collab_server::message::Peer;
 use ed::command::CommandArgs;
 use ed::fs::{self, AbsPath, AbsPathBuf};
-use ed::{Backend, ByteOffset, Context, notify};
+use ed::{ByteOffset, Context, Editor, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::config;
 
-/// A [`Backend`] subtrait defining additional capabilities needed by the
+/// An [`Editor`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
-pub trait CollabBackend: Backend {
+pub trait CollabEditor: Editor {
     /// TODO: docs.
     type Io: AsyncRead + AsyncWrite + Unpin;
 
@@ -33,21 +33,21 @@ pub trait CollabBackend: Backend {
         >;
 
     /// The type of error returned by
-    /// [`connect_to_server`](CollabBackend::connect_to_server).
+    /// [`connect_to_server`](CollabEditor::connect_to_server).
     type ConnectToServerError: Debug + notify::Error;
 
     /// The type of error returned by
-    /// [`copy_session_id`](CollabBackend::copy_session_id).
+    /// [`copy_session_id`](CollabEditor::copy_session_id).
     type CopySessionIdError: Debug + notify::Error;
 
     /// The type of error returned by
-    /// [`default_dir_for_remote_projects`](CollabBackend::default_dir_for_remote_projects).
+    /// [`default_dir_for_remote_projects`](CollabEditor::default_dir_for_remote_projects).
     type DefaultDirForRemoteProjectsError: Debug + notify::Error;
 
-    /// The type of error returned by [`home_dir`](CollabBackend::home_dir).
+    /// The type of error returned by [`home_dir`](CollabEditor::home_dir).
     type HomeDirError: Debug + notify::Error;
 
-    /// The type of error returned by [`lsp_root`](CollabBackend::lsp_root).
+    /// The type of error returned by [`lsp_root`](CollabEditor::lsp_root).
     type LspRootError: Debug + notify::Error;
 
     /// Asks the user to confirm starting a new collaborative editing session
@@ -142,15 +142,15 @@ pub(crate) type MessageTx<B> = collab_server::client::ClientTx<Writer<B>>;
 
 /// TODO: docs.
 pub(crate) type Reader<B> =
-    futures_util::io::ReadHalf<<B as CollabBackend>::Io>;
+    futures_util::io::ReadHalf<<B as CollabEditor>::Io>;
 
 /// TODO: docs.
 pub(crate) type Writer<B> =
-    futures_util::io::WriteHalf<<B as CollabBackend>::Io>;
+    futures_util::io::WriteHalf<<B as CollabEditor>::Io>;
 
 /// TODO: docs.
 pub(crate) type SessionId<B> =
-    <<B as CollabBackend>::ServerConfig as collab_server::Config>::SessionId;
+    <<B as CollabEditor>::ServerConfig as collab_server::Config>::SessionId;
 
 /// TODO: docs.
 pub(crate) type Welcome<B> =

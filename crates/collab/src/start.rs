@@ -19,13 +19,13 @@ use ed::command::ToCompletionFn;
 use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
-use ed::{Backend, Buffer, Context};
+use ed::{Editor, Buffer, Context};
 use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
 use smol_str::ToSmolStr;
 use walkdir::FsExt;
 
-use crate::backend::CollabBackend;
+use crate::editors::CollabEditor;
 use crate::collab::Collab;
 use crate::config::Config;
 use crate::event_stream::{EventStream, EventStreamBuilder};
@@ -41,22 +41,22 @@ use crate::session::Session;
 
 /// TODO: docs.
 pub type ProjectFilter<B> = walkdir::Either<
-    <B as CollabBackend>::ProjectFilter,
-    AllButOne<<B as Backend>::Fs>,
+    <B as CollabEditor>::ProjectFilter,
+    AllButOne<<B as Editor>::Fs>,
 >;
 
 type Markers = root_markers::GitDirectory;
 
 /// The `Action` used to start a new collaborative editing session.
 #[derive(cauchy::Clone)]
-pub struct Start<B: CollabBackend> {
+pub struct Start<Ed: CollabEditor> {
     auth_infos: Shared<Option<AuthInfos>>,
     config: Shared<Config>,
-    projects: Projects<B>,
-    stop_channels: StopChannels<B>,
+    projects: Projects<Ed>,
+    stop_channels: StopChannels<Ed>,
 }
 
-impl<B: CollabBackend> AsyncAction<B> for Start<B> {
+impl<Ed: CollabEditor> AsyncAction<Ed> for Start<Ed> {
     const NAME: Name = "start";
 
     type Args = ();
@@ -65,8 +65,8 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
     async fn call(
         &mut self,
         _: Self::Args,
-        ctx: &mut Context<B>,
-    ) -> Result<(), StartError<B>> {
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), StartError<Ed>> {
         let auth_infos =
             self.auth_infos.cloned().ok_or(StartError::UserNotLoggedIn)?;
 
@@ -85,7 +85,7 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
             .new_guard(project_root)
             .map_err(StartError::OverlappingProject)?;
 
-        if !B::confirm_start(project_guard.root(), ctx).await {
+        if !Ed::confirm_start(project_guard.root(), ctx).await {
             return Ok(());
         }
 
@@ -96,14 +96,14 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
 
         let server_addr = self.config.with(|c| c.server_address.clone());
 
-        let (reader, writer) = B::connect_to_server(server_addr, ctx)
+        let (reader, writer) = Ed::connect_to_server(server_addr, ctx)
             .await
             .map_err(StartError::ConnectToServer)?
             .split();
 
         let github_handle = auth_infos.handle().clone();
 
-        let knock = collab_server::Knock::<B::ServerConfig> {
+        let knock = collab_server::Knock::<Ed::ServerConfig> {
             auth_infos: auth_infos.into(),
             session_intent: SessionIntent::StartNew(project_name.to_owned()),
         };
@@ -147,8 +147,8 @@ impl<B: CollabBackend> AsyncAction<B> for Start<B> {
     }
 }
 
-impl<B: CollabBackend> From<&Collab<B>> for Start<B> {
-    fn from(collab: &Collab<B>) -> Self {
+impl<Ed: CollabEditor> From<&Collab<Ed>> for Start<Ed> {
+    fn from(collab: &Collab<Ed>) -> Self {
         Self {
             auth_infos: collab.auth_infos.clone(),
             config: collab.config.clone(),
@@ -158,17 +158,17 @@ impl<B: CollabBackend> From<&Collab<B>> for Start<B> {
     }
 }
 
-impl<B: CollabBackend> ToCompletionFn<B> for Start<B> {
+impl<Ed: CollabEditor> ToCompletionFn<Ed> for Start<Ed> {
     fn to_completion_fn(&self) {}
 }
 
 /// Searches for the root of the project containing the buffer with the given
 /// ID.
-async fn search_project_root<B: CollabBackend>(
-    buffer_id: B::BufferId,
-    ctx: &mut Context<B>,
-) -> Result<AbsPathBuf, SearchProjectRootError<B>> {
-    if let Some(lsp_res) = B::lsp_root(buffer_id.clone(), ctx).transpose() {
+async fn search_project_root<Ed: CollabEditor>(
+    buffer_id: Ed::BufferId,
+    ctx: &mut Context<Ed>,
+) -> Result<AbsPathBuf, SearchProjectRootError<Ed>> {
+    if let Some(lsp_res) = Ed::lsp_root(buffer_id.clone(), ctx).transpose() {
         return lsp_res.map_err(SearchProjectRootError::Lsp);
     }
 
@@ -179,7 +179,7 @@ async fn search_project_root<B: CollabBackend>(
     })?;
 
     let home_dir =
-        B::home_dir(ctx).await.map_err(SearchProjectRootError::HomeDir)?;
+        Ed::home_dir(ctx).await.map_err(SearchProjectRootError::HomeDir)?;
 
     let args = root_markers::FindRootArgs {
         marker: root_markers::GitDirectory,
@@ -202,13 +202,13 @@ async fn search_project_root<B: CollabBackend>(
 /// Constructs a [`Project`] by reading the contents of the file or directory
 /// at the given path.
 #[allow(clippy::too_many_lines)]
-async fn read_project<B: CollabBackend>(
+async fn read_project<Ed: CollabEditor>(
     root_path: &AbsPath,
     local_id: PeerId,
-    ctx: &mut Context<B>,
+    ctx: &mut Context<Ed>,
 ) -> Result<
-    (Project, EventStream<B, ProjectFilter<B>>, IdMaps<B>),
-    ReadProjectError<B>,
+    (Project, EventStream<Ed, ProjectFilter<Ed>>, IdMaps<Ed>),
+    ReadProjectError<Ed>,
 > {
     let fs = ctx.fs();
 
@@ -222,7 +222,7 @@ async fn read_project<B: CollabBackend>(
 
     let (project_root, project_filter) = match root_node {
         FsNode::Directory(dir) => {
-            let filter = B::project_filter(&dir, ctx);
+            let filter = Ed::project_filter(&dir, ctx);
             (dir, walkdir::Either::Left(filter))
         },
         // The user wants to collaborate on a single file. The root must always
@@ -231,7 +231,7 @@ async fn read_project<B: CollabBackend>(
         FsNode::File(file) => {
             let parent =
                 file.parent().await.map_err(ReadProjectError::FileParent)?;
-            let filter = AllButOne::<B::Fs> { id: file.id() };
+            let filter = AllButOne::<Ed::Fs> { id: file.id() };
             (parent, walkdir::Either::Right(filter))
         },
         FsNode::Symlink(_) => {
@@ -393,12 +393,12 @@ async fn read_node<Fs: fs::Fs>(
 
 /// The type of error that can occur when [`Start`]ing a session fails.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum StartError<B: CollabBackend> {
+pub enum StartError<Ed: CollabEditor> {
     /// TODO: docs.
-    ConnectToServer(B::ConnectToServerError),
+    ConnectToServer(Ed::ConnectToServerError),
 
     /// TODO: docs.
-    Knock(client::KnockError<B::ServerConfig>),
+    Knock(client::KnockError<Ed::ServerConfig>),
 
     /// TODO: docs.
     NoBufferFocused,
@@ -410,10 +410,10 @@ pub enum StartError<B: CollabBackend> {
     ProjectRootIsFsRoot,
 
     /// TODO: docs.
-    ReadProject(ReadProjectError<B>),
+    ReadProject(ReadProjectError<Ed>),
 
     /// TODO: docs.
-    SearchProjectRoot(SearchProjectRootError<B>),
+    SearchProjectRoot(SearchProjectRootError<Ed>),
 
     /// TODO: docs.
     UserNotLoggedIn,
@@ -441,18 +441,18 @@ pub enum ReadNodeError<Fs: fs::Fs> {
 /// The type of error that can occur when [read](`read_project`)ing a project
 /// fails.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum ReadProjectError<B: CollabBackend> {
+pub enum ReadProjectError<Ed: CollabEditor> {
     /// TODO: docs.
-    GetRoot(<B::Fs as Fs>::NodeAtPathError),
+    GetRoot(<Ed::Fs as Fs>::NodeAtPathError),
 
     /// TODO: docs.
     NoNodeAtRootPath(AbsPathBuf),
 
     /// TODO: docs.
-    FileParent(<<B::Fs as Fs>::File as File>::ParentError),
+    FileParent(<<Ed::Fs as Fs>::File as File>::ParentError),
 
     /// TODO: docs.
-    ReadNode(ReadNodeError<B::Fs>),
+    ReadNode(ReadNodeError<Ed::Fs>),
 
     /// TODO: docs.
     RootIsSymlink(AbsPathBuf),
@@ -461,16 +461,16 @@ pub enum ReadProjectError<B: CollabBackend> {
     #[allow(clippy::type_complexity)]
     WalkRoot(
         walkdir::WalkError<
-            B::Fs,
-            walkdir::Filtered<ProjectFilter<B>, B::Fs>,
-            ReadNodeError<B::Fs>,
+            Ed::Fs,
+            walkdir::Filtered<ProjectFilter<Ed>, Ed::Fs>,
+            ReadNodeError<Ed::Fs>,
         >,
     ),
 }
 
 /// TODO: docs.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum SearchProjectRootError<B: CollabBackend> {
+pub enum SearchProjectRootError<Ed: CollabEditor> {
     /// TODO: docs.
     BufNameNotAbsolutePath(String),
 
@@ -478,16 +478,16 @@ pub enum SearchProjectRootError<B: CollabBackend> {
     CouldntFindRoot(fs::AbsPathBuf),
 
     /// TODO: docs.
-    FindRoot(root_markers::FindRootError<B::Fs, Markers>),
+    FindRoot(root_markers::FindRootError<Ed::Fs, Markers>),
 
     /// TODO: docs.
-    HomeDir(B::HomeDirError),
+    HomeDir(Ed::HomeDirError),
 
     /// TODO: docs.
-    InvalidBufId(B::BufferId),
+    InvalidBufId(Ed::BufferId),
 
     /// TODO: docs.
-    Lsp(B::LspRootError),
+    Lsp(Ed::LspRootError),
 }
 
 /// A [`walkdir::Filter`] that filters out every node but one.
@@ -532,13 +532,13 @@ impl<B> UserNotLoggedInError<B> {
     }
 }
 
-impl<B: CollabBackend> notify::Error for StartError<B> {
+impl<Ed: CollabEditor> notify::Error for StartError<Ed> {
     fn to_message(&self) -> (notify::Level, notify::Message) {
         match self {
             Self::ConnectToServer(err) => err.to_message(),
             Self::Knock(_err) => todo!(),
             Self::NoBufferFocused => {
-                NoBufferFocusedError::<B>::new().to_message()
+                NoBufferFocusedError::<Ed>::new().to_message()
             },
             Self::OverlappingProject(err) => err.to_message(),
             Self::ProjectRootIsFsRoot => (
@@ -551,13 +551,13 @@ impl<B: CollabBackend> notify::Error for StartError<B> {
             Self::ReadProject(err) => err.to_message(),
             Self::SearchProjectRoot(err) => err.to_message(),
             Self::UserNotLoggedIn => {
-                UserNotLoggedInError::<B>::new().to_message()
+                UserNotLoggedInError::<Ed>::new().to_message()
             },
         }
     }
 }
 
-impl<B: CollabBackend> notify::Error for ReadProjectError<B> {
+impl<Ed: CollabEditor> notify::Error for ReadProjectError<Ed> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
         todo!();
     }
@@ -569,7 +569,7 @@ impl<B> notify::Error for NoBufferFocusedError<B> {
     }
 }
 
-impl<B: CollabBackend> notify::Error for SearchProjectRootError<B> {
+impl<Ed: CollabEditor> notify::Error for SearchProjectRootError<Ed> {
     default fn to_message(&self) -> (notify::Level, notify::Message) {
         use SearchProjectRootError::*;
 
@@ -680,12 +680,12 @@ pub mod benches {
 
     /// TODO: docs.
     #[inline]
-    pub async fn read_project<B>(
-        project_root: <B::Fs as fs::Fs>::Directory,
-        ctx: &mut Context<B>,
-    ) -> Result<(), ReadProjectError<B>>
+    pub async fn read_project<Ed>(
+        project_root: <Ed::Fs as fs::Fs>::Directory,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), ReadProjectError<Ed>>
     where
-        B: CollabBackend,
+        Ed: CollabEditor,
     {
         super::read_project(&*project_root.path(), PeerId::new(1), ctx)
             .await

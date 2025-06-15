@@ -3,10 +3,10 @@ use serde::ser::Serialize;
 
 use crate::action::Action;
 use crate::notify::{MaybeResult, Name};
-use crate::{Backend, Borrowed, Context};
+use crate::{Editor, Borrowed, Context};
 
 /// TODO: docs.
-pub trait Function<B: Backend>: 'static {
+pub trait Function<Ed: Editor>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -20,16 +20,16 @@ pub trait Function<B: Backend>: 'static {
     fn call<'this, 'args>(
         &'this mut self,
         args: Self::Args<'args>,
-        ctx: &mut Context<B, Borrowed<'_>>,
-    ) -> impl MaybeResult<Self::Return> + use<'this, 'args, Self, B>;
+        ctx: &mut Context<Ed, Borrowed<'_>>,
+    ) -> impl MaybeResult<Self::Return> + use<'this, 'args, Self, Ed>;
 }
 
-impl<A, B> Function<B> for A
+impl<A, Ed> Function<Ed> for A
 where
-    A: Action<B>,
+    A: Action<Ed>,
     for<'args> A::Args<'args>: Deserialize<'args>,
     A::Return: Serialize,
-    B: Backend,
+    Ed: Editor,
 {
     const NAME: Name = A::NAME;
 
@@ -40,8 +40,8 @@ where
     fn call<'this, 'args>(
         &'this mut self,
         args: A::Args<'args>,
-        ctx: &mut Context<B, Borrowed<'_>>,
-    ) -> impl MaybeResult<Self::Return> + use<'this, 'args, A, B> {
+        ctx: &mut Context<Ed, Borrowed<'_>>,
+    ) -> impl MaybeResult<Self::Return> + use<'this, 'args, A, Ed> {
         A::call(self, args, ctx)
     }
 }

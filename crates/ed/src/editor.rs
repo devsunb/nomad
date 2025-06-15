@@ -24,13 +24,13 @@ use crate::{
 };
 
 /// TODO: docs.
-pub trait Backend: 'static + Sized {
+pub trait Editor: 'static + Sized {
     /// TODO: docs.
     type Api: Api;
 
     /// TODO: docs.
     type Buffer<'a>: Buffer<
-        Backend: Backend<
+        Editor: Editor<
             BufferId = Self::BufferId,
             EventHandle = Self::EventHandle,
         >,
@@ -41,7 +41,7 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     type Cursor<'a>: Cursor<
-        Backend: Backend<
+        Editor: Editor<
             BufferId = Self::BufferId,
             CursorId = Self::CursorId,
             EventHandle = Self::EventHandle,
@@ -65,7 +65,7 @@ pub trait Backend: 'static + Sized {
 
     /// TODO: docs.
     type Selection<'a>: Selection<
-        Backend: Backend<
+        Editor: Editor<
             BufferId = Self::BufferId,
             SelectionId = Self::SelectionId,
             EventHandle = Self::EventHandle,
@@ -233,4 +233,14 @@ pub trait Backend: 'static + Sized {
     fn with_ctx<R>(self, fun: impl FnOnce(&mut Context<Self>) -> R) -> R {
         fun(&mut Context::from_editor(self))
     }
+}
+
+/// TODO: docs.
+pub trait BaseEditor: Editor {
+    /// TODO: docs.
+    fn create_buffer(
+        file_path: &AbsPath,
+        agent_id: AgentId,
+        ctx: &mut Context<impl AsMut<Self> + Editor, impl BorrowState>,
+    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>;
 }

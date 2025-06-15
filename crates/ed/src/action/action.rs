@@ -1,8 +1,8 @@
 use crate::notify::{MaybeResult, Name};
-use crate::{Backend, Borrowed, Context};
+use crate::{Borrowed, Context, Editor};
 
 /// TODO: docs.
-pub trait Action<B: Backend>: 'static {
+pub trait Action<Bd: Editor>: 'static {
     /// TODO: docs.
     const NAME: Name;
 
@@ -26,6 +26,6 @@ pub trait Action<B: Backend>: 'static {
     fn call<'slf: 'slf, 'args: 'args>(
         &'slf mut self,
         args: Self::Args<'args>,
-        ctx: &mut Context<B, Borrowed<'_>>,
-    ) -> impl MaybeResult<Self::Return> + use<'slf, 'args, Self, B>;
+        ctx: &mut Context<Bd, Borrowed<'_>>,
+    ) -> impl MaybeResult<Self::Return> + use<'slf, 'args, Self, Bd>;
 }

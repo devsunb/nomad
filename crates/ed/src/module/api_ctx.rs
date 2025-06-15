@@ -7,7 +7,7 @@ use crate::util::OrderedMap;
 use crate::{
     Api,
     ApiValue,
-    Backend,
+    Editor,
     Borrowed,
     Context,
     Key,
@@ -16,10 +16,10 @@ use crate::{
 };
 
 /// TODO: docs.
-pub(crate) fn build_api<P, B>(plugin: P, mut state: StateMut<B>) -> B::Api
+pub(crate) fn build_api<P, Ed>(plugin: P, mut state: StateMut<Ed>) -> Ed::Api
 where
-    P: Plugin<B>,
-    B: Backend,
+    P: Plugin<Ed>,
+    Ed: Editor,
 {
     let plugin = state.add_plugin(plugin);
     let mut command_builder = CommandBuilder::new::<P>();
@@ -28,7 +28,7 @@ where
     let mut namespace = Namespace::new(P::NAME);
     let mut api_ctx = ApiCtx {
         plugin_id: <P as Plugin<_>>::id(),
-        module_api: B::Api::new(P::NAME),
+        module_api: Ed::Api::new(P::NAME),
         command_builder: &mut command_builder,
         completions_builder: &mut command_completions_builder,
         config_builder: &mut config_builder,
@@ -57,25 +57,25 @@ where
 }
 
 /// TODO: docs.
-pub struct ApiCtx<'a, B: Backend> {
+pub struct ApiCtx<'a, Ed: Editor> {
     plugin_id: PluginId,
-    command_builder: &'a mut CommandBuilder<B>,
+    command_builder: &'a mut CommandBuilder<Ed>,
     completions_builder: &'a mut CommandCompletionsBuilder,
-    config_builder: &'a mut ConfigBuilder<B>,
-    module_api: B::Api,
+    config_builder: &'a mut ConfigBuilder<Ed>,
+    module_api: Ed::Api,
     namespace: &'a mut Namespace,
-    state: StateMut<'a, B>,
+    state: StateMut<'a, Ed>,
 }
 
 type ConfigHandler<B> = Box<
     dyn FnMut(
         ApiValue<B>,
         &mut Context<B, Borrowed<'_>>,
-    ) -> Result<(), <B as Backend>::DeserializeError>,
+    ) -> Result<(), <B as Editor>::DeserializeError>,
 >;
 
-struct ConfigBuilder<B: Backend> {
-    handler: ConfigHandler<B>,
+struct ConfigBuilder<Ed: Editor> {
+    handler: ConfigHandler<Ed>,
     /// The module's name.
     module_name: Name,
     /// Whether the module's `Config` type is `()`.
@@ -83,10 +83,10 @@ struct ConfigBuilder<B: Backend> {
     submodules: OrderedMap<Name, Self>,
 }
 
-impl<B: Backend> ApiCtx<'_, B> {
-    /// Returns an exclusive reference to the backend.
+impl<Ed: Editor> ApiCtx<'_, Ed> {
+    /// Returns an exclusive reference to the editor.
     #[inline]
-    pub fn backend_mut(&mut self) -> &mut B {
+    pub fn editor_mut(&mut self) -> &mut Ed {
         &mut self.state
     }
 
@@ -95,7 +95,7 @@ impl<B: Backend> ApiCtx<'_, B> {
     #[inline]
     pub fn with_command<Cmd>(&mut self, command: Cmd) -> &mut Self
     where
-        Cmd: Command<B>,
+        Cmd: Command<Ed>,
     {
         self.completions_builder.add_command(&command);
         self.command_builder.add_command(command);
@@ -129,7 +129,7 @@ impl<B: Backend> ApiCtx<'_, B> {
     #[inline]
     pub fn with_function<Fun>(&mut self, mut function: Fun) -> &mut Self
     where
-        Fun: Function<B>,
+        Fun: Function<Ed>,
     {
         let state = self.state.handle();
         let mut namespace = self.namespace.clone();
@@ -177,7 +177,7 @@ impl<B: Backend> ApiCtx<'_, B> {
     #[inline]
     pub fn with_module<Mod>(&mut self, module: Mod) -> &mut Self
     where
-        Mod: Module<B>,
+        Mod: Module<Ed>,
     {
         self.namespace.push(Mod::NAME);
         let submodule_api = self.add_submodule::<Mod>(module);
@@ -188,10 +188,10 @@ impl<B: Backend> ApiCtx<'_, B> {
 
     #[track_caller]
     #[inline]
-    fn add_submodule<S: Module<B>>(&mut self, sub: S) -> B::Api {
+    fn add_submodule<S: Module<Ed>>(&mut self, sub: S) -> Ed::Api {
         let sub = self.state.add_module(sub);
         let mut ctx = ApiCtx {
-            module_api: B::Api::new(S::NAME),
+            module_api: Ed::Api::new(S::NAME),
             command_builder: self.command_builder.add_module::<S>(),
             completions_builder: self.completions_builder.add_module::<S, _>(),
             config_builder: self.config_builder.add_module(sub),
@@ -207,17 +207,17 @@ impl<B: Backend> ApiCtx<'_, B> {
     }
 }
 
-impl<B: Backend> ConfigBuilder<B> {
+impl<Ed: Editor> ConfigBuilder<Ed> {
     #[inline]
-    fn add_module<M: Module<B>>(&mut self, module: &'static M) -> &mut Self {
+    fn add_module<M: Module<Ed>>(&mut self, module: &'static M) -> &mut Self {
         self.submodules.insert(M::NAME, ConfigBuilder::new(module))
     }
 
     #[inline]
-    fn build<P: Plugin<B>>(
+    fn build<P: Plugin<Ed>>(
         mut self,
-        state: StateHandle<B>,
-    ) -> impl FnMut(ApiValue<B>) -> Option<ApiValue<B>> {
+        state: StateHandle<Ed>,
+    ) -> impl FnMut(ApiValue<Ed>) -> Option<ApiValue<Ed>> {
         self.remove_empty_modules();
         let mut namespace = notify::Namespace::new(P::NAME);
         namespace.push(P::CONFIG_FN_NAME);
@@ -232,12 +232,12 @@ impl<B: Backend> ConfigBuilder<B> {
 
     #[allow(clippy::too_many_arguments)]
     #[inline]
-    fn handle<P: Plugin<B>>(
+    fn handle<P: Plugin<Ed>>(
         &mut self,
-        mut config: ApiValue<B>,
+        mut config: ApiValue<Ed>,
         namespace: &Namespace,
         config_path: &mut Namespace,
-        mut state: StateMut<B>,
+        mut state: StateMut<Ed>,
     ) {
         let mut map_access = match config.map_access() {
             Ok(map_access) => map_access,
@@ -281,7 +281,7 @@ impl<B: Backend> ConfigBuilder<B> {
         if let Some(Err(err)) = state.with_ctx(
             config_path,
             <P as Plugin<_>>::id(),
-            |ctx: &mut Context<B, Borrowed<'_>>| (self.handler)(config, ctx),
+            |ctx: &mut Context<Ed, Borrowed<'_>>| (self.handler)(config, ctx),
         ) {
             state.emit_deserialize_error_in_config::<P>(
                 config_path,
@@ -292,7 +292,7 @@ impl<B: Backend> ConfigBuilder<B> {
     }
 
     #[inline]
-    fn new<M: Module<B>>(module: &'static M) -> Self {
+    fn new<M: Module<Ed>>(module: &'static M) -> Self {
         Self {
             handler: Box::new(|config, ctx| {
                 ctx.deserialize::<M::Config>(config).into_result().map(

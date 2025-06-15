@@ -809,7 +809,7 @@ impl Point {
 }
 
 impl Buffer for NeovimBuffer<'_> {
-    type Backend = Neovim;
+    type Editor = Neovim;
 
     #[inline]
     fn byte_len(&self) -> ByteOffset {
