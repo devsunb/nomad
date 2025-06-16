@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use ed::notify::{Emitter, Level, Notification, NotificationId};
+use ed::notify::{Emitter, Notification, NotificationId};
 
 use crate::convert::Convert;
 use crate::{oxi, utils};
@@ -171,20 +171,6 @@ impl Emitter for Box<dyn VimNotifyProvider> {
         match oxi::api::notify(&message, level, &opts) {
             Ok(obj) => self.to_notification_id(obj),
             Err(_err) => NotificationId::new(0),
-        }
-    }
-}
-
-impl Convert<oxi::api::types::LogLevel> for Level {
-    #[inline]
-    fn convert(self) -> oxi::api::types::LogLevel {
-        match self {
-            Self::Off => oxi::api::types::LogLevel::Off,
-            Self::Trace => oxi::api::types::LogLevel::Trace,
-            Self::Debug => oxi::api::types::LogLevel::Debug,
-            Self::Info => oxi::api::types::LogLevel::Info,
-            Self::Warn => oxi::api::types::LogLevel::Warn,
-            Self::Error => oxi::api::types::LogLevel::Error,
         }
     }
 }

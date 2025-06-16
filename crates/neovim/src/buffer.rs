@@ -11,9 +11,10 @@ use std::path::PathBuf;
 use compact_str::CompactString;
 use ed::fs::AbsPath;
 use ed::{AgentId, Buffer, ByteOffset, Chunks, Edit, Replacement, Shared};
-use smallvec::smallvec_inline;
+use smallvec::{SmallVec, smallvec_inline};
 
 use crate::Neovim;
+use crate::convert::Convert;
 use crate::cursor::NeovimCursor;
 use crate::decoration_provider::{self, DecorationProvider};
 use crate::events::{self, EventHandle, Events};
@@ -126,6 +127,36 @@ impl<'a> NeovimBuffer<'a> {
                 highlight_group_name,
             ),
         }
+    }
+
+    /// Returns an iterator over the `(byte_range, hl_groups)` tuples of all
+    /// highlight ranges set on this buffer.
+    #[inline]
+    pub fn highlight_ranges(
+        &self,
+    ) -> impl Iterator<Item = (Range<ByteOffset>, SmallVec<[String; 1]>)> {
+        let start = Point::zero();
+        let end = self.point_of_eof();
+        let opts = api::opts::GetExtmarksOpts::builder()
+            .details(true)
+            .ty("highlight")
+            .build();
+
+        self.inner()
+            .get_extmarks(0, start.into(), end.into(), &opts)
+            .expect("couldn't get extmarks")
+            .map(|(_ns_id, start_row, start_col, maybe_infos)| {
+                let infos = maybe_infos.expect("requested details");
+                let end_row = infos.end_row.expect("set for hl marks");
+                let end_col = infos.end_col.expect("set for hl marks");
+                let hl_group = infos.hl_group.expect("set for hl marks");
+
+                let start_point = Point::new(start_row, start_col);
+                let end_point = Point::new(end_row, end_col);
+                let start = self.byte_of_point(start_point);
+                let end = self.byte_of_point(end_point);
+                (start..end, hl_group.convert())
+            })
     }
 
     /// Converts the given [`Point`] to the corresponding [`ByteOffset`] in the
@@ -1095,5 +1126,12 @@ impl Ord for Point {
         self.line_idx
             .cmp(&other.line_idx)
             .then(self.byte_offset.cmp(&other.byte_offset))
+    }
+}
+
+impl From<Point> for api::types::ExtmarkPosition {
+    #[inline]
+    fn from(point: Point) -> Self {
+        Self::ByTuple((point.line_idx, point.byte_offset))
     }
 }
