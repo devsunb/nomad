@@ -83,7 +83,7 @@ impl Neovim {
         Self::new_inner(augroup_name, false)
     }
 
-    #[inline]
+    #[cfg(feature = "test")]
     pub(crate) fn new_test(augroup_name: &str) -> Self {
         Self::new_inner(augroup_name, true)
     }

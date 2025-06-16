@@ -12,12 +12,17 @@ use ed::command::{CommandArgs, Parse};
 use ed::fs::{self, Directory};
 use ed::{ByteOffset, Context, notify};
 use mlua::{Function, Table};
-use neovim::buffer::BufferId;
+use neovim::buffer::{BufferId, HighlightRangeHandle};
 use neovim::{Neovim, mlua, oxi};
 use smol_str::ToSmolStr;
 
 use crate::config;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
+
+pub struct PeerTooltip {
+    /// We use a 1-grapheme-wide highlight to represent a remote peer's cursor.
+    cursor_highlight_handle: HighlightRangeHandle,
+}
 
 pub struct ServerConfig;
 
@@ -73,7 +78,7 @@ struct TildePath<'a> {
 
 impl CollabEditor for Neovim {
     type Io = async_net::TcpStream;
-    type PeerTooltip = ();
+    type PeerTooltip = PeerTooltip;
     type ProjectFilter = walkdir::GitIgnore;
     type ServerConfig = ServerConfig;
 
@@ -130,10 +135,25 @@ impl CollabEditor for Neovim {
 
     async fn create_peer_tooltip(
         _remote_peer: Peer,
-        _tooltip_offset: ByteOffset,
-        _buffer_id: Self::BufferId,
-        _ctx: &mut Context<Self>,
+        tooltip_offset: ByteOffset,
+        buffer_id: Self::BufferId,
+        ctx: &mut Context<Self>,
     ) -> Self::PeerTooltip {
+        ctx.with_borrowed(|ctx| {
+            let buffer = ctx.buffer(buffer_id).expect("invalid buffer ID");
+
+            let cursor_start = tooltip_offset;
+
+            let cursor_end = buffer
+                .grapheme_offsets_from(cursor_start)
+                .next()
+                .unwrap_or(cursor_start);
+
+            PeerTooltip {
+                cursor_highlight_handle: buffer
+                    .highlight_range(cursor_start..cursor_end, "TermCursor"),
+            }
+        })
     }
 
     async fn default_dir_for_remote_projects(
@@ -210,11 +230,27 @@ impl CollabEditor for Neovim {
     }
 
     fn move_peer_tooltip<'ctx>(
-        _tooltip: &mut Self::PeerTooltip,
-        _tooltip_offset: ByteOffset,
-        _ctx: &'ctx mut Context<Self>,
+        tooltip: &mut Self::PeerTooltip,
+        tooltip_offset: ByteOffset,
+        ctx: &'ctx mut Context<Self>,
     ) -> impl Future<Output = ()> + use<'ctx> {
-        async move {}
+        ctx.with_editor(|nvim| {
+            let hl_range = nvim
+                .highlight_range(&tooltip.cursor_highlight_handle)
+                .expect("invalid buffer ID");
+
+            let cursor_start = tooltip_offset;
+
+            let cursor_end = hl_range
+                .buffer()
+                .grapheme_offsets_from(cursor_start)
+                .next()
+                .unwrap_or(cursor_start);
+
+            hl_range.r#move(cursor_start..cursor_end);
+        });
+
+        async {}
     }
 
     fn project_filter(
@@ -228,6 +264,8 @@ impl CollabEditor for Neovim {
         _tooltip: Self::PeerTooltip,
         _ctx: &mut Context<Self>,
     ) {
+        // Dropping the tooltip will automatically remove the highlight, so we
+        // don't have to do anything here.
     }
 
     async fn select_session<'pairs>(
