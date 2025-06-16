@@ -221,6 +221,123 @@ async fn deleting_all_in_buf_with_eol_causes_newline_deletion(
     assert_eq!(&*edit.replacements, &[Replacement::removal(0..1)]);
 }
 
+#[neovim::test]
+fn grapheme_offsets_empty(ctx: &mut Context<Neovim>) {
+    let mut offsets = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .grapheme_offsets()
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    assert_eq!(offsets.next(), None);
+}
+
+#[neovim::test]
+fn grapheme_offsets_ascii(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("iHello");
+
+    let mut offsets = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .grapheme_offsets()
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    assert_eq!(offsets.next().unwrap(), 1);
+    assert_eq!(offsets.next().unwrap(), 2);
+    assert_eq!(offsets.next().unwrap(), 3);
+    assert_eq!(offsets.next().unwrap(), 4);
+    assert_eq!(offsets.next().unwrap(), 5);
+    assert_eq!(offsets.next().unwrap(), 6);
+    assert_eq!(offsets.next(), None);
+}
+
+#[neovim::test]
+fn grapheme_offsets_multiline(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("ifoo<CR>bar");
+
+    let mut offsets = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .grapheme_offsets()
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    assert_eq!(offsets.next().unwrap(), 1);
+    assert_eq!(offsets.next().unwrap(), 2);
+    assert_eq!(offsets.next().unwrap(), 3);
+    assert_eq!(offsets.next().unwrap(), 4);
+    assert_eq!(offsets.next().unwrap(), 5);
+    assert_eq!(offsets.next().unwrap(), 6);
+    assert_eq!(offsets.next().unwrap(), 7);
+    assert_eq!(offsets.next().unwrap(), 8);
+    assert_eq!(offsets.next(), None);
+}
+
+#[neovim::test]
+fn grapheme_offsets_multibyte_chars(ctx: &mut Context<Neovim>) {
+    ctx.feedkeys("i🦆🦀🐎🦖🐤");
+
+    let mut offsets = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .grapheme_offsets()
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    assert_eq!(offsets.next().unwrap(), 4);
+    assert_eq!(offsets.next().unwrap(), 8);
+    assert_eq!(offsets.next().unwrap(), 12);
+    assert_eq!(offsets.next().unwrap(), 16);
+    assert_eq!(offsets.next().unwrap(), 20);
+    assert_eq!(offsets.next().unwrap(), 21);
+    assert_eq!(offsets.next(), None);
+}
+
+#[neovim::test]
+fn grapheme_offsets_multichar_graphemes(ctx: &mut Context<Neovim>) {
+    // Polar bear is 13 bytes, scientist is 11.
+    ctx.feedkeys("i🐻‍❄️🧑‍🔬");
+
+    let mut offsets = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            .grapheme_offsets()
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    assert_eq!(offsets.next().unwrap(), 13);
+    assert_eq!(offsets.next().unwrap(), 24);
+    assert_eq!(offsets.next().unwrap(), 25);
+    assert_eq!(offsets.next(), None);
+}
+
+#[neovim::test]
+fn grapheme_offsets_start_from_middle_of_grapheme(ctx: &mut Context<Neovim>) {
+    // Polar bear is 13 bytes, scientist is 11.
+    ctx.feedkeys("i🐻‍❄️🧑‍🔬");
+
+    let mut offsets = ctx.with_borrowed(|ctx| {
+        ctx.buffer(BufferId::of_focused())
+            .unwrap()
+            // Start between the ZWJ and the snowflake emoji.
+            .grapheme_offsets_from(7)
+            .collect::<Vec<_>>()
+            .into_iter()
+    });
+
+    assert_eq!(offsets.next().unwrap(), 13);
+    assert_eq!(offsets.next().unwrap(), 24);
+    assert_eq!(offsets.next().unwrap(), 25);
+    assert_eq!(offsets.next(), None);
+}
+
 mod ed_buffer {
     //! Contains the editor-agnostic buffer tests.
 
