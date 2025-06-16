@@ -352,6 +352,7 @@ fn highlight_ranges_empty(ctx: &mut Context<Neovim>) {
 }
 
 #[neovim::test]
+#[ignore = "nvim_buf_get_extmarks() doesn't include ephemeral extmarks"]
 fn highlight_range_simple(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("iHello");
 
@@ -379,6 +380,7 @@ fn highlight_range_simple(ctx: &mut Context<Neovim>) {
 }
 
 #[neovim::test]
+#[ignore = "nvim_buf_get_extmarks() doesn't include ephemeral extmarks"]
 fn highlight_range_including_eol(ctx: &mut Context<Neovim>) {
     ctx.feedkeys("iHello");
 
@@ -406,6 +408,7 @@ fn highlight_range_including_eol(ctx: &mut Context<Neovim>) {
 }
 
 #[neovim::test]
+#[ignore = "nvim_buf_get_extmarks() doesn't include ephemeral extmarks"]
 fn highlight_range_is_removed_when_handle_is_dropped(
     ctx: &mut Context<Neovim>,
 ) {
