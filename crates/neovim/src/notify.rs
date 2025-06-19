@@ -37,7 +37,7 @@ pub struct NeovimEmitter {
     inner: Box<dyn VimNotifyProvider>,
 }
 
-/// https://github.com/rcarriga/nvim-notify
+/// <https://github.com/rcarriga/nvim-notify>
 pub struct NvimNotify;
 
 /// TODO: docs.

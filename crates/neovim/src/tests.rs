@@ -29,8 +29,7 @@ pub trait ContextExt {
     /// implicit `<Esc>` will be added to put it back in normal mode.
     ///
     /// If you want to enter insert mode, use
-    /// [`enter_insert_with_i`](ContextExt::enter_insert_with_i) or
-    /// [`enter_insert_with_a`](ContextExt::enter_insert_with_a).
+    /// [`enter_insert_with_i`](ContextExt::enter_insert_with_i).
     fn feedkeys(&self, keys: &str) {
         let keys = api::replace_termcodes(keys, true, false, true);
         api::feedkeys(&keys, c"x", false);
