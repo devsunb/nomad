@@ -7,7 +7,11 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-gitignore = ["dep:compact_str", "ed/os-fs"]
+gitignore = [
+  "ed/os-fs",
+  #
+  "dep:compact_str",
+]
 
 [dependencies]
 abs-path = { workspace = true }

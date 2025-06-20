@@ -231,6 +231,12 @@
               enable = true;
               package = crane.lib.rustfmt;
             };
+            programs.taplo = {
+              enable = true;
+              settings = {
+                reorder_arrays = true;
+              };
+            };
           };
         };
     };

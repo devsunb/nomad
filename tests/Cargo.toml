@@ -12,11 +12,11 @@ crate-type = ["cdylib"]
 
 [features]
 # Features that enable a specific set of tests.
-auth = ["dep:auth", "__any"]
-collab = ["dep:auth", "dep:collab", "__any"]
+auth = ["__any", "dep:auth"]
+collab = ["__any", "dep:auth", "dep:collab"]
 mock = ["__any", "__editor"]
-neovim = ["dep:neovim", "__any", "__editor"]
-walkdir = ["dep:tempdir", "dep:walkdir", "__any"]
+neovim = ["__any", "__editor", "dep:neovim"]
+walkdir = ["__any", "dep:tempdir", "dep:walkdir"]
 
 # Features that should only be enabled by the build script.
 git-in-PATH = []

@@ -7,7 +7,12 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-os-fs = ["dep:async-fs", "dep:notify", "futures-util/io"]
+os-fs = [
+  "futures-util/io",
+  #,
+  "dep:async-fs",
+  "dep:notify",
+]
 
 [dependencies]
 abs-path = { workspace = true, features = ["serde"] }
