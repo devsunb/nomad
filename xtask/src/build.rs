@@ -197,7 +197,7 @@ fn force_rename(src: &AbsPath, dst: &AbsPath) -> anyhow::Result<()> {
 #[derive(Debug, Copy, Clone)]
 enum NeovimVersion {
     /// The latest stable version.
-    ZeroDotTen,
+    ZeroDotEleven,
 
     /// The latest nightly version.
     Nightly,
@@ -232,9 +232,9 @@ impl str::FromStr for NeovimVersion {
             [..s.len() - (is_nightly as usize) * nightly_suffix.len()]
             .parse::<SemanticVersion>()
             .context("Failed to parse Neovim version")?;
-        if version.major == 0 && version.minor == 10 {
-            Ok(Self::ZeroDotTen)
-        } else if version.major == 0 && version.minor == 11 && is_nightly {
+        if version.major == 0 && version.minor == 11 {
+            Ok(Self::ZeroDotEleven)
+        } else if version.major == 0 && version.minor == 12 && is_nightly {
             Ok(Self::Nightly)
         } else {
             Err(anyhow!(
