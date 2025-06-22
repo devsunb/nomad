@@ -10,7 +10,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// TODO: docs
-pub struct Shared<T, Access: SharedAccess = SingleThreaded> {
+pub struct Shared<T: ?Sized, Access: SharedAccess = SingleThreaded> {
     container: Access::Container<T>,
 }
 
@@ -24,7 +24,7 @@ pub struct MultiThreaded;
 pub trait SharedAccess {
     #[allow(private_bounds)]
     #[doc(hidden)]
-    type Container<T>: SharedContainer<T>;
+    type Container<T: ?Sized>: SharedContainer<T>;
 }
 
 impl<T, Access: SharedAccess> Shared<T, Access> {
@@ -67,17 +67,19 @@ impl<T, Access: SharedAccess> Shared<T, Access> {
     }
 
     /// TODO: docs
-    pub fn strong_count(&self) -> usize {
-        self.container.strong_count()
-    }
-
-    /// TODO: docs
     #[track_caller]
     pub fn take(&self) -> T
     where
         T: Default,
     {
         self.replace(T::default())
+    }
+}
+
+impl<T: ?Sized, Access: SharedAccess> Shared<T, Access> {
+    /// TODO: docs
+    pub fn strong_count(&self) -> usize {
+        self.container.strong_count()
     }
 
     /// Tries to call a closure with a shared reference to the value, returning
@@ -120,14 +122,18 @@ impl<T, Access: SharedAccess> Shared<T, Access> {
     }
 }
 
-trait SharedContainer<T>: Clone {
+trait SharedContainer<T: ?Sized>: Clone {
     fn get(&self) -> T
     where
         T: Copy;
 
-    fn into_inner(self) -> Option<T>;
+    fn into_inner(self) -> Option<T>
+    where
+        T: Sized;
 
-    fn new(value: T) -> Self;
+    fn new(value: T) -> Self
+    where
+        T: Sized;
 
     fn strong_count(&self) -> usize;
 
@@ -159,10 +165,10 @@ trait SharedContainer<T>: Clone {
 }
 
 impl SharedAccess for SingleThreaded {
-    type Container<T> = Rc<WithCell<T>>;
+    type Container<T: ?Sized> = Rc<WithCell<T>>;
 }
 
-impl<T> SharedContainer<T> for Rc<WithCell<T>> {
+impl<T: ?Sized> SharedContainer<T> for Rc<WithCell<T>> {
     fn get(&self) -> T
     where
         T: Copy,
@@ -170,11 +176,17 @@ impl<T> SharedContainer<T> for Rc<WithCell<T>> {
         WithCell::get(self)
     }
 
-    fn into_inner(self) -> Option<T> {
+    fn into_inner(self) -> Option<T>
+    where
+        T: Sized,
+    {
         Rc::into_inner(self).map(|cell| cell.value.into_inner())
     }
 
-    fn new(value: T) -> Self {
+    fn new(value: T) -> Self
+    where
+        T: Sized,
+    {
         Rc::new(WithCell::new(value))
     }
 
@@ -200,10 +212,10 @@ impl<T> SharedContainer<T> for Rc<WithCell<T>> {
 }
 
 impl SharedAccess for MultiThreaded {
-    type Container<T> = Arc<Mutex<T>>;
+    type Container<T: ?Sized> = Arc<Mutex<T>>;
 }
 
-impl<T> SharedContainer<T> for Arc<Mutex<T>> {
+impl<T: ?Sized> SharedContainer<T> for Arc<Mutex<T>> {
     fn get(&self) -> T
     where
         T: Copy,
@@ -212,13 +224,19 @@ impl<T> SharedContainer<T> for Arc<Mutex<T>> {
     }
 
     #[track_caller]
-    fn into_inner(self) -> Option<T> {
+    fn into_inner(self) -> Option<T>
+    where
+        T: Sized,
+    {
         Arc::try_unwrap(self)
             .ok()
             .map(|mutex| mutex.into_inner().expect("Mutex was poisoned"))
     }
 
-    fn new(value: T) -> Self {
+    fn new(value: T) -> Self
+    where
+        T: Sized,
+    {
         Arc::new(Mutex::new(value))
     }
 
@@ -275,7 +293,7 @@ impl<T: fmt::Debug, Access: SharedAccess> fmt::Debug for Shared<T, Access> {
 
 #[derive(Default)]
 #[doc(hidden)]
-pub struct WithCell<T> {
+pub struct WithCell<T: ?Sized> {
     borrow: Cell<Borrow>,
     value: UnsafeCell<T>,
 }
@@ -293,7 +311,9 @@ impl<T> WithCell<T> {
     fn new(value: T) -> Self {
         Self { borrow: Cell::new(Borrow::None), value: UnsafeCell::new(value) }
     }
+}
 
+impl<T: ?Sized> WithCell<T> {
     #[track_caller]
     fn try_with<R>(
         &self,
