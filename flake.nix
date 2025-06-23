@@ -44,6 +44,8 @@
       imports = [
         inputs.flake-root.flakeModule
         inputs.treefmt-nix.flakeModule
+        ./nix/crane.nix
+        ./nix/formatter.nix
       ];
 
       perSystem =
@@ -52,61 +54,10 @@
           pkgs,
           lib,
           inputs',
+          crane,
           ...
         }:
         let
-          crane =
-            let
-              mkToolchain =
-                pkgs:
-                let
-                  toolchain =
-                    (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile
-                      ./rust-toolchain.toml;
-                in
-                toolchain.override {
-                  extensions = (toolchain.extensions or [ ]) ++ [
-                    # Needed by cargo-llvm-cov to generate coverage.
-                    "llvm-tools-preview"
-                  ];
-                };
-              craneLib = (inputs.crane.mkLib pkgs).overrideToolchain mkToolchain;
-            in
-            {
-              lib = craneLib;
-              commonArgs =
-                let
-                  args = {
-                    src = craneLib.cleanCargoSource (craneLib.path ./.);
-                    strictDeps = true;
-                    nativeBuildInputs = with pkgs; [ pkg-config ];
-                    buildInputs =
-                      with pkgs;
-                      lib.lists.optionals stdenv.isLinux [
-                        # Needed by /crates/auth to let "keyring" access the
-                        # Secret Service.
-                        dbus
-                      ];
-                    # Crane will emit a warning if there's no
-                    # `workspace.package.name` set in the workspace's
-                    # Cargo.lock, so add a `pname` here to silence that.
-                    pname = "mad";
-                    env = {
-                      # Crane will run all 'cargo' invocation with `--release`
-                      # if this is not unset.
-                      CARGO_PROFILE = "";
-                      # The .git directory is always removed from the flake's
-                      # source files, so set the latest commit's hash and
-                      # timestamp via environment variables or crates/version's
-                      # build script will fail.
-                      COMMIT_HASH = inputs.self.rev or (lib.removeSuffix "-dirty" inputs.self.dirtyRev);
-                      COMMIT_UNIX_TIMESTAMP = toString inputs.self.lastModified;
-                    };
-                  };
-                in
-                args // { cargoArtifacts = craneLib.buildDepsOnly args; };
-            };
-
           common = {
             devShell = crane.lib.devShell {
               inherit (config) checks;
@@ -304,36 +255,6 @@
             neovim = neovim.devShells.zero-dot-eleven;
             neovim-nightly = neovim.devShells.nightly;
           };
-          treefmt =
-            let
-              cargoSortPriority = 1;
-            in
-            {
-              inherit (config.flake-root) projectRootFile;
-              programs.nixfmt.enable = true;
-              programs.rustfmt = {
-                enable = true;
-                package = crane.lib.rustfmt;
-              };
-              programs.taplo = {
-                enable = true;
-                # cargo-sort messes up the indentation, so make sure to run
-                # taplo after it.
-                priority = cargoSortPriority + 1;
-              };
-              # TODO: make it format [workspace.dependencies].
-              settings.formatter.cargo-sort = {
-                command = "${pkgs.cargo-sort}/bin/cargo-sort";
-                options = [
-                  # Only sort *within* newline-separated dependency groups, not
-                  # *across* them.
-                  "--grouped"
-                  "--order=package,lib,features,dependencies,build-dependencies,dev-dependencies,lints"
-                ];
-                includes = [ "**/Cargo.toml" ];
-                priority = cargoSortPriority;
-              };
-            };
         };
     };
 
