@@ -1,4 +1,5 @@
 {
+  inputs,
   ...
 }:
 
@@ -12,6 +13,8 @@
       ...
     }:
     {
+      checks.fmt = config.treefmt.build.check inputs.self;
+
       treefmt =
         let
           cargoSortPriority = 1;

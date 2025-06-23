@@ -101,7 +101,6 @@
                 };
               }
             );
-            fmt = config.treefmt.build.check inputs.self;
           };
           packages = {
             coverage = crane.lib.cargoLlvmCov (
