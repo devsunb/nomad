@@ -92,6 +92,9 @@
                     # Cargo.lock, so add a `pname` here to silence that.
                     pname = "mad";
                     env = {
+                      # Crane will run all 'cargo' invocation with `--release`
+                      # if this is not unset.
+                      CARGO_PROFILE = "";
                       # The .git directory is always removed from the flake's
                       # source files, so set the latest commit's hash and
                       # timestamp via environment variables or crates/version's
@@ -112,7 +115,28 @@
 
           neovim =
             let
-              buildPlugin =
+              neovimPkg =
+                isNightly: if isNightly then inputs'.neovim-nightly-overlay.packages.default else pkgs.neovim;
+
+              mkOverride =
+                {
+                  isNightly,
+                }:
+                (drv: {
+                  nativeBuildInputs = (drv.nativeBuildInputs or [ ]) ++ [
+                    (neovimPkg isNightly)
+                  ];
+                });
+
+              mkDevShell =
+                {
+                  isNightly,
+                }:
+                common.devShell.overrideAttrs (mkOverride {
+                  inherit isNightly;
+                });
+
+              mkPlugin =
                 {
                   isNightly,
                   isRelease ? true,
@@ -150,6 +174,9 @@
                     in
                     {
                       inherit (crateInfos) pname version;
+                      doCheck = false;
+                      # We'll handle the installation ourselves.
+                      doNotPostBuildInstallCargoBinaries = true;
                       buildPhaseCargoCommand =
                         let
                           nightlyFlag = lib.optionalString isNightly "--nightly";
@@ -160,29 +187,39 @@
                         mkdir -p $out
                         mv lua/* $out/
                       '';
-                      doCheck = false;
-                      # We'll handle the installation ourselves.
-                      doNotPostBuildInstallCargoBinaries = true;
                     }
                   )
                 );
+              mkTests =
+                {
+                  isNightly,
+                }:
+                crane.lib.cargoTest (
+                  crane.commonArgs
+                  // {
+                    cargoTestExtraArgs = lib.concatStringsSep " " [
+                      "--package=tests"
+                      "--features=neovim${lib.optionalString isNightly "-nightly"}"
+                      "--no-fail-fast"
+                    ];
+                    nativeBuildInputs = (crane.commonArgs.nativeBuildInputs or [ ]) ++ [
+                      (neovimPkg isNightly)
+                    ];
+                  }
+                );
             in
             {
-              packages = {
-                zero-dot-eleven = buildPlugin { isNightly = false; };
-                nightly = buildPlugin { isNightly = true; };
+              checks = {
+                test = mkTests { isNightly = false; };
+                test-nightly = mkTests { isNightly = true; };
               };
               devShells = {
-                zero-dot-eleven = common.devShell.overrideAttrs (old: {
-                  nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
-                    pkgs.neovim
-                  ];
-                });
-                nightly = common.devShell.overrideAttrs (old: {
-                  nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [
-                    inputs'.neovim-nightly-overlay.packages.default
-                  ];
-                });
+                zero-dot-eleven = mkDevShell { isNightly = false; };
+                nightly = mkDevShell { isNightly = true; };
+              };
+              packages = {
+                zero-dot-eleven = mkPlugin { isNightly = false; };
+                nightly = mkPlugin { isNightly = true; };
               };
             };
         in
@@ -231,6 +268,8 @@
               }
             );
             fmt = config.treefmt.build.check inputs.self;
+            test-neovim = neovim.checks.test;
+            test-neovim-nightly = neovim.checks.test-nightly;
           };
           packages = {
             coverage = crane.lib.cargoLlvmCov (

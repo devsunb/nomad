@@ -64,9 +64,9 @@ jobs:
         neovim: [v0.11.2, nightly]
         include:
           - neovim: v0.11.2
-            features: "neovim"
+            check: "check-test-neovim"
           - neovim: nightly
-            features: "neovim-nightly"
+            check: "check-test-neovim-nightly"
     steps:
       - uses: actions/checkout@v4
       # TODO: remove after publishing private crates.
@@ -80,19 +80,11 @@ jobs:
             ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
             ${{ secrets.PANDO_DEPLOY_KEY }}
             ${{ secrets.PUFF_DEPLOY_KEY }}
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
-      - name: Install Neovim ${{ matrix.neovim }}
-        uses: rhysd/action-setup-vim@v1
-        with:
-            neovim: true
-            version: ${{ matrix.neovim }}
-      - name: Compile Neovim tests
-        working-directory: ./tests
-        run: cargo test --features=${{ matrix.features }} --no-run
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+      - uses: DeterminateSystems/magic-nix-cache-action@main
       - name: Run Neovim tests
-        working-directory: ./tests
-        run: cargo test --features=${{ matrix.features }} --no-fail-fast
+        run: nix run .#${{ matrix.check }} --accept-flake-config
 
   coverage:
     name: coverage
