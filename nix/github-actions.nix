@@ -29,13 +29,16 @@
       mkDevShell =
         devShell:
         let
-          cleanedDevShell = builtins.removeAttrs devShell [ "packages" ];
+          cleanedDevShell = builtins.removeAttrs devShell [
+            "buildInputs"
+            "packages"
+          ];
         in
         pkgs.mkShell (
           cleanedDevShell
           // {
             buildInputs = (crane.commonArgs.buildInputs or [ ]) ++ (devShell.buildInputs or [ ]);
-            nativeBuildInputs = (crane.commonArgs.nativeBuildInputs or [ ]) ++ (devShell.packages or [ ]);
+            packages = (crane.commonArgs.nativeBuildInputs or [ ]) ++ (devShell.packages or [ ]);
           }
         );
     in
