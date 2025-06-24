@@ -9,7 +9,7 @@
       ...
     }:
     {
-      packages.tests = crane.lib.cargoLlvmCov (
+      checks.tests = crane.lib.cargoLlvmCov (
         crane.commonArgs
         // {
           checkPhase = ''

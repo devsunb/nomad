@@ -58,6 +58,7 @@
         {
           config,
           lib,
+          pkgs,
           crane,
           ...
         }:
@@ -68,7 +69,11 @@
             name = "check-${name}";
             value = {
               type = "app";
-              program = "${check}";
+              program =
+                (pkgs.writeShellScript "check-${name}" ''
+                  # Force evaluation of check ${check}.
+                  echo -e "\033[1;32m✓\033[0m Check '${name}' passed"
+                '').outPath;
             };
           }) config.checks;
 
