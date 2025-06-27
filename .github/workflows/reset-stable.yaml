@@ -34,10 +34,8 @@ jobs:
 
           tag_commit=$(gh api repos/${{ github.repository }}/git/refs/tags/${{ github.ref_name }} --jq '.object.sha')
 
-          if gh api repos/${{ github.repository }}/compare/$tag_commit...$default_branch --jq '.status' | grep -q "ahead\|identical"; then
-            echo "✅ Tag commit is at or behind $default_branch's tip"
-          else
-            echo "❌ Tag commit is ahead of $default_branch's tip"
+          if ! gh api repos/${{ github.repository }}/compare/$tag_commit...$default_branch --jq '.status' | grep -q "ahead\|identical"; then
+            echo "❌ Tagged commit is not ancestor of or identical to $default_branch's tip"
             exit 1
           fi
 
