@@ -30,12 +30,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          tag_commit=${{ github.sha }}
           default_branch="${{ steps.default-branch.outputs.branch }}"
 
-          tag_commit=$(gh api repos/${{ github.repository }}/git/refs/tags/${{ github.ref_name }} --jq '.object.sha')
-
           if ! gh api repos/${{ github.repository }}/compare/$tag_commit...$default_branch --jq '.status' | grep -q "ahead\|identical"; then
-            echo "❌ Tagged commit is not ancestor of or identical to $default_branch's tip"
+            echo "❌ Tagged commit is not an ancestor of or identical to $default_branch's tip"
             exit 1
           fi
 
