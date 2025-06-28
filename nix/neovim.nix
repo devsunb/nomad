@@ -58,20 +58,17 @@
         crane.lib.buildPackage (
           crane.commonArgs
           // {
-            inherit (crateInfos) pname version;
+            pname = crateInfos.name;
+            version = crateInfos.version;
             doCheck = false;
-            # We'll handle the installation ourselves.
-            doNotPostBuildInstallCargoBinaries = true;
+            # Already included in the build command.
+            doInstall = false;
             buildPhaseCargoCommand =
               let
                 nightlyFlag = lib.optionalString isNightly "--nightly";
                 releaseFlag = lib.optionalString isRelease "--release";
               in
-              "${xtask} neovim build ${nightlyFlag} ${releaseFlag}";
-            installPhaseCommand = ''
-              mkdir -p $out
-              mv lua $out/
-            '';
+              "${xtask} neovim build ${nightlyFlag} ${releaseFlag} --out-dir=$out";
           }
         );
 

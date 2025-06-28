@@ -1,77 +1,69 @@
 use core::{fmt, iter, str};
-use std::borrow::Cow;
-use std::env;
+use std::{env, fs};
 
 use abs_path::{AbsPath, AbsPathBuf, NodeNameBuf, node};
 use anyhow::{Context, anyhow};
 use cargo_metadata::TargetKind;
 use xshell::cmd;
 
+use crate::WORKSPACE_ROOT;
 use crate::neovim::CARGO_TOML_META;
 
-#[derive(Debug, Copy, Clone, clap::Args)]
+#[derive(Debug, Clone, clap::Args)]
 pub(crate) struct BuildArgs {
     /// Build the plugin in release mode.
-    #[clap(long, short)]
+    #[clap(long, short, default_value_t = false)]
     release: bool,
 
     /// Build the plugin for the latest nightly version of Neovim.
-    #[clap(long)]
+    #[clap(long, default_value_t = false)]
     nightly: bool,
+
+    /// The absolute path to the directory under which to place the build
+    /// artifacts.
+    #[clap(long, default_value_t = WORKSPACE_ROOT.to_owned())]
+    out_dir: AbsPathBuf,
 }
 
 pub(crate) fn build(args: BuildArgs) -> anyhow::Result<()> {
     let sh = xshell::Shell::new()?;
-    build_plugin(args, &sh)?;
-    fix_library_name()?;
-    Ok(())
-}
 
-fn build_plugin(args: BuildArgs, sh: &xshell::Shell) -> anyhow::Result<()> {
-    struct Arg<'a>(Cow<'a, str>);
+    fs::create_dir_all(&args.out_dir)?;
 
-    impl AsRef<std::ffi::OsStr> for Arg<'_> {
-        fn as_ref(&self) -> &std::ffi::OsStr {
-            self.0.as_ref().as_ref()
-        }
-    }
-
-    let package_meta = &CARGO_TOML_META;
+    let artifact_dir = args.out_dir.clone().join(node!("lua"));
 
     // Setting the artifact directory is still unstable.
     let artifact_dir_args = ["-Zunstable-options", "--artifact-dir"]
         .into_iter()
-        .map(Cow::Borrowed)
-        .chain(iter::once(Cow::Owned(artifact_dir().to_string())));
+        .chain(iter::once(artifact_dir.as_str()));
+
+    let package_meta = &CARGO_TOML_META;
 
     // Specify which package to build.
-    let package_args =
-        ["--package", &package_meta.name].into_iter().map(Cow::Borrowed);
+    let package_args = ["--package", &package_meta.name].into_iter();
 
     let is_nightly = args.nightly
-        || NeovimVersion::detect(sh).map(|v| v.is_nightly()).unwrap_or(false);
+        || NeovimVersion::detect(&sh).map(|v| v.is_nightly()).unwrap_or(false);
 
-    let feature_args = is_nightly
-        .then_some("--features=neovim-nightly")
-        .into_iter()
-        .map(Cow::Borrowed);
+    let feature_args =
+        is_nightly.then_some("--features=neovim-nightly").into_iter();
 
-    let profile_args =
-        args.release.then_some("--release").into_iter().map(Cow::Borrowed);
+    let profile_args = args.release.then_some("--release").into_iter();
 
-    let args = artifact_dir_args
+    let build_args = artifact_dir_args
         .chain(package_args)
         .chain(feature_args)
-        .chain(profile_args)
-        .map(Arg);
+        .chain(profile_args);
 
-    cmd!(sh, "cargo build {args...}").run()?;
+    cmd!(sh, "cargo build {build_args...}").run()?;
+
+    fix_library_name(&artifact_dir)?;
 
     Ok(())
 }
 
 #[allow(clippy::unwrap_used)]
-fn fix_library_name() -> anyhow::Result<()> {
+fn fix_library_name(artifact_dir: &AbsPath) -> anyhow::Result<()> {
     let package_meta = &CARGO_TOML_META;
 
     let mut cdylib_targets = package_meta.targets.iter().filter(|target| {
@@ -109,19 +101,15 @@ fn fix_library_name() -> anyhow::Result<()> {
     .parse::<NodeNameBuf>()
     .unwrap();
 
-    force_rename(artifact_dir().push(source), artifact_dir().push(dest))
+    force_rename(&artifact_dir.join(&source), &artifact_dir.join(&dest))
         .context("Failed to rename the library")
 }
 
-fn artifact_dir() -> AbsPathBuf {
-    crate::WORKSPACE_ROOT.join(node!("lua"))
-}
-
 fn force_rename(src: &AbsPath, dst: &AbsPath) -> anyhow::Result<()> {
-    if std::fs::metadata(dst).is_ok() {
-        std::fs::remove_file(dst)?;
+    if fs::metadata(dst).is_ok() {
+        fs::remove_file(dst)?;
     }
-    std::fs::rename(src, dst)?;
+    fs::rename(src, dst)?;
     Ok(())
 }
 
