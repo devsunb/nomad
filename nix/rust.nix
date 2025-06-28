@@ -21,7 +21,10 @@
         nativeBuildInputs = with pkgs; [ pkg-config ];
 
         mkToolchain =
-          pkgs: (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile ../rust-toolchain.toml;
+          pkgs:
+          (inputs.rust-overlay.lib.mkRustBin { } pkgs).fromRustupToolchainFile (
+            crane.lib.path ../rust-toolchain.toml
+          );
 
         toolchain = mkToolchain pkgs;
 

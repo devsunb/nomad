@@ -10,7 +10,7 @@
       {
         config,
         pkgs,
-        crane,
+        rust,
         ...
       }:
       {
@@ -58,8 +58,8 @@
               pkgs.mkShell (
                 cleanedDevShell
                 // {
-                  buildInputs = devShell.buildInputs ++ (crane.commonArgs.buildInputs or [ ]);
-                  packages = devShell.packages ++ (crane.commonArgs.nativeBuildInputs or [ ]);
+                  buildInputs = devShell.buildInputs ++ (rust.buildInputs or [ ]);
+                  packages = devShell.packages ++ (rust.nativeBuildInputs or [ ]);
                   env = devShell.env // {
                     # Fingerprint code by file contents instead of mtime.
                     #

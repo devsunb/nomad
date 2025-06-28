@@ -7,10 +7,24 @@
     {
       pkgs,
       crane,
+      rust,
       ...
     }:
+    let
+      mkToolchain =
+        pkgs:
+        let
+          prev = rust.mkToolchain pkgs;
+        in
+        prev.override {
+          extensions = (prev.extensions or [ ]) ++ [
+            # Needed by cargo-llvm-cov to generate coverage.
+            "llvm-tools-preview"
+          ];
+        };
+    in
     {
-      packages.coverage = crane.lib.cargoLlvmCov (
+      packages.coverage = (crane.lib.overrideToolchain mkToolchain).cargoLlvmCov (
         crane.commonArgs
         // {
           buildPhaseCargoCommand = ''
@@ -29,10 +43,10 @@
           '';
         }
       );
+
       ciDevShells.coverage = {
         packages = [
-          crane.lib.cargo
-          crane.lib.rustc
+          (mkToolchain pkgs)
           pkgs.cargo-llvm-cov
         ];
       };

@@ -11,16 +11,15 @@
     {
       _module.args.crane =
         let
-          craneLib = (inputs.crane.mkLib pkgs).overrideToolchain (
-            pkgs:
-            let
-              toolchain = rust.mkToolchain pkgs;
-            in
-            toolchain.override {
-              extensions = (toolchain.extensions or [ ]) ++ [
-                # Needed by cargo-llvm-cov to generate coverage.
-                "llvm-tools-preview"
-              ];
+          craneLib = ((inputs.crane.mkLib pkgs).overrideToolchain rust.mkToolchain).overrideScope (
+            # Override Crane's 'filterCargoSources' to also keep all Lua files
+            # and all symlinks under `lua/nomad`.
+            final: prev: {
+              filterCargoSources =
+                path: type:
+                (prev.filterCargoSources path type)
+                || (lib.hasSuffix ".lua" (builtins.baseNameOf path))
+                || (type == "symlink" && lib.hasInfix "lua/nomad" path);
             }
           );
         in
