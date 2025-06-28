@@ -1,7 +1,7 @@
 use core::{iter, str};
-use std::{env, fs, process};
+use std::{env, fs, path, process};
 
-use abs_path::{AbsPath, AbsPathBuf, NodeNameBuf, node};
+use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf, node};
 use anyhow::{Context, anyhow};
 use cargo_metadata::TargetKind;
 
@@ -64,6 +64,12 @@ pub(crate) fn build(args: BuildArgs) -> anyhow::Result<()> {
 
     fix_library_name(&artifact_dir)?;
 
+    let dst = artifact_dir.join(node!("nomad"));
+    if !fs::exists(&dst)? {
+        let src = WORKSPACE_ROOT.join(node!("lua")).join(node!("nomad"));
+        copy_dir(&src, &dst)?;
+    }
+
     Ok(())
 }
 
@@ -108,6 +114,63 @@ fn fix_library_name(artifact_dir: &AbsPath) -> anyhow::Result<()> {
 
     force_rename(&artifact_dir.join(&source), &artifact_dir.join(&dest))
         .context("Failed to rename the library")
+}
+
+fn copy_dir(src_dir: &AbsPath, dst_dir: &AbsPath) -> anyhow::Result<()> {
+    assert!(!fs::exists(dst_dir)?);
+
+    fs::create_dir_all(dst_dir)?;
+
+    for entry in fs::read_dir(src_dir)? {
+        let entry = entry?;
+
+        let os_entry_name = entry.file_name();
+
+        let entry_name = os_entry_name
+            .to_str()
+            .map(<&NodeName>::try_from)
+            .context("Invalid file name")??;
+
+        let src = src_dir.join(entry_name);
+        let dst = dst_dir.join(entry_name);
+        let file_type = entry.file_type()?;
+
+        if file_type.is_dir() {
+            copy_dir(&src, &dst)?;
+        } else if file_type.is_file() {
+            fs::copy(&src, &dst)?;
+        } else if file_type.is_symlink() {
+            copy_symlink(&src, &dst)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn copy_symlink(src: &AbsPath, dst: &AbsPath) -> anyhow::Result<()> {
+    let link_target = fs::read_link(src)?;
+
+    let link_src = if link_target.is_absolute() {
+        AbsPathBuf::try_from(link_target)?
+    } else {
+        let src = path::Path::new(src.as_str());
+        let target_src = fs::canonicalize(
+            src.parent().expect("not root").join(link_target),
+        )?;
+        AbsPathBuf::try_from(target_src)?
+    };
+
+    let file_type = fs::metadata(&link_src)?.file_type();
+
+    if file_type.is_dir() {
+        copy_dir(&link_src, dst)?;
+    } else if file_type.is_file() {
+        fs::copy(&link_src, dst)?;
+    } else if file_type.is_symlink() {
+        copy_symlink(&link_src, dst)?;
+    }
+
+    Ok(())
 }
 
 fn force_rename(src: &AbsPath, dst: &AbsPath) -> anyhow::Result<()> {
