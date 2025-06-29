@@ -13,41 +13,28 @@
       _module.args.crane =
         let
           mkCraneLib =
-            targetPkgs:
-            ((inputs.crane.mkLib targetPkgs).overrideToolchain (
-              p:
-              let
-                toolchain = rust.mkToolchain p;
-              in
-              # No fucking clue why this is necessary, but not having it causes
-              # `lib.getExe' toolchain "cargo"` in the common.xtask derivation
-              # to return a store path like
-              # /nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-rust-default-1.89.0-nightly-2025-06-22/bin/cargo
-              toolchain.override {
-                extensions = (toolchain.extensions or [ ]);
+            targetPkgs: toolchain:
+            ((inputs.crane.mkLib targetPkgs).overrideToolchain (_targetPkgs: toolchain)).overrideScope (
+              # Override Crane's 'filterCargoSources' to also keep all Lua
+              # files and all symlinks under `lua/nomad`.
+              final: prev: {
+                filterCargoSources =
+                  path: type:
+                  (prev.filterCargoSources path type)
+                  || (lib.hasSuffix ".lua" (builtins.baseNameOf path))
+                  || (type == "symlink" && lib.hasInfix "lua/nomad" path);
               }
-            )).overrideScope
-              (
-                # Override Crane's 'filterCargoSources' to also keep all Lua
-                # files and all symlinks under `lua/nomad`.
-                final: prev: {
-                  filterCargoSources =
-                    path: type:
-                    (prev.filterCargoSources path type)
-                    || (lib.hasSuffix ".lua" (builtins.baseNameOf path))
-                    || (type == "symlink" && lib.hasInfix "lua/nomad" path);
-                }
-              );
+            );
 
           mkCommonArgs =
-            targetPkgs:
+            targetPkgs: toolchain:
             let
-              craneLib = mkCraneLib targetPkgs;
+              craneLib = mkCraneLib targetPkgs toolchain;
 
               depsArgs = {
                 inherit (common) nativeBuildInputs;
-                buildinputs = common.buildInputs;
-                # buildinputs = common.buildInputs targetPkgs;
+                buildInputs = common.buildInputs;
+                # buildInputs = common.buildInputs targetPkgs;
                 pname = common.workspaceName;
                 src = craneLib.cleanCargoSource (craneLib.path ../.);
                 strictDeps = true;
@@ -69,12 +56,56 @@
               };
             };
 
-          mkCrane = targetPkgs: {
-            lib = mkCraneLib targetPkgs;
-            commonArgs = mkCommonArgs targetPkgs;
-            overridePkgs = targetPkgs2: mkCrane targetPkgs2;
+          mkCrane = targetPkgs: toolchain: {
+            # lib :: craneLib
+            lib = mkCraneLib targetPkgs toolchain;
+
+            # commonArgs :: set
+            commonArgs = mkCommonArgs targetPkgs toolchain;
+
+            # overridePkgs :: newPkgs -> crane
+            #
+            # Overrides the package set used by Crane. If the new package set
+            # is for cross-compilation (i.e. its buildPlatform differs from its
+            # hostPlatform), this will also add the Rust target corresponding
+            # to the new hostPlatform to the Rust toolchain.
+            overridePkgs =
+              newTargetPkgs:
+              let
+                inherit (newTargetPkgs.stdenv) buildPlatform hostPlatform;
+
+                newToolchain =
+                  if buildPlatform != hostPlatform then
+                    toolchain.override {
+                      targets = lib.unique ((toolchain.targets or [ ]) ++ [ hostPlatform.config ]);
+                    }
+                  else
+                    toolchain;
+              in
+              mkCrane newTargetPkgs newToolchain;
+
+            # overrideToolchain :: (pkgs: prevToolchain: newToolchain) -> crane
+            #
+            # Similar to `craneLib.overrideToolchain`, but is given the current
+            # toolchain in addition to the package set, which allows us to keep
+            # adding targets and extensions if called multiple times.
+            overrideToolchain = mkNewToolchain: mkCrane targetPkgs (mkNewToolchain targetPkgs toolchain);
+
+            # toolchain :: drv
+            inherit toolchain;
           };
         in
-        mkCrane pkgs;
+        mkCrane pkgs (
+          let
+            toolchain = rust.mkToolchain pkgs;
+          in
+          # No fucking clue why this is necessary, but not having it causes
+          # `lib.getExe' toolchain "cargo"` in the common.xtask derivation to
+          # return a store path like
+          # /nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-rust-default-1.89.0-nightly-2025-06-22/bin/cargo
+          toolchain.override {
+            extensions = (toolchain.extensions or [ ]);
+          }
+        );
     };
 }
