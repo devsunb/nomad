@@ -82,7 +82,7 @@
           }) config.checks;
 
           devShells.default = pkgs.mkShell {
-            buildInputs = common.buildInputs;
+            buildInputs = common.buildInputsFor pkgs;
 
             packages = common.nativeBuildInputs ++ [
               (rust.toolchain.override {

@@ -58,8 +58,8 @@
               pkgs.mkShell (
                 cleanedDevShell
                 // {
-                  buildInputs = devShell.buildInputs ++ (common.buildInputs or [ ]);
-                  packages = devShell.packages ++ (common.nativeBuildInputs or [ ]);
+                  buildInputs = devShell.buildInputs ++ (common.buildInputsFor pkgs);
+                  packages = devShell.packages ++ common.nativeBuildInputs;
                   env = devShell.env // {
                     # Fingerprint code by file contents instead of mtime.
                     #

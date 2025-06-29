@@ -33,8 +33,7 @@
 
               depsArgs = {
                 inherit (common) nativeBuildInputs;
-                buildInputs = common.buildInputs;
-                # buildInputs = common.buildInputs targetPkgs;
+                buildInputs = common.buildInputsFor targetPkgs;
                 pname = common.workspaceName;
                 src = craneLib.cleanCargoSource (craneLib.path ../.);
                 strictDeps = true;

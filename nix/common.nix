@@ -13,8 +13,9 @@
       _module.args.common = {
         # The list of libraries to be linked against needed to compile all the
         # crates in the workspace with only their default features enabled.
-        buildInputs =
-          with pkgs;
+        buildInputsFor =
+          targetPkgs:
+          with targetPkgs;
           lib.lists.optionals stdenv.isLinux [
             # Needed by crates/auth to let "keyring" access the Secret
             # Service.
