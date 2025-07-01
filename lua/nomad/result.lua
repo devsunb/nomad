@@ -1,6 +1,4 @@
----@alias nomad.Result<T, E> nomad.result.Result<T, E>
-
----@class nomad.result.ResultModule
+---@class nomad.result
 ---@field ok fun(value: T): nomad.result.Result<T, any>
 ---@field err fun(err: E): nomad.result.Result<any, E>
 
@@ -42,7 +40,7 @@ function result:unwrap_err()
   end
 end
 
----@type nomad.result.ResultModule
+---@type nomad.result
 return {
   ok = function(value) return result.new(value, nil) end,
   err = function(err) return result.new(nil, err) end,

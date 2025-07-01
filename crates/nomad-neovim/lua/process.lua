@@ -1,4 +1,4 @@
----@class nomad.neovim.Process
+---@class nomad.neovim.process
 ---@field command nomad.neovim.process.Command
 
 ---@class nomad.neovim.process.Command
@@ -10,7 +10,7 @@
 ---@field on_stderr fun(self: nomad.neovim.process.Command, handler: fun(stdout_line: string)): nomad.neovim.process.Command
 ---@field on_done fun(self: nomad.neovim.process.Command, handler: fun(res: nomad.result.Result<nil, integer>): nomad.neovim.process.Command?): nomad.neovim.process.Command?
 
----@type nomad.result.ResultModule
+---@type nomad.result
 local result = require("nomad.result")
 
 local command = {}

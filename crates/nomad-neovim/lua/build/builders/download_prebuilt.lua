@@ -1,14 +1,14 @@
 ---@class (exact) nomad.neovim.build.DownloadPrebuiltOpts
 
----@type nomad.neovim.Process
-local process = require("nomad.neovim.build.process")
+---@type nomad.neovim.process
+local process = require("nomad.neovim.process")
 
----@type nomad.result.ResultModule
+---@type nomad.result
 local result = require("nomad.result")
 
 ---@param nomad_version string
 ---@param neovim_version string
----@return nomad.Result<string, string>
+---@return nomad.result.Result<string, string>
 local artifact_name = function(nomad_version, neovim_version)
   local arch = ({
     ["x64"] = "x86_64",

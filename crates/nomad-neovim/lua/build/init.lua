@@ -1,6 +1,4 @@
----@alias nomad.neovim.Build nomad.neovim.build.Build
-
----@class (exact) nomad.neovim.build.Build
+---@class (exact) nomad.neovim.build
 ---
 ---Something.
 ---@field build fun(builder: nomad.neovim.build.Builder)
@@ -11,7 +9,7 @@
 ---@class (exact) nomad.neovim.build.Context
 ---
 ---@field emit fun(msg: string)
----@field on_done fun(res: nomad.Result<nil, string>)
+---@field on_done fun(res: nomad.result.Result<nil, string>)
 ---@field override fun(self: nomad.neovim.build.Context, overrides: table<string, any>): nomad.neovim.build.Context
 
 local context = {}

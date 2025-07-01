@@ -1,10 +1,7 @@
 ---@class (exact) nomad.neovim.build.NixOpts
 
----@type nomad.neovim.Process
-local process = require("nomad.neovim.build.process")
-
----@type nomad.result.ResultModule
-local result = require("nomad.result")
+---@type nomad.neovim.process
+local process = require("nomad.neovim.process")
 
 ---@param opts nomad.neovim.build.NixOpts?
 ---@param ctx nomad.neovim.build.Context
