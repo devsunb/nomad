@@ -4,7 +4,7 @@
 local Command = require("nomad.neovim.command")
 
 ---@type nomad.Result
-local Result = require("nomad.Result")
+local Result = require("nomad.result")
 
 ---@param nomad_version string
 ---@return nomad.Result<string, string>
@@ -62,22 +62,28 @@ return function(opts, ctx)
         if res:is_err() then return ctx.on_done(res) end
         if tag == nil then return ctx.on_done(Result.err("not on a tag")) end
 
-        -- We don't offer pre-built artifacts for this machine.
         local nomad_version = tag:gsub("^v", "")
         local res = get_artifact_name(nomad_version)
+        -- We don't offer pre-built artifacts for this machine.
         if res:is_err() then return ctx.on_done(res:map(function() end)) end
 
         artifact_name = res:unwrap()
-        local url = get_artifact_url(tag, artifact_name)
+
+        -- /result is gitignored, which makes it a good place to store the
+        -- downloaded artifact under.
         out_dir = ctx:repo_dir():join("result")
 
-        -- Download the artifact from the releases page.
+        return Command.new("mkdir"):args({ "-p", out_dir })
+      end)
+      :on_done(function(res)
+        if res:is_err() then return ctx.on_done(res:map_err(tostring)) end
+
         return Command.new("curl")
             -- Follow redirects.
             :arg("--location")
             :arg("--output")
             :arg(out_dir:join(artifact_name))
-            :arg(url)
+            :arg(get_artifact_url(tag, artifact_name))
             :on_stdout(ctx.emit)
       end)
       :on_done(function(res)
