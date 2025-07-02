@@ -1,16 +1,11 @@
----@class (exact) nomad.neovim.build.contexts
----@field lazy fun(): nomad.neovim.build.Context
-
----@class (exact) nomad.neovim.build.Context
+---@class (exact) nomad.neovim.build.Context: nomad.neovim.build.ContextOpts
 ---
----@field emit fun(msg: string)
----@field on_done fun(res: nomad.result.Result<nil, string>)
 ---@field override fun(self: nomad.neovim.build.Context, overrides: table<string, any>): nomad.neovim.build.Context
 
 ---@class (exact) nomad.neovim.build.ContextOpts
 ---
+---@field emit fun(msg: string)
 ---@field on_done fun(res: nomad.result.Result<nil, string>)
----@field override fun(self: nomad.neovim.build.Context, overrides: table<string, any>): nomad.neovim.build.Context
 
 ---@type nomad.path
 local path = require("nomad.path")
@@ -31,15 +26,10 @@ end
 local Context = {}
 Context.__index = Context
 
----@param emit fun(msg: string)
----@param on_done fun(res: nomad.result.Result<nil, string>)
+---@param opts nomad.neovim.build.ContextOpts
 ---@return nomad.neovim.build.Context
-Context.new = function(emit, on_done)
-  local self = {
-    emit = emit,
-    on_done = on_done,
-  }
-  return setmetatable(self, Context)
+Context.new = function(opts)
+  return setmetatable(opts, Context)
 end
 
 ---@return nomad.neovim.build.Context
@@ -61,7 +51,4 @@ function Context:repo_dir()
   return self._repo_dir
 end
 
----@type nomad.neovim.build.contexts
-return {
-  lazy = unpack(require("nomad.neovim.build.contexts.lazy")),
-}
+return Context

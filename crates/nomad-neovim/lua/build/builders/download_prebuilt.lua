@@ -1,13 +1,13 @@
 ---@class (exact) nomad.neovim.build.DownloadPrebuiltOpts
 
----@type nomad.neovim.process
-local process = require("nomad.neovim.process")
+---@type nomad.neovim.Command
+local Command = require("nomad.neovim.command")
 
----@type nomad.result
-local result = require("nomad.result")
+---@type nomad.Result
+local Result = require("nomad.Result")
 
 ---@param nomad_version string
----@return nomad.result.Result<string, string>
+---@return nomad.Result<string, string>
 local get_artifact_name = function(nomad_version)
   local arch = ({
     ["x64"] = "x86_64",
@@ -15,7 +15,7 @@ local get_artifact_name = function(nomad_version)
   })[jit.arch]
 
   if not arch then
-    return result.err(("unsupported architecture: %s"):format(jit.arch))
+    return Result.err(("unsupported architecture: %s"):format(jit.arch))
   end
 
   local os = ({
@@ -24,7 +24,7 @@ local get_artifact_name = function(nomad_version)
   })[jit.os:lower()]
 
   if not os then
-    return result.err(("unsupported OS: %s"):format(jit.os:lower()))
+    return Result.err(("unsupported OS: %s"):format(jit.os:lower()))
   end
 
   local version = vim.version()
@@ -32,7 +32,7 @@ local get_artifact_name = function(nomad_version)
     version.major, version.minor, version.prerelease and "-nightly" or ""
   )
 
-  return result.ok(("nomad-%s-for-neovim-%s-%s-%s.tar.gz")
+  return Result.ok(("nomad-%s-for-neovim-%s-%s-%s.tar.gz")
     :format(nomad_version, neovim_version, os, arch))
 end
 
@@ -53,14 +53,14 @@ return function(opts, ctx)
   ---@type string
   local out_dir
 
-  process.command.new("git")
+  Command.new("git")
       :args({ "describe", "--tags", "--exact-match" })
       :current_dir(ctx:repo_dir())
       :on_stdout(function(line) tag = line end)
       :on_done(function(res)
         -- We're not on a tag, so we can't download a pre-built artifact.
         if res:is_err() then return ctx.on_done(res) end
-        if tag == nil then return ctx.on_done(result.err("not on a tag")) end
+        if tag == nil then return ctx.on_done(Result.err("not on a tag")) end
 
         -- We don't offer pre-built artifacts for this machine.
         local nomad_version = tag:gsub("^v", "")
@@ -72,7 +72,7 @@ return function(opts, ctx)
         out_dir = ctx:repo_dir():join("result")
 
         -- Download the artifact from the releases page.
-        return process.command.new("curl")
+        return Command.new("curl")
             -- Follow redirects.
             :arg("--location")
             :arg("--output")
@@ -83,14 +83,14 @@ return function(opts, ctx)
       :on_done(function(res)
         if res:is_err() then return ctx.on_done(res:map_err(tostring)) end
 
-        return process.command.new("tar")
+        return Command.new("tar")
             :args({ "-xzf", out_dir:join(artifact_name) })
             :args({ "-C", out_dir })
       end)
       :on_done(function(res)
         if res:is_err() then return ctx.on_done(res:map_err(tostring)) end
 
-        return process.command.new("cp")
+        return Command.new("cp")
             :args({ out_dir:join("/lua/*"), "lua/" })
             :current_dir(ctx:repo_dir())
       end)
