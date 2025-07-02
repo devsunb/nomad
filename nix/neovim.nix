@@ -147,6 +147,8 @@
                   arch = common.getArchString args.targetPkgs;
                   os = common.getOSString args.targetPkgs;
                 in
+                # TODO: neovimVersion should be e.g. 0.11 or 0.12-nightly, get
+                # it from package.
                 "${workspaceName}-${version}-for-neovim-${neovimVersion}-${os}-${arch}.tar.gz";
 
               archivePlugins =

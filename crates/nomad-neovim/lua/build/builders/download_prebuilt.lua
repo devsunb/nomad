@@ -7,9 +7,8 @@ local process = require("nomad.neovim.process")
 local result = require("nomad.result")
 
 ---@param nomad_version string
----@param neovim_version string
 ---@return nomad.result.Result<string, string>
-local get_artifact_name = function(nomad_version, neovim_version)
+local get_artifact_name = function(nomad_version)
   local arch = ({
     ["x64"] = "x86_64",
     ["arm64"] = "aarch64",
@@ -27,6 +26,11 @@ local get_artifact_name = function(nomad_version, neovim_version)
   if not os then
     return result.err(("unsupported OS: %s"):format(jit.os:lower()))
   end
+
+  local version = vim.version()
+  local neovim_version = ("%s.%s%s"):format(
+    version.major, version.minor, version.prerelease and "-nightly" or ""
+  )
 
   return result.ok(("nomad-%s-for-neovim-%s-%s-%s.tar.gz")
     :format(nomad_version, neovim_version, os, arch))
@@ -60,7 +64,7 @@ return function(opts, ctx)
 
         -- We don't offer pre-built artifacts for this machine.
         local nomad_version = tag:gsub("^v", "")
-        local res = get_artifact_name(nomad_version, ctx.neovim_version())
+        local res = get_artifact_name(nomad_version)
         if res:is_err() then return ctx.on_done(res) end
 
         artifact_name = res:unwrap()
