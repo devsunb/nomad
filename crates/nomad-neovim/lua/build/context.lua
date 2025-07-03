@@ -5,7 +5,6 @@
 ---
 ---@field emit fun(msg: string)
 
----@type nomad.path
 local path = require("nomad.path")
 
 ---@generic T
