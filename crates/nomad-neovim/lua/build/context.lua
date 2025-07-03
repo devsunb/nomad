@@ -37,7 +37,7 @@ function Context:repo_dir()
       error("not a in file source")
     end
     local file_components = vim.split(src:sub(2), path.separator)
-    local repo_components = slice(file_components, 1, #file_components - 6)
+    local repo_components = slice(file_components, 1, #file_components - 5)
     self._repo_dir = path.Path.from_components(repo_components)
   end
   return self._repo_dir
