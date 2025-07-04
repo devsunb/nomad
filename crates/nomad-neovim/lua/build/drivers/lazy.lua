@@ -36,7 +36,7 @@ return {
     end
 
     if build_res:is_err() then
-      error(build_res:unwrap_err())
+      error(build_res:unwrap_err(), 2)
     end
   end,
 
