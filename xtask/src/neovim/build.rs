@@ -1,4 +1,4 @@
-use core::{iter, str};
+use core::{fmt, iter, str};
 use std::{env, fs, path, process};
 
 use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf, node};
@@ -8,7 +8,7 @@ use cargo_metadata::TargetKind;
 use crate::WORKSPACE_ROOT;
 use crate::neovim::CARGO_TOML_META;
 
-#[derive(Debug, Clone, clap::Args)]
+#[derive(Debug, clap::Args)]
 pub(crate) struct BuildArgs {
     /// Build the plugin for the latest nightly version of Neovim.
     #[clap(long)]
@@ -22,21 +22,31 @@ pub(crate) struct BuildArgs {
     #[clap(long)]
     target: Option<String>,
 
-    /// The absolute path to the directory under which to place the build
-    /// artifacts.
+    /// The absolute path of the directory under which to place the 'lua'
+    /// directory containing the build artifacts.
     #[clap(long, default_value_t = WORKSPACE_ROOT.to_owned())]
     out_dir: AbsPathBuf,
+
+    /// The absolute paths of any additional files or directories to be copied
+    /// under the 'lua' directory.
+    #[clap(long, default_value_t = IncludePaths::default())]
+    includes: IncludePaths,
+}
+
+#[derive(Debug, Clone)]
+struct IncludePaths {
+    vec: Vec<AbsPathBuf>,
 }
 
 pub(crate) fn build(args: BuildArgs) -> anyhow::Result<()> {
     fs::create_dir_all(&args.out_dir)?;
 
-    let artifact_dir = args.out_dir.clone().join(node!("lua"));
+    let lua_dir = args.out_dir.clone().join(node!("lua"));
 
     // Setting the artifact directory is still unstable.
     let artifact_dir_args = ["-Zunstable-options", "--artifact-dir"]
         .into_iter()
-        .chain(iter::once(artifact_dir.as_str()));
+        .chain(iter::once(lua_dir.as_str()));
 
     let target_args =
         args.target.as_deref().map(|target| ["--target", target]);
@@ -54,12 +64,32 @@ pub(crate) fn build(args: BuildArgs) -> anyhow::Result<()> {
         process::exit(exit_status.code().unwrap_or(1));
     }
 
-    fix_library_name(&artifact_dir)?;
+    fix_library_name(&lua_dir)?;
 
-    let dst = artifact_dir.join(node!("nomad"));
-    if !fs::exists(&dst)? {
-        let src = WORKSPACE_ROOT.join(node!("lua")).join(node!("nomad"));
-        copy_dir(&src, &dst)?;
+    // Copy any additional files or directories under the lua directory.
+    for path in args.includes {
+        let dst =
+            (*lua_dir).join(path.node_name().expect("tried to copy root"));
+
+        // A file or directory with the same name already exists, so skip it.
+        if fs::exists(&dst)? {
+            continue;
+        }
+
+        let file_type = fs::metadata(&path)?.file_type();
+
+        if file_type.is_dir() {
+            copy_dir(&path, &dst)?;
+        } else if file_type.is_file() {
+            fs::copy(&path, &dst)?;
+        } else if file_type.is_symlink() {
+            panic!(
+                "tried to include symlink at '{path}', but including \
+                 symlinks is not supported"
+            );
+        } else {
+            panic!("invalid file type for file at '{path}': {file_type:?}");
+        }
     }
 
     Ok(())
@@ -113,6 +143,8 @@ fn copy_dir(src_dir: &AbsPath, dst_dir: &AbsPath) -> anyhow::Result<()> {
 
     fs::create_dir_all(dst_dir)?;
 
+    let mut entry_names = Vec::new();
+
     for entry in fs::read_dir(src_dir)? {
         let entry = entry?;
 
@@ -122,6 +154,8 @@ fn copy_dir(src_dir: &AbsPath, dst_dir: &AbsPath) -> anyhow::Result<()> {
             .to_str()
             .map(<&NodeName>::try_from)
             .context("Invalid file name")??;
+
+        entry_names.push(entry_name.to_owned());
 
         let src = src_dir.join(entry_name);
         let dst = dst_dir.join(entry_name);
@@ -171,4 +205,49 @@ fn force_rename(src: &AbsPath, dst: &AbsPath) -> anyhow::Result<()> {
     }
     fs::rename(src, dst)?;
     Ok(())
+}
+
+impl Default for IncludePaths {
+    fn default() -> Self {
+        Self {
+            vec: vec![WORKSPACE_ROOT.join(node!("lua")).join(node!("nomad"))],
+        }
+    }
+}
+
+impl fmt::Display for IncludePaths {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use fmt::Write;
+
+        let is_last = |idx| idx + 1 == self.vec.len();
+
+        for (idx, path) in self.vec.iter().enumerate() {
+            write!(f, "{path}")?;
+            if !is_last(idx) {
+                f.write_char(',')?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+impl str::FromStr for IncludePaths {
+    type Err = <AbsPathBuf as str::FromStr>::Err;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.split(',')
+            .map(AbsPathBuf::from_str)
+            .collect::<Result<_, _>>()
+            .map(|vec| Self { vec })
+    }
+}
+
+impl IntoIterator for IncludePaths {
+    type Item = AbsPathBuf;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.vec.into_iter()
+    }
 }

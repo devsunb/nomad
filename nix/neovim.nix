@@ -75,7 +75,7 @@
         in
         craneLib.buildPackage (
           targetCrane.commonArgs
-          // {
+          // rec {
             pname = crateInfos.name;
             version = crateInfos.version;
             src = (cleanCargoSourceButKeepLua craneLib) (craneLib.path ../.);
@@ -85,7 +85,8 @@
                 ${lib.optionalString isNightly "--nightly"} \
                 ${lib.optionalString isRelease "--release"} \
                 ${lib.optionalString isCross "--target=${hostPlatform.rust.rustcTarget}"} \
-                --out-dir=$out
+                --out-dir=$out \
+                --includes='${src}/lua/nomad'
             '';
             # Installation was already handled by the build command.
             doNotPostBuildInstallCargoBinaries = true;
