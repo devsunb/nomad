@@ -8,6 +8,13 @@ local Result = require("nomad.result")
 ---@type nomad.neovim.Command
 local Command = require("nomad.neovim.command")
 
+---@param exit_code integer
+---@return string
+local err = function(exit_code)
+  return ("Builder 'download_prebuilt' failed with exit code %s")
+      :format(exit_code)
+end
+
 --- NOTE: this has to be kept in sync with the 'mkArchiveName' function in
 --- neovim.nix which is responsible for naming the Neovim artifacts published
 --- in the releases.
@@ -62,10 +69,11 @@ return function(opts, build_ctx)
         :args({ "describe", "--tags", "--exact-match" })
         :current_dir(build_ctx:repo_dir())
         :on_stdout(function(line) tag = line end)
+        :on_stderr(build_ctx.notify)
         :await(ctx)
 
     -- We're not on a tag, so we can't download a pre-built artifact.
-    if tag_res:is_err() then return tag_res:map_err(tostring) end
+    if tag_res:is_err() then return tag_res:map_err(err) end
     if tag == nil then return Result.err("not on a tag") end
 
     local nomad_version = tag:gsub("^v", "")
@@ -81,9 +89,10 @@ return function(opts, build_ctx)
 
     local mkdir_res = Command.new("mkdir")
         :args({ "-p", out_dir })
+        :on_stderr(build_ctx.notify)
         :await(ctx)
 
-    if mkdir_res:is_err() then return mkdir_res:map_err(tostring) end
+    if mkdir_res:is_err() then return mkdir_res:map_err(err) end
 
     local curl_res = Command.new("curl")
         -- Follow redirects.
@@ -92,21 +101,24 @@ return function(opts, build_ctx)
         :arg(out_dir:join(artifact_name))
         :arg(get_artifact_url(tag, artifact_name))
         :on_stdout(build_ctx.notify)
+        :on_stderr(build_ctx.notify)
         :await(ctx)
 
-    if curl_res:is_err() then return curl_res:map_err(tostring) end
+    if curl_res:is_err() then return curl_res:map_err(err) end
 
     local tar_res = Command.new("tar")
         :args({ "-xzf", out_dir:join(artifact_name) })
         :args({ "-C", out_dir })
+        :on_stderr(build_ctx.notify)
         :await(ctx)
 
-    if tar_res:is_err() then return tar_res:map_err(tostring) end
+    if tar_res:is_err() then return tar_res:map_err(err) end
 
     return Command.new("cp")
         :args({ out_dir:join("/lua/*"), "lua/" })
         :current_dir(build_ctx:repo_dir())
         :await(ctx)
-        :map_err(tostring)
+        :on_stderr(build_ctx.notify)
+        :map_err(err)
   end)
 end
