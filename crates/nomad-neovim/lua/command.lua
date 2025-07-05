@@ -17,6 +17,15 @@ Command.new = function(cmd)
   return self
 end
 
+---@param cmd string
+---@return nomad.future.Future<boolean>
+Command.is_in_path = function(cmd)
+  return Command.new("command")
+      :args({ "-v", cmd })
+      :into_future()
+      :map(function(res) return res:is_ok() end)
+end
+
 ---@param self nomad.neovim.Command
 ---@param arg string?
 ---@return nomad.neovim.Command
@@ -25,6 +34,7 @@ function Command:arg(arg)
   return self
 end
 
+---@param self nomad.neovim.Command
 ---@param args [string]
 ---@return nomad.neovim.Command
 function Command:args(args)
@@ -34,6 +44,7 @@ function Command:args(args)
   return self
 end
 
+---@param self nomad.neovim.Command
 ---@param dir neovim.path.Path
 ---@return nomad.neovim.Command
 function Command:current_dir(dir)
@@ -41,6 +52,7 @@ function Command:current_dir(dir)
   return self
 end
 
+---@param self nomad.neovim.Command
 ---@param handler fun(stdout_line: string)
 ---@return nomad.neovim.Command
 function Command:on_stdout(handler)

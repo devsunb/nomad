@@ -45,6 +45,16 @@ function Future:await(ctx)
   end
 end
 
+---@generic T, U
+---@param self nomad.future.Future<T>
+---@param fun fun(output: T): U
+---@return nomad.future.Future<U>
+function Future:map(fun)
+  return Future.new(function(ctx)
+    return self.poll(ctx):map(fun)
+  end)
+end
+
 ---@generic T
 ---@param fun fun(ctx: nomad.future.Context): T
 ---@return nomad.future.Future<T>
