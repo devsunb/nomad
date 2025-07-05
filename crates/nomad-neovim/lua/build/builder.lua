@@ -26,7 +26,7 @@ end
 function Builder:build(driver)
   local build_ctx = Context.new({ notify = driver.notify })
   local build_fut = self.build_fn(build_ctx)
-  driver.block_on_build(build_fut)
+  driver.block_on_build(build_fut, 3)
 end
 
 ---@param self nomad.neovim.build.Builder

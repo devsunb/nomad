@@ -3,7 +3,7 @@ local message_queue = {}
 
 ---@type nomad.neovim.build.Driver
 return {
-  block_on_build = function(build_fut)
+  block_on_build = function(build_fut, error_lvl)
     --- Lazy already takes care of scheduling a coroutine.resume() to run in
     --- the next tick of the event loop every time we yield, so we can just use
     --- a no-op waker that does nothing.
@@ -36,7 +36,7 @@ return {
     end
 
     if build_res:is_err() then
-      error(build_res:unwrap_err(), 2)
+      error(build_res:unwrap_err(), error_lvl)
     end
   end,
 

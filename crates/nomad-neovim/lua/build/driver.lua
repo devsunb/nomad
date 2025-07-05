@@ -1,5 +1,5 @@
 ---@class (exact) nomad.neovim.build.Driver
 ---
----@field block_on_build fun(fut: nomad.future.Future<nomad.Result<nil, string>>)
+---@field block_on_build fun(fut: nomad.future.Future<nomad.Result<nil, string>>, error_lvl: integer)
 ---
 ---@field notify fun(message: string)

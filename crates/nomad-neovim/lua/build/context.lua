@@ -34,7 +34,7 @@ function Context:repo_dir()
   if not self._repo_dir then
     local src = debug.getinfo(1, "S").source
     if src:sub(1, 1) ~= "@" then
-      error("not a in file source")
+      error("not a in file source", 2)
     end
     local file_components = vim.split(src:sub(2), path.separator)
     local repo_components = slice(file_components, 1, #file_components - 5)

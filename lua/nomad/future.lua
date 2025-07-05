@@ -71,8 +71,9 @@ local async = function(fun)
 
     local success, output = coroutine.resume(thread, ctx)
 
-    -- Rethrow the error, with level=0 to preserve the original error location.
-    if not success then error(output, 0) end
+    -- Rethrow the error. Is there a way to preserve the original error
+    -- location? AFAIK there isn't a non-pcalled version of coroutine.resume.
+    if not success then error(output) end
 
     -- The coroutine has completed, and we can return its output.
     if coroutine.status(thread) == "dead" then
