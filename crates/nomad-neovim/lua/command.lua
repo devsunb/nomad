@@ -1,8 +1,10 @@
 --- Same as Rust's `std::process::Command`, but async.
+---
 ---@class nomad.neovim.Command
 
 local future = require("nomad.future")
 
+---@type nomad.Option
 local Option = require("nomad.option")
 
 ---@type nomad.Result

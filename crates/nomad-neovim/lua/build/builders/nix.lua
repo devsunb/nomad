@@ -1,3 +1,5 @@
+--- Optional parameters for the 'nix' builder. Currently unused.
+---
 ---@class (exact) nomad.neovim.build.NixOpts
 
 local future = require("nomad.future")

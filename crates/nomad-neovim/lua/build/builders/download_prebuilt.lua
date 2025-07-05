@@ -1,3 +1,5 @@
+--- Optional parameters for the 'download_prebuilt' builder. Currently unused.
+---
 ---@class (exact) nomad.neovim.build.DownloadPrebuiltOpts
 
 local future = require("nomad.future")

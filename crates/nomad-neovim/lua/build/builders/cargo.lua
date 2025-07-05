@@ -1,3 +1,5 @@
+--- Optional parameters for the 'cargo' builder. Currently unused.
+---
 ---@class (exact) nomad.neovim.build.CargoOpts
 
 local future = require("nomad.future")

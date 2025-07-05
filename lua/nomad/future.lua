@@ -2,13 +2,18 @@
 --- a context, and:
 ---
 --- * if the future hasn't yet completed, it must schedule the `ctx.wake`
---- function to be called when it's ready to make some progress;
+---   function to be called when it's ready to make some progress;
 ---
 --- * if the future has completed, polling it will return the output of the
----   computation.
+---   computation, or it'll `error` if a previous `poll` had already returned
+---   the output.
+---
 ---@class (exact) nomad.future.Future<T>: { poll: fun(ctx: nomad.future.Context): nomad.Option<T> }
 
---- TODO: docs.
+--- Context used when polling a future.
+---
+--- It contains a `wake` callback that the future can use to signal that it's
+--- ready to be polled again.
 ---
 ---@class (exact) nomad.future.Context
 ---@field wake fun()

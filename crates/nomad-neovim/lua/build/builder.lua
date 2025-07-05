@@ -8,9 +8,13 @@
 
 ---@alias nomad.neovim.build.BuildFn fun(ctx: nomad.neovim.build.Context): nomad.future.Future<nomad.Result<nil, string>>
 
-local Context = require("nomad.neovim.build.context")
-local Result = require("nomad.result")
 local future = require("nomad.future")
+
+---@type nomad.Result
+local Result = require("nomad.result")
+
+---@type nomad.neovim.build.Context
+local Context = require("nomad.neovim.build.context")
 
 local Builder = {}
 Builder.__index = Builder
