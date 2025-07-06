@@ -17,11 +17,12 @@ jobs:
 
   release-stable:
     needs: setup
-    uses: ./.github/workflows/reusable/build-and-release.yaml
+    uses: ./.github/workflows/build-and-release.yaml
     with:
-      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
       checkout_ref: ${{ github.ref_name }}
       is_stable: true
       release_name: "Mad ${{ github.ref_name }}"
       release_body: ""
       release_tag: ${{ github.ref_name }}
+    secrets:
+      cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}

@@ -3,10 +3,6 @@ name: "Build and Release"
 on:
   workflow_call:
     inputs:
-      cachix_auth_token:
-        description: "Auth token for pushing Nix artifacts to Cachix"
-        required: true
-        type: string
       checkout_ref:
         description: "Branch, tag, or commit to checkout and build from"
         required: true
@@ -27,6 +23,10 @@ on:
         description: "The tag to attach the release to"
         required: true
         type: string
+    secrets:
+      cachix_auth_token:
+        description: "Auth token for pushing Nix artifacts to Cachix"
+        required: true
 
 jobs:
   build-neovim:
@@ -48,7 +48,7 @@ jobs:
       - name: Install Nix
         uses: ./.github/actions/setup-nix
         with:
-          cachix-auth-token: ${{ inputs.cachix_auth_token }}
+          cachix-auth-token: ${{ secrets.cachix_auth_token }}
 
       - name: Build the Neovim release artifacts
         run: nix build ${{ matrix.release-artifacts-package }}
