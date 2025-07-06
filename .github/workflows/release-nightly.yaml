@@ -10,14 +10,22 @@ permissions:
   contents: write
 
 env:
-  NIGHTLY_TAG: &nightly_tag nightly
+  NIGHTLY_TAG: nightly
 
 jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
       formatted_date: ${{ steps.release-date.outputs.formatted_date }}
+      nightly_tag: ${{ steps.set-tag.outputs.nightly_tag }}
     steps:
+      # NOTE: we have to do this because GitHub doesn't support YAML anchors.
+      #
+      # See https://github.com/actions/runner/issues/1182 for more infos.
+      - name: Set tag output
+        id: set-tag
+        run: echo "nightly_tag=$NIGHTLY_TAG" >> $GITHUB_OUTPUT
+
       - name: Delete old nightly release
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -69,6 +77,6 @@ jobs:
       is_stable: false
       release_name: "Mad Nightly (${{ needs.setup.outputs.formatted_date }})"
       release_body: ""
-      release_tag: *nightly_tag
+      release_tag: ${{ needs.setup.outputs.nightly_tag }}
     secrets:
       cachix_auth_token: ${{ secrets.CACHIX_AUTH_TOKEN }}
