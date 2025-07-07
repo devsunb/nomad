@@ -37,7 +37,7 @@ end
 ---
 ---@param nomad_version string
 ---@return nomad.Result<string, string>
-local get_artifact_name = function(nomad_version)
+local get_archive_name = function(nomad_version)
   local arch = ({
     ["x64"] = "x86_64",
     ["arm64"] = "aarch64",
@@ -89,15 +89,17 @@ local build_fn = function(opts, build_ctx)
     if tag_res:is_err() then return tag_res:map_err(err) end
     if tag == nil then return Result.err("not on a tag") end
 
+    -- FIXME: if the tag is "nightly", this will be "nightly" instead of e.g.
+    -- "x.y.z-dev".
     local nomad_version = tag:gsub("^v", "")
-    local artifact_res = get_artifact_name(nomad_version)
+    local name_res = get_archive_name(nomad_version)
     -- We don't offer pre-built artifacts for this machine.
-    if artifact_res:is_err() then return artifact_res:map(function() end) end
+    if name_res:is_err() then return name_res:map(function() end) end
 
-    local artifact_name = artifact_res:unwrap()
+    local archive_name = name_res:unwrap()
 
     -- /result is gitignored, which makes it a good place to store the
-    -- downloaded artifact under.
+    -- downloaded archive under.
     local out_dir = build_ctx:repo_dir():join("result")
 
     local mkdir_res = Command.new(commands.mkdir)
@@ -111,8 +113,8 @@ local build_fn = function(opts, build_ctx)
         -- Follow redirects.
         :arg("--location")
         :arg("--output")
-        :arg(out_dir:join(artifact_name))
-        :arg(get_artifact_url(tag, artifact_name))
+        :arg(out_dir:join(archive_name))
+        :arg(get_artifact_url(tag, archive_name))
         :on_stdout(build_ctx.notify)
         :on_stderr(build_ctx.notify)
         :await(ctx)
@@ -120,7 +122,7 @@ local build_fn = function(opts, build_ctx)
     if curl_res:is_err() then return curl_res:map_err(err) end
 
     local tar_res = Command.new(commands.tar)
-        :args({ "-xzf", out_dir:join(artifact_name) })
+        :args({ "-xzf", out_dir:join(archive_name) })
         :args({ "-C", out_dir })
         :on_stderr(build_ctx.notify)
         :await(ctx)

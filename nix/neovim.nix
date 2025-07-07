@@ -130,17 +130,34 @@
                 }
               ];
 
+              mkNeovimVersion =
+                isNightly:
+                let
+                  stable = pkgs.neovim.version;
+                in
+                if !isNightly then
+                  lib.versions.majorMinor stable
+                else
+                  # The 'version' of the package given by
+                  # neovim-nightly-overlay is just "nightly", so we have to
+                  # construct it manually by increasing the minor version of
+                  # the latest stable release.
+                  let
+                    major = lib.versions.major stable;
+                    minor = lib.versions.minor stable;
+                    minorPlusOne = builtins.toString ((lib.toInt minor) + 1);
+                  in
+                  "${major}.${minorPlusOne}-nightly";
+
               mkArchiveName =
                 args:
                 let
                   inherit (common) workspaceName;
                   inherit (crateInfos) version;
-                  neovimVersion = if args.isNightly then "nightly" else "stable";
+                  neovimVersion = mkNeovimVersion args.isNightly;
                   arch = common.getArchString args.targetPkgs;
                   os = common.getOSString args.targetPkgs;
                 in
-                # TODO: neovimVersion should be e.g. 0.11 or 0.12-nightly, get
-                # it from package.
                 "${workspaceName}-${version}-for-neovim-${neovimVersion}-${os}-${arch}.tar.gz";
 
               archivePlugins =
