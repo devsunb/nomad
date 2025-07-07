@@ -8,6 +8,10 @@ on:
     branches:
       - main
 
+# TODO: remove after publishing private crates.
+env:
+  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
 jobs:
   clippy:
     name: clippy

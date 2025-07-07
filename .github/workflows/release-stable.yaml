@@ -22,7 +22,7 @@ jobs:
       checkout-ref: ${{ github.ref_name }}
       is-stable: true
       release-name: "Nomad ${{ github.ref_name }}"
-      release-body: ""
+      release-body: "TODO"
       release-tag: ${{ github.ref_name }}
     secrets:
       cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
