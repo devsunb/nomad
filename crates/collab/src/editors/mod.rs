@@ -4,6 +4,7 @@ pub mod mock;
 mod neovim;
 
 use core::fmt::Debug;
+use core::ops::Range;
 
 use collab_server::Authenticator;
 use collab_server::message::Peer;
@@ -19,6 +20,10 @@ use crate::config;
 pub trait CollabEditor: Editor {
     /// TODO: docs.
     type Io: AsyncRead + AsyncWrite + Unpin;
+
+    /// The type representing a text selection created by a remote peer in a
+    /// given buffer.
+    type PeerSelection;
 
     /// TODO: docs.
     type PeerTooltip;
@@ -68,6 +73,14 @@ pub trait CollabEditor: Editor {
         session_id: SessionId<Self>,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = Result<(), Self::CopySessionIdError>>;
+
+    /// TODO: docs.
+    fn create_peer_selection(
+        remote_peer: Peer,
+        selected_range: Range<ByteOffset>,
+        buffer_id: Self::BufferId,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = Self::PeerSelection>;
 
     /// TODO: docs.
     fn create_peer_tooltip(

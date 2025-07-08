@@ -4,6 +4,7 @@ use core::convert::Infallible;
 use core::error::Error;
 use core::fmt;
 use core::num::NonZeroU32;
+use core::ops::Range;
 use core::str::FromStr;
 
 use collab_server::Config;
@@ -221,6 +222,7 @@ where
     F: walkdir::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
 {
     type Io = DuplexStream;
+    type PeerSelection = ();
     type PeerTooltip = ();
     type ProjectFilter = F;
     type ServerConfig = ServerConfig;
@@ -262,6 +264,14 @@ where
     ) -> Result<(), Self::CopySessionIdError> {
         ctx.with_editor(|this| this.clipboard = Some(session_id));
         Ok(())
+    }
+
+    async fn create_peer_selection(
+        _remote_peer: Peer,
+        _selected_range: Range<ByteOffset>,
+        _buffer_id: Self::BufferId,
+        _ctx: &mut Context<Self>,
+    ) -> Self::PeerTooltip {
     }
 
     async fn create_peer_tooltip(

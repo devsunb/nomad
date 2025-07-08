@@ -1,5 +1,6 @@
 use core::fmt;
 use core::num::NonZeroU32;
+use core::ops::Range;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::{env, io};
@@ -18,6 +19,10 @@ use smol_str::ToSmolStr;
 
 use crate::config;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
+
+pub struct NeovimPeerSelection {
+    selection_highlight_handle: HighlightRangeHandle,
+}
 
 pub struct PeerTooltip {
     /// We use a 1-grapheme-wide highlight to represent a remote peer's cursor.
@@ -78,6 +83,7 @@ struct TildePath<'a> {
 
 impl CollabEditor for Neovim {
     type Io = async_net::TcpStream;
+    type PeerSelection = NeovimPeerSelection;
     type PeerTooltip = PeerTooltip;
     type ProjectFilter = walkdir::GitIgnore;
     type ServerConfig = ServerConfig;
@@ -131,6 +137,19 @@ impl CollabEditor for Neovim {
     ) -> Result<(), Self::CopySessionIdError> {
         clipboard::set(session_id)
             .map_err(|inner| NeovimCopySessionIdError { inner, session_id })
+    }
+
+    async fn create_peer_selection(
+        _remote_peer: Peer,
+        selected_range: Range<ByteOffset>,
+        buffer_id: Self::BufferId,
+        ctx: &mut Context<Self>,
+    ) -> Self::PeerSelection {
+        ctx.with_borrowed(|ctx| {
+            let buffer = ctx.buffer(buffer_id).expect("invalid buffer ID");
+            let hl_handle = buffer.highlight_range(selected_range, "Visual");
+            NeovimPeerSelection { selection_highlight_handle: hl_handle }
+        })
     }
 
     async fn create_peer_tooltip(

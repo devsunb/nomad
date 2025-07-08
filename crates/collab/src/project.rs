@@ -54,6 +54,7 @@ pub(crate) struct Project<Ed: CollabEditor> {
     host_id: PeerId,
     id_maps: IdMaps<Ed>,
     _local_peer: Peer,
+    peer_selections: FxHashMap<text::SelectionId, Ed::PeerSelection>,
     peer_tooltips: FxHashMap<text::CursorId, Ed::PeerTooltip>,
     project: collab_project::Project,
     remote_peers: FxHashMap<PeerId, Peer>,
@@ -83,14 +84,14 @@ pub(crate) struct NewProjectArgs<Ed: CollabEditor> {
 }
 
 #[derive(cauchy::Default)]
-pub(crate) struct IdMaps<Edd: Editor> {
-    pub(crate) buffer2file: FxHashMap<Edd::BufferId, FileId>,
-    pub(crate) cursor2cursor: FxHashMap<Edd::CursorId, text::CursorId>,
-    pub(crate) file2buffer: FxHashMap<FileId, Edd::BufferId>,
-    pub(crate) node2dir: FxHashMap<<Edd::Fs as fs::Fs>::NodeId, DirectoryId>,
-    pub(crate) node2file: FxHashMap<<Edd::Fs as fs::Fs>::NodeId, FileId>,
+pub(crate) struct IdMaps<Ed: Editor> {
+    pub(crate) buffer2file: FxHashMap<Ed::BufferId, FileId>,
+    pub(crate) cursor2cursor: FxHashMap<Ed::CursorId, text::CursorId>,
+    pub(crate) file2buffer: FxHashMap<FileId, Ed::BufferId>,
+    pub(crate) node2dir: FxHashMap<<Ed::Fs as fs::Fs>::NodeId, DirectoryId>,
+    pub(crate) node2file: FxHashMap<<Ed::Fs as fs::Fs>::NodeId, FileId>,
     pub(crate) selection2selection:
-        FxHashMap<Edd::SelectionId, text::SelectionId>,
+        FxHashMap<Ed::SelectionId, text::SelectionId>,
 }
 
 #[derive(cauchy::Debug)]
@@ -251,6 +252,10 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         move_tooltip.await;
     }
 
+    async fn integrate_fs_op<T: FsOp>(&self, _op: T, _ctx: &mut Context<Ed>) {
+        todo!();
+    }
+
     async fn integrate_peer_joined(&self, peer: Peer, _ctx: &mut Context<Ed>) {
         self.with_project(|proj| match proj.remote_peers.entry(peer.id) {
             hash_map::Entry::Occupied(_) => {
@@ -289,8 +294,33 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         }
     }
 
-    async fn integrate_fs_op<T: FsOp>(&self, _op: T, _ctx: &mut Context<Ed>) {
-        todo!();
+    async fn integrate_selection_creation(
+        &self,
+        creation: text::SelectionCreation,
+        ctx: &mut Context<Ed>,
+    ) {
+        let Some((peer, range, buf_id, sel_id)) = self.with_project(|proj| {
+            let selection =
+                proj.project.integrate_selection_creation(creation)?;
+            let file_id = selection.file()?.id();
+            let buf_id = proj.id_maps.file2buffer.get(&file_id)?;
+            let selection_owner = proj.remote_peers.get(&selection.owner())?;
+            Some((
+                selection_owner.clone(),
+                selection.offset_range(),
+                buf_id.clone(),
+                selection.id(),
+            ))
+        }) else {
+            return;
+        };
+
+        let peer_selection =
+            Ed::create_peer_selection(peer, range, buf_id, ctx).await;
+
+        self.with_project(|proj| {
+            proj.peer_selections.insert(sel_id, peer_selection);
+        });
     }
 
     #[allow(clippy::too_many_lines)]
@@ -922,6 +952,7 @@ impl<Ed: CollabEditor> ProjectGuard<Ed> {
             host_id: args.host_id,
             id_maps: args.id_maps,
             _local_peer: args.local_peer,
+            peer_selections: FxHashMap::default(),
             peer_tooltips: FxHashMap::default(),
             project: args.project,
             remote_peers,
