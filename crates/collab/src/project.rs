@@ -7,9 +7,9 @@ use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use collab_project::fs::{DirectoryId, FileId, FileMut, FsOp, Node, NodeMut};
-use collab_project::{PeerId, text};
+use collab_project::{PeerId, binary, text};
 use collab_server::message::{Message, Peer, Peers};
-use ed::fs::{self, File as _, Symlink as _};
+use ed::fs::{self, File as _, Fs, FsNode, Symlink as _};
 use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
 use fxhash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -110,6 +110,27 @@ pub(crate) enum SynchronizeError<Ed: CollabEditor> {
     ContentsAtPath(ContentsAtPathError<Ed::Fs>),
 }
 
+/// The type of error that can occcur when integrating a
+/// [`binary::BinaryEdit`].
+#[derive(cauchy::Debug)]
+pub enum IntegrateBinaryEditError<Ed: CollabEditor> {
+    /// The node at the given path was a directory, not a file.
+    DirectoryAtPath(AbsPathBuf),
+
+    /// It wasn't possible to get the node at the given path.
+    NodeAtPath(<Ed::Fs as Fs>::NodeAtPathError),
+
+    /// There wasn't any node at the given path.
+    NoNodeAtPath(AbsPathBuf),
+
+    /// The node at the given path was a symlink, not a file.
+    SymlinkAtPath(AbsPathBuf),
+
+    /// It wasn't possible to write the new contents to the file at the given
+    /// path.
+    WriteToFile(AbsPathBuf, <<Ed::Fs as Fs>::File as fs::File>::WriteError),
+}
+
 enum FsNodeContents {
     Directory,
     Text(String),
@@ -163,7 +184,9 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                 self.integrate_selection_deletion(selection_deletion, ctx)
                     .await;
             },
-            Message::EditedBinary(_binary_edit) => todo!(),
+            Message::EditedBinary(binary_edit) => {
+                let _ = self.integrate_binary_edit(binary_edit, ctx).await;
+            },
             Message::EditedText(text_edit) => {
                 self.integrate_text_edit(text_edit, ctx).await
             },
@@ -211,6 +234,53 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
             },
             other => Ok(self.with_project(|proj| proj.synchronize(other))),
         }
+    }
+
+    async fn integrate_binary_edit(
+        &self,
+        edit: binary::BinaryEdit,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), IntegrateBinaryEditError<Ed>> {
+        let Some((file_path, new_contents)) = self.with_project(|proj| {
+            let file_mut = proj.inner.integrate_binary_edit(edit)?;
+            let file = file_mut.as_file();
+            let file_path = proj.root_path.clone().concat(file.path());
+            let new_contents = file.contents().to_owned();
+            Some((file_path, new_contents))
+        }) else {
+            return Ok(());
+        };
+
+        let fs = ctx.fs();
+
+        ctx.spawn_background(async move {
+            let Some(node) = fs
+                .node_at_path(&*file_path)
+                .await
+                .map_err(IntegrateBinaryEditError::NodeAtPath)?
+            else {
+                return Err(IntegrateBinaryEditError::NoNodeAtPath(file_path));
+            };
+
+            let mut file = match node {
+                FsNode::File(file) => file,
+                FsNode::Directory(_) => {
+                    return Err(IntegrateBinaryEditError::DirectoryAtPath(
+                        file_path,
+                    ));
+                },
+                FsNode::Symlink(_) => {
+                    return Err(IntegrateBinaryEditError::SymlinkAtPath(
+                        file_path,
+                    ));
+                },
+            };
+
+            file.write(new_contents).await.map_err(|err| {
+                IntegrateBinaryEditError::WriteToFile(file_path, err)
+            })
+        })
+        .await
     }
 
     async fn integrate_cursor_creation(
