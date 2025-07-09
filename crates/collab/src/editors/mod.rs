@@ -149,6 +149,9 @@ pub trait CollabEditor: Editor {
         action: ActionForSelectedSession,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = Option<&'pairs (AbsPathBuf, SessionId<Self>)>>;
+
+    /// TODO: docs.
+    fn should_remote_save_cause_local_save(buffer: &Self::Buffer<'_>) -> bool;
 }
 
 /// TODO: docs

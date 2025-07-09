@@ -352,6 +352,10 @@ where
             this.select_session_with.as_mut()?(sessions, action)
         })
     }
+
+    fn should_remote_save_cause_local_save(_: &Self::Buffer<'_>) -> bool {
+        true
+    }
 }
 
 impl<Ed, F> Editor for CollabMock<Ed, F>

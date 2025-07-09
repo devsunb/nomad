@@ -33,6 +33,7 @@ pub trait Editor: 'static + Sized {
         Editor: Editor<
             BufferId = Self::BufferId,
             EventHandle = Self::EventHandle,
+            BufferSaveError = Self::BufferSaveError,
         >,
     >;
 
@@ -76,7 +77,7 @@ pub trait Editor: 'static + Sized {
     type SelectionId: Clone + Debug + Eq + Hash;
 
     /// TODO: docs.
-    type BufferSaveError: Debug;
+    type BufferSaveError: Debug + 'static;
 
     /// TODO: docs.
     type CreateBufferError: Debug + notify::Error;

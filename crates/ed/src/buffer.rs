@@ -76,9 +76,7 @@ pub trait Buffer {
     fn save(
         &mut self,
         agent_id: AgentId,
-    ) -> impl Future<
-        Output = Result<(), <Self::Editor as Editor>::BufferSaveError>,
-    > + use<Self>;
+    ) -> Result<(), <Self::Editor as Editor>::BufferSaveError>;
 }
 
 /// TODO: docs.

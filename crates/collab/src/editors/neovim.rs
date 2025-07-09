@@ -362,6 +362,10 @@ impl CollabEditor for Neovim {
             .ok()?
             .and_then(|idx| sessions.get(idx as usize))
     }
+
+    fn should_remote_save_cause_local_save(buf: &Self::Buffer<'_>) -> bool {
+        !buf.is_focused()
+    }
 }
 
 impl Config for ServerConfig {

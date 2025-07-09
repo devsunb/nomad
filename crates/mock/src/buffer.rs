@@ -340,10 +340,8 @@ impl<'a> ed::Buffer for Buffer<'a> {
     fn save(
         &mut self,
         _agent_id: AgentId,
-    ) -> impl Future<
-        Output = Result<(), <Self::Editor as ed::Editor>::BufferSaveError>,
-    > + use<'a> {
-        async { todo!() }
+    ) -> Result<(), <Self::Editor as ed::Editor>::BufferSaveError> {
+        todo!()
     }
 }
 

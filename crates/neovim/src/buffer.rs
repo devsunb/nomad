@@ -161,6 +161,13 @@ impl<'a> NeovimBuffer<'a> {
             })
     }
 
+    /// Returns whether the buffer is focused.
+    #[inline]
+    pub fn is_focused(&self) -> bool {
+        api::Window::current().get_buf().expect("window is valid")
+            == self.inner()
+    }
+
     /// Converts the given [`Point`] to the corresponding [`ByteOffset`] in the
     /// buffer.
     #[track_caller]
@@ -264,12 +271,6 @@ impl<'a> NeovimBuffer<'a> {
     pub(crate) fn inner(&self) -> api::Buffer {
         debug_assert!(self.id.is_valid());
         self.id.into()
-    }
-
-    #[inline]
-    pub(crate) fn is_focused(&self) -> bool {
-        api::Window::current().get_buf().expect("window is valid")
-            == self.inner()
     }
 
     #[inline]
@@ -1019,12 +1020,9 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     fn save(
         &mut self,
         _agent_id: AgentId,
-    ) -> impl Future<
-        Output = Result<(), <Self::Editor as ed::Editor>::BufferSaveError>,
-    > + use<'a> {
+    ) -> Result<(), <Self::Editor as ed::Editor>::BufferSaveError> {
         // TODO: save agent ID.
-        let res = self.inner().call(|()| api::command("write"));
-        async { res }
+        self.inner().call(|()| api::command("write"))
     }
 }
 

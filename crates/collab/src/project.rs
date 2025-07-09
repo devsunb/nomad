@@ -6,7 +6,15 @@ use std::collections::hash_map;
 use std::sync::Arc;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use collab_project::fs::{DirectoryId, FileId, FileMut, FsOp, Node, NodeMut};
+use collab_project::fs::{
+    DirectoryId,
+    FileId,
+    FileMut,
+    FsOp,
+    GlobalFileId,
+    Node,
+    NodeMut,
+};
 use collab_project::{PeerId, binary, text};
 use collab_server::message::{Message, Peer, Peers};
 use ed::fs::{self, File as _, Fs, FsNode, Symlink as _};
@@ -155,6 +163,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
     }
 
     /// TODO: docs.
+    #[allow(clippy::too_many_lines)]
     pub(crate) async fn integrate(
         &self,
         message: Message,
@@ -215,7 +224,9 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                     "received unexpected ProjectResponse message",
                 ));
             },
-            Message::SavedTextFile(_global_file_id) => todo!(),
+            Message::SavedTextFile(file_id) => {
+                let _ = self.integrate_file_save(file_id, ctx).await;
+            },
         }
     }
 
@@ -341,6 +352,29 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         };
 
         move_tooltip.await;
+    }
+
+    async fn integrate_file_save(
+        &self,
+        global_id: GlobalFileId,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), Ed::BufferSaveError> {
+        let Some((buf_id, agent_id)) = self.with_project(|proj| {
+            let file_id = proj.inner.local_file_of_global(global_id)?;
+            let buf_id = proj.id_maps.file2buffer.get(&file_id)?.clone();
+            Some((buf_id, proj.agent_id))
+        }) else {
+            return Ok(());
+        };
+
+        ctx.with_borrowed(|ctx| {
+            let mut buffer = ctx.buffer(buf_id).expect("invalid buffer ID");
+            if Ed::should_remote_save_cause_local_save(&buffer) {
+                buffer.save(agent_id)
+            } else {
+                Ok(())
+            }
+        })
     }
 
     async fn integrate_fs_op<T: FsOp>(&self, _op: T, _ctx: &mut Context<Ed>) {
