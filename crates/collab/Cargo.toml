@@ -10,23 +10,23 @@ publish.workspace = true
 benches = []
 mock = ["collab-server/server", "collab-server/test", "dep:duplex-stream"]
 neovim = [
-  "collab-server/nomad",
-  "walkdir/gitignore",
-  "dep:async-net",
-  "dep:clipboard",
-  "dep:home",
-  "dep:neovim",
+	"collab-server/nomad",
+	"walkdir/gitignore",
+	"dep:async-net",
+	"dep:clipboard",
+	"dep:home",
+	"dep:neovim",
 ]
 
 [dependencies]
 abs-path = { workspace = true, features = ["macros"] }
 auth = { workspace = true }
 cauchy = { workspace = true }
-collab-project = { git = "ssh://git@github.com/nomad/collab-server.git" }
+collab-project = { workspace = true }
 collab-server = { git = "ssh://git@github.com/nomad/collab-server.git", default-features = false, features = [
-  "client",
+	"client",
 ] }
-collab-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
+collab-types = { workspace = true }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
 ed = { workspace = true }
