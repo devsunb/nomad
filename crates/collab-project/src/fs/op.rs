@@ -42,7 +42,7 @@ impl FsOp for FileCreation {
         SyncActions::new(
             proj.peer_id(),
             proj.tree.integrate_file_creation(creation),
-            &mut proj.backlog,
+            &mut proj.backlogs,
             &mut proj.contexts,
         )
     }
@@ -54,7 +54,7 @@ impl FsOp for DirectoryCreation {
         SyncActions::new(
             proj.peer_id(),
             proj.tree.integrate_directory_creation(self),
-            &mut proj.backlog,
+            &mut proj.backlogs,
             &mut proj.contexts,
         )
     }
@@ -66,7 +66,7 @@ impl FsOp for DirectoryDeletion {
         SyncActions::new(
             proj.peer_id(),
             proj.tree.integrate_directory_deletion(self),
-            &mut proj.backlog,
+            &mut proj.backlogs,
             &mut proj.contexts,
         )
     }
@@ -78,7 +78,7 @@ impl FsOp for DirectoryMove {
         SyncActions::new(
             proj.peer_id(),
             proj.tree.integrate_directory_move(self),
-            &mut proj.backlog,
+            &mut proj.backlogs,
             &mut proj.contexts,
         )
     }
@@ -90,7 +90,7 @@ impl FsOp for FileDeletion {
         SyncActions::new(
             proj.peer_id(),
             proj.tree.integrate_file_deletion(self),
-            &mut proj.backlog,
+            &mut proj.backlogs,
             &mut proj.contexts,
         )
     }
@@ -102,7 +102,7 @@ impl FsOp for FileMove {
         SyncActions::new(
             proj.peer_id(),
             proj.tree.integrate_file_move(self),
-            &mut proj.backlog,
+            &mut proj.backlogs,
             &mut proj.contexts,
         )
     }
@@ -114,7 +114,7 @@ impl FsOp for Rename {
         SyncActions::new(
             proj.peer_id(),
             proj.tree.integrate_rename(self),
-            &mut proj.backlog,
+            &mut proj.backlogs,
             &mut proj.contexts,
         )
     }

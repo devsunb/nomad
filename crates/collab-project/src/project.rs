@@ -56,7 +56,7 @@ use crate::text::{
 /// TODO: docs.
 #[derive(Clone)]
 pub struct Project {
-    pub(crate) backlog: Backlogs,
+    pub(crate) backlogs: Backlogs,
     pub(crate) contexts: Contexts,
     pub(crate) tree: ProjectTree,
 }
@@ -203,7 +203,7 @@ impl Project {
         let Some(file_id) =
             self.tree.local_file_id_of_global_id(binary_edit.file_id)
         else {
-            self.backlog.binary.insert(binary_edit);
+            self.backlogs.binary.insert(binary_edit);
             return None;
         };
 
@@ -360,7 +360,7 @@ impl Project {
         let Some(file_id) =
             self.tree.local_file_id_of_global_id(text_edit.file_id)
         else {
-            self.backlog.text.insert(text_edit);
+            self.backlogs.text.insert(text_edit);
             return None;
         };
 
@@ -398,7 +398,7 @@ impl Project {
     #[inline]
     pub fn new(peer_id: PeerId) -> Self {
         Self {
-            backlog: Backlogs::default(),
+            backlogs: Backlogs::default(),
             contexts: Contexts::new(peer_id),
             tree: ProjectTree::new((), peer_id.into()),
         }

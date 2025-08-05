@@ -26,7 +26,7 @@ impl ProjectBuilder {
     #[inline]
     pub fn build(self) -> Project {
         let tree = self.inner.build();
-        Project { backlog: Default::default(), contexts: self.contexts, tree }
+        Project { backlogs: Default::default(), contexts: self.contexts, tree }
     }
 
     /// TODO: docs.
