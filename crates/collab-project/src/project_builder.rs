@@ -8,14 +8,14 @@ use puff::directory::LocalDirectoryId;
 use puff::file::LocalFileId;
 
 use crate::abs_path::AbsPath;
-use crate::fs::{FileContents, ProjectTreeBuilder};
+use crate::fs::{FileContents, FsBuilder};
 use crate::symlink::SymlinkContents;
 use crate::text::TextContents;
 use crate::{Project, binary};
 
 /// TODO: docs.
 pub struct ProjectBuilder {
-    pub(crate) inner: ProjectTreeBuilder,
+    pub(crate) inner: FsBuilder,
     pub(crate) binary_ctx: binary::BinaryCtx,
 }
 

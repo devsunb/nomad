@@ -26,10 +26,18 @@ pub use sync::{
     SyncActions,
 };
 
-pub(crate) type ProjectTree = puff::Fs<DirectoryContents, FileContents>;
+pub(crate) type Fs = puff::Fs<DirectoryContents, FileContents>;
 
-pub(crate) type ProjectTreeBuilder =
+pub(crate) type FsBuilder =
     puff::builder::FsBuilder<DirectoryContents, FileContents>;
+
+#[cfg(feature = "serde")]
+pub(crate) type SerializeFs<'fs> =
+    puff::serde::SerializeFs<'fs, DirectoryContents, FileContents>;
+
+#[cfg(feature = "serde")]
+pub(crate) type DeserializeFs =
+    puff::serde::DeserializeFs<DirectoryContents, FileContents>;
 
 pub(crate) type PuffDirectory<'a, S> =
     puff::directory::Directory<'a, DirectoryContents, FileContents, S>;

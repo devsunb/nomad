@@ -39,56 +39,56 @@ impl FsOp for FileCreation {
             )),
         });
 
-        let (state, tree) = proj.state_mut();
-        SyncActions::new(tree.integrate_file_creation(creation), state)
+        let (state, fs) = proj.state_mut();
+        SyncActions::new(fs.integrate_file_creation(creation), state)
     }
 }
 
 impl FsOp for DirectoryCreation {
     #[doc(hidden)]
     fn integrate_into(self, proj: &mut Project) -> SyncActions<'_> {
-        let (state, tree) = proj.state_mut();
-        SyncActions::new(tree.integrate_directory_creation(self), state)
+        let (state, fs) = proj.state_mut();
+        SyncActions::new(fs.integrate_directory_creation(self), state)
     }
 }
 
 impl FsOp for DirectoryDeletion {
     #[doc(hidden)]
     fn integrate_into(self, proj: &mut Project) -> SyncActions<'_> {
-        let (state, tree) = proj.state_mut();
-        SyncActions::new(tree.integrate_directory_deletion(self), state)
+        let (state, fs) = proj.state_mut();
+        SyncActions::new(fs.integrate_directory_deletion(self), state)
     }
 }
 
 impl FsOp for DirectoryMove {
     #[doc(hidden)]
     fn integrate_into(self, proj: &mut Project) -> SyncActions<'_> {
-        let (state, tree) = proj.state_mut();
-        SyncActions::new(tree.integrate_directory_move(self), state)
+        let (state, fs) = proj.state_mut();
+        SyncActions::new(fs.integrate_directory_move(self), state)
     }
 }
 
 impl FsOp for FileDeletion {
     #[doc(hidden)]
     fn integrate_into(self, proj: &mut Project) -> SyncActions<'_> {
-        let (state, tree) = proj.state_mut();
-        SyncActions::new(tree.integrate_file_deletion(self), state)
+        let (state, fs) = proj.state_mut();
+        SyncActions::new(fs.integrate_file_deletion(self), state)
     }
 }
 
 impl FsOp for FileMove {
     #[doc(hidden)]
     fn integrate_into(self, proj: &mut Project) -> SyncActions<'_> {
-        let (state, tree) = proj.state_mut();
-        SyncActions::new(tree.integrate_file_move(self), state)
+        let (state, fs) = proj.state_mut();
+        SyncActions::new(fs.integrate_file_move(self), state)
     }
 }
 
 impl FsOp for Rename {
     #[doc(hidden)]
     fn integrate_into(self, proj: &mut Project) -> SyncActions<'_> {
-        let (state, tree) = proj.state_mut();
-        SyncActions::new(tree.integrate_rename(self), state)
+        let (state, fs) = proj.state_mut();
+        SyncActions::new(fs.integrate_rename(self), state)
     }
 }
 

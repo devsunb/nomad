@@ -24,7 +24,7 @@ use crate::{ProjectBuilder, binary, fs, text};
 pub struct Project {
     backlogs: Backlogs,
     contexts: Contexts,
-    tree: fs::ProjectTree,
+    fs: fs::Fs,
 }
 
 /// An error returned when trying to acquire a mutable reference to some
@@ -66,7 +66,7 @@ impl Project {
     #[inline]
     pub fn builder(peer_id: PeerId) -> ProjectBuilder {
         ProjectBuilder {
-            inner: fs::ProjectTreeBuilder::new(peer_id.into()),
+            inner: fs::FsBuilder::new(peer_id.into()),
             binary_ctx: binary::BinaryCtx::default(),
         }
     }
@@ -114,7 +114,7 @@ impl Project {
         &self,
         directory_id: LocalDirectoryId,
     ) -> Option<fs::Directory<'_>> {
-        match self.tree.directory(directory_id) {
+        match self.fs.directory(directory_id) {
             puff::directory::DirectoryState::Visible(directory) => {
                 Some(fs::Directory::new(directory, self.state()))
             },
@@ -128,9 +128,9 @@ impl Project {
         &mut self,
         directory_id: LocalDirectoryId,
     ) -> Option<fs::DirectoryMut<'_>> {
-        let (state, tree) = self.state_mut();
+        let (state, fs) = self.state_mut();
 
-        match tree.directory_mut(directory_id) {
+        match fs.directory_mut(directory_id) {
             puff::directory::DirectoryMutState::Visible(directory) => {
                 Some(fs::DirectoryMut::new(directory, state))
             },
@@ -155,7 +155,7 @@ impl Project {
     /// TODO: docs.
     #[inline]
     pub fn file(&self, file_id: LocalFileId) -> Option<fs::File<'_>> {
-        match self.tree.file(file_id) {
+        match self.fs.file(file_id) {
             puff::file::FileState::Visible(file) => {
                 Some(fs::File::new(file, self.state()))
             },
@@ -169,9 +169,9 @@ impl Project {
         &mut self,
         file_id: LocalFileId,
     ) -> Option<fs::FileMut<'_>> {
-        let (state, tree) = self.state_mut();
+        let (state, fs) = self.state_mut();
 
-        match tree.file_mut(file_id) {
+        match fs.file_mut(file_id) {
             puff::file::FileMutState::Visible(file) => {
                 Some(fs::FileMut::new(file, state))
             },
@@ -186,7 +186,7 @@ impl Project {
         binary_edit: BinaryEdit,
     ) -> Option<binary::BinaryFileMut<'_>> {
         let Some(file_id) =
-            self.tree.local_file_id_of_global_id(binary_edit.file_id)
+            self.fs.local_file_id_of_global_id(binary_edit.file_id)
         else {
             self.backlogs.binary.insert(binary_edit);
             return None;
@@ -216,7 +216,7 @@ impl Project {
             .contexts
             .text
             .cursors
-            .integrate_creation(cursor_creation, &self.tree)?;
+            .integrate_creation(cursor_creation, &self.fs)?;
 
         text::CursorRef::from_id(cursor.id().into(), self)
     }
@@ -307,7 +307,7 @@ impl Project {
             .contexts
             .text
             .selections
-            .integrate_creation(selection_creation, &self.tree)?;
+            .integrate_creation(selection_creation, &self.fs)?;
 
         text::SelectionRef::from_id(selection.id().into(), self)
     }
@@ -348,7 +348,7 @@ impl Project {
         text_edit: TextEdit,
     ) -> Option<(text::TextFileMut<'_>, text::TextReplacements)> {
         let Some(file_id) =
-            self.tree.local_file_id_of_global_id(text_edit.file_id)
+            self.fs.local_file_id_of_global_id(text_edit.file_id)
         else {
             self.backlogs.text.insert(text_edit);
             return None;
@@ -372,7 +372,7 @@ impl Project {
         &self,
         global_id: GlobalDirectoryId,
     ) -> Option<LocalDirectoryId> {
-        self.tree.local_directory_id_of_global_id(global_id)
+        self.fs.local_directory_id_of_global_id(global_id)
     }
 
     /// TODO: docs.
@@ -381,7 +381,7 @@ impl Project {
         &self,
         global_id: GlobalFileId,
     ) -> Option<LocalFileId> {
-        self.tree.local_file_id_of_global_id(global_id)
+        self.fs.local_file_id_of_global_id(global_id)
     }
 
     /// TODO: docs.
@@ -390,14 +390,14 @@ impl Project {
         Self {
             backlogs: Backlogs::default(),
             contexts: Contexts::default(),
-            tree: fs::ProjectTree::new((), peer_id.into()),
+            fs: fs::Fs::new((), peer_id.into()),
         }
     }
 
     /// TODO: docs.
     #[inline]
     pub fn node_at_path(&self, path: &AbsPath) -> Option<fs::Node<'_>> {
-        match self.tree.node_at_path(path)? {
+        match self.fs.node_at_path(path)? {
             puff::node::Node::Directory(directory) => {
                 Some(fs::Node::Directory(fs::Directory::new(
                     directory,
@@ -416,9 +416,9 @@ impl Project {
         &mut self,
         path: &AbsPath,
     ) -> Option<fs::NodeMut<'_>> {
-        let (state, tree) = self.state_mut();
+        let (state, fs) = self.state_mut();
 
-        match tree.node_at_path_mut(path)? {
+        match fs.node_at_path_mut(path)? {
             puff::node::NodeMut::Directory(directory) => {
                 Some(fs::NodeMut::Directory(fs::DirectoryMut::new(
                     directory, state,
@@ -433,20 +433,20 @@ impl Project {
     /// TODO: docs.
     #[inline]
     pub fn peer_id(&self) -> PeerId {
-        self.tree.peer_id().into()
+        self.fs.peer_id().into()
     }
 
     /// TODO: docs.
     #[inline]
     pub fn root(&self) -> fs::Directory<'_> {
-        fs::Directory::new(self.tree.root(), self.state())
+        fs::Directory::new(self.fs.root(), self.state())
     }
 
     /// TODO: docs.
     #[inline]
     pub fn root_mut(&mut self) -> fs::DirectoryMut<'_> {
-        let (state, tree) = self.state_mut();
-        fs::DirectoryMut::new(tree.root_mut(), state)
+        let (state, fs) = self.state_mut();
+        fs::DirectoryMut::new(fs.root_mut(), state)
     }
 
     /// TODO: docs.
@@ -485,7 +485,7 @@ impl Project {
                 binary: builder.binary_ctx,
                 text: text::TextCtx::default(),
             },
-            tree: builder.inner.build(),
+            fs: builder.inner.build(),
         }
     }
 
@@ -495,16 +495,14 @@ impl Project {
     }
 
     #[inline]
-    pub(crate) fn state_mut(
-        &mut self,
-    ) -> (StateMut<'_>, &mut fs::ProjectTree) {
+    pub(crate) fn state_mut(&mut self) -> (StateMut<'_>, &mut fs::Fs) {
         let peer_id = self.peer_id();
         let state = StateMut {
             backlogs: &mut self.backlogs,
             contexts: &mut self.contexts,
             peer_id,
         };
-        (state, &mut self.tree)
+        (state, &mut self.fs)
     }
 
     #[inline]
@@ -518,13 +516,13 @@ impl Project {
     }
 
     #[inline]
-    pub(crate) fn tree(&self) -> &fs::ProjectTree {
-        &self.tree
+    pub(crate) fn fs(&self) -> &fs::Fs {
+        &self.fs
     }
 
     #[inline]
-    pub(crate) fn tree_mut(&mut self) -> &mut fs::ProjectTree {
-        &mut self.tree
+    pub(crate) fn fs_mut(&mut self) -> &mut fs::Fs {
+        &mut self.fs
     }
 
     #[inline]
@@ -532,8 +530,8 @@ impl Project {
         &mut self,
         file_id: LocalFileId,
     ) -> Option<binary::BinaryStateMut<'_>> {
-        let (state, tree) = self.state_mut();
-        binary::BinaryStateMut::new(tree.file_mut(file_id), state)
+        let (state, fs) = self.state_mut();
+        binary::BinaryStateMut::new(fs.file_mut(file_id), state)
     }
 
     #[inline]
@@ -541,8 +539,8 @@ impl Project {
         &mut self,
         file_id: LocalFileId,
     ) -> Option<text::TextStateMut<'_>> {
-        let (state, tree) = self.state_mut();
-        text::TextStateMut::new(tree.file_mut(file_id), state)
+        let (state, fs) = self.state_mut();
+        text::TextStateMut::new(fs.file_mut(file_id), state)
     }
 }
 
@@ -603,5 +601,226 @@ impl Clone for State<'_> {
     #[inline]
     fn clone(&self) -> Self {
         *self
+    }
+}
+
+#[cfg(feature = "serde")]
+mod serde_impls {
+    use core::fmt;
+
+    use serde::de;
+    use serde::ser::{self, SerializeStruct};
+
+    use super::*;
+
+    impl Project {
+        #[inline]
+        pub(super) fn deserialize(peer_id: PeerId) -> DeserializeProject {
+            DeserializeProject::new(peer_id)
+        }
+
+        #[inline]
+        pub(super) fn serialize(&self) -> SerializeProject<'_> {
+            SerializeProject::new(self)
+        }
+    }
+
+    /// TODO: docs.
+    pub(super) struct SerializeProject<'proj> {
+        backlogs: &'proj Backlogs,
+        contexts: &'proj Contexts,
+        fs: fs::SerializeFs<'proj>,
+    }
+
+    /// TODO: docs.
+    pub(super) struct DeserializeProject {
+        inner: fs::DeserializeFs,
+    }
+
+    #[derive(serde::Deserialize)]
+    #[serde(field_identifier, rename_all = "snake_case")]
+    enum ProjectField {
+        Fs,
+        Contexts,
+        Backlogs,
+    }
+
+    impl<'proj> SerializeProject<'proj> {
+        const NAME: &'static str = "SerializeProject";
+
+        #[inline]
+        pub(super) fn with_fs_state(self, with_fs_state: bool) -> Self {
+            Self { fs: self.fs.with_fs_state(with_fs_state), ..self }
+        }
+
+        #[inline]
+        fn new(proj: &'proj Project) -> Self {
+            Self {
+                backlogs: &proj.backlogs,
+                contexts: &proj.contexts,
+                fs: proj.fs.serialize(),
+            }
+        }
+    }
+
+    impl DeserializeProject {
+        #[inline]
+        fn new(peer_id: PeerId) -> Self {
+            Self { inner: fs::Fs::deserialize(peer_id.into()) }
+        }
+    }
+
+    impl ProjectField {
+        const AS_SLICE: &'static [&'static str] = &[
+            Self::Fs.as_str(),
+            Self::Contexts.as_str(),
+            Self::Backlogs.as_str(),
+        ];
+
+        #[inline]
+        const fn as_str(&self) -> &'static str {
+            match self {
+                Self::Fs => "fs",
+                Self::Contexts => "contexts",
+                Self::Backlogs => "backlogs",
+            }
+        }
+    }
+
+    impl Copy for SerializeProject<'_> {}
+
+    impl Clone for SerializeProject<'_> {
+        #[inline]
+        fn clone(&self) -> Self {
+            *self
+        }
+    }
+
+    impl ser::Serialize for SerializeProject<'_> {
+        #[inline]
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: ser::Serializer,
+        {
+            let mut proj = serializer
+                .serialize_struct(Self::NAME, ProjectField::AS_SLICE.len())?;
+
+            proj.serialize_field(ProjectField::Fs.as_str(), &self.fs)?;
+
+            proj.serialize_field(
+                ProjectField::Contexts.as_str(),
+                &self.contexts,
+            )?;
+
+            proj.serialize_field(
+                ProjectField::Backlogs.as_str(),
+                &self.backlogs,
+            )?;
+
+            proj.end()
+        }
+    }
+
+    impl Copy for DeserializeProject {}
+
+    impl Clone for DeserializeProject {
+        #[inline]
+        fn clone(&self) -> Self {
+            *self
+        }
+    }
+
+    impl<'de> de::DeserializeSeed<'de> for DeserializeProject {
+        type Value = Project;
+
+        #[inline]
+        fn deserialize<Ds>(
+            self,
+            deserializer: Ds,
+        ) -> Result<Self::Value, Ds::Error>
+        where
+            Ds: de::Deserializer<'de>,
+        {
+            deserializer.deserialize_struct(
+                SerializeProject::NAME,
+                ProjectField::AS_SLICE,
+                self,
+            )
+        }
+    }
+
+    impl<'de> de::Visitor<'de> for DeserializeProject {
+        type Value = Project;
+
+        #[inline]
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            write!(
+                formatter,
+                "a map representing a {}",
+                SerializeProject::NAME
+            )
+        }
+
+        #[inline]
+        fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+        where
+            A: de::MapAccess<'de>,
+        {
+            let mut fs: Option<fs::Fs> = None;
+            let mut contexts: Option<Contexts> = None;
+            let mut backlogs: Option<Backlogs> = None;
+
+            while let Some(fs_field) = map.next_key::<ProjectField>()? {
+                match fs_field {
+                    ProjectField::Fs => {
+                        fs = Some(map.next_value_seed(self.inner)?);
+                    },
+                    ProjectField::Contexts => {
+                        contexts = Some(map.next_value()?);
+                    },
+                    ProjectField::Backlogs => {
+                        backlogs = Some(map.next_value()?);
+                    },
+                }
+            }
+
+            let fs = fs.ok_or_else(|| {
+                de::Error::missing_field(ProjectField::Fs.as_str())
+            })?;
+
+            let contexts = contexts.ok_or_else(|| {
+                de::Error::missing_field(ProjectField::Contexts.as_str())
+            })?;
+
+            let backlogs = backlogs.ok_or_else(|| {
+                de::Error::missing_field(ProjectField::Backlogs.as_str())
+            })?;
+
+            Ok(Project { fs, contexts, backlogs })
+        }
+
+        #[inline]
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+        where
+            A: de::SeqAccess<'de>,
+        {
+            let fs = seq
+                .next_element_seed::<fs::DeserializeFs>(self.inner)?
+                .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+
+            let contexts = seq
+                .next_element()?
+                .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+
+            let backlogs = seq
+                .next_element()?
+                .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+
+            if seq.next_element::<de::IgnoredAny>()?.is_some() {
+                return Err(de::Error::invalid_length(4, &self));
+            }
+
+            Ok(Project { fs, contexts, backlogs })
+        }
     }
 }

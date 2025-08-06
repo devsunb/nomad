@@ -13,7 +13,7 @@ use fxhash::FxHashMap;
 use nohash::IntMap as NoHashMap;
 use puff::file::{GlobalFileId, LocalFileId};
 
-use crate::fs::{ProjectTree, PuffFile};
+use crate::fs::{Fs, PuffFile};
 
 pub(crate) trait Annotation {
     type Op;
@@ -55,8 +55,8 @@ pub(crate) struct Annotations<T: Annotation> {
     )]
     backlog: FxHashMap<AnnotationId, T::Backlog>,
 
-    /// Creations that have been backlogged due to the local project tree not
-    /// yet having received the creation of the file they're in.
+    /// Creations that have been backlogged due to the local fs not yet having
+    /// received the creation of the file they're in.
     backlogged_creations: FxHashMap<GlobalFileId, AnnotationCreation<T>>,
 
     /// Map from annotation owner to the ranges of sequences of annotations
@@ -145,7 +145,7 @@ impl<T: Annotation> Annotations<T> {
     pub(crate) fn integrate_creation(
         &mut self,
         mut creation: AnnotationCreation<T>,
-        project_tree: &ProjectTree,
+        fs: &Fs,
     ) -> Option<AnnotationMut<'_, T>> {
         if self.is_deleted(creation.annotation_id) {
             None
@@ -156,7 +156,7 @@ impl<T: Annotation> Annotations<T> {
             }
 
             let Some(local_id) =
-                project_tree.local_file_id_of_global_id(creation.file_id)
+                fs.local_file_id_of_global_id(creation.file_id)
             else {
                 self.backlogged_creations.insert(creation.file_id, creation);
                 return None;

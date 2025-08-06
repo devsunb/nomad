@@ -396,7 +396,7 @@ impl<'a> CursorRef<'a> {
     pub(crate) fn from_id(id: CursorId, proj: &'a Project) -> Option<Self> {
         let cursor = proj.state().text_ctx().cursors.get(id.inner)?;
 
-        let file = proj.tree().file(cursor.file_id());
+        let file = proj.fs().file(cursor.file_id());
 
         let FileContents::Text(contents) = file.metadata() else {
             unreachable!("cursors can only be created on TextFiles");
@@ -422,8 +422,8 @@ impl<'a> CursorMut<'a> {
     #[inline]
     pub fn file_mut(&mut self) -> Option<TextFileMut<'_>> {
         let file_id = self.annotation().file_id();
-        let (state, tree) = self.proj.state_mut();
-        match tree.file_mut(file_id) {
+        let (state, fs) = self.proj.state_mut();
+        match fs.file_mut(file_id) {
             PuffFileStateMut::Visible(file) => {
                 Some(TextFileMut::new(file, state))
             },
@@ -435,7 +435,7 @@ impl<'a> CursorMut<'a> {
     #[inline]
     pub fn r#move(&mut self, new_offset: ByteOffset) -> CursorMove {
         let file_id = self.annotation().file_id();
-        let file_state = self.proj.tree_mut().file(file_id);
+        let file_state = self.proj.fs_mut().file(file_id);
 
         let FileContents::Text(contents) = file_state.metadata() else {
             unreachable!("cursors can only be created on TextFiles");
@@ -519,7 +519,7 @@ impl<'a> SelectionRef<'a> {
     pub(crate) fn from_id(id: SelectionId, proj: &'a Project) -> Option<Self> {
         let selection = proj.state().text_ctx().selections.get(id.inner)?;
 
-        let file = proj.tree().file(selection.file_id());
+        let file = proj.fs().file(selection.file_id());
 
         let FileContents::Text(contents) = file.metadata() else {
             unreachable!("selections can only be created on TextFiles");
@@ -545,8 +545,8 @@ impl<'a> SelectionMut<'a> {
     #[inline]
     pub fn file_mut(&mut self) -> Option<TextFileMut<'_>> {
         let file_id = self.annotation().file_id();
-        let (state, tree) = self.proj.state_mut();
-        match tree.file_mut(file_id) {
+        let (state, fs) = self.proj.state_mut();
+        match fs.file_mut(file_id) {
             PuffFileStateMut::Visible(file) => {
                 Some(TextFileMut::new(file, state))
             },
@@ -557,7 +557,7 @@ impl<'a> SelectionMut<'a> {
     /// TODO: docs.
     #[inline]
     pub fn r#move(&mut self, new_range: Range<ByteOffset>) -> SelectionMove {
-        let file_state = self.proj.tree().file(self.annotation().file_id());
+        let file_state = self.proj.fs().file(self.annotation().file_id());
 
         let FileContents::Text(contents) = file_state.metadata() else {
             unreachable!("selections can only be created on TextFiles");
