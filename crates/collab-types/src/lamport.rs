@@ -7,7 +7,9 @@ use crate::Counter;
 /// A [Lamport clock][lamport-ts] producing [`LamportTimestamp`]s.
 ///
 /// [lamport-ts]: https://en.wikipedia.org/wiki/Lamport_timestamp
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(transparent))]
 pub struct LamportClock {
     counter: Counter<u64>,
 }
