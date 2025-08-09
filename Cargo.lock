@@ -233,8 +233,7 @@ name = "auth"
 version = "0.1.0-dev"
 dependencies = [
  "abs-path",
- "collab-server",
- "collab-types 0.1.0-dev (git+ssh://git@github.com/nomad/nomad.git?rev=ce96475)",
+ "auth-types",
  "ed",
  "event-listener",
  "keyring",

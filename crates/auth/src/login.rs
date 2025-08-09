@@ -1,13 +1,13 @@
 //! TODO: docs.
 
-use collab_types::GitHubHandle;
+use auth_types::{AuthInfos, GitHubHandle};
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
 use ed::{Context, Shared};
 
 use crate::credential_store::{self, CredentialStore};
-use crate::{Auth, AuthEditor, AuthInfos};
+use crate::{Auth, AuthEditor};
 
 /// TODO: docs.
 #[derive(Clone, Default)]
@@ -27,7 +27,7 @@ impl<Ed: AuthEditor> AsyncAction<Ed> for Login {
         ctx: &mut Context<Ed>,
     ) -> Result<(), LoginError<Ed>> {
         if let Some(handle) = self.infos.with(|maybe_infos| {
-            maybe_infos.as_ref().map(|infos| infos.handle().clone())
+            maybe_infos.as_ref().map(|infos| infos.github_handle.clone())
         }) {
             return Err(LoginError::AlreadyLoggedIn(handle));
         }

@@ -1,10 +1,8 @@
-use collab_server::nomad::NomadAuthenticateInfos;
-use collab_types::GitHubHandle;
+use auth_types::AuthInfos;
 use ed::{Borrowed, Context};
 use neovim::Neovim;
 
-use crate::AuthInfos;
-use crate::editors::AuthEditor;
+use crate::AuthEditor;
 
 impl AuthEditor for Neovim {
     type LoginError = core::convert::Infallible;
@@ -20,9 +18,6 @@ impl AuthEditor for Neovim {
     async fn login(
         _: &mut Context<Self>,
     ) -> Result<AuthInfos, Self::LoginError> {
-        Ok(NomadAuthenticateInfos {
-            github_handle: "noib3".parse::<GitHubHandle>().expect("valid"),
-        }
-        .into())
+        Ok(AuthInfos { github_handle: "noib3".parse().expect("valid") })
     }
 }

@@ -1,6 +1,7 @@
 use std::sync::{Arc, OnceLock};
 
-use crate::AuthInfos;
+use auth_types::AuthInfos;
+
 use crate::async_once_lock::AsyncOnceLock;
 
 #[derive(Clone, Default)]

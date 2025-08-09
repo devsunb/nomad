@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use abs_path::AbsPath;
+use auth_types::AuthInfos;
 use ed::notify::MaybeResult;
 use ed::{
     AgentId,
@@ -13,7 +14,7 @@ use ed::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{AuthEditor, AuthInfos};
+use crate::AuthEditor;
 
 pub struct AuthMock<Ed> {
     inner: Ed,

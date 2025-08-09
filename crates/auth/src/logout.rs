@@ -1,12 +1,13 @@
 //! TODO: docs.
 
+use auth_types::AuthInfos;
 use ed::action::AsyncAction;
 use ed::command::ToCompletionFn;
 use ed::notify::{self, Name};
 use ed::{Context, Editor, Shared};
 
+use crate::Auth;
 use crate::credential_store::{self, CredentialStore};
-use crate::{Auth, AuthInfos};
 
 /// TODO: docs.
 #[derive(Clone, Default)]

@@ -1,9 +1,9 @@
+use auth_types::AuthInfos;
 use ed::module::{ApiCtx, Module};
 use ed::notify::Name;
 use ed::{Borrowed, Context, Shared};
 
 use crate::AuthEditor;
-use crate::auth_infos::AuthInfos;
 use crate::credential_store::CredentialStore;
 use crate::login::Login;
 use crate::logout::Logout;
@@ -37,7 +37,7 @@ impl Auth {
     #[track_caller]
     pub fn logged_in<Gh>(github_handle: Gh) -> Self
     where
-        Gh: TryInto<collab_types::GitHubHandle>,
+        Gh: TryInto<auth_types::GitHubHandle>,
         Gh::Error: core::fmt::Debug,
     {
         Self {
