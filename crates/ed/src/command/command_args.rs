@@ -57,7 +57,7 @@ pub enum CommandCursor<'a> {
     },
 }
 
-/// TODO: docs.
+/// A compatibility wrapper from `FromStr` to `TryFrom<CommandArgs<'_>>`.
 #[derive(
     Debug,
     Copy,

@@ -3,13 +3,13 @@ pub mod mock;
 #[cfg(feature = "neovim")]
 mod neovim;
 
+use core::error::Error;
 use core::fmt::Debug;
 use core::ops::Range;
+use core::str::FromStr;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use collab_server::Authenticator;
 use collab_types::Peer;
-use ed::command::CommandArgs;
 use ed::{ByteOffset, Context, Editor, fs, notify};
 use futures_util::{AsyncRead, AsyncWrite};
 
@@ -32,9 +32,9 @@ pub trait CollabEditor: Editor {
     type ProjectFilter: walkdir::Filter<Self::Fs, Error: Send> + Send + Sync;
 
     /// TODO: docs.
-    type ServerConfig: collab_server::Config<
-            Authenticator: Authenticator<Infos: From<auth::AuthInfos>>,
-            SessionId: for<'a> TryFrom<CommandArgs<'a>, Error: notify::Error>,
+    type ServerProtocol: collab_types::Protocol<
+            AuthenticateInfos: From<auth::AuthInfos>,
+            SessionId: FromStr<Err: Error>,
         >;
 
     /// The type of error returned by
@@ -165,7 +165,7 @@ pub enum ActionForSelectedSession {
 
 /// TODO: docs.
 pub type SessionId<B> =
-    <<B as CollabEditor>::ServerConfig as collab_server::Config>::SessionId;
+    <<B as CollabEditor>::ServerProtocol as collab_types::Protocol>::SessionId;
 
 /// TODO: docs.
 pub(crate) type MessageRx<B> = collab_server::client::ClientRx<Reader<B>>;

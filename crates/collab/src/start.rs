@@ -98,9 +98,9 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Start<Ed> {
             .map_err(StartError::ConnectToServer)?
             .split();
 
-        let github_handle = auth_infos.handle().clone();
+        let github_handle = auth_infos.github_handle.clone();
 
-        let knock = collab_server::Knock::<Ed::ServerConfig> {
+        let knock = collab_server::Knock::<Ed::ServerProtocol> {
             auth_infos: auth_infos.into(),
             session_intent: SessionIntent::StartNew(project_name.to_owned()),
         };
@@ -395,7 +395,7 @@ pub enum StartError<Ed: CollabEditor> {
     ConnectToServer(Ed::ConnectToServerError),
 
     /// TODO: docs.
-    Knock(client::KnockError<Ed::ServerConfig>),
+    Knock(client::KnockError<Ed::ServerProtocol>),
 
     /// TODO: docs.
     NoBufferFocused,

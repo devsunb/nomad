@@ -12,7 +12,9 @@ neovim = ["keyring/apple-native", "keyring/secret-service", "dep:neovim"]
 
 [dependencies]
 abs-path = { workspace = true }
-auth-types = { workspace = true, features = ["serde"] }
+auth-types = { git = "ssh://git@github.com/nomad/collab-server.git", branch = "message-channel", features = [
+  "serde",
+] }
 ed = { workspace = true }
 event-listener = "5"
 keyring = { git = "https://git@github.com/open-source-cooperative/keyring-rs.git", branch = "v4", default-features = false }

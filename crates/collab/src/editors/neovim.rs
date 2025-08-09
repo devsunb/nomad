@@ -1,15 +1,12 @@
 use core::fmt;
-use core::num::NonZeroU32;
 use core::ops::Range;
 use std::ffi::OsString;
 use std::path::PathBuf;
 use std::{env, io};
 
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
-use collab_server::Config;
-use collab_server::nomad::{NomadConfig, NomadSessionId};
-use collab_types::{Peer, PeerId};
-use ed::command::{CommandArgs, Parse};
+use collab_types::Peer;
+use collab_types::nomad::ulid;
 use ed::fs::{self, Directory};
 use ed::{ByteOffset, Context, notify};
 use mlua::{Function, Table};
@@ -20,6 +17,8 @@ use smol_str::ToSmolStr;
 use crate::config;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 
+pub type SessionId = ulid::Ulid;
+
 pub struct NeovimPeerSelection {
     selection_highlight_handle: HighlightRangeHandle,
 }
@@ -28,21 +27,6 @@ pub struct PeerTooltip {
     /// We use a 1-grapheme-wide highlight to represent a remote peer's cursor.
     cursor_highlight_handle: HighlightRangeHandle,
 }
-
-pub struct ServerConfig;
-
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-#[serde(transparent)]
-pub struct SessionId(NomadSessionId);
 
 #[derive(Debug)]
 pub struct NeovimCopySessionIdError {
@@ -86,7 +70,7 @@ impl CollabEditor for Neovim {
     type PeerSelection = NeovimPeerSelection;
     type PeerTooltip = PeerTooltip;
     type ProjectFilter = walkdir::GitIgnore;
-    type ServerConfig = ServerConfig;
+    type ServerProtocol = collab_types::nomad::NomadProtocol;
 
     type ConnectToServerError = NeovimConnectToServerError;
     type CopySessionIdError = NeovimCopySessionIdError;
@@ -365,43 +349,6 @@ impl CollabEditor for Neovim {
 
     fn should_remote_save_cause_local_save(buf: &Self::Buffer<'_>) -> bool {
         !buf.is_focused()
-    }
-}
-
-impl Config for ServerConfig {
-    const MAX_FRAME_LEN: NonZeroU32 = <NomadConfig as Config>::MAX_FRAME_LEN;
-    const SERVER_PEER_ID: PeerId = <NomadConfig as Config>::SERVER_PEER_ID;
-
-    type Authenticator = <NomadConfig as Config>::Authenticator;
-    #[cfg(feature = "mock")]
-    type Executor = <NomadConfig as Config>::Executor;
-    type SessionId = SessionId;
-
-    #[cfg(feature = "mock")]
-    fn authenticator(&self) -> &Self::Authenticator {
-        unreachable!()
-    }
-    #[cfg(feature = "mock")]
-    fn executor(&self) -> &Self::Executor {
-        unreachable!()
-    }
-    #[cfg(feature = "mock")]
-    fn new_session_id(&self) -> Self::SessionId {
-        unreachable!()
-    }
-}
-
-impl fmt::Display for SessionId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.0, f)
-    }
-}
-
-impl<'a> TryFrom<CommandArgs<'a>> for SessionId {
-    type Error = <Parse<NomadSessionId> as TryFrom<CommandArgs<'a>>>::Error;
-
-    fn try_from(args: CommandArgs<'a>) -> Result<Self, Self::Error> {
-        Parse::<NomadSessionId>::try_from(args).map(|Parse(inner)| Self(inner))
     }
 }
 

@@ -3,6 +3,7 @@ use auth::Auth;
 use collab::Collab;
 use collab::mock::{CollabMock, CollabServer, SessionId};
 use ed::action::AsyncAction;
+use ed::command::Parse;
 use ed::fs::Fs;
 use futures_lite::future::{self, FutureExt};
 use mock::{EditorExt, Mock};
@@ -40,7 +41,7 @@ fn replicate_simple_project() {
     let run_peer2 = peer2.run(async move |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer2"));
         let session_id = started_rx.recv_async().await.unwrap();
-        collab.join().call(session_id, ctx).await.unwrap();
+        collab.join().call(Parse(session_id), ctx).await.unwrap();
         let fs2 = ctx.fs();
         assert_eq!(
             fs1.node_at_path(path!("/foo")).await.unwrap().unwrap(),

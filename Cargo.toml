@@ -14,6 +14,7 @@ publish = false
 abs-path = { git = "ssh://git@github.com/nomad/abs-path.git" }
 async-net = "2"
 cauchy = { git = "ssh://git@github.com/nomad/cauchy.git" }
+collab-types = { git = "ssh://git@github.com/nomad/collab-server.git", branch = "message-channel" }
 compact_str = "0.9"
 derive_more = { version = "2", features = ["display"] }
 flume = { version = "0.11", features = ["async"] }
@@ -38,7 +39,6 @@ auth-types = { path = "./crates/auth-types" }
 clipboard = { path = "./crates/clipboard" }
 collab = { path = "./crates/collab" }
 collab-project = { path = "./crates/collab-project" }
-collab-types = { git = "ssh://git@github.com/nomad/nomad.git", rev = "ce96475" }
 ed = { path = "./crates/ed" }
 mock = { path = "./crates/mock" }
 neovim = { path = "./crates/neovim" }

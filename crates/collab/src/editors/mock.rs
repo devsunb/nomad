@@ -3,14 +3,11 @@
 use core::convert::Infallible;
 use core::error::Error;
 use core::fmt;
-use core::num::NonZeroU32;
 use core::ops::Range;
-use core::str::FromStr;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use collab_server::Config;
-use collab_server::test::{TestConfig as InnerConfig, TestSessionId};
-use collab_types::{Peer, PeerId};
+use collab_server::test::TestSessionId;
+use collab_types::Peer;
 use duplex_stream::{DuplexStream, duplex};
 use ed::notify::{self, MaybeResult};
 use ed::{
@@ -28,11 +25,13 @@ use serde::{Deserialize, Serialize};
 use crate::config;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 
+pub type SessionId = TestSessionId;
+
 #[allow(clippy::type_complexity)]
 pub struct CollabMock<Ed: Editor, F = ()> {
     inner: Ed,
     confirm_start_with: Option<Box<dyn FnMut(&AbsPath) -> bool>>,
-    clipboard: Option<SessionId>,
+    clipboard: Option<TestSessionId>,
     default_dir_for_remote_projects: Option<AbsPathBuf>,
     home_dir: Option<AbsPathBuf>,
     lsp_root_with: Option<Box<dyn FnMut(Ed::BufferId) -> Option<AbsPathBuf>>>,
@@ -40,40 +39,29 @@ pub struct CollabMock<Ed: Editor, F = ()> {
     select_session_with: Option<
         Box<
             dyn FnMut(
-                &[(AbsPathBuf, SessionId)],
+                &[(AbsPathBuf, TestSessionId)],
                 ActionForSelectedSession,
-            ) -> Option<&(AbsPathBuf, SessionId)>,
+            ) -> Option<&(AbsPathBuf, TestSessionId)>,
         >,
     >,
     server_tx: Option<flume::Sender<DuplexStream>>,
 }
 
 pub struct CollabServer {
-    inner: collab_server::CollabServer<ServerConfig>,
+    inner: collab_server::CollabServer<MockConfig>,
     conn_rx: flume::Receiver<DuplexStream>,
     conn_tx: flume::Sender<DuplexStream>,
 }
 
 #[derive(Default)]
-pub struct Authenticator;
-
-#[derive(Default)]
-pub struct ServerConfig {
-    inner: InnerConfig,
+pub struct MockConfig {
+    inner: collab_server::test::TestConfig,
 }
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-#[serde(transparent)]
-pub struct SessionId(pub u64);
+#[derive(Default)]
+pub struct MockAuthenticator;
+
+pub struct MockProtocol;
 
 #[derive(Debug)]
 pub struct AnyError {
@@ -123,9 +111,9 @@ where
     pub fn select_session_with(
         mut self,
         fun: impl FnMut(
-            &[(AbsPathBuf, SessionId)],
+            &[(AbsPathBuf, TestSessionId)],
             ActionForSelectedSession,
-        ) -> Option<&(AbsPathBuf, SessionId)>
+        ) -> Option<&(AbsPathBuf, TestSessionId)>
         + 'static,
     ) -> Self {
         self.select_session_with = Some(Box::new(fun) as _);
@@ -226,7 +214,7 @@ where
     type PeerSelection = ();
     type PeerTooltip = ();
     type ProjectFilter = F;
-    type ServerConfig = ServerConfig;
+    type ServerProtocol = MockProtocol;
 
     type ConnectToServerError = AnyError;
     type CopySessionIdError = Infallible;
@@ -260,7 +248,7 @@ where
     }
 
     async fn copy_session_id(
-        session_id: SessionId,
+        session_id: TestSessionId,
         ctx: &mut Context<Self>,
     ) -> Result<(), Self::CopySessionIdError> {
         ctx.with_editor(|this| this.clipboard = Some(session_id));
@@ -345,10 +333,10 @@ where
     }
 
     async fn select_session<'pairs>(
-        sessions: &'pairs [(AbsPathBuf, SessionId)],
+        sessions: &'pairs [(AbsPathBuf, TestSessionId)],
         action: ActionForSelectedSession,
         ctx: &mut Context<Self>,
-    ) -> Option<&'pairs (AbsPathBuf, SessionId)> {
+    ) -> Option<&'pairs (AbsPathBuf, TestSessionId)> {
         ctx.with_editor(|this| {
             this.select_session_with.as_mut()?(sessions, action)
         })
@@ -467,25 +455,6 @@ impl<Ed: Editor, F> AsMut<Ed> for CollabMock<Ed, F> {
     }
 }
 
-impl Config for ServerConfig {
-    const MAX_FRAME_LEN: NonZeroU32 = <InnerConfig as Config>::MAX_FRAME_LEN;
-    const SERVER_PEER_ID: PeerId = <InnerConfig as Config>::SERVER_PEER_ID;
-
-    type Authenticator = Authenticator;
-    type Executor = <InnerConfig as Config>::Executor;
-    type SessionId = SessionId;
-
-    fn authenticator(&self) -> &Self::Authenticator {
-        &Authenticator
-    }
-    fn executor(&self) -> &Self::Executor {
-        self.inner.executor()
-    }
-    fn new_session_id(&self) -> Self::SessionId {
-        self.inner.new_session_id().into()
-    }
-}
-
 impl Default for CollabServer {
     fn default() -> Self {
         let (conn_tx, conn_rx) = flume::unbounded();
@@ -510,7 +479,26 @@ impl<Ed: Editor + Default> Default for CollabMock<Ed, ()> {
 )]
 pub enum Never {}
 
-impl collab_server::Authenticator for Authenticator {
+impl collab_server::Config for MockConfig {
+    type Authenticator = MockAuthenticator;
+    type Executor =
+        <collab_server::test::TestConfig as collab_server::Config>::Executor;
+    type Protocol = MockProtocol;
+
+    fn authenticator(&self) -> &Self::Authenticator {
+        &MockAuthenticator
+    }
+
+    fn executor(&self) -> &Self::Executor {
+        self.inner.executor()
+    }
+
+    fn new_session_id(&self) -> TestSessionId {
+        self.inner.new_session_id()
+    }
+}
+
+impl collab_server::Authenticator for MockAuthenticator {
     type Infos = auth::AuthInfos;
     type Error = Never;
 
@@ -519,31 +507,12 @@ impl collab_server::Authenticator for Authenticator {
     }
 }
 
-impl FromStr for SessionId {
-    type Err = core::num::ParseIntError;
+impl collab_types::Protocol for MockProtocol {
+    const MAX_FRAGMENT_LEN: u32 = 64;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(SessionId)
-    }
-}
-
-impl<'a> TryFrom<ed::command::CommandArgs<'a>> for SessionId {
-    type Error = <ed::command::Parse<Self> as TryFrom<
-        ed::command::CommandArgs<'a>,
-    >>::Error;
-
-    fn try_from(
-        args: ed::command::CommandArgs<'a>,
-    ) -> Result<Self, Self::Error> {
-        ed::command::Parse::<Self>::try_from(args)
-            .map(|ed::command::Parse(this)| this)
-    }
-}
-
-impl From<TestSessionId> for SessionId {
-    fn from(TestSessionId(session_id): TestSessionId) -> Self {
-        Self(session_id)
-    }
+    type AuthenticateInfos = auth::AuthInfos;
+    type AuthenticateError = Never;
+    type SessionId = TestSessionId;
 }
 
 impl<E: Error + 'static> From<E> for AnyError {

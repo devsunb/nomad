@@ -17,7 +17,7 @@ use collab_server::{SessionIntent, client};
 use collab_types::{Message, Peer, ProjectRequest, puff};
 use ed::Context;
 use ed::action::AsyncAction;
-use ed::command::ToCompletionFn;
+use ed::command::{self, ToCompletionFn};
 use ed::fs::{self, Directory, File, Fs, Symlink};
 use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
@@ -52,12 +52,12 @@ pub struct Join<Ed: CollabEditor> {
 impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
     const NAME: Name = "join";
 
-    type Args = SessionId<Ed>;
+    type Args = command::Parse<SessionId<Ed>>;
 
     #[allow(clippy::too_many_lines)]
     async fn call(
         &mut self,
-        session_id: Self::Args,
+        command::Parse(session_id): Self::Args,
         ctx: &mut Context<Ed>,
     ) -> Result<(), JoinError<Ed>> {
         let auth_infos =
@@ -70,9 +70,9 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
             .map_err(JoinError::ConnectToServer)?
             .split();
 
-        let github_handle = auth_infos.handle().clone();
+        let github_handle = auth_infos.github_handle.clone();
 
-        let knock = collab_server::Knock::<Ed::ServerConfig> {
+        let knock = collab_server::Knock::<Ed::ServerProtocol> {
             auth_infos: auth_infos.into(),
             session_intent: SessionIntent::JoinExisting(session_id),
         };
@@ -359,7 +359,7 @@ pub enum JoinError<Ed: CollabEditor> {
     DefaultDirForRemoteProjects(Ed::DefaultDirForRemoteProjectsError),
 
     /// TODO: docs.
-    Knock(client::KnockError<Ed::ServerConfig>),
+    Knock(client::KnockError<Ed::ServerProtocol>),
 
     /// TODO: docs.
     OverlappingProject(OverlappingProjectError),
