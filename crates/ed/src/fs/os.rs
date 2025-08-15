@@ -175,7 +175,7 @@ impl Fs for OsFs {
 }
 
 impl Directory for OsDirectory {
-    type EventStream = futures_util::stream::Pending<DirectoryEvent<OsFs>>;
+    type EventStream = stream::Pending<DirectoryEvent<OsFs>>;
     type Fs = OsFs;
 
     type ClearError = io::Error;
@@ -328,12 +328,12 @@ impl Directory for OsDirectory {
 
     #[inline]
     fn watch(&self) -> Self::EventStream {
-        todo!()
+        stream::pending()
     }
 }
 
 impl File for OsFile {
-    type EventStream = futures_util::stream::Pending<FileEvent<OsFs>>;
+    type EventStream = stream::Pending<FileEvent<OsFs>>;
     type Fs = OsFs;
 
     type DeleteError = io::Error;
@@ -380,7 +380,7 @@ impl File for OsFile {
 
     #[inline]
     fn watch(&self) -> Self::EventStream {
-        todo!()
+        stream::pending()
     }
 
     #[inline]
