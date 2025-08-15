@@ -113,6 +113,9 @@ pub trait Editor: 'static + Sized {
     fn cursor(&mut self, id: Self::CursorId) -> Option<Self::Cursor<'_>>;
 
     /// TODO: docs.
+    fn debug<T: Debug>(&mut self, value: T);
+
+    /// TODO: docs.
     fn fs(&mut self) -> Self::Fs;
 
     /// TODO: docs.

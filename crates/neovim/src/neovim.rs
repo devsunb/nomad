@@ -1,3 +1,5 @@
+use core::fmt;
+
 use ::serde::{Deserialize, Serialize};
 use abs_path::AbsPath;
 use ed::fs::os::OsFs;
@@ -172,6 +174,10 @@ impl Editor for Neovim {
     fn cursor(&mut self, buf_id: Self::CursorId) -> Option<Self::Cursor<'_>> {
         let buffer = self.buffer(buf_id)?;
         buffer.is_focused().then_some(NeovimCursor::new(buffer))
+    }
+
+    fn debug<T: fmt::Debug>(&mut self, value: T) {
+        oxi::print!("{value:?}");
     }
 
     #[inline]

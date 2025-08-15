@@ -1,5 +1,7 @@
 #![allow(missing_docs)]
 
+use core::fmt;
+
 use abs_path::AbsPath;
 use auth_types::AuthInfos;
 use ed::notify::MaybeResult;
@@ -85,6 +87,9 @@ impl<Ed: BaseEditor> Editor for AuthMock<Ed> {
     }
     fn cursor(&mut self, id: Self::CursorId) -> Option<Self::Cursor<'_>> {
         self.inner.cursor(id)
+    }
+    fn debug<T: fmt::Debug>(&mut self, value: T) {
+        self.inner.debug(value);
     }
     fn fs(&mut self) -> Self::Fs {
         self.inner.fs()

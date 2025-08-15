@@ -384,6 +384,9 @@ where
     fn cursor(&mut self, id: Self::CursorId) -> Option<Self::Cursor<'_>> {
         self.inner.cursor(id)
     }
+    fn debug<T: fmt::Debug>(&mut self, value: T) {
+        self.inner.debug(value);
+    }
     fn fs(&mut self) -> Self::Fs {
         self.inner.fs()
     }

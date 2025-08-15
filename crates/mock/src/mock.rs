@@ -1,3 +1,5 @@
+use core::fmt;
+
 use abs_path::AbsPath;
 use ed::executor::BackgroundSpawner;
 use ed::notify::{self, MaybeResult};
@@ -222,6 +224,10 @@ where
     ) -> Option<Self::Cursor<'_>> {
         self.buffer(cursor_id.buffer_id())
             .and_then(|buf| buf.into_cursor(cursor_id))
+    }
+
+    fn debug<T: fmt::Debug>(&mut self, value: T) {
+        println!("{value:?}");
     }
 
     fn fs(&mut self) -> Self::Fs {
