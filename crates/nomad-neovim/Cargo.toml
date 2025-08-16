@@ -15,11 +15,13 @@ neovim-nightly = ["neovim/nightly"]
 
 [dependencies]
 auth = { workspace = true, features = ["neovim"] }
+cauchy = { workspace = true }
 collab = { workspace = true, features = ["neovim"] }
 ed = { workspace = true }
 neovim = { workspace = true, features = ["tracing"] }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["chrono"] }
 version = { workspace = true }
 
 [lints]
