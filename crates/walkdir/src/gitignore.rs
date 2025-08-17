@@ -1,434 +1,356 @@
-use core::ops::Range;
-use core::time::Duration;
-use core::{iter, str};
-use std::io;
-use std::path::MAIN_SEPARATOR;
-use std::process::{Command, ExitStatus};
-use std::sync::Mutex;
-use std::time::Instant;
+use std::collections::VecDeque;
+use std::io::{self, BufRead, Read, Write};
+use std::process;
+use std::sync::{Arc, OnceLock};
 
-use abs_path::{AbsPath, AbsPathBuf, InvalidNodeNameError, NodeName};
-use compact_str::CompactString;
-use ed::fs::{Metadata, MetadataNameError, os};
+use abs_path::{AbsPath, AbsPathBuf};
+use ed::executor::{BackgroundSpawner, Task};
+use ed::fs::{self, os};
+use futures_util::{StreamExt, select_biased};
 
-use crate::{Either, Filter};
+use crate::Filter;
 
-/// TODO: docs.
+/// A [`Filter`] that filters out nodes based on the various exclusion rules
+/// used by Git.
+#[derive(Clone)]
 pub struct GitIgnore {
-    inner: Mutex<GitIgnoreInner>,
+    /// A sender used to send [`CheckRequest`]s to the background task.
+    request_tx: flume::Sender<CheckRequest>,
+
+    /// The exit status of the `git check-ignore` process, if it has exited.
+    exit_status: Arc<OnceLock<io::Result<process::ExitStatus>>>,
 }
 
-/// TODO: docs.
-#[derive(Debug, derive_more::Display, cauchy::Error)]
-pub enum GitIgnoreError {
-    #[display(
-        "Running {cmd:?} failed with status {status:?}: {stderr:?}",
-        cmd = GitIgnore::command()
-    )]
-    FailedCommand { status: ExitStatus, stderr: String },
+/// The type of error that can occur when creating the [`GitIgnore`] filter.
+#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
+pub enum GitIgnoreCreateError {
+    /// The path given to [`GitIgnore::new`] doesn't point to a Git repository.
+    #[display("the path {_0:?} does not point to a Git repository")]
+    InvalidRepoPath(AbsPathBuf),
 
+    /// Running the `git check-ignore` command failed.
     #[display("Running {cmd:?} failed: {_0}", cmd = GitIgnore::command())]
-    GitCommand(io::Error),
+    CommandFailed(io::Error),
+}
 
-    #[display("{node_name:?} is not a valid node name: {err:?}")]
-    NotNodeName { node_name: String, err: InvalidNodeNameError },
+/// The type of error that can occur when using the [`GitIgnore`] filter.
+#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
+pub enum GitIgnoreFilterError {
+    /// The name corresponding to a node's metadata could not be obtained.
+    #[display("{_0}")]
+    NodeName(fs::MetadataNameError),
 
-    #[display("{path:?} is not in {dir_path:?}")]
-    NotInDir { path: AbsPathBuf, dir_path: AbsPathBuf },
+    /// The path given to [`GitIgnore::should_filter`] does not exist.
+    #[display("the path {_0:?} does not exist")]
+    PathDoesNotExist(AbsPathBuf),
 
+    /// The path is outside the repository.
+    #[display("the path {path:?} is outside the repository at {repo_path:?}")]
+    PathOutsideRepo {
+        /// The path given to [`GitIgnore::should_filter`].
+        path: AbsPathBuf,
+
+        /// The repo's path.
+        repo_path: AbsPathBuf,
+    },
+
+    /// The `git check-ignore` process has exited.
     #[display(
-        "The stdout of {cmd:?} was not valid UTF-8",
-        cmd = GitIgnore::command()
+        "the 'git check-ignore ..' process has exited{}",
+        _0.map_or(Default::default(), |status| format!(" with status {status}"))
     )]
-    StdoutNotUtf8,
+    ProcessExited(Option<process::ExitStatus>),
 }
 
-struct GitIgnoreInner {
-    dir_path: AbsPathBuf,
-    ignored_paths: IgnoredPaths,
-    last_refreshed_ignored_paths_at: Instant,
+/// A request to check if a path is ignored, together with a sender that the
+/// background task can use to send the result back.
+struct CheckRequest {
+    node_path: AbsPathBuf,
+    result_tx: flume::Sender<Result<bool, GitIgnoreFilterError>>,
 }
 
-#[derive(Debug, Default)]
-struct IgnoredPaths {
-    inner: Vec<CompactString>,
+enum Message {
+    /// Sent by the stdout task when a new line is read. The `bool` indicates
+    /// whether the path (which is not included in the message) is ignored.
+    FromStdout(bool),
+
+    /// Send by the stderr task when an error occurs.
+    FromStderr(GitIgnoreFilterError),
 }
 
 impl GitIgnore {
-    /// TODO: docs.
-    pub const REFRESH_IGNORED_PATHS_AFTER: Duration = Duration::from_secs(10);
+    /// Creates a new `GitIgnore` filter.
+    pub fn new(
+        repo_path: &AbsPath,
+        bg_spawner: &mut impl BackgroundSpawner,
+    ) -> Result<Self, GitIgnoreCreateError> {
+        let mut child = Self::command()
+            .current_dir(repo_path)
+            .stdin(process::Stdio::piped())
+            .stdout(process::Stdio::piped())
+            .stderr(process::Stdio::piped())
+            .spawn()
+            .map_err(GitIgnoreCreateError::CommandFailed)?;
 
-    /// TODO: docs.
-    pub fn new(dir_path: AbsPathBuf) -> Self {
-        let inner = GitIgnoreInner::new_outdated(dir_path);
-        debug_assert!(inner.is_outdated());
-        Self { inner: Mutex::new(inner) }
+        let stdin = child.stdin.take().expect("stdin handle present");
+        let stdout = child.stdout.take().expect("stdout handle present");
+        let stderr = child.stderr.take().expect("stderr handle present");
+
+        let exit_status = Arc::new(OnceLock::new());
+        let (request_tx, request_rx) = flume::unbounded();
+        let (message_tx, message_rx) = flume::unbounded();
+
+        bg_spawner
+            .spawn({
+                let exit_status = exit_status.clone();
+                async move {
+                    Self::event_loop(
+                        child,
+                        stdin,
+                        request_rx,
+                        message_rx,
+                        exit_status,
+                    )
+                    .await;
+                }
+            })
+            .detach();
+
+        bg_spawner
+            .spawn({
+                let message_tx = message_tx.clone();
+                async move { Self::read_from_stdout(stdout, message_tx) }
+            })
+            .detach();
+
+        bg_spawner
+            .spawn({
+                let message_tx = message_tx.clone();
+                async move { Self::read_from_stderr(stderr, message_tx) }
+            })
+            .detach();
+
+        Ok(Self { request_tx, exit_status })
     }
 
-    fn command() -> Command {
-        let mut cmd = Command::new("git");
-        cmd.args(["ls-files", "--others", "--ignored", "--exclude-standard"]);
+    fn command() -> process::Command {
+        let mut cmd = process::Command::new("git");
+
+        // See https://git-scm.com/docs/git-check-ignore#_options for more
+        // infos on the options used here.
+        cmd.arg("check-ignore")
+            .arg("--stdin")
+            .arg("--non-matching")
+            .arg("--verbose")
+            .arg("-z");
+
         cmd
     }
 
-    fn with_inner<R>(
-        &self,
-        f: impl FnOnce(&GitIgnoreInner) -> R,
-    ) -> Result<R, GitIgnoreError> {
-        let inner = &mut *self.inner.lock().expect("poisoned mutex");
+    async fn event_loop(
+        mut child: process::Child,
+        mut stdin: process::ChildStdin,
+        request_rx: flume::Receiver<CheckRequest>,
+        message_rx: flume::Receiver<Message>,
+        exit_status: Arc<OnceLock<io::Result<process::ExitStatus>>>,
+    ) {
+        let mut request_stream = request_rx.into_stream();
+        let mut message_stream = message_rx.into_stream();
+        let mut result_tx_queue = VecDeque::new();
 
-        if inner.is_outdated() {
-            inner.refresh()?;
-        }
+        loop {
+            select_biased! {
+                request = request_stream.select_next_some() => {
+                    let path = request.node_path.as_str().as_bytes();
 
-        Ok(f(inner))
-    }
-}
+                    let write_res = stdin
+                        .write_all(path)
+                        .and_then(|()| stdin.write_all(b"\0"));
 
-/// TODO: docs.
-trait Path: Sized {
-    /// TODO: docs.
-    fn components(&self) -> impl Iterator<Item = &NodeName> + '_;
-
-    /// TODO: docs.
-    fn strip_prefix(&self, s: &AbsPath) -> Option<Self>;
-}
-
-impl GitIgnoreInner {
-    fn is_ignored(&self, path: impl Path) -> Result<bool, GitIgnoreError> {
-        path.strip_prefix(&self.dir_path)
-            .map(|stripped| self.ignored_paths.contains(stripped.components()))
-            .ok_or_else(|| GitIgnoreError::NotInDir {
-                dir_path: self.dir_path.clone(),
-                path: path.components().collect(),
-            })
-    }
-
-    fn is_outdated(&self) -> bool {
-        self.last_refreshed_ignored_paths_at.elapsed()
-            > GitIgnore::REFRESH_IGNORED_PATHS_AFTER
-    }
-
-    fn new_outdated(dir_path: AbsPathBuf) -> Self {
-        let outdated_time = Instant::now()
-            - GitIgnore::REFRESH_IGNORED_PATHS_AFTER
-            - Duration::from_secs(1);
-
-        Self {
-            dir_path,
-            ignored_paths: Default::default(),
-            last_refreshed_ignored_paths_at: outdated_time,
-        }
-    }
-
-    fn refresh(&mut self) -> Result<(), GitIgnoreError> {
-        self.ignored_paths.clear();
-
-        let output =
-            match GitIgnore::command().current_dir(&self.dir_path).output() {
-                Ok(out) => out,
-
-                // The `git` executable is not in `$PATH`. This probably means
-                // the user is not using Git, which probably means the
-                // directory is not in a Git repository.
-                Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                    return Ok(());
-                },
-
-                Err(err) => return Err(GitIgnoreError::GitCommand(err)),
-            };
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-
-            return if stderr.starts_with("fatal: not a git repository") {
-                Ok(())
-            } else {
-                Err(GitIgnoreError::FailedCommand {
-                    status: output.status,
-                    stderr,
-                })
-            };
-        }
-
-        let stdout = str::from_utf8(&output.stdout)
-            .map_err(|_| GitIgnoreError::StdoutNotUtf8)?;
-
-        for line in stdout.lines() {
-            if let Err(err) = self.ignored_paths.insert(line) {
-                self.ignored_paths.clear();
-                return Err(err);
-            }
-        }
-
-        self.last_refreshed_ignored_paths_at = Instant::now();
-
-        Ok(())
-    }
-}
-
-impl IgnoredPaths {
-    fn clear(&mut self) {
-        self.inner.clear();
-    }
-
-    fn contains<'a>(&self, path: impl Iterator<Item = &'a NodeName>) -> bool {
-        let mut cursor = Cursor::new(self);
-        for component in path {
-            if let Some(result) = cursor.seek(component) {
-                return matches!(result, SeekResult::FoundAt(_));
-            }
-        }
-        false
-    }
-
-    fn insert(&mut self, path: &str) -> Result<(), GitIgnoreError> {
-        assert!(!path.is_empty());
-
-        let path = path.trim_matches(MAIN_SEPARATOR);
-        let mut cursor = Cursor::new(self);
-        let mut components = path.split(MAIN_SEPARATOR);
-
-        let idx = loop {
-            let Some(component) = components.next() else {
-                let range = cursor.matched_range().expect(
-                    "path is not empty, so Cursor::seek() must've been \
-                     called at least once",
-                );
-                self.inner.splice(range, iter::once(path.into()));
-                return Ok(());
-            };
-
-            let component =
-                <&NodeName>::try_from(component).map_err(|err| {
-                    GitIgnoreError::NotNodeName {
-                        node_name: component.to_owned(),
-                        err,
+                    match write_res {
+                        Ok(()) => {
+                            result_tx_queue.push_front(request.result_tx)
+                        },
+                        Err(_) => {
+                            // Just give up if we can't write to stdin.
+                            break
+                        },
                     }
-                })?;
+                },
+                message = message_stream.select_next_some() => {
+                    // We can always pop from the front of the queue because
+                    // 'git check-ignore' outputs paths in the same order they
+                    // were sent to stdin.
+                    let result_tx = result_tx_queue
+                        .pop_back()
+                        .expect("the queue should not be empty");
 
-            if let Some(status) = cursor.seek(component) {
-                match status {
-                    SeekResult::FoundAt(_) => return Ok(()),
-                    SeekResult::InsertAt(idx) => break idx,
+                    let result = match message {
+                        Message::FromStdout(is_ignored) => Ok(is_ignored),
+                        Message::FromStderr(err) => Err(err),
+                    };
+
+                    // The receiver might've been dropped, and that's ok.
+                    let _ = result_tx.send(result);
+                },
+                complete => break,
+            }
+        }
+
+        drop(stdin);
+
+        match exit_status.set(child.wait()) {
+            Ok(()) => (),
+            Err(_) => unreachable!("exit status only set once"),
+        }
+
+        for result_tx in result_tx_queue {
+            let _ = result_tx.send(Err(GitIgnoreFilterError::ProcessExited(
+                exit_status.get().expect("just set it").as_ref().ok().copied(),
+            )));
+        }
+    }
+
+    /// Continuosly reads from the `stdout` of the `git check-ignore` process
+    /// until it hits EOF or an error occurs.
+    fn read_from_stdout(
+        mut stdout: process::ChildStdout,
+        message_tx: flume::Sender<Message>,
+    ) {
+        /// See https://git-scm.com/docs/git-check-ignore#_output for more
+        /// infos on what each variant represents.
+        enum ReadingState {
+            Source,
+            Linenum,
+            Pattern,
+            Pathname,
+        }
+
+        let mut state = ReadingState::Source;
+        let mut buf = Vec::new();
+        let mut is_ignored = false;
+
+        loop {
+            buf.clear();
+
+            match stdout.read_to_end(&mut buf) {
+                Ok(0) | Err(_) => return,
+                Ok(_non_zero) => (),
+            }
+
+            let mut buf = &buf[..];
+
+            while let Some(split_idx) = buf.iter().position(|&b| b == 0) {
+                buf = &buf[split_idx + 1..];
+
+                match state {
+                    ReadingState::Source => {
+                        is_ignored = split_idx == 0;
+                        state = ReadingState::Linenum;
+                    },
+                    ReadingState::Linenum => state = ReadingState::Pattern,
+                    ReadingState::Pattern => state = ReadingState::Pathname,
+                    ReadingState::Pathname => {
+                        state = ReadingState::Source;
+                        message_tx
+                            .send(Message::FromStdout(is_ignored))
+                            .expect("event loop is still running");
+                        is_ignored = false;
+                    },
                 }
             }
-        };
-
-        self.inner.insert(idx, path.into());
-
-        Ok(())
-    }
-}
-
-struct Cursor<'a> {
-    paths: &'a [CompactString],
-
-    /// The index of the first element of `paths` in the original slice
-    /// constructed in [`Cursor::new`], or `None` if [`Cursor::seek`] has never
-    /// been called.
-    start_idx: Option<usize>,
-
-    /// The number of leading bytes in each element of `paths` that have
-    /// already been matched by previous calls to [`Cursor::seek`].
-    num_bytes_already_matched: usize,
-}
-
-enum SeekResult {
-    /// TODO: docs.
-    FoundAt(#[allow(dead_code)] usize),
-
-    /// TODO: docs.
-    InsertAt(usize),
-}
-
-impl<'a> Cursor<'a> {
-    fn first_component(&self, path: &'a str) -> &'a str {
-        path[self.num_bytes_already_matched..]
-            .split(MAIN_SEPARATOR)
-            .next()
-            .expect("path is not empty")
-    }
-
-    fn matched_range(&self) -> Option<Range<usize>> {
-        self.start_idx.map(|start_idx| start_idx..start_idx + self.paths.len())
-    }
-
-    fn new(paths: &'a IgnoredPaths) -> Self {
-        Self {
-            paths: paths.inner.as_slice(),
-            start_idx: None,
-            num_bytes_already_matched: 0,
         }
     }
 
-    fn seek(&mut self, node_name: &NodeName) -> Option<SeekResult> {
-        // Look for the index of the 1st path whose first component matches the
-        // node_name.
-        let idx_match = match self
-            .paths
-            .binary_search_by(|path| self.first_component(path).cmp(node_name))
-        {
-            Ok(idx) => idx,
-            Err(idx) => {
-                return Some(SeekResult::InsertAt(
-                    self.start_idx.unwrap_or(0) + idx,
-                ));
-            },
-        };
+    /// Continuosly reads from the `stderr` of the `git check-ignore` process
+    /// until it hits EOF or an error occurs.
+    fn read_from_stderr(
+        stderr: process::ChildStderr,
+        message_tx: flume::Sender<Message>,
+    ) {
+        let mut reader = io::BufReader::new(stderr);
+        let mut line = String::new();
 
-        // Binary search may not return the first match when multiple matches
-        // exist.
-        //
-        // Example: with paths ["a/a", "a/b", "a/c"] and node_name "a", the
-        // search might return index 1, but the first match is at index 0.
+        loop {
+            line.clear();
 
-        let num_matches_backward = self.paths[..idx_match]
-            .iter()
-            .rev()
-            .take_while(|path| self.first_component(path) == node_name)
-            .count();
+            match reader.read_line(&mut line) {
+                Ok(0) | Err(_) => return,
+                Ok(_non_zero) => (),
+            }
 
-        let num_matches_forward = self.paths[idx_match + 1..]
-            .iter()
-            .take_while(|path| self.first_component(path) == node_name)
-            .count();
-
-        let idx_first_match = idx_match - num_matches_backward;
-        let idx_last_match = idx_match + num_matches_forward;
-
-        let new_start_idx = self.start_idx.unwrap_or(0) + idx_first_match;
-        self.start_idx = Some(new_start_idx);
-        self.paths = &self.paths[idx_first_match..idx_last_match + 1];
-
-        if let [path] = self.paths
-            && &path[self.num_bytes_already_matched..] == node_name
-        {
-            return Some(SeekResult::FoundAt(new_start_idx));
+            if let Some(err) = GitIgnoreFilterError::parse_stderr_line(&line) {
+                message_tx
+                    .send(Message::FromStderr(err))
+                    .expect("event loop is still running");
+            }
         }
+    }
+}
 
-        self.num_bytes_already_matched +=
-            node_name.len() + MAIN_SEPARATOR.len_utf8();
+impl GitIgnoreFilterError {
+    fn parse_path_does_not_exist(line: &str) -> Option<Self> {
+        line.strip_prefix("fatal: Invalid path '")
+            .and_then(|rest| rest.strip_suffix("': No such file or directory"))
+            .and_then(|path| path.parse::<AbsPathBuf>().ok())
+            .map(Self::PathDoesNotExist)
+    }
 
-        None
+    fn parse_path_outside_repo(line: &str) -> Option<Self> {
+        let (left, right) = line.split_once("' is outside repository at '")?;
+        let (_, path) = left.split_once(": '")?;
+        let repo_path = right.strip_suffix('\'')?;
+        Some(Self::PathOutsideRepo {
+            path: path.parse().ok()?,
+            repo_path: repo_path.parse().ok()?,
+        })
+    }
+
+    fn parse_stderr_line(line: &str) -> Option<Self> {
+        Self::parse_path_does_not_exist(line)
+            .or_else(|| Self::parse_path_outside_repo(line))
     }
 }
 
 // We're shelling out to Git to get the list of ignored files, so this can only
 // be a filter on a real filesystem.
 impl Filter<os::OsFs> for GitIgnore {
-    type Error = Either<MetadataNameError, GitIgnoreError>;
+    type Error = GitIgnoreFilterError;
 
     async fn should_filter(
         &self,
         dir_path: &AbsPath,
-        node_meta: &impl Metadata<Fs = os::OsFs>,
+        node_meta: &impl fs::Metadata<Fs = os::OsFs>,
     ) -> Result<bool, Self::Error> {
-        struct Concat<'a>(&'a AbsPath, &'a NodeName);
-
-        impl Path for Concat<'_> {
-            fn components(&self) -> impl Iterator<Item = &NodeName> + '_ {
-                let &Self(parent, name) = self;
-                parent.components().chain(iter::once(name))
+        loop {
+            if let Some(exit_status) = self.exit_status.get() {
+                return Err(GitIgnoreFilterError::ProcessExited(
+                    exit_status.as_ref().ok().cloned(),
+                ));
             }
-            fn strip_prefix(&self, s: &AbsPath) -> Option<Self> {
-                let &Self(parent, name) = self;
-                parent.strip_prefix(s).map(|parent| Self(parent, name))
+
+            let node_name =
+                node_meta.name().map_err(GitIgnoreFilterError::NodeName)?;
+
+            let (result_tx, result_rx) = flume::bounded(1);
+
+            let request = CheckRequest {
+                node_path: dir_path.join(node_name),
+                result_tx,
+            };
+
+            if self.request_tx.send(request).is_err() {
+                // The background task just completed. Loop again, there will
+                // be an exit status set.
+                continue;
             }
-        }
 
-        let node_name = node_meta.name().map_err(Either::Left)?;
-        let path = Concat(dir_path, node_name);
-        self.with_inner(|inner| inner.is_ignored(path))
-            .map_err(Either::Right)?
-            .map_err(Either::Right)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    #[cfg_attr(target_os = "windows", ignore)]
-    fn ignored_paths_1() {
-        let paths = IgnoredPaths::from_lines(["a/", "a/foo.txt"]);
-        assert!(paths.contains_str("a"));
-        assert!(paths.contains_str("a/bar.txt"));
-    }
-
-    #[test]
-    #[cfg_attr(target_os = "windows", ignore)]
-    fn ignored_paths_2() {
-        let paths = IgnoredPaths::from_lines(["a/foo.txt", "a/bar.txt"]);
-        assert!(!paths.contains_str("a"));
-        assert!(!paths.contains_str("a/baz.txt"));
-        assert!(paths.contains_str("a/foo.txt"));
-    }
-
-    #[test]
-    #[cfg_attr(target_os = "windows", ignore)]
-    fn ignored_paths_3() {
-        let paths = IgnoredPaths::from_lines(["a/b/foo.txt", "a/b/c/foo.txt"]);
-        assert!(!paths.contains_str("a/b/"));
-        assert!(!paths.contains_str("a/b/bar.txt"));
-        assert!(paths.contains_str("a/b/foo.txt"));
-        assert!(paths.contains_str("a/b/c/foo.txt"));
-    }
-
-    #[test]
-    #[cfg_attr(target_os = "windows", ignore)]
-    fn ignored_paths_4() {
-        let paths = IgnoredPaths::from_lines(["abc"]);
-        assert!(!paths.contains_str("a"));
-        assert!(!paths.contains_str("ab"));
-        assert!(!paths.contains_str("a/bc"));
-        assert!(!paths.contains_str("ab/c"));
-    }
-
-    #[test]
-    #[cfg_attr(target_os = "windows", ignore)]
-    fn ignored_paths_5() {
-        let mut array = ["a/foo.txt", "a/bar.txt", "a/baz.txt"];
-        let paths = IgnoredPaths::from_lines(array);
-        array.sort();
-        assert_eq!(paths.inner, array);
-    }
-
-    #[test]
-    #[cfg_attr(target_os = "windows", ignore)]
-    fn ignored_paths_6() {
-        let paths = IgnoredPaths::from_lines([
-            "a/foo.txt",
-            "a/bar.txt",
-            "a/baz.txt",
-            "a/",
-        ]);
-        assert_eq!(paths.inner, ["a"]);
-    }
-
-    #[test]
-    #[cfg_attr(target_os = "windows", ignore)]
-    fn ignored_paths_7() {
-        let paths = IgnoredPaths::from_lines(["a/foo.txt", "a/foo.txt/"]);
-        assert_eq!(paths.inner, ["a/foo.txt"]);
-    }
-
-    impl IgnoredPaths {
-        fn contains_str(&self, s: &str) -> bool {
-            self.contains(
-                s.trim_matches(MAIN_SEPARATOR).split(MAIN_SEPARATOR).map(
-                    |component| <&NodeName>::try_from(component).unwrap(),
-                ),
-            )
-        }
-
-        fn from_lines<'a>(lines: impl IntoIterator<Item = &'a str>) -> Self {
-            let mut this = Self::default();
-            for line in lines {
-                this.insert(line).unwrap();
+            match result_rx.recv_async().await {
+                Ok(result) => return result,
+                // The background task just completed. Loop again, there will
+                // be an exit status set.
+                Err(_recv_err) => continue,
             }
-            this
         }
     }
 }

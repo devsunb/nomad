@@ -7,8 +7,9 @@ use std::{env, io};
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
 use collab_types::Peer;
 use collab_types::nomad::ulid;
+use ed::executor::Executor;
 use ed::fs::{self, Directory};
-use ed::{ByteOffset, Context, notify};
+use ed::{ByteOffset, Context, Editor, notify};
 use mlua::{Function, Table};
 use neovim::buffer::{BufferId, HighlightRangeHandle};
 use neovim::{Neovim, mlua, oxi};
@@ -272,9 +273,15 @@ impl CollabEditor for Neovim {
 
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
-        _: &mut Context<Self>,
+        ctx: &mut Context<Self>,
     ) -> Self::ProjectFilter {
-        walkdir::GitIgnore::new(project_root.path().to_owned())
+        match ctx.with_editor(|nvim| {
+            let spawner = nvim.executor().background_spawner();
+            walkdir::GitIgnore::new(&project_root.path(), spawner)
+        }) {
+            Ok(gitignore) => gitignore,
+            Err(err) => todo!("handle {err}"),
+        }
     }
 
     async fn remove_peer_selection(

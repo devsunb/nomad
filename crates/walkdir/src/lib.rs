@@ -8,8 +8,6 @@ mod filter;
 mod fs_ext;
 #[cfg(feature = "gitignore")]
 mod gitignore;
-#[cfg(feature = "gitignore")]
-mod gitignore2;
 mod walkdir;
 
 pub use filter::{And, Either, Filter, Filtered};

@@ -5,18 +5,17 @@ use abs_path::{AbsPathBuf, node, path};
 use ed::fs::Directory;
 use ed::fs::os::OsFs;
 use tempdir::TempDir;
+use thread_pool::ThreadPool;
 use walkdir::GitIgnore;
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
 fn gitignore_1() {
-    let repo = <TempDir as GitRepository>::create(mock::fs! {
+    let repo: TempDir = GitRepository::create_and_init(mock::fs! {
         "a.txt": "",
         "b.txt": "",
         ".gitignore": "a.txt",
     });
-
-    repo.init();
 
     assert_eq!(
         repo.non_ignored_paths().remove_git_dir(),
@@ -26,60 +25,19 @@ fn gitignore_1() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
-fn gitignore_is_ignored_if_not_in_git_repo() {
-    let repo = <TempDir as GitRepository>::create(mock::fs! {
+fn gitignore_2() {
+    let repo: TempDir = GitRepository::create_and_init(mock::fs! {
         "a.txt": "",
         "b.txt": "",
         ".gitignore": "a.txt",
     });
-
-    assert_eq!(repo.non_ignored_paths(), ["/a.txt", "/b.txt", "/.gitignore"]);
-}
-
-#[test]
-#[cfg_attr(git_in_PATH, ignore = "git is in $PATH")]
-fn gitignore_is_ignored_if_git_is_not_in_path() {
-    let repo = <TempDir as GitRepository>::create(mock::fs! {
-        "a.txt": "",
-        "b.txt": "",
-        ".gitignore": "a.txt",
-    });
-
-    assert_eq!(repo.non_ignored_paths(), ["/a.txt", "/b.txt", "/.gitignore"]);
-}
-
-#[test]
-#[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
-fn gitignore_cache_is_refreshed_after_expiration() {
-    let repo = <TempDir as GitRepository>::create(mock::fs! {
-        "a.txt": "",
-        "b.txt": "",
-        ".gitignore": "a.txt",
-    });
-
-    repo.init();
-
-    let gitignore = GitIgnore::new(repo.path().to_owned());
-
-    assert_eq!(
-        repo.non_ignored_paths_with_gitignore(&gitignore).remove_git_dir(),
-        ["/b.txt", "/.gitignore"]
-    );
 
     // Change the .gitignore file.
     std::fs::write(repo.path().join(node!(".gitignore")), "b.txt").unwrap();
 
-    // We won't react to the change until the GitIgnore cache expires.
-    std::thread::sleep(GitIgnore::REFRESH_IGNORED_PATHS_AFTER / 2);
+    // Now 'b.txt' should be ignored, and 'a.txt' should not.
     assert_eq!(
-        repo.non_ignored_paths_with_gitignore(&gitignore).remove_git_dir(),
-        ["/b.txt", "/.gitignore"]
-    );
-
-    // Now the cache will be refreshed and we'll detect the change.
-    std::thread::sleep(GitIgnore::REFRESH_IGNORED_PATHS_AFTER / 2);
-    assert_eq!(
-        repo.non_ignored_paths_with_gitignore(&gitignore).remove_git_dir(),
+        repo.non_ignored_paths().remove_git_dir(),
         ["/a.txt", "/.gitignore"]
     );
 }
@@ -88,8 +46,15 @@ trait GitRepository: Directory {
     /// Creates a directory from the given [`mock::fs::MockFs`].
     ///
     /// Note that the returned directory will not be initialized as a Git
-    /// repository. To do so, call [`Self::init`].
+    /// repository. To do so, call [`Self::init`] or [`Self::create_and_init`].
     fn create(fs: mock::fs::MockFs) -> Self;
+
+    /// Same as [`Self::create`] followed by [`Self::init`].
+    fn create_and_init(fs: mock::fs::MockFs) -> Self {
+        let repo = Self::create(fs);
+        repo.init();
+        repo
+    }
 
     /// `git init`s the repository.
     fn init(&self);
@@ -97,9 +62,9 @@ trait GitRepository: Directory {
     /// Returns the paths of all non-gitignored files and directories in the
     /// repository, relative to its root.
     fn non_ignored_paths(&self) -> NonIgnoredPaths {
-        self.non_ignored_paths_with_gitignore(&GitIgnore::new(
-            self.path().to_owned(),
-        ))
+        let mut thread_pool = ThreadPool::default();
+        let ignore = GitIgnore::new(&self.path(), &mut thread_pool).unwrap();
+        self.non_ignored_paths_with_gitignore(&ignore)
     }
 
     /// Same as [`Self::non_ignored_paths`], but uses the given [`GitIgnore`]
