@@ -3,7 +3,7 @@ use core::error::Error;
 use abs_path::{AbsPathBuf, NodeName, node};
 use ed::module::{ApiCtx, Empty, Module};
 use ed::notify::Name;
-use ed::plugin::Plugin;
+use ed::plugin::{PanicInfo, Plugin};
 use ed::{Borrowed, Context};
 use either::Either;
 use neovim::Neovim;
@@ -37,6 +37,26 @@ impl Nomad {
 
 impl Plugin<Neovim> for Nomad {
     const COMMAND_NAME: Name = "Mad";
+
+    fn handle_panic(
+        &self,
+        panic_info: PanicInfo,
+        ctx: &mut Context<Neovim, Borrowed<'_>>,
+    ) {
+        tracing::error!(
+            title = %ctx.namespace().dot_separated(),
+            "panicked{at_location}{with_payload}",
+            at_location = panic_info
+                .location
+                .as_ref()
+                .map(|loc| format!(" at {loc}"))
+                .unwrap_or_default(),
+            with_payload = panic_info
+                .payload_as_str()
+                .map(|payload| format!(": {payload}"))
+                .unwrap_or_default(),
+        );
+    }
 }
 
 impl Module<Neovim> for Nomad {
