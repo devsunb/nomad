@@ -1,7 +1,11 @@
 use core::pin::Pin;
 use core::task::{Context, Poll, ready};
+use std::panic;
 
 use ed::executor::{BackgroundSpawner, Task};
+use futures_lite::FutureExt;
+
+type PanicPayload = Box<dyn std::any::Any + Send + 'static>;
 
 /// TODO: docs.
 #[derive(Clone)]
@@ -13,31 +17,8 @@ pin_project_lite::pin_project! {
     /// TODO: docs.
     pub struct ThreadPoolTask<T: 'static> {
         #[pin]
-        inner: flume::r#async::RecvFut<'static, T>,
+        inner: flume::r#async::RecvFut<'static, Result<T, PanicPayload>>,
         is_forever_pending: bool,
-    }
-}
-
-impl ThreadPool {
-    #[inline]
-    fn spawn_inner<Fut>(&self, future: Fut) -> ThreadPoolTask<Fut::Output>
-    where
-        Fut: Future + Send + 'static,
-        Fut::Output: Send + 'static,
-    {
-        let (tx, rx) = flume::bounded(1);
-        self.inner.spawn_ok(async move {
-            // The task might've been detached, and that's ok.
-            let _ = tx.send(future.await);
-        });
-        ThreadPoolTask::new(rx.into_recv_async())
-    }
-}
-
-impl<T> ThreadPoolTask<T> {
-    #[inline]
-    pub(crate) fn new(inner: flume::r#async::RecvFut<'static, T>) -> Self {
-        Self { inner, is_forever_pending: false }
     }
 }
 
@@ -62,7 +43,18 @@ impl BackgroundSpawner for ThreadPool {
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
     {
-        Self::spawn_inner(self, future)
+        let (tx, rx) = flume::bounded(1);
+
+        self.inner.spawn_ok(async move {
+            let result = panic::AssertUnwindSafe(future).catch_unwind().await;
+            // The task might've been dropped, and that's ok.
+            let _ = tx.send(result);
+        });
+
+        ThreadPoolTask {
+            inner: rx.into_recv_async(),
+            is_forever_pending: false,
+        }
     }
 }
 
@@ -81,10 +73,11 @@ impl<T> Future for ThreadPoolTask<T> {
             return Poll::Pending;
         }
         match ready!(this.inner.poll(ctx)) {
-            Ok(value) => Poll::Ready(value),
+            Ok(Ok(value)) => Poll::Ready(value),
+            Ok(Err(panic_payload)) => panic::resume_unwind(panic_payload),
             Err(flume::RecvError::Disconnected) => {
-                // This only happens if the background executor is dropped,
-                // which should only happen when Neovim is shutting down.
+                // This can happen if all handles to the thread pool are
+                // dropped.
                 *this.is_forever_pending = true;
                 Poll::Pending
             },
