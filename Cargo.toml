@@ -49,6 +49,7 @@ nomad = { path = "./crates/nomad" }
 root-finder = { path = "./crates/root-finder" }
 tempdir = { path = "./crates/tempdir" }
 thread-pool = { path = "./crates/thread-pool" }
+tracing-layers = { path = "./crates/tracing-layers" }
 version = { path = "./crates/version" }
 walkdir = { path = "./crates/walkdir" }
 

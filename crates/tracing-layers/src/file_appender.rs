@@ -1,28 +1,23 @@
-use core::error::Error;
 use core::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use abs_path::{AbsPath, AbsPathBuf};
+use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf};
+use ed::fs::os::OsFs;
 use ed::{BorrowState, Context, Editor};
 use tracing::error;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{InitError, RollingFileAppender, Rotation};
+use tracing_subscriber::Layer;
 use tracing_subscriber::fmt::{self, format, time};
 use tracing_subscriber::registry::LookupSpan;
 
-use crate::nomad::Nomad;
-
-/// A [`tracing_subscriber::Layer`] implementation that appends logs to a file
-/// that is rolled over daily.
+/// A [`Layer`] implementation that appends logs to a file, creating a new file
+/// every day.
 #[derive(cauchy::Clone)]
-pub(crate) struct FileAppender<S> {
+pub struct FileAppender<S> {
     inner: Arc<OnceLock<FileAppenderInner<S>>>,
     creating_inner_has_failed: Arc<AtomicBool>,
 }
-
-#[derive(Debug, derive_more::Display, cauchy::Error, cauchy::From)]
-#[display("failed to create tracing file appender: {_0}")]
-pub(crate) struct FileAppenderCreateError<T: Error>(pub(crate) T);
 
 struct FileAppenderInner<S> {
     inner: fmt::Layer<
@@ -42,10 +37,18 @@ struct FileAppenderInner<S> {
 }
 
 impl<S: 'static> FileAppender<S> {
-    pub(crate) fn new(
+    /// Creates a new `FileAppender` that creates daily log files under the
+    /// given directory with the given file name prefix.
+    pub fn new<Ed>(
         log_dir: AbsPathBuf,
-        ctx: &mut Context<impl Editor, impl BorrowState>,
-    ) -> Self {
+        filename_prefix: NodeNameBuf,
+        ctx: &mut Context<Ed, impl BorrowState>,
+    ) -> Self
+    where
+        // Creating the inner file appender will access the file system, so
+        // bound this to editors with a real file system.
+        Ed: Editor<Fs = OsFs>,
+    {
         let this = Self {
             inner: Arc::new(OnceLock::new()),
             creating_inner_has_failed: Arc::new(AtomicBool::new(false)),
@@ -58,14 +61,17 @@ impl<S: 'static> FileAppender<S> {
         ctx.spawn_background({
             let this = this.clone();
             async move {
-                match FileAppenderInner::new(&log_dir) {
+                match FileAppenderInner::new(&log_dir, &filename_prefix) {
                     Ok(file_appender) => {
                         assert!(this.inner.set(file_appender).is_ok());
                     },
                     Err(err) => {
                         this.creating_inner_has_failed
                             .store(true, Ordering::Relaxed);
-                        error!(title = %namespace.dot_separated(), "{err}");
+                        error!(
+                            title = %namespace.dot_separated(),
+                            "failed to create tracing file appender: {err}",
+                        );
                     },
                 };
             }
@@ -79,10 +85,11 @@ impl<S: 'static> FileAppender<S> {
 impl<S> FileAppenderInner<S> {
     fn new(
         log_dir: &AbsPath,
-    ) -> Result<Self, FileAppenderCreateError<InitError>> {
+        filename_prefix: &NodeName,
+    ) -> Result<Self, InitError> {
         let file_appender = RollingFileAppender::builder()
             .rotation(Rotation::DAILY)
-            .filename_prefix(Nomad::LOG_FILENAME_PREFIX.to_string())
+            .filename_prefix(filename_prefix.to_string())
             .build(log_dir)?;
 
         let (non_blocking, _guard) =
@@ -98,7 +105,7 @@ impl<S> FileAppenderInner<S> {
     }
 }
 
-impl<S> tracing_subscriber::Layer<S> for FileAppender<S>
+impl<S> Layer<S> for FileAppender<S>
 where
     S: tracing::Subscriber + for<'a> LookupSpan<'a>,
 {
@@ -217,8 +224,7 @@ where
     }
 }
 
-impl<S: tracing::Subscriber> tracing_subscriber::Layer<S>
-    for FileAppenderInner<S>
+impl<S: tracing::Subscriber> Layer<S> for FileAppenderInner<S>
 where
     S: tracing::Subscriber + for<'a> LookupSpan<'a>,
 {

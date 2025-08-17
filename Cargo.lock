@@ -1908,12 +1908,11 @@ dependencies = [
  "auth",
  "cauchy",
  "collab",
- "derive_more",
  "ed",
  "either",
  "neovim",
  "tracing",
- "tracing-appender",
+ "tracing-layers",
  "tracing-subscriber",
  "version",
 ]
@@ -3217,6 +3216,18 @@ checksum = "b9d12581f227e93f094d3af2ae690a574abb8a2b9b7a96e7cfe9647b2b617678"
 dependencies = [
  "once_cell",
  "valuable",
+]
+
+[[package]]
+name = "tracing-layers"
+version = "0.1.0-dev"
+dependencies = [
+ "abs-path",
+ "cauchy",
+ "ed",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
 ]
 
 [[package]]
