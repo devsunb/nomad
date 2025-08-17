@@ -1,15 +1,14 @@
+use core::error::Error;
 use core::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
 use abs_path::{AbsPath, AbsPathBuf};
 use ed::{BorrowState, Context, Editor};
 use tracing::error;
-use tracing::level_filters::LevelFilter;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{InitError, RollingFileAppender, Rotation};
 use tracing_subscriber::fmt::{self, format, time};
 use tracing_subscriber::registry::LookupSpan;
-use tracing_subscriber::{Layer, filter};
 
 use crate::nomad::Nomad;
 
@@ -21,17 +20,16 @@ pub(crate) struct FileAppender<S> {
     creating_inner_has_failed: Arc<AtomicBool>,
 }
 
+#[derive(Debug, derive_more::Display, cauchy::Error, cauchy::From)]
+#[display("failed to create tracing file appender: {_0}")]
+pub(crate) struct FileAppenderCreateError<T: Error>(pub(crate) T);
+
 struct FileAppenderInner<S> {
-    #[allow(clippy::type_complexity)]
-    inner: filter::Filtered<
-        fmt::Layer<
-            S,
-            format::DefaultFields,
-            format::Format<format::Full, time::ChronoUtc>,
-            NonBlocking,
-        >,
-        LevelFilter,
+    inner: fmt::Layer<
         S,
+        format::DefaultFields,
+        format::Format<format::Full, time::ChronoUtc>,
+        NonBlocking,
     >,
 
     /// We need to keep this guard around for the entire lifetime of the
@@ -43,10 +41,7 @@ struct FileAppenderInner<S> {
     _guard: WorkerGuard,
 }
 
-impl<S> FileAppender<S>
-where
-    S: tracing::Subscriber + for<'a> LookupSpan<'a>,
-{
+impl<S: 'static> FileAppender<S> {
     pub(crate) fn new(
         log_dir: AbsPathBuf,
         ctx: &mut Context<impl Editor, impl BorrowState>,
@@ -55,6 +50,8 @@ where
             inner: Arc::new(OnceLock::new()),
             creating_inner_has_failed: Arc::new(AtomicBool::new(false)),
         };
+
+        let namespace = ctx.namespace().clone();
 
         // Creating the inner file appender does a bunch of blocking I/O, so we
         // do it in the background.
@@ -68,7 +65,7 @@ where
                     Err(err) => {
                         this.creating_inner_has_failed
                             .store(true, Ordering::Relaxed);
-                        error!("failed to create file appender: {err}");
+                        error!(title = %namespace.dot_separated(), "{err}");
                     },
                 };
             }
@@ -79,11 +76,10 @@ where
     }
 }
 
-impl<S> FileAppenderInner<S>
-where
-    S: tracing::Subscriber + for<'a> LookupSpan<'a>,
-{
-    fn new(log_dir: &AbsPath) -> Result<Self, InitError> {
+impl<S> FileAppenderInner<S> {
+    fn new(
+        log_dir: &AbsPath,
+    ) -> Result<Self, FileAppenderCreateError<InitError>> {
         let file_appender = RollingFileAppender::builder()
             .rotation(Rotation::DAILY)
             .filename_prefix(Nomad::LOG_FILENAME_PREFIX.to_string())
@@ -96,9 +92,7 @@ where
             .with_ansi(false)
             // Formats timestamps as "2001-07-08T00:34:60Z".
             .with_timer(time::ChronoUtc::new("%FT%TZ".to_owned()))
-            .with_writer(non_blocking)
-            // Only log events at the INFO, WARN and ERROR levels.
-            .with_filter(LevelFilter::INFO);
+            .with_writer(non_blocking);
 
         Ok(Self { inner, _guard })
     }

@@ -1908,6 +1908,7 @@ dependencies = [
  "auth",
  "cauchy",
  "collab",
+ "derive_more",
  "ed",
  "either",
  "neovim",

@@ -7,9 +7,12 @@ use ed::plugin::Plugin;
 use ed::{Borrowed, Context};
 use either::Either;
 use neovim::Neovim;
+use neovim::notify::ContextExt;
+use tracing::level_filters::LevelFilter;
+use tracing_subscriber::Layer;
 use tracing_subscriber::layer::SubscriberExt;
 
-use crate::file_appender::FileAppender;
+use crate::file_appender::{FileAppender, FileAppenderCreateError};
 
 pub(crate) struct Nomad;
 
@@ -17,12 +20,18 @@ impl Nomad {
     /// The prefix for the log file names.
     pub(crate) const LOG_FILENAME_PREFIX: &NodeName = node!("nomad.log");
 
-    /// Returns the directory under which the log files should be stored.
-    fn log_dir(&self) -> Result<AbsPathBuf, impl Error> {
+    /// Returns the directory path under which files that need to be persisted
+    /// over Neovim restarts should be stored.
+    fn data_dir(&self) -> Result<AbsPathBuf, impl Error> {
         neovim::oxi::api::call_function::<_, String>("stdpath", ("data",))
             .map_err(Either::Left)
             .and_then(|path| path.parse::<AbsPathBuf>().map_err(Either::Right))
             .map(|neovim_data_dir| neovim_data_dir.join(node!("nomad")))
+    }
+
+    /// Returns the directory path under which the log files should be stored.
+    fn log_dir(&self) -> Result<AbsPathBuf, impl Error> {
+        self.data_dir().map(|dir| dir.join(node!("logs")))
     }
 }
 
@@ -51,9 +60,15 @@ impl Module<Neovim> for Nomad {
     fn on_init(&self, ctx: &mut Context<Neovim, Borrowed>) {
         ctx.set_notifier(neovim::notify::detect());
 
+        let file_appender = self
+            .log_dir()
+            .map(|dir| FileAppender::new(dir, ctx))
+            .map_err(|err| ctx.notify_error(FileAppenderCreateError(err)))
+            .ok();
+
         let subscriber = tracing_subscriber::Registry::default()
             .with(ctx.tracing_layer())
-            .with(self.log_dir().map(|dir| FileAppender::new(dir, ctx)).ok());
+            .with(file_appender.with_filter(LevelFilter::INFO));
 
         if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
             panic!("failed to set global tracing subscriber: {err}");
