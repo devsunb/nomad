@@ -1,7 +1,7 @@
 use core::ops::Deref;
 use std::process::{Command, Stdio};
 
-use abs_path::{AbsPath, node};
+use abs_path::{AbsPath, node, path};
 use ed::fs::Directory;
 use ed::fs::os::OsFs;
 use tempdir::{FsExt, TempDir};
@@ -69,6 +69,20 @@ fn errors_if_path_is_outside_repo() {
                 .unwrap(),
         }
     );
+}
+
+#[test]
+#[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+fn errors_if_path_doesnt_exist() {
+    let repo = GitRepository::init(mock::fs! {});
+    let path = path!("/foo/bar");
+    let err = repo.is_ignored(path).unwrap_err();
+    let GitIgnoreFilterError::PathDoesNotExist(error_path) = err else {
+        panic!("expected PathDoesNotExist error, got: {err:?}");
+    };
+    // Git stops at the first component that doesn't exist, so we can't assert
+    // full equality here.
+    assert!(path.starts_with(error_path));
 }
 
 struct GitRepository {
