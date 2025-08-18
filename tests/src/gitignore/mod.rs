@@ -11,49 +11,43 @@ use walkdir::{GitIgnore, GitIgnoreFilterError};
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
 fn gitignore_1() {
-    futures_lite::future::block_on(async {
-        let repo = GitRepository::init(mock::fs! {
-            "a.txt": "",
-            "b.txt": "",
-            ".gitignore": "a.txt",
-        })
-        .await;
-
-        assert!(
-            repo.is_ignored(repo.path().join(node!("a.txt"))).await.unwrap(),
-        );
-
-        assert!(
-            !repo.is_ignored(repo.path().join(node!("b.txt"))).await.unwrap(),
-        );
+    let repo = GitRepository::init(mock::fs! {
+        "a.txt": "",
+        "b.txt": "",
+        ".gitignore": "a.txt",
     });
+
+    assert!(repo.is_ignored(repo.path().join(node!("a.txt"))).unwrap());
+    assert!(!repo.is_ignored(repo.path().join(node!("b.txt"))).unwrap());
 }
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
 fn gitignore_2() {
-    futures_lite::future::block_on(async {
-        let repo = GitRepository::init(mock::fs! {
-            "a.txt": "",
-            "b.txt": "",
-            ".gitignore": "a.txt",
-        })
-        .await;
-
-        // Change the .gitignore file.
-        std::fs::write(repo.path().join(node!(".gitignore")), "b.txt")
-            .unwrap();
-
-        // Now 'b.txt' should be ignored, and 'a.txt' should not.
-
-        assert!(
-            repo.is_ignored(repo.path().join(node!("b.txt"))).await.unwrap(),
-        );
-
-        assert!(
-            !repo.is_ignored(repo.path().join(node!("a.txt"))).await.unwrap(),
-        );
+    let repo = GitRepository::init(mock::fs! {
+        "a.txt": "",
+        "b.txt": "",
+        ".gitignore": "a.txt",
     });
+
+    // Change the .gitignore file.
+    std::fs::write(repo.path().join(node!(".gitignore")), "b.txt").unwrap();
+
+    // Now 'b.txt' should be ignored, and 'a.txt' should not.
+    assert!(repo.is_ignored(repo.path().join(node!("b.txt"))).unwrap());
+    assert!(!repo.is_ignored(repo.path().join(node!("a.txt"))).unwrap());
+}
+
+#[test]
+#[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+fn gitignore_slashed_dirs_are_ignored() {
+    let repo = GitRepository::init(mock::fs! {
+        "target": {},
+        ".gitignore": "target/",
+    });
+
+    let ignored_res = repo.is_ignored(repo.path().join(node!("target")));
+    assert_eq!(ignored_res, Ok(true));
 }
 
 struct GitRepository {
@@ -62,18 +56,24 @@ struct GitRepository {
 }
 
 impl GitRepository {
-    async fn init(fs: mock::fs::MockFs) -> Self {
-        let tempdir =
-            OsFs::default().tempdir().await.expect("couldn't create tempdir");
+    fn init(fs: mock::fs::MockFs) -> Self {
+        let dir = futures_lite::future::block_on(async move {
+            let tempdir = OsFs::default()
+                .tempdir()
+                .await
+                .expect("couldn't create tempdir");
 
-        tempdir
-            .replicate_from(&fs.root())
-            .await
-            .expect("couldn't replicate from mock fs");
+            tempdir
+                .replicate_from(&fs.root())
+                .await
+                .expect("couldn't replicate from mock fs");
+
+            tempdir
+        });
 
         Command::new("git")
             .arg("init")
-            .current_dir(tempdir.path())
+            .current_dir(dir.path())
             // Ignore all global config files.
             //
             // See https://stackoverflow.com/a/67512433 for more info.
@@ -85,20 +85,19 @@ impl GitRepository {
             .expect("failed to `git init` directory");
 
         Self {
-            gitignore: GitIgnore::new(
-                tempdir.path(),
-                &mut ThreadPool::default(),
-            )
-            .unwrap(),
-            dir: tempdir,
+            gitignore: GitIgnore::new(dir.path(), &mut ThreadPool::default())
+                .unwrap(),
+            dir,
         }
     }
 
-    async fn is_ignored(
+    fn is_ignored(
         &self,
         path: impl AsRef<AbsPath>,
     ) -> Result<bool, GitIgnoreFilterError> {
-        self.gitignore.is_ignored(path.as_ref()).await
+        futures_lite::future::block_on(async {
+            self.gitignore.is_ignored(path.as_ref()).await
+        })
     }
 }
 

@@ -216,10 +216,8 @@ impl GitIgnore {
         loop {
             select_biased! {
                 request = request_stream.select_next_some() => {
-                    let path = request.path.as_str().as_bytes();
-
                     let write_res = stdin
-                        .write_all(path)
+                        .write_all(request.path.as_bytes())
                         .and_then(|()| stdin.write_all(b"\0"));
 
                     match write_res {
@@ -377,8 +375,8 @@ impl StdoutParser {
     }
 }
 
-// We're shelling out to Git to get the list of ignored files, so this can only
-// be a filter on a real filesystem.
+// We're shelling out to Git, so this can only be a filter on a real
+// filesystem.
 impl Filter<os::OsFs> for GitIgnore {
     type Error = Either<fs::MetadataNameError, GitIgnoreFilterError>;
 
