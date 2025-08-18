@@ -1,5 +1,6 @@
 use core::ops::Deref;
 use std::process::{Command, Stdio};
+use std::{thread, time};
 
 use abs_path::{AbsPath, node, path};
 use ed::fs::Directory;
@@ -116,6 +117,38 @@ fn exit_status_is_returned_if_process_is_killed() {
     assert_eq!(repo.gitignore.process_id().unwrap_err(), maybe_exit_status);
 }
 
+#[test]
+#[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+fn process_terminates_when_all_gitignore_instances_are_dropped() {
+    let repo = GitRepository::init(mock::fs! {});
+    let gitignore_2 = repo.gitignore.clone();
+    let gitignore_pid = repo.gitignore.process_id().unwrap();
+
+    // Dropping the second instance shouldn't terminate the process.
+    drop(gitignore_2);
+    assert!(is_process_alive(gitignore_pid));
+
+    // Drop the repo, which will drop the last GitIgnore instance.
+    drop(repo);
+
+    // Wait a bit to ensure the process has time to terminate.
+    let mut num_tries = 0;
+    let num_max_tries = 10;
+    let retry_internal = time::Duration::from_millis(50);
+    while num_tries < num_max_tries {
+        if !is_process_alive(gitignore_pid) {
+            return;
+        }
+        num_tries += 1;
+        thread::sleep(retry_internal);
+    }
+    panic!(
+        "process should have terminated after all GitIgnore instances were \
+         dropped, but it's still alive after {}ms",
+        num_tries * retry_internal.as_millis() as usize
+    );
+}
+
 struct GitRepository {
     dir: TempDir,
     gitignore: GitIgnore,
@@ -173,4 +206,19 @@ impl Deref for GitRepository {
     fn deref(&self) -> &Self::Target {
         &self.dir
     }
+}
+
+/// Checks if a process with the given PID is alive.
+#[track_caller]
+fn is_process_alive(pid: u32) -> bool {
+    Command::new("kill")
+        .arg("-0")
+        .arg(pid.to_string())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .expect("failed to check if process is alive")
+        .code()
+        .expect("'kill -0' should have an exit code")
+        == 0
 }

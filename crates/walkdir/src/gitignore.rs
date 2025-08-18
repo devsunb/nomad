@@ -8,7 +8,6 @@ use abs_path::{AbsPath, AbsPathBuf};
 use ed::executor::{BackgroundSpawner, Task};
 use ed::fs::{self, os};
 use either::Either;
-use futures_util::{StreamExt, select_biased};
 
 use crate::Filter;
 
@@ -16,8 +15,8 @@ use crate::Filter;
 /// used by Git.
 #[derive(Clone)]
 pub struct GitIgnore {
-    /// A sender used to send [`CheckRequest`]s to the background task.
-    request_tx: flume::Sender<CheckRequest>,
+    /// A sender used to send [`Message`]s to the background task.
+    message_tx: flume::Sender<Message>,
 
     /// The exit status of the `git check-ignore` process, if it has exited.
     exit_status: Arc<OnceLock<io::Result<process::ExitStatus>>>,
@@ -66,11 +65,24 @@ pub enum GitIgnoreFilterError {
     ProcessExited(Option<process::ExitStatus>),
 }
 
-/// A request to check if a path is ignored, together with a sender that the
-/// background task can use to send the result back.
-struct CheckRequest {
-    path: AbsPathBuf,
-    result_tx: flume::Sender<Result<bool, GitIgnoreFilterError>>,
+#[derive(Debug)]
+enum Message {
+    /// A request to check if a path is ignored, together with a sender that
+    /// the background task can use to send the result back.
+    CheckRequest {
+        path: AbsPathBuf,
+        result_tx: flume::Sender<Result<bool, GitIgnoreFilterError>>,
+    },
+
+    /// Sent by the stdout task when a new line is read. The `bool` indicates
+    /// whether the path (which is not included in the message) is ignored.
+    FromStdout(bool),
+
+    /// Sent by the stderr task when an error occurs.
+    FromStderr(GitIgnoreFilterError),
+
+    /// Sent when dropping the last `GitIgnore` instance.
+    TerminateProcess,
 }
 
 #[derive(Debug, Default)]
@@ -90,16 +102,6 @@ enum StdoutReadState {
     Pathname,
 }
 
-#[derive(Debug)]
-enum Message {
-    /// Sent by the stdout task when a new line is read. The `bool` indicates
-    /// whether the path (which is not included in the message) is ignored.
-    FromStdout(bool),
-
-    /// Send by the stderr task when an error occurs.
-    FromStderr(GitIgnoreFilterError),
-}
-
 impl GitIgnore {
     /// Checks if the given path is ignored by Git.
     pub async fn is_ignored(
@@ -117,12 +119,12 @@ impl GitIgnore {
 
             let (result_tx, result_rx) = flume::bounded(1);
 
-            let request = CheckRequest {
+            let message = Message::CheckRequest {
                 path: path.take().expect("we never send two requests"),
                 result_tx,
             };
 
-            if self.request_tx.send(request).is_err() {
+            if self.message_tx.send(message).is_err() {
                 // The background task just completed. Loop again, there will
                 // be an exit status set.
                 continue;
@@ -157,21 +159,14 @@ impl GitIgnore {
         let stderr = child.stderr.take().expect("stderr handle present");
 
         let exit_status = Arc::new(OnceLock::new());
-        let (request_tx, request_rx) = flume::unbounded();
         let (message_tx, message_rx) = flume::unbounded();
 
         bg_spawner
             .spawn({
                 let exit_status = exit_status.clone();
                 async move {
-                    Self::event_loop(
-                        child,
-                        stdin,
-                        request_rx,
-                        message_rx,
-                        exit_status,
-                    )
-                    .await;
+                    Self::event_loop(child, stdin, message_rx, exit_status)
+                        .await;
                 }
             })
             .detach();
@@ -190,7 +185,7 @@ impl GitIgnore {
             })
             .detach();
 
-        Ok(Self { request_tx, exit_status, process_id })
+        Ok(Self { message_tx, exit_status, process_id })
     }
 
     /// Returns the ID of the `git check-ignore` process, or an error if the
@@ -219,49 +214,47 @@ impl GitIgnore {
     async fn event_loop(
         mut child: process::Child,
         mut stdin: process::ChildStdin,
-        request_rx: flume::Receiver<CheckRequest>,
         message_rx: flume::Receiver<Message>,
         exit_status: Arc<OnceLock<io::Result<process::ExitStatus>>>,
     ) {
-        let mut request_stream = request_rx.into_stream();
-        let mut message_stream = message_rx.into_stream();
         let mut result_tx_queue = VecDeque::new();
 
-        loop {
-            select_biased! {
-                request = request_stream.select_next_some() => {
+        while let Ok(message) = message_rx.recv_async().await {
+            let result = match message {
+                Message::CheckRequest { path, result_tx } => {
                     let write_res = stdin
-                        .write_all(request.path.as_bytes())
+                        .write_all(path.as_bytes())
                         .and_then(|()| stdin.write_all(b"\0"));
 
                     match write_res {
                         Ok(()) => {
-                            result_tx_queue.push_front(request.result_tx)
+                            result_tx_queue.push_front(result_tx);
+                            continue;
                         },
-                        Err(_) => {
-                            // Just give up if we can't write to stdin.
-                            break
-                        },
+                        // Just give up if we can't write to stdin.
+                        Err(_) => break,
                     }
                 },
-                message = message_stream.select_next_some() => {
-                    // We can always pop from the front of the queue because
-                    // 'git check-ignore' outputs paths in the same order they
-                    // were sent to stdin.
-                    let result_tx = result_tx_queue
-                        .pop_back()
-                        .expect("the queue should not be empty");
 
-                    let result = match message {
-                        Message::FromStdout(is_ignored) => Ok(is_ignored),
-                        Message::FromStderr(err) => Err(err),
-                    };
+                Message::FromStdout(is_ignored) => Ok(is_ignored),
 
-                    // The receiver might've been dropped, and that's ok.
-                    let _ = result_tx.send(result);
+                Message::FromStderr(err) => Err(err),
+
+                Message::TerminateProcess => {
+                    let _ = child.kill();
+                    return;
                 },
-                complete => break,
-            }
+            };
+
+            // We can always pop from the front of the queue because
+            // 'git check-ignore' outputs paths in the same order they were
+            // sent to stdin.
+            let result_tx = result_tx_queue
+                .pop_back()
+                .expect("the queue should not be empty");
+
+            // The receiver might've been dropped, and that's ok.
+            let _ = result_tx.send(result);
         }
 
         drop(stdin);
@@ -386,6 +379,14 @@ impl StdoutParser {
         }
 
         None
+    }
+}
+
+impl Drop for GitIgnore {
+    fn drop(&mut self) {
+        if self.message_tx.sender_count() == 1 {
+            let _ = self.message_tx.send(Message::TerminateProcess);
+        }
     }
 }
 
