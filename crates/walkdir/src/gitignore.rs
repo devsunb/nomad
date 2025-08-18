@@ -34,7 +34,9 @@ pub enum GitIgnoreCreateError {
 }
 
 /// The type of error that can occur when using the [`GitIgnore`] filter.
-#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
+#[derive(
+    cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
+)]
 pub enum GitIgnoreFilterError {
     /// The name corresponding to a node's metadata could not be obtained.
     #[display("{_0}")]
@@ -307,6 +309,7 @@ impl GitIgnoreFilterError {
     }
 
     fn parse_stderr_line(line: &str) -> Option<Self> {
+        let line = line.trim_end();
         Self::parse_path_does_not_exist(line)
             .or_else(|| Self::parse_path_outside_repo(line))
     }
@@ -352,5 +355,39 @@ impl Filter<os::OsFs> for GitIgnore {
                 Err(_recv_err) => continue,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use abs_path::path;
+
+    use super::*;
+
+    #[test]
+    fn parse_stderr_1() {
+        let stderr =
+            "fatal: /foo: '/foo' is outside repository at '/foo/bar'\n";
+        let err = GitIgnoreFilterError::parse_stderr_line(stderr).unwrap();
+        assert_eq!(
+            err,
+            GitIgnoreFilterError::PathOutsideRepo {
+                path: path!("/foo").to_owned(),
+                repo_path: path!("/foo/bar").to_owned(),
+            }
+        )
+    }
+
+    #[test]
+    fn parse_stderr_2() {
+        let stderr =
+            "fatal: Invalid path '/foo/bar': No such file or directory\n";
+        let err = GitIgnoreFilterError::parse_stderr_line(stderr).unwrap();
+        assert_eq!(
+            err,
+            GitIgnoreFilterError::PathDoesNotExist(
+                path!("/foo/bar").to_owned()
+            )
+        )
     }
 }

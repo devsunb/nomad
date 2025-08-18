@@ -20,5 +20,8 @@ send-future = "0.1"
 
 compact_str = { workspace = true, optional = true }
 
+[dev-dependencies]
+abs-path = { workspace = true, features = ["macros"] }
+
 [lints]
 workspace = true
