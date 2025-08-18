@@ -219,7 +219,8 @@ async fn read_project<Ed: CollabEditor>(
 
     let (project_root, project_filter) = match root_node {
         FsNode::Directory(dir) => {
-            let filter = Ed::project_filter(&dir, ctx);
+            let filter = Ed::project_filter(&dir, ctx)
+                .map_err(ReadProjectError::ProjectFilter)?;
             (dir, Either::Left(filter))
         },
         // The user wants to collaborate on a single file. The root must always
@@ -450,6 +451,9 @@ pub enum ReadProjectError<Ed: CollabEditor> {
 
     /// TODO: docs.
     FileParent(<<Ed::Fs as Fs>::File as File>::ParentError),
+
+    /// The project filter couldn't be created.
+    ProjectFilter(Ed::ProjectFilterError),
 
     /// TODO: docs.
     ReadNode(ReadNodeError<Ed::Fs>),

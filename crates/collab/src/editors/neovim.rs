@@ -1,3 +1,4 @@
+use core::convert::Infallible;
 use core::fmt;
 use core::ops::Range;
 use std::ffi::OsString;
@@ -78,6 +79,7 @@ impl CollabEditor for Neovim {
     type DefaultDirForRemoteProjectsError = NeovimDataDirError;
     type HomeDirError = NeovimHomeDirError;
     type LspRootError = NeovimLspRootError;
+    type ProjectFilterError = Infallible;
 
     async fn confirm_start(
         project_root: &AbsPath,
@@ -274,12 +276,12 @@ impl CollabEditor for Neovim {
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
         ctx: &mut Context<Self>,
-    ) -> Self::ProjectFilter {
+    ) -> Result<Self::ProjectFilter, Self::ProjectFilterError> {
         match ctx.with_editor(|nvim| {
             let spawner = nvim.executor().background_spawner();
             walkdir::GitIgnore::new(&project_root.path(), spawner)
         }) {
-            Ok(gitignore) => gitignore,
+            Ok(gitignore) => Ok(gitignore),
             Err(err) => todo!("handle {err}"),
         }
     }

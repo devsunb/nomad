@@ -29,7 +29,7 @@ use puff::file::LocalFileId;
 use crate::collab::Collab;
 use crate::config::Config;
 use crate::editors::{CollabEditor, SessionId, Welcome};
-use crate::event_stream::{EventStream, EventStreamBuilder};
+use crate::event_stream::EventStreamBuilder;
 use crate::leave::StopChannels;
 use crate::project::{
     IdMaps,
@@ -106,14 +106,20 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
                 .await
                 .map_err(JoinError::RequestProject)?;
 
-        let (event_stream, id_maps) =
+        let (project_root, stream_builder, id_maps) =
             write_project(&project, project_guard.root().to_owned(), ctx)
                 .await
                 .map_err(JoinError::WriteProject)?;
 
+        let project_filter = Ed::project_filter(&project_root, ctx)
+            .map_err(JoinError::ProjectFilter)?;
+
+        let event_stream =
+            stream_builder.push_filter(project_filter).build(ctx);
+
         let project_handle = project_guard.activate(NewProjectArgs {
             agent_id: event_stream.agent_id(),
-            id_maps,
+            id_maps: id_maps.into(),
             host_id: welcome.host_id,
             local_peer,
             project,
@@ -204,7 +210,14 @@ async fn write_project<Ed: CollabEditor>(
     project: &Project,
     root_path: AbsPathBuf,
     ctx: &mut Context<Ed>,
-) -> Result<(EventStream<Ed>, IdMaps<Ed>), WriteProjectError<Ed::Fs>> {
+) -> Result<
+    (
+        <Ed::Fs as Fs>::Directory,
+        EventStreamBuilder<Ed::Fs>,
+        NodeIdMaps<Ed::Fs>,
+    ),
+    WriteProjectError<Ed::Fs>,
+> {
     let fs = ctx.fs();
 
     // SAFETY: we're awaiting on the following background task and not
@@ -212,47 +225,37 @@ async fn write_project<Ed: CollabEditor>(
     // for its entire duration.
     let project_ptr = unsafe { ProjectPtr::new(project) };
 
-    let (project_root, stream_builder, node_id_maps) = ctx
-        .spawn_background(async move {
-            if let Some(node) = fs
-                .node_at_path(&root_path)
-                .await
-                .map_err(WriteProjectError::GetNodeAtRoot)?
-            {
-                node.delete()
-                    .await
-                    .map_err(WriteProjectError::DeleteNodeAtRoot)?
-            }
+    ctx.spawn_background(async move {
+        if let Some(node) = fs
+            .node_at_path(&root_path)
+            .await
+            .map_err(WriteProjectError::GetNodeAtRoot)?
+        {
+            node.delete().await.map_err(WriteProjectError::DeleteNodeAtRoot)?
+        }
 
-            let project_root = fs
-                .create_all_missing_directories(&root_path)
-                .await
-                .map_err(WriteProjectError::CreateRootDirectory)?;
+        let project_root = fs
+            .create_all_missing_directories(&root_path)
+            .await
+            .map_err(WriteProjectError::CreateRootDirectory)?;
 
-            let mut stream_builder = EventStreamBuilder::new(&project_root);
-            let stream_builder_mut = Shared::new(&mut stream_builder);
+        let mut stream_builder = EventStreamBuilder::new(&project_root);
+        let stream_builder_mut = Shared::new(&mut stream_builder);
 
-            let mut node_id_maps = NodeIdMaps::default();
-            let node_id_maps_mut = Shared::new(&mut node_id_maps);
+        let mut node_id_maps = NodeIdMaps::default();
+        let node_id_maps_mut = Shared::new(&mut node_id_maps);
 
-            write_children(
-                project_ptr.root(),
-                &project_root,
-                &stream_builder_mut,
-                &node_id_maps_mut,
-            )
-            .await?;
-
-            Ok((project_root, stream_builder, node_id_maps))
-        })
+        write_children(
+            project_ptr.root(),
+            &project_root,
+            &stream_builder_mut,
+            &node_id_maps_mut,
+        )
         .await?;
 
-    let project_filter = Ed::project_filter(&project_root, ctx);
-
-    Ok((
-        stream_builder.push_filter(project_filter).build(ctx),
-        node_id_maps.into(),
-    ))
+        Ok((project_root, stream_builder, node_id_maps))
+    })
+    .await
 }
 
 /// TODO: docs.
@@ -364,6 +367,9 @@ pub enum JoinError<Ed: CollabEditor> {
 
     /// TODO: docs.
     OverlappingProject(OverlappingProjectError),
+
+    /// The project filter couldn't be created.
+    ProjectFilter(Ed::ProjectFilterError),
 
     /// TODO: docs.
     RequestProject(RequestProjectError),
@@ -479,6 +485,7 @@ impl<Ed: CollabEditor> notify::Error for JoinError<Ed> {
             Self::WriteProject(err) => err.to_message(),
             Self::Knock(_err) => todo!(),
             Self::OverlappingProject(err) => err.to_message(),
+            Self::ProjectFilter(_err) => todo!(),
             Self::RequestProject(err) => err.to_message(),
             Self::UserNotLoggedIn => {
                 UserNotLoggedInError::<Ed>::new().to_message()

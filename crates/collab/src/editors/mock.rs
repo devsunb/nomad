@@ -212,6 +212,7 @@ where
     type DefaultDirForRemoteProjectsError = NoDefaultDirForRemoteProjectsError;
     type HomeDirError = AnyError;
     type LspRootError = Infallible;
+    type ProjectFilterError = Infallible;
 
     async fn confirm_start(
         project_root: &AbsPath,
@@ -307,8 +308,10 @@ where
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
         ctx: &mut Context<Self>,
-    ) -> Self::ProjectFilter {
-        ctx.with_editor(|this| this.project_filter_with.as_mut()(project_root))
+    ) -> Result<Self::ProjectFilter, Self::ProjectFilterError> {
+        Ok(ctx.with_editor(|this| {
+            this.project_filter_with.as_mut()(project_root)
+        }))
     }
 
     async fn remove_peer_selection(

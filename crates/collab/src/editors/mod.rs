@@ -55,6 +55,10 @@ pub trait CollabEditor: Editor {
     /// The type of error returned by [`lsp_root`](CollabEditor::lsp_root).
     type LspRootError: Debug + notify::Error;
 
+    /// The type of error returned by
+    /// [`project_filter`](CollabEditor::project_filter).
+    type ProjectFilterError: Error + Send;
+
     /// Asks the user to confirm starting a new collaborative editing session
     /// rooted at the given path.
     fn confirm_start(
@@ -128,7 +132,7 @@ pub trait CollabEditor: Editor {
     fn project_filter(
         project_root: &<Self::Fs as fs::Fs>::Directory,
         ctx: &mut Context<Self>,
-    ) -> Self::ProjectFilter;
+    ) -> Result<Self::ProjectFilter, Self::ProjectFilterError>;
 
     /// TODO: docs.
     fn remove_peer_selection(
