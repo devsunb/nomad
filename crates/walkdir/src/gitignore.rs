@@ -108,35 +108,29 @@ impl GitIgnore {
         &self,
         path: impl Into<AbsPathBuf>,
     ) -> Result<bool, GitIgnoreFilterError> {
-        let mut path = Some(path.into());
-
-        loop {
-            if let Some(exit_status) = self.exit_status.get() {
-                return Err(GitIgnoreFilterError::ProcessExited(
-                    exit_status.as_ref().ok().cloned(),
-                ));
-            }
-
-            let (result_tx, result_rx) = flume::bounded(1);
-
-            let message = Message::CheckRequest {
-                path: path.take().expect("we never send two requests"),
-                result_tx,
-            };
-
-            if self.message_tx.send(message).is_err() {
-                // The background task just completed. Loop again, there will
-                // be an exit status set.
-                continue;
-            }
-
-            match result_rx.recv_async().await {
-                Ok(result) => return result,
-                // The background task just completed. Loop again, there will
-                // be an exit status set.
-                Err(_recv_err) => continue,
-            }
+        if let Some(exit_status) = self.exit_status.get() {
+            return Err(GitIgnoreFilterError::ProcessExited(
+                exit_status.as_ref().ok().cloned(),
+            ));
         }
+
+        let (result_tx, result_rx) = flume::bounded(1);
+
+        let message = Message::CheckRequest { path: path.into(), result_tx };
+
+        if self.message_tx.send(message).is_err() {
+            let exit_status = self.exit_status.get().expect(
+                "event loop has stopped running, so the exit status must've \
+                 been set",
+            );
+            return Err(GitIgnoreFilterError::ProcessExited(
+                exit_status.as_ref().ok().cloned(),
+            ));
+        }
+
+        result_rx.recv_async().await.expect(
+            "message has been sent successfully, so we'll get a response",
+        )
     }
 
     /// Creates a new `GitIgnore` filter.
@@ -222,15 +216,14 @@ impl GitIgnore {
         while let Ok(message) = message_rx.recv_async().await {
             let result = match message {
                 Message::CheckRequest { path, result_tx } => {
+                    result_tx_queue.push_front(result_tx);
+
                     let write_res = stdin
                         .write_all(path.as_bytes())
                         .and_then(|()| stdin.write_all(b"\0"));
 
                     match write_res {
-                        Ok(()) => {
-                            result_tx_queue.push_front(result_tx);
-                            continue;
-                        },
+                        Ok(()) => continue,
                         // Just give up if we can't write to stdin.
                         Err(_) => break,
                     }
@@ -264,7 +257,17 @@ impl GitIgnore {
             Err(_) => unreachable!("exit status only set once"),
         }
 
-        for result_tx in result_tx_queue {
+        let result_txs = result_tx_queue.into_iter().chain(
+            message_rx.into_iter().filter_map(|msg| {
+                if let Message::CheckRequest { result_tx, .. } = msg {
+                    Some(result_tx)
+                } else {
+                    None
+                }
+            }),
+        );
+
+        for result_tx in result_txs {
             let _ = result_tx.send(Err(GitIgnoreFilterError::ProcessExited(
                 exit_status.get().expect("just set it").as_ref().ok().copied(),
             )));
