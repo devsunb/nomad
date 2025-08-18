@@ -13,34 +13,39 @@ use crate::Filter;
 
 /// A [`Filter`] that filters out nodes based on the various exclusion rules
 /// used by Git.
-#[derive(Clone)]
+#[derive(Clone, cauchy::Debug)]
 pub struct GitIgnore {
     /// A sender used to send [`Message`]s to the background task.
+    #[debug(skip)]
     message_tx: flume::Sender<Message>,
 
     /// The exit status of the `git check-ignore` process, if it has exited.
+    #[debug(skip)]
     exit_status: Arc<OnceLock<io::Result<process::ExitStatus>>>,
 
     /// The ID of the `git check-ignore` process.
+    #[debug(skip)]
     process_id: u32,
 }
 
 /// The type of error that can occur when creating the [`GitIgnore`] filter.
-#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
+#[derive(Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq)]
 pub enum GitIgnoreCreateError {
-    /// The path given to [`GitIgnore::new`] doesn't point to a Git repository.
-    #[display("the path {_0:?} does not point to a Git repository")]
-    InvalidRepoPath(AbsPathBuf),
-
     /// Running the `git check-ignore` command failed.
     #[display("Running {cmd:?} failed: {_0}", cmd = GitIgnore::command())]
-    CommandFailed(io::Error),
+    CommandFailed(#[partial_eq(skip)] io::Error),
+
+    /// The path given to [`GitIgnore::new`] doesn't exist.
+    #[display("the path does not exist")]
+    InvalidPath,
+
+    /// The path given to [`GitIgnore::new`] doesn't point to a Git repository.
+    #[display("the path does not point to a Git repository")]
+    PathNotInGitRepository,
 }
 
 /// The type of error that can occur when using the [`GitIgnore`] filter.
-#[derive(
-    cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
-)]
+#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq)]
 pub enum GitIgnoreFilterError {
     /// The given path does not exist.
     #[display("the path {_0:?} does not exist")]
@@ -75,11 +80,10 @@ enum Message {
     },
 
     /// `Ok` variants are sent by the stdout task when a new output is read.
-    /// The `bool` indicates whether the path (which is not included in the
-    /// message) is ignored.
+    /// The boolean indicates whether the path it read is ignored.
     ///
     /// `Err` variants are sent by the stderr task when a new line is read
-    /// that indicates an error.
+    /// that was successfully parsed into a [`GitIgnoreFilterError`].
     ReadIgnoreResult(Result<bool, GitIgnoreFilterError>),
 
     /// Sent by the stdout task when it has reached EOF or if an error occured
@@ -276,6 +280,9 @@ impl GitIgnore {
             "exit status only set once"
         );
 
+        let maybe_status =
+            exit_status.get().expect("just set it").as_ref().ok().copied();
+
         let result_txs = result_tx_queue.into_iter().chain(
             message_rx.into_iter().filter_map(|msg| {
                 if let Message::CheckRequest { result_tx, .. } = msg {
@@ -286,16 +293,13 @@ impl GitIgnore {
             }),
         );
 
-        let maybe_status =
-            exit_status.get().expect("just set it").as_ref().ok().copied();
-
         for result_tx in result_txs {
             let _ = result_tx
                 .send(Err(GitIgnoreFilterError::ProcessExited(maybe_status)));
         }
     }
 
-    /// Returns the number of instances to this `GitIgnore` filter.
+    /// Returns the number of instances of this `GitIgnore` filter.
     fn num_instances(&self) -> usize {
         let is_event_loop_running = self.exit_status.get().is_none();
         Arc::strong_count(&self.exit_status) - is_event_loop_running as usize
