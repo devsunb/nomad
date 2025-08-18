@@ -3,6 +3,7 @@ use core::error::Error;
 
 use abs_path::AbsPath;
 use ed::fs::{self, Metadata};
+use either::Either;
 use futures_util::stream::{self, FusedStream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select};
 
@@ -40,18 +41,6 @@ pub struct Filtered<F, W> {
 pub struct And<F1, F2> {
     filter_1: F1,
     filter_2: F2,
-}
-
-/// TODO: docs.
-#[derive(
-    Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq, cauchy::Eq,
-)]
-#[display("{_0}")]
-pub enum Either<L, R> {
-    /// TODO: docs.
-    Left(L),
-    /// TODO: docs.
-    Right(R),
 }
 
 /// TODO: docs.

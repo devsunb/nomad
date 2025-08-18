@@ -30,6 +30,7 @@ collab-types = { workspace = true }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
 ed = { workspace = true }
+either = { workspace = true }
 fastrand = "2"
 flume = { workspace = true, features = ["async"] }
 futures-util = { workspace = true }

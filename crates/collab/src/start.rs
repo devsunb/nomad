@@ -15,6 +15,7 @@ use ed::fs::{self, Directory, File, Fs, FsNode, Metadata, Symlink};
 use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
 use ed::{Buffer, Context, Editor};
+use either::Either;
 use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
 use puff::directory::LocalDirectoryId;
@@ -37,10 +38,8 @@ use crate::root_markers;
 use crate::session::Session;
 
 /// TODO: docs.
-pub type ProjectFilter<B> = walkdir::Either<
-    <B as CollabEditor>::ProjectFilter,
-    AllButOne<<B as Editor>::Fs>,
->;
+pub type ProjectFilter<B> =
+    Either<<B as CollabEditor>::ProjectFilter, AllButOne<<B as Editor>::Fs>>;
 
 type Markers = root_markers::GitDirectory;
 
@@ -221,7 +220,7 @@ async fn read_project<Ed: CollabEditor>(
     let (project_root, project_filter) = match root_node {
         FsNode::Directory(dir) => {
             let filter = Ed::project_filter(&dir, ctx);
-            (dir, walkdir::Either::Left(filter))
+            (dir, Either::Left(filter))
         },
         // The user wants to collaborate on a single file. The root must always
         // be a directory, so we just use its parent together with a filter
@@ -230,7 +229,7 @@ async fn read_project<Ed: CollabEditor>(
             let parent =
                 file.parent().await.map_err(ReadProjectError::FileParent)?;
             let filter = AllButOne::<Ed::Fs> { id: file.id() };
-            (parent, walkdir::Either::Right(filter))
+            (parent, Either::Right(filter))
         },
         FsNode::Symlink(_) => {
             return Err(ReadProjectError::RootIsSymlink(root_path.to_owned()));

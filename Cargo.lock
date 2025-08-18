@@ -679,6 +679,7 @@ dependencies = [
  "derive_more",
  "duplex-stream",
  "ed",
+ "either",
  "fastrand",
  "flume",
  "futures-util",

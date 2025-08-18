@@ -10,7 +10,7 @@ mod fs_ext;
 mod gitignore;
 mod walkdir;
 
-pub use filter::{And, Either, Filter, Filtered};
+pub use filter::{And, Filter, Filtered};
 pub use fs_ext::{FsExt, Walker};
 #[cfg(feature = "gitignore")]
 pub use gitignore::GitIgnore;
