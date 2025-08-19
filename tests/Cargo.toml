@@ -14,7 +14,12 @@ crate-type = ["cdylib"]
 # Features that enable a specific set of tests.
 auth = ["dep:auth"]
 collab = ["dep:auth", "dep:collab"]
-gitignore = ["dep:tempdir", "dep:thread-pool", "fs-filters/gitignore"]
+gitignore = [
+  "dep:real-fs",
+  "dep:tempdir",
+  "dep:thread-pool",
+  "fs-filters/gitignore",
+]
 mock = []
 neovim = ["dep:neovim", "auth?/neovim", "collab?/neovim"]
 thread-pool = ["dep:thread-pool"]
@@ -41,6 +46,7 @@ tracing-subscriber = { workspace = true }
 auth = { workspace = true, optional = true, features = ["mock"] }
 collab = { workspace = true, optional = true, features = ["mock"] }
 neovim = { workspace = true, optional = true, features = ["test"] }
+real-fs = { workspace = true, optional = true }
 tempdir = { workspace = true, optional = true }
 thread-pool = { workspace = true, optional = true }
 

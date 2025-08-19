@@ -1,5 +1,5 @@
 [package]
-name = "tempdir"
+name = "real-fs"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
@@ -8,12 +8,10 @@ publish.workspace = true
 
 [dependencies]
 abs-path = { workspace = true }
-cauchy = { workspace = true }
-derive_more = { workspace = true }
+async-fs = { workspace = true }
 fs = { workspace = true }
-real-fs = { workspace = true }
-futures-util = { workspace = true }
-tempdir-inner = { workspace = true }
+futures-util = { workspace = true, features = ["io"] }
+notify = { workspace = true, optional = true }
 
 [lints]
 workspace = true

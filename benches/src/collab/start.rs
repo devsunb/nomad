@@ -16,13 +16,13 @@ mod read_neovim {
     use collab::mock::CollabMock;
     use criterion::BenchmarkId;
     use ed::executor::Executor;
-    use ed::fs::os::{OsDirectory, OsFs};
-    use ed::fs::{Directory, Fs};
     use ed::{Context, Editor};
+    use fs::{Directory, Fs};
     use fs_filters::gitignore::GitIgnore;
     use futures_lite::future;
     use mock::fs::MockFs;
     use mock::{ContextExt, Mock};
+    use real_fs::RealFs;
     use thread_pool::ThreadPool;
 
     use super::*;
@@ -44,7 +44,7 @@ mod read_neovim {
 
     pub(super) fn from_real_fs(group: &mut BenchmarkGroup<'_, WallTime>) {
         CollabMock::new(
-            Mock::<OsFs>::default()
+            Mock::<RealFs>::default()
                 .with_background_spawner(ThreadPool::default()),
         )
         .with_project_filter(|project_root| {
@@ -55,9 +55,9 @@ mod read_neovim {
         });
     }
 
-    fn neovim_repo() -> OsDirectory {
+    fn neovim_repo() -> real_fs::Directory {
         future::block_on(async {
-            OsFs::default()
+            RealFs::default()
                 .node_at_path(crate::generated::collab::NEOVIM_REPO_PATH)
                 .await
                 .unwrap()

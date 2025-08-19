@@ -4,9 +4,9 @@ use std::{thread, time};
 
 use abs_path::{AbsPath, node, path};
 use fs::Directory;
-use fs::os::OsFs;
 use fs_filters::gitignore::{CreateError, GitIgnore, IgnoreError};
 use futures_lite::future;
+use real_fs::RealFs;
 use tempdir::{FsExt, TempDir};
 use thread_pool::ThreadPool;
 
@@ -153,7 +153,7 @@ fn process_terminates_when_all_gitignore_instances_are_dropped() {
 #[test]
 #[cfg_attr(git_in_PATH, ignore = "git is in $PATH")]
 fn creating_gitignore_fails_if_git_is_not_in_path() {
-    let tempdir = future::block_on(OsFs::default().tempdir()).unwrap();
+    let tempdir = future::block_on(RealFs::default().tempdir()).unwrap();
     let mut spawner = ThreadPool::default();
     let err = GitIgnore::new(tempdir.path(), &mut spawner).unwrap_err();
     assert_eq!(err, CreateError::GitNotInPath);
@@ -170,7 +170,7 @@ fn creating_gitignore_fails_if_path_doesnt_exist() {
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
 fn creating_gitignore_fails_if_not_in_git_repo() {
-    let tempdir = future::block_on(OsFs::default().tempdir()).unwrap();
+    let tempdir = future::block_on(RealFs::default().tempdir()).unwrap();
     let mut spawner = ThreadPool::default();
     let err = GitIgnore::new(tempdir.path(), &mut spawner).unwrap_err();
     assert_eq!(err, CreateError::PathNotInGitRepository);
@@ -184,7 +184,7 @@ struct GitRepository {
 impl GitRepository {
     fn init(fs: mock::fs::MockFs) -> Self {
         let dir = future::block_on(async move {
-            let tempdir = OsFs::default()
+            let tempdir = RealFs::default()
                 .tempdir()
                 .await
                 .expect("couldn't create tempdir");

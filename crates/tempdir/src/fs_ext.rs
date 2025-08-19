@@ -3,7 +3,6 @@ use std::path::PathBuf;
 
 use abs_path::AbsPath;
 use fs::Fs;
-use fs::os::OsFs;
 
 use crate::TempDir;
 
@@ -23,14 +22,14 @@ pub enum TempDirError {
     CreateDir(io::Error),
 
     /// TODO: docs.
-    GetDir(<OsFs as Fs>::NodeAtPathError),
+    GetDir(<real_fs::RealFs as Fs>::NodeAtPathError),
 
     /// The path the temporary directory was created at is not valid UTF-8.
     #[display("{_0:?} is not valid UTF-8")]
     NonUtf8Path(PathBuf),
 }
 
-impl FsExt for OsFs {
+impl FsExt for real_fs::RealFs {
     async fn tempdir(&self) -> Result<TempDir, TempDirError> {
         let temp_dir = tempdir_inner::TempDir::new("")
             .map_err(TempDirError::CreateDir)?;

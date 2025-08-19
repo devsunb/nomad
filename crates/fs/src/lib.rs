@@ -12,8 +12,6 @@ mod fs;
 mod metadata;
 mod node;
 mod node_kind;
-#[cfg(feature = "os-fs")]
-pub mod os;
 mod symlink;
 #[cfg(feature = "walk")]
 pub mod walk;

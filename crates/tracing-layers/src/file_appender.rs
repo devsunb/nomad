@@ -3,7 +3,6 @@ use std::sync::{Arc, OnceLock};
 
 use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf};
 use ed::{BorrowState, Context, Editor};
-use fs::os::OsFs;
 use tracing::error;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{InitError, RollingFileAppender, Rotation};
@@ -47,7 +46,7 @@ impl<S: 'static> FileAppender<S> {
     where
         // Creating the inner file appender will access the file system, so
         // bound this to editors with a real file system.
-        Ed: Editor<Fs = OsFs>,
+        Ed: Editor<Fs = real_fs::RealFs>,
     {
         let this = Self {
             inner: Arc::new(OnceLock::new()),

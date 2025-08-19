@@ -7,25 +7,17 @@ license.workspace = true
 publish.workspace = true
 
 [features]
-gitignore = [
-  "fs/os-fs",
-  "dep:abs-path",
-  "dep:cauchy",
-  "dep:derive_more",
-  "dep:ed",
-  "dep:either",
-  "dep:flume",
-]
+gitignore = []
 
 [dependencies]
+abs-path = { workspace = true }
+cauchy = { workspace = true }
+derive_more = { workspace = true }
+ed = { workspace = true }
+either = { workspace = true }
+flume = { workspace = true }
 fs = { workspace = true, features = ["filter"] }
-
-abs-path = { workspace = true, optional = true }
-cauchy = { workspace = true, optional = true }
-derive_more = { workspace = true, optional = true }
-ed = { workspace = true, optional = true }
-either = { workspace = true, optional = true }
-flume = { workspace = true, optional = true }
+real-fs = { workspace = true }
 
 [dev-dependencies]
 abs-path = { workspace = true, features = ["macros"] }

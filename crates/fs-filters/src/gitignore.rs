@@ -485,13 +485,13 @@ impl Drop for GitIgnore {
 
 // We're shelling out to Git, so this can only be a filter on a real
 // filesystem.
-impl Filter<fs::os::OsFs> for GitIgnore {
+impl Filter<real_fs::RealFs> for GitIgnore {
     type Error = Either<fs::MetadataNameError, IgnoreError>;
 
     async fn should_filter(
         &self,
         dir_path: &AbsPath,
-        node_meta: &impl fs::Metadata<Fs = fs::os::OsFs>,
+        node_meta: &impl fs::Metadata<Fs = real_fs::RealFs>,
     ) -> Result<bool, Self::Error> {
         let node_name = node_meta.name().map_err(Either::Left)?;
         let node_path = dir_path.join(node_name);

@@ -73,6 +73,7 @@ fs-filters = { path = "./crates/fs-filters" }
 mock = { path = "./crates/mock" }
 neovim = { path = "./crates/neovim" }
 nomad = { path = "./crates/nomad" }
+real-fs = { path = "./crates/real-fs" }
 root-finder = { path = "./crates/root-finder" }
 tempdir = { path = "./crates/tempdir" }
 thread-pool = { path = "./crates/thread-pool" }

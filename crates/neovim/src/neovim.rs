@@ -6,7 +6,6 @@ use ed::notify::Namespace;
 use ed::plugin::Plugin;
 use ed::{AgentId, BaseEditor, BorrowState, Buffer, Context, Editor, Shared};
 use fs::Fs;
-use fs::os::OsFs;
 
 use crate::buffer::{
     BufferId,
@@ -34,7 +33,7 @@ pub struct Neovim {
 /// TODO: docs.
 #[derive(Debug)]
 pub struct CreateBufferError {
-    inner: fs::ReadFileToStringError<OsFs>,
+    inner: fs::ReadFileToStringError<real_fs::RealFs>,
 }
 
 impl Neovim {
@@ -125,7 +124,7 @@ impl Editor for Neovim {
     type BufferId = BufferId;
     type Cursor<'a> = NeovimCursor<'a>;
     type CursorId = BufferId;
-    type Fs = fs::os::OsFs;
+    type Fs = real_fs::RealFs;
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
     type Executor = executor::NeovimExecutor;
     type EventHandle = EventHandle;
