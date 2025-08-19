@@ -2,7 +2,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll, ready};
 use std::panic;
 
-use ed::executor::{BackgroundSpawner, Task};
+use executor::{BackgroundSpawner, Task};
 use futures_lite::FutureExt;
 
 type PanicPayload = Box<dyn std::any::Any + Send + 'static>;

@@ -1,17 +1,19 @@
 [package]
-name = "thread-pool"
+name = "executor"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+async-task = ["dep:async-task"]
+
 [dependencies]
-executor = { workspace = true }
-flume = { workspace = true }
-futures-executor = { workspace = true, features = ["thread-pool"] }
 futures-lite = { workspace = true }
 pin-project-lite = { workspace = true }
+
+async-task = { workspace = true, optional = true }
 
 [lints]
 workspace = true

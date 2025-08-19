@@ -28,6 +28,7 @@ collab-types = { workspace = true }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
 ed = { workspace = true }
+executor = { workspace = true }
 either = { workspace = true }
 fastrand = { workspace = true }
 flume = { workspace = true, features = ["async"] }

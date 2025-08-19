@@ -4,15 +4,15 @@ use core::ops::{Deref, DerefMut};
 use core::{fmt, panic};
 
 use abs_path::AbsPath;
-use futures_lite::future::{self, FutureExt};
-
-use crate::executor::{
+use executor::{
     BackgroundSpawner,
     BackgroundTask,
     Executor,
     LocalSpawner,
     LocalTask,
 };
+use futures_lite::future::{self, FutureExt};
+
 use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::{Plugin, PluginId};
@@ -183,7 +183,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     pub fn spawn_background<Fut>(
         &mut self,
         fut: Fut,
-    ) -> BackgroundTask<Fut::Output, Ed>
+    ) -> BackgroundTask<Fut::Output, Ed::Executor>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
@@ -230,7 +230,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     fn spawn_local_inner<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
-    ) -> LocalTask<Option<T>, Ed> {
+    ) -> LocalTask<Option<T>, Ed::Executor> {
         self.spawn_local_unprotected_inner(async move |ctx| {
             match panic::AssertUnwindSafe(fun(ctx)).catch_unwind().await {
                 Ok(ret) => Some(ret),
@@ -246,7 +246,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     fn spawn_local_unprotected_inner<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
-    ) -> LocalTask<T, Ed> {
+    ) -> LocalTask<T, Ed::Executor> {
         let mut ctx = Context::new(NotBorrowedInner {
             namespace: self.namespace().clone(),
             plugin_id: self.plugin_id(),
@@ -369,7 +369,7 @@ impl<Ed: Editor> Context<Ed, NotBorrowed> {
     pub fn spawn_local<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Self) -> T + 'static,
-    ) -> LocalTask<Option<T>, Ed> {
+    ) -> LocalTask<Option<T>, Ed::Executor> {
         self.spawn_local_inner(fun)
     }
 
@@ -378,7 +378,7 @@ impl<Ed: Editor> Context<Ed, NotBorrowed> {
     pub fn spawn_local_unprotected<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Self) -> T + 'static,
-    ) -> LocalTask<T, Ed> {
+    ) -> LocalTask<T, Ed::Executor> {
         self.spawn_local_unprotected_inner(fun)
     }
 

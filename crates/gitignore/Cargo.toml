@@ -10,8 +10,8 @@ publish.workspace = true
 abs-path = { workspace = true }
 cauchy = { workspace = true }
 derive_more = { workspace = true }
-ed = { workspace = true }
 either = { workspace = true }
+executor = { workspace = true }
 flume = { workspace = true }
 fs = { workspace = true, features = ["filter"] }
 real-fs = { workspace = true }

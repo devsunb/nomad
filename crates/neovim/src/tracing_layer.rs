@@ -1,9 +1,9 @@
 use std::io::{self, Write};
 
 use compact_str::CompactString;
-use ed::executor::{Executor, LocalSpawner};
 use ed::shared::MultiThreaded;
 use ed::{Editor, Shared};
+use executor::{Executor, LocalSpawner};
 use tracing_subscriber::fmt;
 use tracing_subscriber::registry::LookupSpan;
 

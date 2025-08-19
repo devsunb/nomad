@@ -27,6 +27,7 @@ abs-path = { workspace = true, features = ["macros"] }
 async-io = { workspace = true }
 cauchy = { workspace = true }
 ed = { workspace = true }
+executor = { workspace = true }
 flume = { workspace = true }
 fs = { workspace = true }
 futures-lite = { workspace = true, features = ["default"] }

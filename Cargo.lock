@@ -706,6 +706,7 @@ dependencies = [
  "duplex-stream",
  "ed",
  "either",
+ "executor",
  "fastrand",
  "flume",
  "fs",
@@ -1053,15 +1054,14 @@ name = "ed"
 version = "0.1.0-dev"
 dependencies = [
  "abs-path",
- "async-task",
  "cauchy",
  "compact_str",
  "derive_more",
+ "executor",
  "flume",
  "fs",
  "futures-lite",
  "fxhash",
- "pin-project-lite",
  "serde",
  "smallvec",
  "smol_str",
@@ -1124,6 +1124,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8be9f3dfaaffdae2972880079a491a1a8bb7cbed0b8dd7a347f668b4150a3b93"
 dependencies = [
  "event-listener",
+ "pin-project-lite",
+]
+
+[[package]]
+name = "executor"
+version = "0.1.0-dev"
+dependencies = [
+ "async-task",
+ "futures-lite",
  "pin-project-lite",
 ]
 
@@ -1354,8 +1363,8 @@ dependencies = [
  "abs-path",
  "cauchy",
  "derive_more",
- "ed",
  "either",
+ "executor",
  "flume",
  "fs",
  "real-fs",
@@ -1874,6 +1883,7 @@ dependencies = [
  "cauchy",
  "derive_more",
  "ed",
+ "executor",
  "flume",
  "fs",
  "futures-lite",
@@ -1915,6 +1925,7 @@ dependencies = [
  "concurrent-queue",
  "derive_more",
  "ed",
+ "executor",
  "flume",
  "fs",
  "neovim-macros",
@@ -3041,6 +3052,7 @@ dependencies = [
  "cauchy",
  "collab",
  "ed",
+ "executor",
  "flume",
  "fs",
  "futures-lite",
@@ -3100,7 +3112,7 @@ dependencies = [
 name = "thread-pool"
 version = "0.1.0-dev"
 dependencies = [
- "ed",
+ "executor",
  "flume",
  "futures-executor",
  "futures-lite",

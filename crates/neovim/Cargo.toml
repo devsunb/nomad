@@ -18,7 +18,8 @@ cauchy = { workspace = true }
 compact_str = { workspace = true }
 concurrent-queue = { workspace = true }
 derive_more = { workspace = true }
-ed = { workspace = true, features = ["async-task"] }
+ed = { workspace = true }
+executor = { workspace = true, features = ["async-task"] }
 fs = { workspace = true }
 neovim-macros = { path = "./macros" }
 nohash = { workspace = true }

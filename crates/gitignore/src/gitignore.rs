@@ -7,8 +7,8 @@ use std::process;
 use std::sync::{Arc, OnceLock};
 
 use abs_path::{AbsPath, AbsPathBuf};
-use ed::executor::{BackgroundSpawner, Task};
 use either::Either;
+use executor::{BackgroundSpawner, Task};
 use fs::filter::Filter;
 
 use crate::{CommandError, CreateError, IgnoreError};

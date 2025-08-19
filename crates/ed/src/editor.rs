@@ -2,10 +2,10 @@ use core::fmt::Debug;
 use core::hash::Hash;
 
 use abs_path::AbsPath;
+use executor::Executor;
 use serde::Serialize;
 use serde::de::Deserialize;
 
-use crate::executor::Executor;
 use crate::notify::{self, Emitter, MaybeResult};
 use crate::plugin::Plugin;
 use crate::{

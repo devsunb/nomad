@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use async_task::Builder;
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
-use ed::executor::{Executor, LocalSpawner};
+use executor::{Executor, LocalSpawner};
 use thread_pool::ThreadPool;
 
 use crate::oxi;

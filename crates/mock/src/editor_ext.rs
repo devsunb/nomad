@@ -1,7 +1,7 @@
 use core::mem;
 
-use ed::executor::BackgroundSpawner;
 use ed::{Context, Editor};
+use executor::BackgroundSpawner;
 use futures_lite::future;
 
 /// An [`Editor`] extension trait used to run async closures with a

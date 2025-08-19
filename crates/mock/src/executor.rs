@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use async_task::Runnable;
-use ed::executor::{self, BackgroundSpawner, LocalSpawner};
+use executor::{BackgroundSpawner, LocalSpawner};
 use futures_lite::future::{self, FutureExt};
 
 pub struct Executor<BackgroundSpawner = Spawner> {

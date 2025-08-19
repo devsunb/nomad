@@ -15,8 +15,8 @@ mod read_neovim {
     use collab::CollabEditor;
     use collab::mock::CollabMock;
     use criterion::BenchmarkId;
-    use ed::executor::Executor;
     use ed::{Context, Editor};
+    use executor::Executor;
     use fs::{Directory, Fs};
     use futures_lite::future;
     use gitignore::GitIgnore;

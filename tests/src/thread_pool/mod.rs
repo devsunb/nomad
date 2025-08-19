@@ -1,4 +1,4 @@
-use ed::executor::BackgroundSpawner;
+use executor::BackgroundSpawner;
 use futures_lite::future;
 use thread_pool::ThreadPool;
 
