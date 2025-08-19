@@ -1,9 +1,9 @@
 //! TODO: docs.
 
-use ed::Context;
-use ed::action::AsyncAction;
-use ed::command::ToCompletionFn;
-use ed::notify::{self, Name};
+use editor::Context;
+use editor::action::AsyncAction;
+use editor::command::ToCompletionFn;
+use editor::notify::{self, Name};
 
 use crate::collab::Collab;
 use crate::editors::{ActionForSelectedSession, CollabEditor};

@@ -4,8 +4,8 @@ use core::fmt;
 
 use abs_path::AbsPath;
 use auth_types::AuthInfos;
-use ed::notify::MaybeResult;
-use ed::{
+use editor::notify::MaybeResult;
+use editor::{
     AgentId,
     ApiValue,
     BaseEditor,

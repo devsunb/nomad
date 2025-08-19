@@ -1,4 +1,4 @@
-use ed::{AgentId, BorrowState, Buffer, Context, Editor};
+use editor::{AgentId, BorrowState, Buffer, Context, Editor};
 
 pub(crate) trait TestEditor: Editor {
     fn create_scratch_buffer(

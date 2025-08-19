@@ -9,7 +9,7 @@ use std::borrow::Cow;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use compact_str::CompactString;
-use ed::{AgentId, Buffer, ByteOffset, Chunks, Edit, Replacement, Shared};
+use editor::{AgentId, Buffer, ByteOffset, Chunks, Edit, Replacement, Shared};
 use smallvec::{SmallVec, smallvec_inline};
 
 use crate::Neovim;
@@ -1024,7 +1024,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     fn save(
         &mut self,
         _agent_id: AgentId,
-    ) -> Result<(), <Self::Editor as ed::Editor>::BufferSaveError> {
+    ) -> Result<(), <Self::Editor as editor::Editor>::BufferSaveError> {
         // TODO: save agent ID.
         self.inner().call(|()| api::command("write"))
     }

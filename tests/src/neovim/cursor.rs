@@ -1,7 +1,7 @@
 use core::mem;
 use core::time::Duration;
 
-use ed::{ByteOffset, Context};
+use editor::{ByteOffset, Context};
 use futures_util::stream::{FusedStream, StreamExt};
 use futures_util::{FutureExt, select_biased};
 use neovim::Neovim;
@@ -61,7 +61,7 @@ trait ByteOffsetExt {
     fn new_stream(
         ctx: &mut Context<Neovim>,
     ) -> impl FusedStream<Item = ByteOffset> + Unpin + use<Self> {
-        use ed::{Buffer, Cursor};
+        use editor::{Buffer, Cursor};
 
         let (tx, rx) = flume::unbounded();
 
@@ -86,7 +86,7 @@ mod ed_cursor {
     //! Contains the editor-agnostic cursor tests.
 
     use super::*;
-    use crate::ed::cursor;
+    use crate::editor::cursor;
 
     #[neovim::test]
     async fn on_cursor_created_1(ctx: &mut Context<Neovim>) {

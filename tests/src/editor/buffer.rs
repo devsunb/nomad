@@ -1,10 +1,10 @@
 use core::{fmt, iter, mem};
 
-use ed::{Buffer, Context, Edit, Editor, Replacement};
+use editor::{Buffer, Context, Edit, Editor, Replacement};
 use futures_util::stream::{FusedStream, StreamExt};
 use rand::Rng;
 
-use crate::ed::{ContextExt, TestEditor};
+use crate::editor::{ContextExt, TestEditor};
 use crate::utils::{CodeDistribution, fuzz};
 
 pub(crate) async fn fuzz_edits(
@@ -127,7 +127,7 @@ pub(crate) trait EditExt {
         buf_id: Ed::BufferId,
         ctx: &mut Context<Ed>,
     ) -> impl FusedStream<Item = Edit> + Unpin + use<Self, Ed> {
-        use ed::Buffer;
+        use editor::Buffer;
 
         let (tx, rx) = flume::unbounded();
 

@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use ed::{Buffer, Context, Edit, Replacement};
+use editor::{Buffer, Context, Edit, Replacement};
 use futures_util::future::FutureExt;
 use futures_util::select_biased;
 use futures_util::stream::StreamExt;
@@ -9,7 +9,7 @@ use neovim::buffer::BufferId;
 use neovim::oxi::api::{self, opts};
 use neovim::tests::ContextExt;
 
-use crate::ed::buffer::EditExt;
+use crate::editor::buffer::EditExt;
 
 #[neovim::test]
 async fn deleting_trailing_newline_is_like_unsetting_eol(
@@ -451,7 +451,7 @@ mod ed_buffer {
     //! Contains the editor-agnostic buffer tests.
 
     use super::*;
-    use crate::ed::buffer;
+    use crate::editor::buffer;
 
     #[neovim::test]
     async fn fuzz_edits_10e1(ctx: &mut Context<Neovim>) {

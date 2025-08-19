@@ -249,7 +249,7 @@ version = "0.1.0-dev"
 dependencies = [
  "abs-path",
  "auth-types",
- "ed",
+ "editor",
  "event-listener",
  "keyring",
  "neovim",
@@ -295,7 +295,7 @@ dependencies = [
  "anyhow",
  "collab",
  "criterion",
- "ed",
+ "editor",
  "fs",
  "futures-lite",
  "gitignore",
@@ -704,7 +704,7 @@ dependencies = [
  "compact_str",
  "derive_more",
  "duplex-stream",
- "ed",
+ "editor",
  "either",
  "executor",
  "fastrand",
@@ -1050,7 +1050,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ed"
+name = "editor"
 version = "0.1.0-dev"
 dependencies = [
  "abs-path",
@@ -1882,7 +1882,7 @@ dependencies = [
  "async-task",
  "cauchy",
  "derive_more",
- "ed",
+ "editor",
  "executor",
  "flume",
  "fs",
@@ -1924,7 +1924,7 @@ dependencies = [
  "compact_str",
  "concurrent-queue",
  "derive_more",
- "ed",
+ "editor",
  "executor",
  "flume",
  "fs",
@@ -1965,7 +1965,7 @@ dependencies = [
  "auth",
  "cauchy",
  "collab",
- "ed",
+ "editor",
  "either",
  "neovim",
  "tracing",
@@ -3051,7 +3051,7 @@ dependencies = [
  "auth",
  "cauchy",
  "collab",
- "ed",
+ "editor",
  "executor",
  "flume",
  "fs",
@@ -3285,7 +3285,7 @@ version = "0.1.0-dev"
 dependencies = [
  "abs-path",
  "cauchy",
- "ed",
+ "editor",
  "fs",
  "real-fs",
  "tracing",
@@ -3415,7 +3415,7 @@ name = "version"
 version = "0.1.0-dev"
 dependencies = [
  "chrono",
- "ed",
+ "editor",
  "git2",
  "serde",
 ]

@@ -2,7 +2,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 
 use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf};
-use ed::{BorrowState, Context, Editor};
+use editor::{BorrowState, Context, Editor};
 use tracing::error;
 use tracing_appender::non_blocking::{NonBlocking, WorkerGuard};
 use tracing_appender::rolling::{InitError, RollingFileAppender, Rotation};

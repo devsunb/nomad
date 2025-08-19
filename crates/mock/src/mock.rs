@@ -1,9 +1,17 @@
 use core::fmt;
 
 use abs_path::AbsPath;
-use ed::notify::{self, MaybeResult};
-use ed::shared::Shared;
-use ed::{AgentId, ApiValue, BaseEditor, BorrowState, Context, Edit, Editor};
+use editor::notify::{self, MaybeResult};
+use editor::{
+    AgentId,
+    ApiValue,
+    BaseEditor,
+    BorrowState,
+    Context,
+    Edit,
+    Editor,
+    Shared,
+};
 use executor::BackgroundSpawner;
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};

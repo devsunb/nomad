@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use ed::{Key, MapAccess, Value, notify};
+use editor::{Key, MapAccess, Value, notify};
 
 use crate::oxi::{self, Dictionary, Object, ObjectKind, lua};
 

@@ -10,7 +10,7 @@ use collab_project::fs::{File, FileMut, FsOp, Node, NodeMut};
 use collab_project::text::{CursorId, SelectionId, TextReplacement};
 use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
 use compact_str::format_compact;
-use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
+use editor::{AgentId, Buffer, Context, Editor, Shared, notify};
 use fs::{File as _, Fs, Symlink as _};
 use fxhash::{FxHashMap, FxHashSet};
 use puff::directory::LocalDirectoryId;

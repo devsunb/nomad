@@ -1,4 +1,4 @@
-use ed::notify;
+use editor::notify;
 
 use crate::oxi::api::types::LogLevel;
 

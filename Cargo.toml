@@ -67,7 +67,7 @@ auth = { path = "./crates/auth" }
 clipboard = { path = "./crates/clipboard" }
 collab = { path = "./crates/collab" }
 collab-project = { path = "./crates/collab-project" }
-ed = { path = "./crates/ed" }
+editor = { path = "./crates/editor" }
 executor = { path = "./crates/executor" }
 fs = { path = "./crates/fs" }
 gitignore = { path = "./crates/gitignore" }

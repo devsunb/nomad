@@ -1,7 +1,7 @@
-use ed::action::Action;
-use ed::command::ToCompletionFn;
-use ed::notify::{Message, Name};
-use ed::{Borrowed, Context, Editor};
+use editor::action::Action;
+use editor::command::ToCompletionFn;
+use editor::notify::{Message, Name};
+use editor::{Borrowed, Context, Editor};
 
 use crate::VERSION;
 

@@ -1,5 +1,5 @@
 use auth_types::AuthInfos;
-use ed::{Borrowed, Context};
+use editor::{Borrowed, Context};
 use neovim::Neovim;
 
 use crate::AuthEditor;

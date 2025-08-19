@@ -2,7 +2,7 @@ use core::ops::Range;
 use std::collections::hash_map;
 
 use compact_str::CompactString;
-use ed::Shared;
+use editor::Shared;
 use nohash::IntMap as NoHashMap;
 use slotmap::SlotMap;
 

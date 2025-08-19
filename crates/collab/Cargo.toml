@@ -27,7 +27,7 @@ collab-server = { workspace = true, features = ["client"] }
 collab-types = { workspace = true }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
-ed = { workspace = true }
+editor = { workspace = true }
 executor = { workspace = true }
 either = { workspace = true }
 fastrand = { workspace = true }

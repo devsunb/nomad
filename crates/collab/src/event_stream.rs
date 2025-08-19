@@ -1,5 +1,5 @@
 use abs_path::AbsPathBuf;
-use ed::{AgentId, Buffer, Context, Cursor, Selection, Shared};
+use editor::{AgentId, Buffer, Context, Cursor, Selection, Shared};
 use fs::filter::Filter;
 use fs::{Directory, File, Fs};
 use futures_util::future::FusedFuture;

@@ -1,4 +1,4 @@
-use ed::Editor;
+use editor::Editor;
 use mock::Mock;
 use mock::fs::MockFs;
 
@@ -6,7 +6,7 @@ mod ed_cursor {
     //! Contains the editor-agnostic cursor tests.
 
     use super::*;
-    use crate::ed::cursor;
+    use crate::editor::cursor;
 
     #[test]
     fn on_cursor_created_1() {

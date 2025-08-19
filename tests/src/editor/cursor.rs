@@ -1,11 +1,19 @@
 use core::mem;
 use core::time::Duration;
 
-use ed::{AgentId, Buffer, ByteOffset, Context, Cursor, Editor, Replacement};
+use editor::{
+    AgentId,
+    Buffer,
+    ByteOffset,
+    Context,
+    Cursor,
+    Editor,
+    Replacement,
+};
 use futures_util::stream::{FusedStream, StreamExt};
 use futures_util::{FutureExt, select_biased};
 
-use crate::ed::{ContextExt, TestEditor};
+use crate::editor::{ContextExt, TestEditor};
 
 pub(crate) async fn on_cursor_created_1(ctx: &mut Context<impl TestEditor>) {
     let agent_id = ctx.new_agent_id();

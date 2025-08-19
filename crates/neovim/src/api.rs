@@ -1,8 +1,8 @@
 //! TODO: docs.
 
-use ed::command::{CommandArgs, CommandCompletion};
-use ed::notify::Name;
-use ed::{Api, ByteOffset};
+use editor::command::{CommandArgs, CommandCompletion};
+use editor::notify::Name;
+use editor::{Api, ByteOffset};
 
 use crate::oxi::{Dictionary, Function, Object, api};
 use crate::value::NeovimValue;

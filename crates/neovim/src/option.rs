@@ -2,7 +2,7 @@ use core::marker::PhantomData;
 use core::mem;
 use core::ops::Deref;
 
-use ed::{AgentId, Buffer, Shared};
+use editor::{AgentId, Buffer, Shared};
 
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{

@@ -9,8 +9,8 @@ use abs_path::{AbsPath, AbsPathBuf};
 pub use collab_server::test::TestSessionId as MockSessionId;
 use collab_types::Peer;
 use duplex_stream::{DuplexStream, duplex};
-use ed::notify::{self, MaybeResult};
-use ed::{
+use editor::notify::{self, MaybeResult};
+use editor::{
     AgentId,
     ApiValue,
     BaseEditor,

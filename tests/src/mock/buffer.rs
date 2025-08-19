@@ -1,4 +1,4 @@
-use ed::Editor;
+use editor::Editor;
 use mock::Mock;
 use mock::fs::MockFs;
 
@@ -6,7 +6,7 @@ mod ed_buffer {
     //! Contains the editor-agnostic buffer tests.
 
     use super::*;
-    use crate::ed::buffer;
+    use crate::editor::buffer;
 
     #[test]
     fn fuzz_edits_10e1() {

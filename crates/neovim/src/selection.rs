@@ -2,7 +2,7 @@
 
 use core::ops::Range;
 
-use ed::{AgentId, Buffer, ByteOffset, Selection, Shared};
+use editor::{AgentId, Buffer, ByteOffset, Selection, Shared};
 
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{EventHandle, Events};

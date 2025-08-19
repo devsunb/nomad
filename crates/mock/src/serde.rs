@@ -1,4 +1,4 @@
-use ed::notify;
+use editor::notify;
 use serde::{Deserialize, Serialize};
 
 use crate::value::Value;

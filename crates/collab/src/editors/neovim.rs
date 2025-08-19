@@ -7,7 +7,7 @@ use std::{env, io};
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
 use collab_types::Peer;
 use collab_types::nomad::ulid;
-use ed::{ByteOffset, Context, Editor, notify};
+use editor::{ByteOffset, Context, Editor, notify};
 use executor::Executor;
 use fs::Directory;
 use mlua::{Function, Table};

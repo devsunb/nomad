@@ -2,9 +2,17 @@ use core::fmt;
 
 use ::serde::{Deserialize, Serialize};
 use abs_path::AbsPath;
-use ed::notify::Namespace;
-use ed::plugin::Plugin;
-use ed::{AgentId, BaseEditor, BorrowState, Buffer, Context, Editor, Shared};
+use editor::notify::Namespace;
+use editor::plugin::Plugin;
+use editor::{
+    AgentId,
+    BaseEditor,
+    BorrowState,
+    Buffer,
+    Context,
+    Editor,
+    Shared,
+};
 use fs::Fs;
 
 use crate::buffer::{
@@ -350,11 +358,11 @@ impl AsMut<Self> for Neovim {
     }
 }
 
-impl ed::notify::Error for CreateBufferError {
-    fn to_message(&self) -> (ed::notify::Level, ed::notify::Message) {
+impl editor::notify::Error for CreateBufferError {
+    fn to_message(&self) -> (editor::notify::Level, editor::notify::Message) {
         (
-            ed::notify::Level::Error,
-            ed::notify::Message::from_display(&self.inner),
+            editor::notify::Level::Error,
+            editor::notify::Message::from_display(&self.inner),
         )
     }
 }

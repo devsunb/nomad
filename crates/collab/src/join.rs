@@ -15,11 +15,11 @@ use collab_project::fs::{
 };
 use collab_server::client as collab_client;
 use collab_types::{Message, Peer, ProjectRequest, puff};
-use ed::Context;
-use ed::action::AsyncAction;
-use ed::command::{self, ToCompletionFn};
-use ed::notify::{self, Name};
-use ed::shared::{MultiThreaded, Shared};
+use editor::Context;
+use editor::action::AsyncAction;
+use editor::command::{self, ToCompletionFn};
+use editor::notify::{self, Name};
+use editor::shared::{MultiThreaded, Shared};
 use fs::{Directory, File, Fs, Symlink};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
 use fxhash::FxHashMap;

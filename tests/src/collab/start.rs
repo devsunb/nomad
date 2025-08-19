@@ -3,7 +3,7 @@ use auth::Auth;
 use collab::Collab;
 use collab::mock::{CollabMock, CollabServer, MockSessionId};
 use collab::start::StartError;
-use ed::action::AsyncAction;
+use editor::action::AsyncAction;
 use futures_lite::future::{self, FutureExt};
 use mock::{EditorExt, Mock};
 

@@ -2,7 +2,7 @@ use std::io;
 
 use collab_server::client as collab_client;
 use collab_types::Message;
-use ed::{Context, notify};
+use editor::{Context, notify};
 use flume::Receiver;
 use fs::filter::Filter;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};

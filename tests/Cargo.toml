@@ -26,7 +26,7 @@ neovim-nightly = ["neovim", "neovim/nightly"]
 abs-path = { workspace = true, features = ["macros"] }
 async-io = { workspace = true }
 cauchy = { workspace = true }
-ed = { workspace = true }
+editor = { workspace = true }
 executor = { workspace = true }
 flume = { workspace = true }
 fs = { workspace = true }

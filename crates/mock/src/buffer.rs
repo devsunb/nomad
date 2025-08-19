@@ -2,7 +2,7 @@ use core::ops::{Deref, DerefMut, Range};
 use std::borrow::Cow;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use ed::{
+use editor::{
     self,
     AgentId,
     Buffer as _,
@@ -226,7 +226,7 @@ impl SelectionInner {
     }
 }
 
-impl<'a> ed::Buffer for Buffer<'a> {
+impl<'a> editor::Buffer for Buffer<'a> {
     type Editor = mock::Mock;
 
     fn byte_len(&self) -> ByteOffset {
@@ -340,7 +340,7 @@ impl<'a> ed::Buffer for Buffer<'a> {
     fn save(
         &mut self,
         _agent_id: AgentId,
-    ) -> Result<(), <Self::Editor as ed::Editor>::BufferSaveError> {
+    ) -> Result<(), <Self::Editor as editor::Editor>::BufferSaveError> {
         todo!()
     }
 }
@@ -359,7 +359,7 @@ impl DerefMut for Buffer<'_> {
     }
 }
 
-impl ed::Cursor for Cursor<'_> {
+impl editor::Cursor for Cursor<'_> {
     type Editor = mock::Mock;
 
     fn buffer_id(&self) -> BufferId {
@@ -435,7 +435,7 @@ impl DerefMut for Cursor<'_> {
     }
 }
 
-impl ed::Selection for Selection<'_> {
+impl editor::Selection for Selection<'_> {
     type Editor = mock::Mock;
 
     fn buffer_id(&self) -> BufferId {

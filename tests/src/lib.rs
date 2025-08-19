@@ -5,7 +5,7 @@
 #![allow(clippy::unwrap_used)]
 #![cfg_attr(not(test), allow(dead_code, unused_imports))]
 
-mod ed;
+mod editor;
 mod fs;
 mod utils;
 

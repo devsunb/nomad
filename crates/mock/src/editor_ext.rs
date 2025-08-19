@@ -1,6 +1,6 @@
 use core::mem;
 
-use ed::{Context, Editor};
+use editor::{Context, Editor};
 use executor::BackgroundSpawner;
 use futures_lite::future;
 

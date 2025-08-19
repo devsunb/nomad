@@ -1,11 +1,11 @@
 use core::time::Duration;
 
-use ed::Context;
+use editor::Context;
 use futures_util::{FutureExt, StreamExt, select_biased};
 use neovim::Neovim;
 use neovim::tests::ContextExt;
 
-use crate::ed::selection::SelectionEvent;
+use crate::editor::selection::SelectionEvent;
 
 #[neovim::test]
 async fn charwise_simple(ctx: &mut Context<Neovim>) {

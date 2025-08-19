@@ -12,7 +12,7 @@ collab = ["dep:collab", "dep:gitignore", "dep:real-fs"]
 [dependencies]
 abs-path = { workspace = true }
 criterion = { workspace = true }
-ed = { workspace = true }
+editor = { workspace = true }
 fs = { workspace = true }
 futures-lite = { workspace = true }
 mock = { workspace = true }

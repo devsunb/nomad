@@ -1,7 +1,7 @@
 use core::fmt;
 
-use ed::module::Constant;
-use ed::notify::Name;
+use editor::module::Constant;
+use editor::notify::Name;
 
 use crate::generated;
 

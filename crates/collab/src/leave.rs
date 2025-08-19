@@ -2,10 +2,10 @@
 
 use std::collections::hash_map::Entry;
 
-use ed::action::AsyncAction;
-use ed::command::ToCompletionFn;
-use ed::notify::Name;
-use ed::{Context, Shared};
+use editor::action::AsyncAction;
+use editor::command::ToCompletionFn;
+use editor::notify::Name;
+use editor::{Context, Shared};
 use flume::{Receiver, Sender};
 use fxhash::FxHashMap;
 

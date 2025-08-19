@@ -2,7 +2,7 @@
 
 use core::fmt;
 
-use ed::notify::{self, Namespace};
+use editor::notify::{self, Namespace};
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 

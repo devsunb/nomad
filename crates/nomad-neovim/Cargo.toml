@@ -18,7 +18,7 @@ abs-path = { workspace = true, features = ["macros"] }
 auth = { workspace = true, features = ["neovim"] }
 cauchy = { workspace = true }
 collab = { workspace = true, features = ["neovim"] }
-ed = { workspace = true }
+editor = { workspace = true }
 either = { workspace = true }
 neovim = { workspace = true, features = ["tracing"] }
 tracing = { workspace = true }

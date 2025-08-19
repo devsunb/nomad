@@ -4,7 +4,7 @@ pub(crate) trait Convert<T> {
     fn convert(self) -> T;
 }
 
-impl Convert<collab_project::text::TextReplacement> for ed::Replacement {
+impl Convert<collab_project::text::TextReplacement> for editor::Replacement {
     fn convert(self) -> collab_project::text::TextReplacement {
         collab_project::text::TextReplacement {
             deleted_range: self.removed_range(),
@@ -13,8 +13,8 @@ impl Convert<collab_project::text::TextReplacement> for ed::Replacement {
     }
 }
 
-impl Convert<ed::Replacement> for collab_project::text::TextReplacement {
-    fn convert(self) -> ed::Replacement {
-        ed::Replacement::new(self.deleted_range, &*self.inserted_text)
+impl Convert<editor::Replacement> for collab_project::text::TextReplacement {
+    fn convert(self) -> editor::Replacement {
+        editor::Replacement::new(self.deleted_range, &*self.inserted_text)
     }
 }

@@ -5,8 +5,8 @@ use core::task::{Context, Poll};
 
 use abs_path::{AbsPath, AbsPathBuf, NodeName, NodeNameBuf, node};
 use cauchy::PartialEq;
-use ed::ByteOffset;
-use ed::shared::{MultiThreaded, Shared};
+use editor::ByteOffset;
+use editor::shared::{MultiThreaded, Shared};
 use fs::{Directory, DirectoryEvent, FileEvent, Fs, NodeKind};
 use futures_lite::Stream;
 use indexmap::IndexMap;

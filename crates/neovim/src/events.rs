@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash};
 use std::rc::Rc;
 
-use ed::{AgentId, Edit, Shared};
+use editor::{AgentId, Edit, Shared};
 use nohash::IntMap as NoHashMap;
 use slotmap::SlotMap;
 use smallvec::{SmallVec, smallvec_inline};

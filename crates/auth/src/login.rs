@@ -1,10 +1,10 @@
 //! TODO: docs.
 
 use auth_types::{AuthInfos, GitHubHandle};
-use ed::action::AsyncAction;
-use ed::command::ToCompletionFn;
-use ed::notify::{self, Name};
-use ed::{Context, Shared};
+use editor::action::AsyncAction;
+use editor::command::ToCompletionFn;
+use editor::notify::{self, Name};
+use editor::{Context, Shared};
 
 use crate::credential_store::{self, CredentialStore};
 use crate::{Auth, AuthEditor};

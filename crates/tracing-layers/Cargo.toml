@@ -13,7 +13,7 @@ file-appender = ["dep:tracing-appender", "tracing-subscriber/chrono"]
 [dependencies]
 abs-path = { workspace = true }
 cauchy = { workspace = true }
-ed = { workspace = true }
+editor = { workspace = true }
 fs = { workspace = true }
 real-fs = { workspace = true }
 tracing = { workspace = true }

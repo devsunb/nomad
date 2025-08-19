@@ -6,7 +6,7 @@ mod neovim;
 use core::fmt::Debug;
 
 use auth_types::AuthInfos;
-use ed::{Borrowed, Context, Editor, notify};
+use editor::{Borrowed, Context, Editor, notify};
 
 /// TODO: docs.
 pub trait AuthEditor: Editor {

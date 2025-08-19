@@ -2,7 +2,7 @@ use core::error::Error;
 use core::fmt;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use ed::notify;
+use editor::notify;
 use fs::{Directory, File, MetadataNameError, Symlink};
 use futures_util::select;
 use futures_util::stream::{self, StreamExt};

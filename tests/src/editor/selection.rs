@@ -1,7 +1,7 @@
 use core::mem;
 use core::ops::Range;
 
-use ed::{Buffer, Context, Editor, Selection};
+use editor::{Buffer, Context, Editor, Selection};
 use futures_util::stream::FusedStream;
 
 #[derive(Debug, PartialEq, Eq)]

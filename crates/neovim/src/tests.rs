@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use ed::{BorrowState, Context};
+use editor::{BorrowState, Context};
 
 use crate::Neovim;
 use crate::oxi::api;
@@ -41,7 +41,7 @@ pub trait ContextExt {
     }
 }
 
-impl<Bs: BorrowState> ContextExt for ed::Context<Neovim, Bs> {}
+impl<Bs: BorrowState> ContextExt for editor::Context<Neovim, Bs> {}
 
 #[doc(hidden)]
 pub mod test_macro {
@@ -54,7 +54,7 @@ pub mod test_macro {
     use std::panic;
     use std::sync::Arc;
 
-    use ed::Editor;
+    use editor::Editor;
 
     use super::*;
     use crate::oxi;

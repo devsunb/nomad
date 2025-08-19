@@ -3,10 +3,10 @@
 use core::error::Error;
 
 use abs_path::{AbsPathBuf, NodeName, node};
-use ed::module::{ApiCtx, Empty, Module};
-use ed::notify::Name;
-use ed::plugin::{PanicInfo, Plugin};
-use ed::{Borrowed, Context};
+use editor::module::{ApiCtx, Empty, Module};
+use editor::notify::Name;
+use editor::plugin::{PanicInfo, Plugin};
+use editor::{Borrowed, Context};
 use either::Either;
 use neovim::Neovim;
 use neovim::notify::ContextExt;

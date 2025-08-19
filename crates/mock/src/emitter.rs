@@ -1,4 +1,4 @@
-use ed::notify::{self, NotificationId};
+use editor::notify::{self, NotificationId};
 
 #[derive(Default)]
 pub struct Emitter {
