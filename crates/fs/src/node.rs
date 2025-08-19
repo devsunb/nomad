@@ -2,53 +2,53 @@ use abs_path::AbsPath;
 
 use crate::{Directory, File, NodeKind, Symlink};
 
-/// TODO: docs.
+/// A node in a file system tree.
 #[derive(cauchy::Debug, cauchy::PartialEq)]
-pub enum FsNode<Fs: crate::Fs> {
-    /// TODO: docs.
+pub enum Node<Fs: crate::Fs> {
+    /// A file node.
     File(Fs::File),
 
-    /// TODO: docs.
+    /// A directory node.
     Directory(Fs::Directory),
 
-    /// TODO: docs.
+    /// A symlink node.
     Symlink(Fs::Symlink),
 }
 
-/// TODO: docs.
+/// The type of error that can occur when deleting a node in a file system.
 #[derive(
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
 #[display("{_0}")]
 pub enum NodeDeleteError<Fs: crate::Fs> {
-    /// TODO: docs.
+    /// Deleting a file failed.
     File(<Fs::File as File>::DeleteError),
 
-    /// TODO: docs.
+    /// Deleting a directory failed..
     Directory(<Fs::Directory as Directory>::DeleteError),
 
-    /// TODO: docs.
+    /// Deleting a symling failed.
     Symlink(<Fs::Symlink as Symlink>::DeleteError),
 }
 
-/// TODO: docs.
+/// The type of error that can occur when moving a node in a file system.
 #[derive(
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
 #[display("{_0}")]
 pub enum NodeMoveError<Fs: crate::Fs> {
-    /// TODO: docs.
+    /// Moving a file failed.
     File(<Fs::File as File>::MoveError),
 
-    /// TODO: docs.
+    /// Moving a directory failed.
     Directory(<Fs::Directory as Directory>::MoveError),
 
-    /// TODO: docs.
+    /// Moving a symlink failed.
     Symlink(<Fs::Symlink as Symlink>::MoveError),
 }
 
-impl<Fs: crate::Fs> FsNode<Fs> {
-    /// TODO: docs.
+impl<Fs: crate::Fs> Node<Fs> {
+    /// Deletes this file system node.
     #[inline]
     pub async fn delete(self) -> Result<(), NodeDeleteError<Fs>> {
         match self {
@@ -64,7 +64,7 @@ impl<Fs: crate::Fs> FsNode<Fs> {
         }
     }
 
-    /// TODO: docs.
+    /// Returns the node's ID.
     #[inline]
     pub fn id(&self) -> Fs::NodeId {
         match self {
@@ -74,19 +74,19 @@ impl<Fs: crate::Fs> FsNode<Fs> {
         }
     }
 
-    /// TODO: docs.
+    /// Returns whether the node is a [`Directory`](Self::Directory).
     #[inline]
     pub fn is_dir(&self) -> bool {
         self.kind().is_dir()
     }
 
-    /// TODO: docs.
+    /// Returns whether the node is a [`File`](Self::File).
     #[inline]
     pub fn is_file(&self) -> bool {
         self.kind().is_file()
     }
 
-    /// TODO: docs.
+    /// Returns the node's kind.
     #[inline]
     pub fn kind(&self) -> NodeKind {
         match self {
@@ -96,7 +96,7 @@ impl<Fs: crate::Fs> FsNode<Fs> {
         }
     }
 
-    /// TODO: docs.
+    /// Returns the node's metadata.
     #[inline]
     pub fn meta(&self) -> Fs::Metadata {
         match self {
@@ -106,7 +106,7 @@ impl<Fs: crate::Fs> FsNode<Fs> {
         }
     }
 
-    /// TODO: docs.
+    /// Moves the node to the given path.
     #[inline]
     pub async fn r#move(
         &self,
@@ -125,7 +125,7 @@ impl<Fs: crate::Fs> FsNode<Fs> {
         }
     }
 
-    /// TODO: docs.
+    /// Returns the node's path in the file system.
     #[inline]
     pub fn path(&self) -> &AbsPath {
         match self {
@@ -135,7 +135,11 @@ impl<Fs: crate::Fs> FsNode<Fs> {
         }
     }
 
-    /// TODO: docs.
+    /// Returns the node as a [`Directory`](Self::Directory).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is not a [`Directory`](Self::Directory).
     #[track_caller]
     #[inline]
     pub fn unwrap_directory(self) -> Fs::Directory {
@@ -145,7 +149,11 @@ impl<Fs: crate::Fs> FsNode<Fs> {
         }
     }
 
-    /// TODO: docs.
+    /// Returns the node as a [`File`](Self::File).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is not a [`File`](Self::File).
     #[track_caller]
     #[inline]
     pub fn unwrap_file(self) -> Fs::File {
@@ -155,7 +163,11 @@ impl<Fs: crate::Fs> FsNode<Fs> {
         }
     }
 
-    /// TODO: docs.
+    /// Returns the node as a [`Symlink`](Self::Symlink).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is not a [`Symlink`](Self::Symlink).
     #[track_caller]
     #[inline]
     pub fn unwrap_symlink(self) -> Fs::Symlink {

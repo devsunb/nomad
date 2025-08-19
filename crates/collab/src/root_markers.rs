@@ -80,14 +80,14 @@ impl<M> FindRootArgs<'_, M> {
 
         let mut dir = loop {
             match node {
-                fs::FsNode::Directory(dir) => break dir,
-                fs::FsNode::File(file) => {
+                fs::Node::Directory(dir) => break dir,
+                fs::Node::File(file) => {
                     break file
                         .parent()
                         .await
                         .map_err(FindRootError::FileParent)?;
                 },
-                fs::FsNode::Symlink(symlink) => {
+                fs::Node::Symlink(symlink) => {
                     node = symlink
                         .follow_recursively()
                         .await

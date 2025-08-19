@@ -15,9 +15,9 @@ use crate::{
     File,
     FileEvent,
     Fs,
-    FsNode,
     Metadata,
     MetadataNameError,
+    Node,
     NodeKind,
     Symlink,
 };
@@ -125,7 +125,7 @@ impl Fs for OsFs {
     async fn node_at_path<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
-    ) -> Result<Option<FsNode<Self>>, Self::NodeAtPathError> {
+    ) -> Result<Option<Node<Self>>, Self::NodeAtPathError> {
         let path = path.as_ref();
         let metadata = match async_fs::symlink_metadata(path).await {
             Ok(metadata) => metadata,
@@ -136,17 +136,17 @@ impl Fs for OsFs {
             return Ok(None);
         };
         Ok(Some(match file_type {
-            NodeKind::File => FsNode::File(OsFile {
+            NodeKind::File => Node::File(OsFile {
                 file: None,
                 metadata,
                 path: path.to_owned(),
             }),
-            NodeKind::Directory => FsNode::Directory(OsDirectory {
+            NodeKind::Directory => Node::Directory(OsDirectory {
                 metadata,
                 path: path.to_owned(),
             }),
             NodeKind::Symlink => {
-                FsNode::Symlink(OsSymlink { metadata, path: path.to_owned() })
+                Node::Symlink(OsSymlink { metadata, path: path.to_owned() })
             },
         }))
     }
@@ -402,7 +402,7 @@ impl Symlink for OsSymlink {
     }
 
     #[inline]
-    async fn follow(&self) -> Result<Option<FsNode<OsFs>>, Self::FollowError> {
+    async fn follow(&self) -> Result<Option<Node<OsFs>>, Self::FollowError> {
         let target_path = async_fs::read_link(&*self.path).await?;
         let path = <&AbsPath>::try_from(&*target_path)
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
@@ -412,7 +412,7 @@ impl Symlink for OsSymlink {
     #[inline]
     async fn follow_recursively(
         &self,
-    ) -> Result<Option<FsNode<OsFs>>, Self::FollowError> {
+    ) -> Result<Option<Node<OsFs>>, Self::FollowError> {
         let target_path = async_fs::canonicalize(&*self.path).await?;
         let path = <&AbsPath>::try_from(&*target_path)
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;

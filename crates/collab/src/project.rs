@@ -11,7 +11,7 @@ use collab_project::text::{CursorId, SelectionId, TextReplacement};
 use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
 use compact_str::format_compact;
 use ed::{AgentId, Buffer, Context, Editor, Shared, notify};
-use fs::{File as _, Fs, FsNode, Symlink as _};
+use fs::{File as _, Fs, Symlink as _};
 use fxhash::{FxHashMap, FxHashSet};
 use puff::directory::LocalDirectoryId;
 use puff::file::{GlobalFileId, LocalFileId};
@@ -315,13 +315,13 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
             };
 
             let mut file = match node {
-                FsNode::File(file) => file,
-                FsNode::Directory(_) => {
+                fs::Node::File(file) => file,
+                fs::Node::Directory(_) => {
                     return Err(IntegrateBinaryEditError::DirectoryAtPath(
                         file_path,
                     ));
                 },
-                FsNode::Symlink(_) => {
+                fs::Node::Symlink(_) => {
                     return Err(IntegrateBinaryEditError::SymlinkAtPath(
                         file_path,
                     ));
@@ -1709,9 +1709,9 @@ trait FsExt: fs::Fs {
             };
 
             Ok(Some(match &node {
-                fs::FsNode::Directory(_) => FsNodeContents::Directory,
+                fs::Node::Directory(_) => FsNodeContents::Directory,
 
-                fs::FsNode::File(file) => {
+                fs::Node::File(file) => {
                     let contents = file
                         .read()
                         .await
@@ -1723,7 +1723,7 @@ trait FsExt: fs::Fs {
                     }
                 },
 
-                fs::FsNode::Symlink(symlink) => symlink
+                fs::Node::Symlink(symlink) => symlink
                     .read_path()
                     .await
                     .map(FsNodeContents::Symlink)

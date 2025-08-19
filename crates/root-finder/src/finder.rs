@@ -28,11 +28,11 @@ impl<Fs: fs::Fs> Finder<Fs> {
             .ok_or(FindRootError::StartPathNotFound)?;
 
         let mut dir = match node {
-            fs::FsNode::Directory(dir) => dir,
-            fs::FsNode::File(file) => {
+            fs::Node::Directory(dir) => dir,
+            fs::Node::File(file) => {
                 file.parent().await.map_err(FindRootError::FileParent)?
             },
-            fs::FsNode::Symlink(symlink) => {
+            fs::Node::Symlink(symlink) => {
                 symlink.parent().await.map_err(FindRootError::SymlinkParent)?
             },
         };

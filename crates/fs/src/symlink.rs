@@ -2,7 +2,7 @@ use core::error::Error;
 
 use abs_path::{AbsPath, NodeName};
 
-use crate::{Fs, FsNode, Metadata};
+use crate::{Fs, Metadata, Node};
 
 /// TODO: docs.
 pub trait Symlink: Send + Sync {
@@ -32,16 +32,14 @@ pub trait Symlink: Send + Sync {
     /// TODO: docs.
     fn follow(
         &self,
-    ) -> impl Future<
-        Output = Result<Option<FsNode<Self::Fs>>, Self::FollowError>,
-    > + Send;
+    ) -> impl Future<Output = Result<Option<Node<Self::Fs>>, Self::FollowError>>
+    + Send;
 
     /// TODO: docs.
     fn follow_recursively(
         &self,
-    ) -> impl Future<
-        Output = Result<Option<FsNode<Self::Fs>>, Self::FollowError>,
-    > + Send;
+    ) -> impl Future<Output = Result<Option<Node<Self::Fs>>, Self::FollowError>>
+    + Send;
 
     /// TODO: docs.
     #[inline]

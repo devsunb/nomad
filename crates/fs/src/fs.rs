@@ -5,7 +5,7 @@ use core::hash::Hash;
 
 use abs_path::{AbsPath, AbsPathBuf};
 
-use crate::{Directory, File, FsNode, Metadata, Symlink};
+use crate::{Directory, File, Metadata, Node, Symlink};
 
 /// TODO: docs.
 pub trait Fs: Clone + Send + Sync + 'static {
@@ -45,9 +45,8 @@ pub trait Fs: Clone + Send + Sync + 'static {
     fn node_at_path<P: AsRef<AbsPath> + Send>(
         &self,
         path: P,
-    ) -> impl Future<
-        Output = Result<Option<FsNode<Self>>, Self::NodeAtPathError>,
-    > + Send;
+    ) -> impl Future<Output = Result<Option<Node<Self>>, Self::NodeAtPathError>>
+    + Send;
 
     /// TODO: docs.
     fn now(&self) -> Self::Timestamp;
@@ -119,9 +118,9 @@ pub trait Fs: Clone + Send + Sync + 'static {
                 .map_err(GetDirError::GetNode)?
                 .ok_or_else(|| GetDirError::NoNodeAtPath(path.to_owned()))?
             {
-                FsNode::File(file) => Err(GetDirError::GotFile(file)),
-                FsNode::Directory(dir) => Ok(dir),
-                FsNode::Symlink(symlink) => {
+                Node::File(file) => Err(GetDirError::GotFile(file)),
+                Node::Directory(dir) => Ok(dir),
+                Node::Symlink(symlink) => {
                     Err(GetDirError::GotSymlink(symlink))
                 },
             }
@@ -164,9 +163,9 @@ pub trait Fs: Clone + Send + Sync + 'static {
                 .map_err(ReadFileError::NodeAtPath)?
                 .ok_or_else(|| ReadFileError::NoNodeAtPath(path.to_owned()))?
             {
-                FsNode::File(file) => Some(file),
-                FsNode::Directory(_) => None,
-                FsNode::Symlink(symlink) => {
+                Node::File(file) => Some(file),
+                Node::Directory(_) => None,
+                Node::Symlink(symlink) => {
                     match symlink
                         .follow_recursively()
                         .await
@@ -174,8 +173,8 @@ pub trait Fs: Clone + Send + Sync + 'static {
                         .ok_or_else(|| {
                             ReadFileError::NoNodeAtPath(path.to_owned())
                         })? {
-                        FsNode::File(file) => Some(file),
-                        FsNode::Directory(_) => None,
+                        Node::File(file) => Some(file),
+                        Node::Directory(_) => None,
                         _ => unreachable!(
                             "recursively following a symlink cannot resolve \
                              to another symlink"

@@ -619,7 +619,7 @@ impl fs::Fs for MockFs {
             };
 
             match node {
-                fs::FsNode::Directory(dir) => break dir,
+                fs::Node::Directory(dir) => break dir,
                 other => {
                     return Err(CreateNodeError::AlreadyExists(
                         NodeAlreadyExistsError {
@@ -648,25 +648,25 @@ impl fs::Fs for MockFs {
     async fn node_at_path<P: AsRef<AbsPath>>(
         &self,
         path: P,
-    ) -> Result<Option<fs::FsNode<Self>>, Self::NodeAtPathError> {
+    ) -> Result<Option<fs::Node<Self>>, Self::NodeAtPathError> {
         let path = path.as_ref();
         Ok(self.with_inner(|inner| {
             inner.node_at_path(path).map(|node| {
                 let metadata = node.metadata().clone();
                 match metadata.node_kind {
-                    NodeKind::File => fs::FsNode::File(MockFile {
+                    NodeKind::File => fs::Node::File(MockFile {
                         fs: self.clone(),
                         metadata,
                         path: path.to_owned(),
                     }),
                     NodeKind::Directory => {
-                        fs::FsNode::Directory(MockDirectory {
+                        fs::Node::Directory(MockDirectory {
                             fs: self.clone(),
                             metadata,
                             path: path.to_owned(),
                         })
                     },
-                    NodeKind::Symlink => fs::FsNode::Symlink(MockSymlink {
+                    NodeKind::Symlink => fs::Node::Symlink(MockSymlink {
                         fs: self.clone(),
                         metadata,
                         path: path.to_owned(),
@@ -749,7 +749,7 @@ impl fs::Directory for MockDirectory {
     }
 
     async fn list_metas(&self) -> Result<ReadDir, Self::ListError> {
-        let fs::FsNode::Directory(dir_handle) = self
+        let fs::Node::Directory(dir_handle) = self
             .fs
             .node_at_path(&*self.path)
             .await?
@@ -775,7 +775,7 @@ impl fs::Directory for MockDirectory {
         let Some(parent_path) = self.path.parent() else { return Ok(None) };
         let Ok(maybe_node) = self.fs.node_at_path(parent_path).await;
         match maybe_node.expect("parent must exist") {
-            fs::FsNode::Directory(parent) => Ok(Some(parent)),
+            fs::Node::Directory(parent) => Ok(Some(parent)),
             other => Err(GetNodeError::WrongKind {
                 expected: NodeKind::Directory,
                 actual: other.kind(),
@@ -826,7 +826,7 @@ impl fs::File for MockFile {
         let parent_path = self.path.parent().expect("can't be root");
         let Ok(maybe_node) = self.fs.node_at_path(parent_path).await;
         match maybe_node.expect("parent must exist") {
-            fs::FsNode::Directory(parent) => Ok(parent),
+            fs::Node::Directory(parent) => Ok(parent),
             other => Err(GetNodeError::WrongKind {
                 expected: NodeKind::Directory,
                 actual: other.kind(),
@@ -881,7 +881,7 @@ impl fs::Symlink for MockSymlink {
 
     async fn follow(
         &self,
-    ) -> Result<Option<fs::FsNode<MockFs>>, Self::FollowError> {
+    ) -> Result<Option<fs::Node<MockFs>>, Self::FollowError> {
         use std::path::MAIN_SEPARATOR;
 
         let target_path = self.read_path().await?;
@@ -921,7 +921,7 @@ impl fs::Symlink for MockSymlink {
 
     async fn follow_recursively(
         &self,
-    ) -> Result<Option<fs::FsNode<MockFs>>, Self::FollowError> {
+    ) -> Result<Option<fs::Node<MockFs>>, Self::FollowError> {
         let mut symlink = Self {
             fs: self.fs.clone(),
             metadata: self.metadata.clone(),
@@ -930,7 +930,7 @@ impl fs::Symlink for MockSymlink {
         loop {
             let Some(node) = symlink.follow().await? else { return Ok(None) };
             match node {
-                fs::FsNode::Symlink(new_symlink) => symlink = new_symlink,
+                fs::Node::Symlink(new_symlink) => symlink = new_symlink,
                 other => return Ok(Some(other)),
             }
         }
@@ -951,7 +951,7 @@ impl fs::Symlink for MockSymlink {
         let parent_path = self.path.parent().expect("can't be root");
         let Ok(maybe_node) = self.fs.node_at_path(parent_path).await;
         match maybe_node.expect("parent must exist") {
-            fs::FsNode::Directory(parent) => Ok(parent),
+            fs::Node::Directory(parent) => Ok(parent),
             other => Err(GetNodeError::WrongKind {
                 expected: NodeKind::Directory,
                 actual: other.kind(),

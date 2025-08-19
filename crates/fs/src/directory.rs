@@ -4,7 +4,7 @@ use abs_path::{AbsPath, AbsPathBuf, NodeName};
 use futures_util::stream::{self, Stream, StreamExt};
 use futures_util::{FutureExt, pin_mut, select_biased};
 
-use crate::{File, Fs, FsNode, Metadata, MetadataNameError, Symlink};
+use crate::{File, Fs, Metadata, MetadataNameError, Node, Symlink};
 
 /// TODO: docs.
 pub trait Directory: Send + Sync + Sized {
@@ -135,7 +135,7 @@ pub trait Directory: Send + Sync + Sized {
         &self,
     ) -> impl Future<
         Output = Result<
-            impl Stream<Item = Result<FsNode<Self::Fs>, ReadNodeError<Self::Fs>>>
+            impl Stream<Item = Result<Node<Self::Fs>, ReadNodeError<Self::Fs>>>
             + Send,
             Self::ListError,
         >,
@@ -362,7 +362,7 @@ pub enum ReplicateError<Dst: Fs, Src: Fs> {
 #[inline]
 async fn replicate_node<Dst: Directory, Src: Fs>(
     dst_dir: &Dst,
-    src_node: &FsNode<Src>,
+    src_node: &Node<Src>,
 ) -> Result<(), ReplicateError<Dst::Fs, Src>>
 where
     <Dst::Fs as Fs>::Directory: Directory<
@@ -373,7 +373,7 @@ where
     Src::Directory: AsRef<Src>,
 {
     match src_node {
-        FsNode::Directory(src_dir) => {
+        Node::Directory(src_dir) => {
             let src_dir_name = src_dir.name().expect("dir is not root");
 
             let dst_dir = dst_dir
@@ -383,7 +383,7 @@ where
 
             dst_dir.replicate_from(src_dir).boxed().await?;
         },
-        FsNode::File(src_file) => {
+        Node::File(src_file) => {
             let mut dst_file = dst_dir
                 .create_file(src_file.name())
                 .await
@@ -397,7 +397,7 @@ where
                 .await
                 .map_err(ReplicateError::WriteFile)?;
         },
-        FsNode::Symlink(src_symlink) => {
+        Node::Symlink(src_symlink) => {
             let src_target_path = src_symlink
                 .read_path()
                 .await

@@ -3,8 +3,8 @@
 mod directory;
 mod file;
 mod fs;
-mod fs_node;
 mod metadata;
+mod node;
 mod node_kind;
 #[cfg(feature = "os-fs")]
 pub mod os;
@@ -28,7 +28,7 @@ pub use fs::{
     ReadFileError,
     ReadFileToStringError,
 };
-pub use fs_node::{FsNode, NodeDeleteError, NodeMoveError};
 pub use metadata::{Metadata, MetadataNameError};
+pub use node::{Node, NodeDeleteError, NodeMoveError};
 pub use node_kind::NodeKind;
 pub use symlink::Symlink;

@@ -237,7 +237,7 @@ impl<Ed: CollabEditor, F: Filter<Ed::Fs>> EventStream<Ed, F> {
                     return Ok(None);
                 }
 
-                let fs::FsNode::File(file) = node else { return Ok(None) };
+                let fs::Node::File(file) = node else { return Ok(None) };
 
                 let is_watched = ctx.with_borrowed(|ctx| {
                     if let Some(buffer) = ctx.buffer(buffer_id.clone()) {
@@ -419,7 +419,7 @@ impl<Ed: CollabEditor, F: Filter<Ed::Fs>> EventStream<Ed, F> {
     /// Panics if the node is not in the root's subtree.
     async fn should_watch_node(
         &self,
-        node: &fs::FsNode<Ed::Fs>,
+        node: &fs::Node<Ed::Fs>,
     ) -> Result<bool, EventError<Ed::Fs, F>> {
         debug_assert!(node.path().starts_with(&self.root_path));
 
@@ -431,14 +431,10 @@ impl<Ed: CollabEditor, F: Filter<Ed::Fs>> EventStream<Ed, F> {
             .map_err(EventError::Filter)
     }
 
-    fn watch_node(
-        &mut self,
-        node: &fs::FsNode<Ed::Fs>,
-        ctx: &mut Context<Ed>,
-    ) {
+    fn watch_node(&mut self, node: &fs::Node<Ed::Fs>, ctx: &mut Context<Ed>) {
         match node {
-            fs::FsNode::Directory(dir) => self.dir_streams.insert(dir),
-            fs::FsNode::File(file) => {
+            fs::Node::Directory(dir) => self.dir_streams.insert(dir),
+            fs::Node::File(file) => {
                 self.file_streams.insert(file);
                 ctx.with_borrowed(|ctx| {
                     if let Some(buffer) = ctx.buffer_at_path(file.path()) {
@@ -446,7 +442,7 @@ impl<Ed: CollabEditor, F: Filter<Ed::Fs>> EventStream<Ed, F> {
                     }
                 });
             },
-            fs::FsNode::Symlink(_) => {},
+            fs::Node::Symlink(_) => {},
         }
     }
 }

@@ -15,7 +15,7 @@ use ed::notify::{self, Name};
 use ed::shared::{MultiThreaded, Shared};
 use ed::{Buffer, Context, Editor};
 use either::Either;
-use fs::{Directory, File, Fs, FsNode, Metadata, Symlink};
+use fs::{Directory, File, Fs, Metadata, Node, Symlink};
 use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
 use puff::directory::LocalDirectoryId;
@@ -218,7 +218,7 @@ async fn read_project<Ed: CollabEditor>(
         })?;
 
     let (project_root, project_filter) = match root_node {
-        FsNode::Directory(dir) => {
+        Node::Directory(dir) => {
             let filter = Ed::project_filter(&dir, ctx)
                 .map_err(ReadProjectError::ProjectFilter)?;
             (dir, Either::Left(filter))
@@ -226,13 +226,13 @@ async fn read_project<Ed: CollabEditor>(
         // The user wants to collaborate on a single file. The root must always
         // be a directory, so we just use its parent together with a filter
         // that ignores all its siblings.
-        FsNode::File(file) => {
+        Node::File(file) => {
             let parent =
                 file.parent().await.map_err(ReadProjectError::FileParent)?;
             let filter = AllButOne::<Ed::Fs> { id: file.id() };
             (parent, Either::Right(filter))
         },
-        FsNode::Symlink(_) => {
+        Node::Symlink(_) => {
             return Err(ReadProjectError::RootIsSymlink(root_path.to_owned()));
         },
     };
@@ -331,7 +331,7 @@ async fn read_node<Fs: fs::Fs>(
         .expect("node is under the root dir");
 
     let push_res = match &node {
-        FsNode::Directory(dir) => {
+        Node::Directory(dir) => {
             stream_builder.with_mut(|builder| builder.push_directory(dir));
             project_builder
                 .with_mut(|builder| builder.push_directory(path_in_project))
@@ -342,7 +342,7 @@ async fn read_node<Fs: fs::Fs>(
                 })
         },
 
-        FsNode::File(file) => {
+        Node::File(file) => {
             stream_builder.with_mut(|builder| builder.push_file(file));
 
             let contents =
@@ -363,7 +363,7 @@ async fn read_node<Fs: fs::Fs>(
                 })
             })
         },
-        FsNode::Symlink(symlink) => {
+        Node::Symlink(symlink) => {
             let target_path = symlink
                 .read_path()
                 .await

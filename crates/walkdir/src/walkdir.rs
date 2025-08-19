@@ -234,13 +234,13 @@ impl<Fs: fs::Fs> WalkDir<Self> for Fs {
         };
 
         match node {
-            fs::FsNode::Directory(dir) => dir
+            fs::Node::Directory(dir) => dir
                 .list_metas()
                 .await
                 .map(StreamExt::fuse)
                 .map_err(FsReadDirError::ListDir),
-            fs::FsNode::File(_) => Err(FsReadDirError::ReadFile),
-            fs::FsNode::Symlink(_) => Err(FsReadDirError::ReadSymlink),
+            fs::Node::File(_) => Err(FsReadDirError::ReadFile),
+            fs::Node::Symlink(_) => Err(FsReadDirError::ReadSymlink),
         }
     }
 }
