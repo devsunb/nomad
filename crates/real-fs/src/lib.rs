@@ -5,12 +5,16 @@ mod file;
 mod metadata;
 mod real_fs;
 mod symlink;
+#[cfg(feature = "tempdir")]
+mod tempdir;
 
 pub use directory::Directory;
 pub use file::File;
 pub use metadata::Metadata;
 pub use real_fs::{Inode, RealFs};
 pub use symlink::Symlink;
+#[cfg(feature = "tempdir")]
+pub use tempdir::TempDirectory;
 
 /// Moves the node at the given source path to the target path.
 ///

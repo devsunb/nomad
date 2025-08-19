@@ -7,7 +7,6 @@ use fs::Directory;
 use fs_filters::gitignore::{CreateError, GitIgnore, IgnoreError};
 use futures_lite::future;
 use real_fs::RealFs;
-use tempdir::{FsExt, TempDir};
 use thread_pool::ThreadPool;
 
 #[test]
@@ -177,7 +176,7 @@ fn creating_gitignore_fails_if_not_in_git_repo() {
 }
 
 struct GitRepository {
-    dir: TempDir,
+    dir: real_fs::TempDirectory,
     gitignore: GitIgnore,
 }
 
@@ -228,7 +227,7 @@ impl GitRepository {
 }
 
 impl Deref for GitRepository {
-    type Target = TempDir;
+    type Target = real_fs::Directory;
 
     fn deref(&self) -> &Self::Target {
         &self.dir

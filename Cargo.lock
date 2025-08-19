@@ -2602,6 +2602,7 @@ dependencies = [
  "fs",
  "futures-util",
  "notify",
+ "tempdir",
 ]
 
 [[package]]
@@ -3022,19 +3023,6 @@ dependencies = [
 
 [[package]]
 name = "tempdir"
-version = "0.1.0-dev"
-dependencies = [
- "abs-path",
- "cauchy",
- "derive_more",
- "fs",
- "futures-util",
- "real-fs",
- "tempdir 0.3.7",
-]
-
-[[package]]
-name = "tempdir"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15f2b5fb00ccdf689e0149d1b1b3c03fead81c2b37735d812fa8bddbbf41b6d8"
@@ -3064,7 +3052,6 @@ dependencies = [
  "rand 0.9.2",
  "rand_chacha 0.9.0",
  "real-fs",
- "tempdir 0.1.0-dev",
  "thread-pool",
  "tracing-subscriber",
 ]
