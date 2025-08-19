@@ -1,13 +1,13 @@
 use core::mem;
 
-use ed::executor::Executor;
+use ed::executor::BackgroundSpawner;
 use ed::{Context, Editor};
 use futures_lite::future;
 
-/// An [`Editor`] extension trait used to run async closures with an
+/// An [`Editor`] extension trait used to run async closures with a
 /// `Context<Self>`.
-pub trait EditorExt:
-    Editor<Executor: Executor<Runner: AsMut<crate::executor::Runner>>>
+pub trait EditorExt<BgSpawner: BackgroundSpawner>:
+    Editor<Executor = crate::executor::Executor<BgSpawner>>
 {
     /// Same as [`run`](EditorExt::run), but it blocks the current thread
     /// until the future returned by it completes.
@@ -134,14 +134,13 @@ pub trait EditorExt:
         fun: impl AsyncFnOnce(&mut Context<Self>) -> T + 'static,
         run_all: bool,
     ) -> impl Future<Output = T> {
-        let (runner, task) = Editor::with_ctx(self, move |ctx| {
+        let (runner, task) = self.with_ctx(move |ctx| {
             let task = ctx.spawn_local_unprotected(fun);
-            let runner =
-                ctx.with_editor(|ed| ed.executor().runner().as_mut().clone());
+            let runner = ctx.with_editor(|ed| ed.executor().runner.clone());
             (runner, task)
         });
 
-        async move { runner.run_inner(task, run_all).await }
+        async move { runner.run(task, run_all).await }
     }
 }
 
@@ -217,7 +216,9 @@ unsafe fn extend_lifetime<Ed: Editor, T: 'static>(
     }
 }
 
-impl<Ed> EditorExt for Ed where
-    Ed: Editor<Executor: Executor<Runner: AsMut<crate::executor::Runner>>>
+impl<Ed, BgSpawner> EditorExt<BgSpawner> for Ed
+where
+    Ed: Editor<Executor = crate::executor::Executor<BgSpawner>>,
+    BgSpawner: BackgroundSpawner,
 {
 }

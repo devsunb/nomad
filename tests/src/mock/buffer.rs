@@ -1,6 +1,6 @@
 use ed::Editor;
+use mock::Mock;
 use mock::fs::MockFs;
-use mock::{ContextExt, Mock};
 
 mod ed_buffer {
     //! Contains the editor-agnostic buffer tests.

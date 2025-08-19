@@ -7,7 +7,7 @@ use ed::executor::{self, BackgroundSpawner, LocalSpawner};
 use futures_lite::future::{self, FutureExt};
 
 pub struct Executor<BackgroundSpawner = Spawner> {
-    runner: Runner,
+    pub(crate) runner: Runner,
     local_spawner: Spawner,
     background_spawner: BackgroundSpawner,
 }
@@ -20,13 +20,13 @@ pin_project_lite::pin_project! {
 }
 
 #[derive(Clone)]
-pub struct Runner {
-    runnable_rx: Rc<flume::Receiver<Runnable>>,
+pub struct Spawner {
+    runnable_tx: flume::Sender<Runnable>,
 }
 
 #[derive(Clone)]
-pub struct Spawner {
-    runnable_tx: flume::Sender<Runnable>,
+pub(crate) struct Runner {
+    runnable_rx: Rc<flume::Receiver<Runnable>>,
 }
 
 impl<BgSpawner> Executor<BgSpawner> {
@@ -43,7 +43,7 @@ impl<BgSpawner> Executor<BgSpawner> {
 }
 
 impl Runner {
-    pub(crate) async fn run_inner<Fut: Future>(
+    pub(crate) async fn run<Fut: Future>(
         &self,
         future: Fut,
         run_all: bool,
@@ -110,12 +110,15 @@ impl Default for Executor {
 }
 
 impl<BgSpawner: BackgroundSpawner> executor::Executor for Executor<BgSpawner> {
-    type Runner = Runner;
     type LocalSpawner = Spawner;
     type BackgroundSpawner = BgSpawner;
 
-    fn runner(&mut self) -> &mut Self::Runner {
-        &mut self.runner
+    fn run<Fut: Future>(
+        &mut self,
+        future: Fut,
+    ) -> impl Future<Output = Fut::Output> + use<BgSpawner, Fut> {
+        let runner = self.runner.clone();
+        async move { runner.run(future, false).await }
     }
 
     fn local_spawner(&mut self) -> &mut Self::LocalSpawner {
@@ -130,12 +133,6 @@ impl<BgSpawner: BackgroundSpawner> executor::Executor for Executor<BgSpawner> {
 impl AsMut<Self> for Runner {
     fn as_mut(&mut self) -> &mut Self {
         self
-    }
-}
-
-impl executor::Runner for Runner {
-    async fn run<T>(&mut self, future: impl Future<Output = T>) -> T {
-        self.run_inner(future, false).await
     }
 }
 

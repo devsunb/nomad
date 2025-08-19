@@ -8,31 +8,28 @@ use crate::Editor;
 /// TODO: docs.
 pub trait Executor {
     /// TODO: docs.
-    type Runner: Runner;
-
-    /// TODO: docs.
     type LocalSpawner: LocalSpawner;
 
     /// TODO: docs.
     type BackgroundSpawner: BackgroundSpawner;
 
     /// TODO: docs.
-    fn runner(&mut self) -> &mut Self::Runner;
+    fn run<Fut: Future>(
+        &mut self,
+        future: Fut,
+    ) -> impl Future<Output = Fut::Output> + use<Self, Fut>;
 
     /// TODO: docs.
     fn local_spawner(&mut self) -> &mut Self::LocalSpawner;
 
     /// TODO: docs.
     fn background_spawner(&mut self) -> &mut Self::BackgroundSpawner;
-}
 
-/// TODO: docs.
-pub trait Runner: Clone + 'static {
-    /// TODO: docs.
-    fn run<T>(
-        &mut self,
-        future: impl Future<Output = T>,
-    ) -> impl Future<Output = T>;
+    /// Blocks the current thread until the given future completes.
+    #[inline]
+    fn block_on<T>(&mut self, future: impl Future<Output = T>) -> T {
+        futures_lite::future::block_on(self.run(future))
+    }
 }
 
 /// TODO: docs.

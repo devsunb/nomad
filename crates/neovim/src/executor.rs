@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use async_task::Builder;
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
-use ed::executor::{Executor, LocalSpawner, Runner, Task};
+use ed::executor::{Executor, LocalSpawner, Task};
 use thread_pool::ThreadPool;
 
 use crate::oxi;
@@ -17,14 +17,9 @@ type Runnable = async_task::Runnable<()>;
 /// TODO: docs.
 #[derive(Default)]
 pub struct NeovimExecutor {
-    runner: NeovimRunner,
     local_spawner: NeovimLocalSpawner,
     background_spawner: ThreadPool,
 }
-
-/// TODO: docs.
-#[derive(Default, Copy, Clone)]
-pub struct NeovimRunner;
 
 /// TODO: docs.
 #[derive(Clone)]
@@ -111,13 +106,17 @@ impl RunnableQueue {
 }
 
 impl Executor for NeovimExecutor {
-    type Runner = NeovimRunner;
     type LocalSpawner = NeovimLocalSpawner;
     type BackgroundSpawner = ThreadPool;
 
     #[inline]
-    fn runner(&mut self) -> &mut Self::Runner {
-        &mut self.runner
+    fn run<Fut: Future>(
+        &mut self,
+        future: Fut,
+    ) -> impl Future<Output = Fut::Output> + use<Fut> {
+        // Scheduling a task also notifies the libuv event loop, so we don't
+        // have to do anything else here.
+        future
     }
 
     #[inline]
@@ -128,15 +127,6 @@ impl Executor for NeovimExecutor {
     #[inline]
     fn background_spawner(&mut self) -> &mut Self::BackgroundSpawner {
         &mut self.background_spawner
-    }
-}
-
-impl Runner for NeovimRunner {
-    #[inline]
-    async fn run<T>(&mut self, future: impl Future<Output = T>) -> T {
-        // Scheduling a task also notifies the libuv event loop, so we don't
-        // have to do anything else here.
-        future.await
     }
 }
 

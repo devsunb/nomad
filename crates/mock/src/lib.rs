@@ -6,7 +6,6 @@
 
 pub mod api;
 pub mod buffer;
-mod context_ext;
 mod editor_ext;
 pub mod emitter;
 pub mod executor;
@@ -19,7 +18,6 @@ pub mod value;
 /// crate's public API.
 #[doc(hidden)]
 pub use abs_path::NodeName;
-pub use context_ext::ContextExt;
 pub use editor_ext::EditorExt;
 pub use mock::Mock;
 pub use mock_macros::fs;

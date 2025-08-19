@@ -12,7 +12,6 @@ use crate::executor::{
     Executor,
     LocalSpawner,
     LocalTask,
-    Runner,
 };
 use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
@@ -56,6 +55,7 @@ pub trait Borrow<Ed: Editor> {
 }
 
 /// TODO: docs.
+#[derive(cauchy::Clone)]
 #[doc(hidden)]
 pub struct NotBorrowedInner<Ed: Editor> {
     namespace: Namespace,
@@ -176,17 +176,6 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     #[inline]
     pub fn new_agent_id(&mut self) -> AgentId {
         self.borrow.with_state(|state| state.next_agent_id())
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub async fn run<T>(
-        &mut self,
-        fun: impl AsyncFnOnce(&mut Self) -> T,
-    ) -> T {
-        self.with_editor(|ed| ed.executor().runner().clone())
-            .run(async move { fun(self).await })
-            .await
     }
 
     /// TODO: docs.
@@ -356,6 +345,25 @@ where
 }
 
 impl<Ed: Editor> Context<Ed, NotBorrowed> {
+    /// TODO: docs.
+    #[inline]
+    pub fn block_on<T>(&mut self, fun: impl AsyncFnOnce(&mut Self) -> T) -> T {
+        let mut this = Self { borrow: self.borrow.clone() };
+        let future = async move { fun(&mut this).await };
+        self.with_editor(|ed| ed.executor().block_on(future))
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub async fn run<T>(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut Self) -> T,
+    ) -> T {
+        let mut this = Self { borrow: self.borrow.clone() };
+        let future = async move { fun(&mut this).await };
+        self.with_editor(|ed| ed.executor().run(future)).await
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn spawn_local<T: 'static>(
