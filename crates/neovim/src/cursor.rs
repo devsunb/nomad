@@ -8,7 +8,7 @@ use crate::events::{self, EventHandle, Events};
 use crate::oxi::api;
 
 /// TODO: docs.
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct NeovimCursor<'a> {
     buffer: NeovimBuffer<'a>,
 }
@@ -16,8 +16,8 @@ pub struct NeovimCursor<'a> {
 impl<'a> NeovimCursor<'a> {
     /// Returns the [`NeovimBuffer`] this cursor is in.
     #[inline]
-    pub(crate) fn buffer(&self) -> NeovimBuffer<'a> {
-        self.buffer
+    pub(crate) fn buffer(&self) -> &NeovimBuffer<'a> {
+        &self.buffer
     }
 
     #[inline]
@@ -111,7 +111,7 @@ impl Cursor for NeovimCursor<'_> {
                 if buf.id() == buffer_id
                     && (old_mode.is_insert() || new_mode.is_insert())
                 {
-                    let this = NeovimCursor::new(buf);
+                    let this = NeovimCursor::new(buf.clone());
                     let new_point = this.point();
                     if old_point.replace(new_point) != new_point {
                         fun.with_mut(|fun| fun(&this, changed_by));
@@ -131,7 +131,7 @@ impl Cursor for NeovimCursor<'_> {
         Events::insert(
             self.buffer().events(),
             events::BufLeave(self.buffer_id()),
-            move |(&buf, unfocused_by)| fun(buf.id(), unfocused_by),
+            move |(buf, unfocused_by)| fun(buf.id(), unfocused_by),
         )
     }
 }

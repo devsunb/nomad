@@ -24,8 +24,8 @@ impl<'a> NeovimSelection<'a> {
 
     /// Returns the [`NeovimBuffer`] this selection is in.
     #[inline]
-    pub(crate) fn buffer(&self) -> NeovimBuffer<'a> {
-        self.buffer
+    pub(crate) fn buffer(&self) -> &NeovimBuffer<'a> {
+        &self.buffer
     }
 }
 
@@ -65,7 +65,8 @@ impl Selection for NeovimSelection<'_> {
                     // Make sure the selection is still alive before calling
                     // the user's function.
                     if is_selection_alive.copied() {
-                        let this = NeovimSelection::new(cursor.buffer());
+                        let this =
+                            NeovimSelection::new(cursor.buffer().clone());
                         fun.with_mut(|fun| {
                             fun(&this, moved_by);
                         })
@@ -85,7 +86,7 @@ impl Selection for NeovimSelection<'_> {
                 }
 
                 if new_mode.has_selected_range() {
-                    let this = NeovimSelection::new(buf);
+                    let this = NeovimSelection::new(buf.clone());
                     fun.with_mut(|fun| fun(&this, changed_by));
                 } else {
                     is_selection_alive.set(false);

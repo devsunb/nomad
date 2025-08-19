@@ -229,12 +229,14 @@ impl Events {
         }
     }
 
+    #[track_caller]
     pub(crate) fn buffer<'a>(
         buffer_id: BufferId,
         events: &'a Shared<Events>,
         bufs_state: &'a BuffersState,
     ) -> NeovimBuffer<'a> {
         NeovimBuffer::new(buffer_id, events, bufs_state)
+            .expect("couldn't get buffer")
     }
 }
 
@@ -693,7 +695,7 @@ impl Event for CursorMoved {
 }
 
 impl Event for ModeChanged {
-    type Args<'a> = (NeovimBuffer<'a>, ModeStr<'a>, ModeStr<'a>, AgentId);
+    type Args<'a> = (&'a NeovimBuffer<'a>, ModeStr<'a>, ModeStr<'a>, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -739,7 +741,7 @@ impl Event for ModeChanged {
                 let new_mode = ModeStr::new(new_mode);
 
                 for callback in callbacks {
-                    callback((buffer, old_mode, new_mode, AgentId::UNKNOWN));
+                    callback((&buffer, old_mode, new_mode, AgentId::UNKNOWN));
                 }
 
                 false

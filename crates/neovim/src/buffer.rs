@@ -7,7 +7,7 @@ use core::iter::FusedIterator;
 use core::ops::Range;
 use std::borrow::Cow;
 
-use abs_path::AbsPath;
+use abs_path::{AbsPath, AbsPathBuf};
 use compact_str::CompactString;
 use ed::{AgentId, Buffer, ByteOffset, Chunks, Edit, Replacement, Shared};
 use smallvec::{SmallVec, smallvec_inline};
@@ -21,8 +21,9 @@ use crate::option::{NeovimOption, UneditableEndOfLine};
 use crate::oxi::{self, BufHandle, String as NvimString, api, mlua};
 
 /// TODO: docs.
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct NeovimBuffer<'a> {
+    path: AbsPathBuf,
     id: BufferId,
     events: &'a Shared<Events>,
     state: &'a BuffersState,
@@ -269,7 +270,6 @@ impl<'a> NeovimBuffer<'a> {
 
     #[inline]
     pub(crate) fn inner(&self) -> api::Buffer {
-        debug_assert!(self.id.is_valid());
         self.id.into()
     }
 
@@ -278,9 +278,19 @@ impl<'a> NeovimBuffer<'a> {
         id: BufferId,
         events: &'a Shared<Events>,
         state: &'a BuffersState,
-    ) -> Self {
-        debug_assert!(id.is_valid());
-        Self { id, events, state }
+    ) -> Option<Self> {
+        let buffer = api::Buffer::from(id);
+
+        if !buffer.is_valid() {
+            return None;
+        }
+
+        let path = match buffer.get_name() {
+            Ok(name) => name.to_str().ok()?.parse().ok()?,
+            Err(_) => return None,
+        };
+
+        Some(Self { path, id, events, state })
     }
 
     /// Converts the given [`ByteOffset`] to the corresponding [`Point`] in the
@@ -743,11 +753,6 @@ impl BufferId {
     }
 
     #[inline]
-    pub(crate) fn is_valid(self) -> bool {
-        api::Buffer::from(self).is_valid()
-    }
-
-    #[inline]
     pub(crate) fn new(inner: api::Buffer) -> Self {
         Self(inner.handle())
     }
@@ -756,8 +761,8 @@ impl BufferId {
 impl<'a> HighlightRange<'a> {
     /// TODO: docs.
     #[inline]
-    pub fn buffer(&self) -> NeovimBuffer<'_> {
-        self.buffer
+    pub fn buffer(&self) -> &NeovimBuffer<'_> {
+        &self.buffer
     }
 
     /// TODO: docs.
@@ -884,7 +889,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
         Fun: FnMut(NeovimCursor),
     {
         if self.is_focused() {
-            fun(NeovimCursor::new(*self));
+            fun(NeovimCursor::new(self.clone()));
         }
     }
 
@@ -1012,8 +1017,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
 
     #[inline]
     fn path(&self) -> Cow<'_, AbsPath> {
-        // self.inner().get_name().expect("buffer exists")
-        todo!();
+        Cow::Borrowed(&self.path)
     }
 
     #[inline]

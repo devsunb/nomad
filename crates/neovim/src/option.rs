@@ -195,7 +195,7 @@ impl Deref for BufferLocalOpts {
 impl<T: WatchedOption> Event for OptionSet<T> {
     /// A tuple of `(buffer, old_value, new_value)`, where `buffer` is only
     /// present for buffer-local options.
-    type Args<'a> = (Option<NeovimBuffer<'a>>, &'a T::Value, &'a T::Value);
+    type Args<'a> = (Option<&'a NeovimBuffer<'a>>, &'a T::Value, &'a T::Value);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -222,7 +222,7 @@ impl<T: WatchedOption> Event for OptionSet<T> {
             };
 
             for callback in callbacks {
-                callback((buffer, old_value, new_value));
+                callback((buffer.as_ref(), old_value, new_value));
             }
 
             false
@@ -251,7 +251,7 @@ impl SetUneditableEolAgentIds {
 }
 
 impl Event for UneditableEndOfLine {
-    type Args<'a> = (NeovimBuffer<'a>, bool, bool, AgentId);
+    type Args<'a> = (&'a NeovimBuffer<'a>, bool, bool, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = (AutocmdId, AutocmdId, AutocmdId);
 
@@ -278,12 +278,12 @@ impl Event for UneditableEndOfLine {
         }
 
         let on_option_set =
-            |buffer: NeovimBuffer,
+            |buffer: &NeovimBuffer,
              old_option_value: bool,
              new_option_value: bool,
              option: Option,
              events: &Shared<Events>| {
-                let opts = (&buffer).into();
+                let opts = buffer.into();
 
                 let value = |option_value: bool| match option {
                     Option::Binary => UneditableEndOfLine::get_inner(
@@ -320,7 +320,7 @@ impl Event for UneditableEndOfLine {
                 };
 
                 for callback in callbacks {
-                    callback((buffer, old_value, new_value, set_by));
+                    callback((&buffer, old_value, new_value, set_by));
                 }
 
                 false
@@ -330,7 +330,7 @@ impl Event for UneditableEndOfLine {
             events.reborrow(),
             move |maybe_buffer, &old_eol, &new_eol, events| {
                 on_option_set(
-                    maybe_buffer.expect("'eol' is buffer-local"),
+                    &maybe_buffer.expect("'eol' is buffer-local"),
                     old_eol,
                     new_eol,
                     Option::Eol,
@@ -343,7 +343,7 @@ impl Event for UneditableEndOfLine {
             events.reborrow(),
             move |maybe_buffer, &old_fix_eol, &new_fix_eol, events| {
                 on_option_set(
-                    maybe_buffer.expect("'fixeol' is buffer-local"),
+                    &maybe_buffer.expect("'fixeol' is buffer-local"),
                     old_fix_eol,
                     new_fix_eol,
                     Option::FixEol,
@@ -356,7 +356,7 @@ impl Event for UneditableEndOfLine {
             events.reborrow(),
             move |maybe_buffer, &old_binary, &new_binary, events| {
                 on_option_set(
-                    maybe_buffer.expect("'binary' is buffer-local"),
+                    &maybe_buffer.expect("'binary' is buffer-local"),
                     old_binary,
                     new_binary,
                     Option::Binary,

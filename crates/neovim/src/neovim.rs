@@ -102,11 +102,7 @@ impl Neovim {
     /// reference.
     #[inline]
     fn buffer_inner(&self, buf_id: BufferId) -> Option<NeovimBuffer<'_>> {
-        buf_id.is_valid().then_some(NeovimBuffer::new(
-            buf_id,
-            &self.events,
-            &self.buffers_state,
-        ))
+        NeovimBuffer::new(buf_id, &self.events, &self.buffers_state)
     }
 
     #[inline]
@@ -242,7 +238,9 @@ impl Editor for Neovim {
         Events::insert(
             self.events.clone(),
             events::BufEnter,
-            move |(&buf, focused_by)| fun(&NeovimCursor::new(buf), focused_by),
+            move |(buf, focused_by)| {
+                fun(&NeovimCursor::new(buf.clone()), focused_by)
+            },
         )
     }
 
@@ -260,7 +258,7 @@ impl Editor for Neovim {
                     // already displaying a selected range.
                     && !old_mode.has_selected_range()
                 {
-                    fun(&NeovimSelection::new(buf), changed_by);
+                    fun(&NeovimSelection::new(buf.clone()), changed_by);
                 }
             },
         )
