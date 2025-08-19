@@ -18,7 +18,7 @@ either = { workspace = true }
 flume = { workspace = true, features = ["async"] }
 fs = { workspace = true }
 futures-util = { workspace = true, features = ["default"] }
-send-future = "0.1"
+send-future = { workspace = true }
 
 [dev-dependencies]
 abs-path = { workspace = true, features = ["macros"] }

@@ -4,7 +4,7 @@ use collab::Collab;
 use collab::mock::{CollabMock, CollabServer, MockSessionId};
 use ed::action::AsyncAction;
 use ed::command::Parse;
-use ed::fs::Fs;
+use fs::Fs;
 use futures_lite::future::{self, FutureExt};
 use mock::{EditorExt, Mock};
 

@@ -22,7 +22,7 @@ derive_more = { workspace = true }
 fxhash = { workspace = true }
 nohash = { workspace = true }
 smallvec = { workspace = true }
-smol_str = "0.3"
+smol_str = { workspace = true }
 
 bincode = { version = "2", optional = true, features = ["serde"] }
 serde = { workspace = true, optional = true, features = ["derive"] }

@@ -11,7 +11,7 @@ ed = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [build-dependencies]
-chrono = { version = "0.4", default-features = false }
+chrono = { workspace = true }
 git2 = { workspace = true }
 
 [lints]

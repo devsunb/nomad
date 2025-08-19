@@ -11,7 +11,7 @@ collab = ["dep:collab", "dep:walkdir"]
 
 [dependencies]
 abs-path = { workspace = true }
-criterion = "0.6"
+criterion = { workspace = true }
 ed = { workspace = true }
 fs = { workspace = true, features = ["os-fs"] }
 futures-lite = { workspace = true }
@@ -24,7 +24,7 @@ walkdir = { workspace = true, optional = true, features = ["gitignore"] }
 
 [build-dependencies]
 abs-path = { workspace = true, features = ["macros"] }
-anyhow = "1.0"
+anyhow = { workspace = true }
 
 [lints]
 workspace = true

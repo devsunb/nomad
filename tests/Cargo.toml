@@ -25,16 +25,17 @@ neovim-nightly = ["neovim", "neovim/nightly"]
 
 [dependencies]
 abs-path = { workspace = true, features = ["macros"] }
-async-io = { version = "2" }
+async-io = { workspace = true }
 cauchy = { workspace = true }
 ed = { workspace = true }
 flume = { workspace = true }
+fs = { workspace = true }
 futures-lite = { workspace = true, features = ["default"] }
 futures-util = { workspace = true, features = ["default"] }
 mock = { workspace = true }
 pin-project-lite = { workspace = true }
-rand = "0.9"
-rand_chacha = "0.9"
+rand = { workspace = true }
+rand_chacha = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 auth = { workspace = true, optional = true, features = ["mock"] }

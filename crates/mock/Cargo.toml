@@ -8,7 +8,7 @@ publish.workspace = true
 
 [dependencies]
 abs-path = { workspace = true, features = ["macros"] }
-async-broadcast = "0.7"
+async-broadcast = { workspace = true }
 async-task = { workspace = true }
 cauchy = { workspace = true }
 derive_more = { workspace = true }
@@ -21,11 +21,11 @@ indexmap = { workspace = true }
 mock-macros = { path = "./macros" }
 pin-project-lite = { workspace = true }
 serde = { workspace = true }
-serde_json = "1"
+serde_json = { workspace = true }
 slotmap = { workspace = true }
 
 [dev-dependencies]
-async-io = "2.4"
+async-io = { workspace = true }
 
 [lints]
 workspace = true

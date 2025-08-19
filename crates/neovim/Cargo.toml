@@ -16,19 +16,15 @@ abs-path = { workspace = true }
 async-task = { workspace = true }
 cauchy = { workspace = true }
 compact_str = { workspace = true }
-concurrent-queue = "2.5"
+concurrent-queue = { workspace = true }
 derive_more = { workspace = true }
 ed = { workspace = true, features = ["async-task"] }
 fs = { workspace = true, features = ["os-fs"] }
 neovim-macros = { path = "./macros" }
 nohash = { workspace = true }
-nvim-oxi = { git = "https://github.com/noib3/nvim-oxi", features = [
-  "libuv",
-  "mlua",
-  "neovim-0-11",
-] }
+nvim-oxi = { workspace = true, features = ["libuv", "mlua", "neovim-0-11"] }
 serde = { workspace = true }
-serde_path_to_error = "0.1"
+serde_path_to_error = { workspace = true }
 slotmap = { workspace = true }
 smallvec = { workspace = true, features = ["const_new"] }
 strsim = { workspace = true }

@@ -3,8 +3,8 @@ use std::process::{Command, Stdio};
 use std::{thread, time};
 
 use abs_path::{AbsPath, node, path};
-use ed::fs::Directory;
-use ed::fs::os::OsFs;
+use fs::Directory;
+use fs::os::OsFs;
 use futures_lite::future;
 use tempdir::{FsExt, TempDir};
 use thread_pool::ThreadPool;

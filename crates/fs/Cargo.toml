@@ -13,7 +13,7 @@ os-fs = ["futures-util/io", "dep:async-fs", "dep:notify"]
 abs-path = { workspace = true }
 cauchy = { workspace = true }
 derive_more = { workspace = true }
-futures-util = { workspace = true }
+futures-util = { workspace = true, features = ["alloc", "async-await-macro"] }
 
 async-fs = { workspace = true, optional = true }
 notify = { workspace = true, optional = true }

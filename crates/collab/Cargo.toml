@@ -23,15 +23,13 @@ abs-path = { workspace = true, features = ["macros"] }
 auth = { workspace = true }
 cauchy = { workspace = true }
 collab-project = { workspace = true, features = ["serde"] }
-collab-server = { git = "ssh://git@github.com/nomad/collab-server.git", default-features = false, features = [
-  "client",
-] }
+collab-server = { workspace = true, features = ["client"] }
 collab-types = { workspace = true }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
 ed = { workspace = true }
 either = { workspace = true }
-fastrand = "2"
+fastrand = { workspace = true }
 flume = { workspace = true, features = ["async"] }
 fs = { workspace = true }
 futures-util = { workspace = true }
@@ -44,12 +42,12 @@ tracing = { workspace = true }
 walkdir = { workspace = true }
 
 # Mock-only dependencies.
-duplex-stream = { git = "ssh://git@github.com/nomad/collab-server.git", optional = true }
+duplex-stream = { workspace = true, optional = true }
 
 # Neovim-only dependencies.
 async-net = { workspace = true, optional = true }
 clipboard = { workspace = true, optional = true }
-home = { version = "0.5", optional = true }
+home = { workspace = true, optional = true }
 neovim = { workspace = true, optional = true }
 
 [lints]
