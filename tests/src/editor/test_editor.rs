@@ -42,7 +42,6 @@ impl TestEditor for neovim::Neovim {
     }
 }
 
-#[cfg(feature = "mock")]
 impl TestEditor for mock::Mock {
     async fn create_scratch_buffer(
         mut this: impl AccessMut<Self>,

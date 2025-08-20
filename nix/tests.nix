@@ -17,7 +17,7 @@
             cargo test --workspace --no-fail-fast
 
             # Run integration tests.
-            cargo test --package=tests --all-features
+            cargo test --package=tests
           '';
         }
       );

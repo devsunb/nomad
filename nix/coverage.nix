@@ -31,7 +31,7 @@
             cargo llvm-cov --no-report --workspace
 
             # Run integration tests.
-            cargo llvm-cov --no-report --package=tests --all-features
+            cargo llvm-cov --no-report --package=tests
 
             # Generate coverage report.
             cargo llvm-cov report --codecov --output-path codecov.json

@@ -11,39 +11,31 @@ publish.workspace = true
 crate-type = ["cdylib"]
 
 [features]
-# Features that enable a specific set of tests.
-auth = ["dep:auth"]
-collab = ["dep:auth", "dep:collab"]
-gitignore = ["dep:gitignore", "dep:real-fs", "dep:thread-pool"]
-mock = []
-neovim = ["dep:neovim", "auth?/neovim", "collab?/neovim"]
-thread-pool = ["dep:thread-pool"]
-
-# Other features.
+neovim = ["dep:neovim", "auth/neovim", "collab/neovim"]
 neovim-nightly = ["neovim", "neovim/nightly"]
 
 [dependencies]
 abs-path = { workspace = true, features = ["macros"] }
 async-io = { workspace = true }
+auth = { workspace = true, features = ["mock"] }
 cauchy = { workspace = true }
+collab = { workspace = true, features = ["mock"] }
 editor = { workspace = true }
 executor = { workspace = true }
 flume = { workspace = true }
 fs = { workspace = true }
 futures-lite = { workspace = true, features = ["default"] }
 futures-util = { workspace = true, features = ["default"] }
+gitignore = { workspace = true }
 mock = { workspace = true }
 pin-project-lite = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
+real-fs = { workspace = true, features = ["tempdir"] }
+thread-pool = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-auth = { workspace = true, optional = true, features = ["mock"] }
-collab = { workspace = true, optional = true, features = ["mock"] }
-gitignore = { workspace = true, optional = true }
 neovim = { workspace = true, optional = true, features = ["test"] }
-real-fs = { workspace = true, optional = true, features = ["tempdir"] }
-thread-pool = { workspace = true, optional = true }
 
 [build-dependencies]
 neovim = { workspace = true, features = ["test"] }
