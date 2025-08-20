@@ -17,7 +17,7 @@ use crate::module::Module;
 use crate::notify::{self, Emitter, Namespace, NotificationId};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
-use crate::{AgentId, Buffer, Editor, Shared};
+use crate::{Access, AccessMut, AgentId, Buffer, Editor, Shared};
 
 /// TODO: docs.
 pub trait BorrowState {
@@ -40,7 +40,7 @@ pub struct Borrowed<'a> {
 
 /// TODO: docs.
 #[doc(hidden)]
-pub trait Borrow<Ed: Editor> {
+pub trait Borrow<Ed: Editor>: AccessMut<State<Ed>> {
     /// TODO: docs.
     fn namespace(&self) -> &Namespace;
 
@@ -49,9 +49,6 @@ pub trait Borrow<Ed: Editor> {
 
     /// TODO: docs.
     fn state_handle(&self) -> Shared<State<Ed>>;
-
-    /// TODO: docs.
-    fn with_state<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T;
 }
 
 /// TODO: docs.
@@ -73,32 +70,6 @@ pub struct BorrowedInner<'a, Ed: Editor> {
 }
 
 impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
-    /// TODO: docs.
-    #[inline]
-    pub async fn create_and_focus(
-        &mut self,
-        file_path: &AbsPath,
-        agent_id: AgentId,
-    ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
-        let buffer_id = self.create_buffer(file_path, agent_id).await?;
-        self.with_editor(|ed| {
-            if let Some(mut buffer) = ed.buffer(buffer_id.clone()) {
-                buffer.focus(agent_id);
-            }
-        });
-        Ok(buffer_id)
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub async fn create_buffer(
-        &mut self,
-        file_path: &AbsPath,
-        agent_id: AgentId,
-    ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
-        self.with_editor(|ed| ed.create_buffer(file_path, agent_id)).await
-    }
-
     /// TODO: docs.
     #[inline]
     pub fn emit_err<Err>(&mut self, err: Err) -> NotificationId
@@ -169,7 +140,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     /// TODO: docs.
     #[inline]
     pub fn new_agent_id(&mut self) -> AgentId {
-        self.borrow.with_state(|state| state.next_agent_id())
+        self.borrow.with_mut(|state| state.next_agent_id())
     }
 
     /// TODO: docs.
@@ -190,7 +161,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     /// TODO: docs.
     #[inline]
     pub fn with_editor<T>(&mut self, fun: impl FnOnce(&mut Ed) -> T) -> T {
-        self.borrow.with_state(move |state| fun(state))
+        self.borrow.with_mut(move |state| fun(state))
     }
 
     #[inline]
@@ -266,6 +237,37 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
                 fun(&mut ctx).await
             })
         }))
+    }
+}
+
+impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs>
+where
+    for<'a> &'a mut Self: AccessMut<Ed>,
+{
+    /// TODO: docs.
+    #[inline]
+    pub async fn create_and_focus(
+        &mut self,
+        file_path: &AbsPath,
+        agent_id: AgentId,
+    ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
+        let buffer_id = self.create_buffer(file_path, agent_id).await?;
+        self.with_editor(|ed| {
+            if let Some(mut buffer) = ed.buffer(buffer_id.clone()) {
+                buffer.focus(agent_id);
+            }
+        });
+        Ok(buffer_id)
+    }
+
+    /// TODO: docs.
+    #[inline]
+    pub async fn create_buffer(
+        &mut self,
+        file_path: &AbsPath,
+        agent_id: AgentId,
+    ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
+        Ed::create_buffer(self, file_path, agent_id).await
     }
 }
 
@@ -447,12 +449,61 @@ where
     }
 }
 
+impl<Ed: Editor> Access<Ed> for Context<Ed, NotBorrowed> {
+    #[inline]
+    fn with<T>(&self, f: impl FnOnce(&Ed) -> T) -> T {
+        self.borrow.with(move |state| f(state))
+    }
+}
+
+impl<Ed: Editor> AccessMut<Ed> for Context<Ed, NotBorrowed> {
+    #[inline]
+    fn with_mut<T>(&mut self, f: impl FnOnce(&mut Ed) -> T) -> T {
+        self.borrow.with_mut(move |state| f(state))
+    }
+}
+
+impl<Ed: Editor> Access<Ed> for &Context<Ed, NotBorrowed> {
+    #[inline]
+    fn with<T>(&self, f: impl FnOnce(&Ed) -> T) -> T {
+        (**self).with(f)
+    }
+}
+
+impl<Ed: Editor> Access<Ed> for &mut Context<Ed, NotBorrowed> {
+    #[inline]
+    fn with<T>(&self, f: impl FnOnce(&Ed) -> T) -> T {
+        (**self).with(f)
+    }
+}
+
+impl<Ed: Editor> AccessMut<Ed> for &mut Context<Ed, NotBorrowed> {
+    #[inline]
+    fn with_mut<T>(&mut self, f: impl FnOnce(&mut Ed) -> T) -> T {
+        (**self).with_mut(f)
+    }
+}
+
 impl BorrowState for NotBorrowed {
     type Borrow<Ed: Editor> = NotBorrowedInner<Ed>;
 }
 
 impl<'a> BorrowState for Borrowed<'a> {
     type Borrow<Ed: Editor> = BorrowedInner<'a, Ed>;
+}
+
+impl<Ed: Editor> Access<State<Ed>> for NotBorrowedInner<Ed> {
+    #[inline]
+    fn with<T>(&self, f: impl FnOnce(&State<Ed>) -> T) -> T {
+        self.state_handle.with(f)
+    }
+}
+
+impl<Ed: Editor> AccessMut<State<Ed>> for NotBorrowedInner<Ed> {
+    #[inline]
+    fn with_mut<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T {
+        self.state_handle.with_mut(f)
+    }
 }
 
 impl<Ed: Editor> Borrow<Ed> for NotBorrowedInner<Ed> {
@@ -470,11 +521,6 @@ impl<Ed: Editor> Borrow<Ed> for NotBorrowedInner<Ed> {
     fn state_handle(&self) -> Shared<State<Ed>> {
         self.state_handle.clone()
     }
-
-    #[inline]
-    fn with_state<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T {
-        self.state_handle.with_mut(f)
-    }
 }
 
 impl<Ed: Editor> Borrow<Ed> for BorrowedInner<'_, Ed> {
@@ -491,11 +537,6 @@ impl<Ed: Editor> Borrow<Ed> for BorrowedInner<'_, Ed> {
     #[inline]
     fn state_handle(&self) -> Shared<State<Ed>> {
         self.state_handle.clone()
-    }
-
-    #[inline]
-    fn with_state<T>(&mut self, f: impl FnOnce(&mut State<Ed>) -> T) -> T {
-        f(self.state)
     }
 }
 

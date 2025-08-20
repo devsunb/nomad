@@ -1,9 +1,9 @@
-use editor::{AgentId, BorrowState, Buffer, Context, Editor};
+use editor::{AccessMut, AgentId, BorrowState, Buffer, Context, Editor};
 
 pub(crate) trait TestEditor: Editor {
     fn create_scratch_buffer(
+        this: impl AccessMut<Self>,
         agent_id: AgentId,
-        ctx: &mut Context<Self, impl BorrowState>,
     ) -> impl Future<Output = Self::BufferId>;
 }
 
@@ -22,13 +22,13 @@ pub(crate) trait ContextExt<Ed: TestEditor> {
 #[cfg(feature = "neovim")]
 impl TestEditor for neovim::Neovim {
     async fn create_scratch_buffer(
+        mut this: impl AccessMut<Self>,
         agent_id: AgentId,
-        ctx: &mut Context<Self, impl BorrowState>,
     ) -> Self::BufferId {
         use neovim::oxi::api::{self, opts};
 
         let buffer_id =
-            ctx.with_editor(|nvim| nvim.create_buf(true, true, agent_id));
+            this.with_mut(|nvim| nvim.create_buf(true, true, agent_id));
 
         // The (fix)eol options mess us the fuzzy edits tests because inserting
         // text when the buffer is empty will also cause a trailing \n to be
@@ -45,8 +45,8 @@ impl TestEditor for neovim::Neovim {
 #[cfg(feature = "mock")]
 impl TestEditor for mock::Mock {
     async fn create_scratch_buffer(
+        mut this: impl AccessMut<Self>,
         agent_id: AgentId,
-        ctx: &mut Context<Self, impl BorrowState>,
     ) -> Self::BufferId {
         let scratch_file_path = |num_scratch: u32| {
             let file_name = format!("scratch-{num_scratch}.txt")
@@ -59,9 +59,9 @@ impl TestEditor for mock::Mock {
 
         loop {
             let file_path = scratch_file_path(num_scratch);
-            if ctx.with_editor(|ed| ed.buffer_at_path(&file_path).is_none()) {
-                return ctx
-                    .create_buffer(&file_path, agent_id)
+            if this.with_mut(|mock| mock.buffer_at_path(&file_path).is_none())
+            {
+                return Self::create_buffer(this, &file_path, agent_id)
                     .await
                     .expect("couldn't create buffer");
             }
@@ -70,12 +70,15 @@ impl TestEditor for mock::Mock {
     }
 }
 
-impl<Ed: TestEditor, Bs: BorrowState> ContextExt<Ed> for Context<Ed, Bs> {
+impl<Ed: TestEditor, Bs: BorrowState> ContextExt<Ed> for Context<Ed, Bs>
+where
+    for<'a> &'a mut Self: AccessMut<Ed>,
+{
     async fn create_scratch_buffer(
         &mut self,
         agent_id: AgentId,
     ) -> Ed::BufferId {
-        Ed::create_scratch_buffer(agent_id, self).await
+        Ed::create_scratch_buffer(self, agent_id).await
     }
 
     async fn create_and_focus_scratch_buffer(

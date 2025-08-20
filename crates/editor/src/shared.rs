@@ -106,6 +106,7 @@ impl<T: ?Sized, Access: SharedAccess> Shared<T, Access> {
     /// value is already exclusively borrowed.
     ///
     /// Check out [`try_with`](Self::try_with) for a non-panicking alternative.
+    #[allow(clippy::same_name_method)]
     #[track_caller]
     pub fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
         self.container.with(fun)
@@ -116,6 +117,7 @@ impl<T: ?Sized, Access: SharedAccess> Shared<T, Access> {
     ///
     /// Check out [`try_with_mut`](Self::try_with_mut) for a non-panicking
     /// alternative.
+    #[allow(clippy::same_name_method)]
     #[track_caller]
     pub fn with_mut<R>(&self, fun: impl FnOnce(&mut T) -> R) -> R {
         self.container.with_mut(fun)
@@ -290,6 +292,18 @@ impl<T: fmt::Debug + ?Sized, Access: SharedAccess> fmt::Debug
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.with(|field| fmt::Debug::fmt(field, f))
+    }
+}
+
+impl<T: ?Sized, A: SharedAccess> crate::Access<T> for Shared<T, A> {
+    fn with<R>(&self, fun: impl FnOnce(&T) -> R) -> R {
+        Self::with(self, fun)
+    }
+}
+
+impl<T: ?Sized, A: SharedAccess> crate::AccessMut<T> for Shared<T, A> {
+    fn with_mut<R>(&mut self, fun: impl FnOnce(&mut T) -> R) -> R {
+        Self::with_mut(self, fun)
     }
 }
 

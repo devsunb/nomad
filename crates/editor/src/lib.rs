@@ -2,6 +2,7 @@
 
 #![feature(min_specialization)]
 
+mod access;
 pub mod action;
 mod agent_id;
 mod api;
@@ -20,6 +21,7 @@ pub mod shared;
 mod state;
 mod util;
 
+pub use access::{Access, AccessMut};
 pub use agent_id::AgentId;
 pub use api::{Api, ApiValue, Key, MapAccess, Value};
 pub use buffer::{Buffer, Chunks, Edit, Replacement};

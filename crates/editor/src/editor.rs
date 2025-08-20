@@ -9,6 +9,7 @@ use serde::de::Deserialize;
 use crate::notify::{self, Emitter, MaybeResult};
 use crate::plugin::Plugin;
 use crate::{
+    AccessMut,
     AgentId,
     Api,
     ApiValue,
@@ -94,11 +95,10 @@ pub trait Editor: 'static + Sized {
 
     /// TODO: docs.
     fn create_buffer(
-        &mut self,
+        this: impl AccessMut<Self>,
         file_path: &AbsPath,
         agent_id: AgentId,
-    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>
-    + use<Self>;
+    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>;
 
     /// TODO: docs.
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>>;

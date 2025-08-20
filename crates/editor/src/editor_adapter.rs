@@ -1,9 +1,10 @@
+use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
 
 use abs_path::AbsPath;
 
 use crate::notify::MaybeResult;
-use crate::{AgentId, Editor};
+use crate::{Access, AccessMut, AgentId, Editor};
 
 /// TODO: docs.
 pub trait EditorAdapter: 'static + Sized + DerefMut<Target: Editor> {}
@@ -40,12 +41,16 @@ impl<Ed: EditorAdapter> Editor for Ed {
 
     #[inline]
     fn create_buffer(
-        &mut self,
+        this: impl AccessMut<Self>,
         file_path: &AbsPath,
         agent_id: AgentId,
     ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>
-    + use<Ed> {
-        self.deref_mut().create_buffer(file_path, agent_id)
+    {
+        <<Self as Deref>::Target>::create_buffer(
+            AccessAdapter::new(this),
+            file_path,
+            agent_id,
+        )
     }
 
     #[inline]
@@ -138,5 +143,39 @@ impl<Ed: EditorAdapter> Editor for Ed {
         T: serde::Deserialize<'de>,
     {
         self.deref_mut().deserialize(value)
+    }
+}
+
+struct AccessAdapter<A, T> {
+    access: A,
+    accessed: PhantomData<T>,
+}
+
+impl<A, T> AccessAdapter<A, T> {
+    #[inline]
+    fn new(access: A) -> Self {
+        Self { access, accessed: PhantomData }
+    }
+}
+
+impl<A, T> Access<T::Target> for AccessAdapter<A, T>
+where
+    A: Access<T>,
+    T: Deref,
+{
+    #[inline]
+    fn with<R>(&self, fun: impl FnOnce(&T::Target) -> R) -> R {
+        self.access.with(|inner: &T| fun(inner.deref()))
+    }
+}
+
+impl<A, T> AccessMut<T::Target> for AccessAdapter<A, T>
+where
+    A: AccessMut<T>,
+    T: DerefMut,
+{
+    #[inline]
+    fn with_mut<R>(&mut self, fun: impl FnOnce(&mut T::Target) -> R) -> R {
+        self.access.with_mut(|inner: &mut T| fun(inner.deref_mut()))
     }
 }
