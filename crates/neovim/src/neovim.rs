@@ -4,15 +4,7 @@ use ::serde::{Deserialize, Serialize};
 use abs_path::AbsPath;
 use editor::notify::Namespace;
 use editor::plugin::Plugin;
-use editor::{
-    AgentId,
-    BaseEditor,
-    BorrowState,
-    Buffer,
-    Context,
-    Editor,
-    Shared,
-};
+use editor::{AgentId, Buffer, Editor, Shared};
 use fs::Fs;
 
 use crate::buffer::{
@@ -181,12 +173,57 @@ impl Editor for Neovim {
     }
 
     #[inline]
-    async fn create_buffer(
-        file_path: &AbsPath,
-        agent_id: AgentId,
-        ctx: &mut Context<Self, impl BorrowState>,
-    ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <Self as BaseEditor>::create_buffer(file_path, agent_id, ctx).await
+    fn create_buffer(
+        &mut self,
+        _file_path: &AbsPath,
+        _agent_id: AgentId,
+    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>> + use<>
+    {
+        async { todo!() }
+        // let contents = match ctx
+        //     .with_editor(|ed| ed.as_mut().fs())
+        //     .read_file_to_string(file_path)
+        //     .await
+        // {
+        //     Ok(contents) => contents,
+        //
+        //     Err(fs::ReadFileToStringError::ReadFile(
+        //         fs::ReadFileError::NoNodeAtPath(_),
+        //     )) => String::default(),
+        //
+        //     Err(other) => return Err(CreateBufferError { inner: other }),
+        // };
+        //
+        // ctx.with_editor(|ed| {
+        //     let this = ed.as_mut();
+        //
+        //     let buf_id = this.create_buf(true, false, agent_id);
+        //
+        //     let buffer = this.buffer_inner(buf_id).expect("just created");
+        //
+        //     // 'eol' is turned on by default, so avoid inserting the file's
+        //     // trailing newline or we'll get an extra line.
+        //     let contents = if contents.ends_with('\n') {
+        //         &contents[..contents.len() - 1]
+        //     } else {
+        //         &contents
+        //     };
+        //
+        //     if !contents.is_empty() {
+        //         buffer.replace_text_in_point_range(
+        //             Point::zero()..Point::zero(),
+        //             contents,
+        //             agent_id,
+        //         );
+        //     }
+        //
+        //     buffer.inner().set_name(file_path).expect("couldn't set name");
+        //
+        //     // TODO: do we have to set the buffer's filetype?
+        //     // vim.filetype.match(buffer.inner())
+        //
+        //     Ok(buffer.id())
+        // })
     }
 
     #[inline]
@@ -294,67 +331,6 @@ impl Editor for Neovim {
     ) {
         err.set_config_path(config_path.clone());
         self.emit_err(namespace, err);
-    }
-}
-
-impl BaseEditor for Neovim {
-    #[inline]
-    async fn create_buffer(
-        file_path: &AbsPath,
-        agent_id: AgentId,
-        ctx: &mut Context<impl AsMut<Self> + Editor, impl BorrowState>,
-    ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        let contents = match ctx
-            .with_editor(|ed| ed.as_mut().fs())
-            .read_file_to_string(file_path)
-            .await
-        {
-            Ok(contents) => contents,
-
-            Err(fs::ReadFileToStringError::ReadFile(
-                fs::ReadFileError::NoNodeAtPath(_),
-            )) => String::default(),
-
-            Err(other) => return Err(CreateBufferError { inner: other }),
-        };
-
-        ctx.with_editor(|ed| {
-            let this = ed.as_mut();
-
-            let buf_id = this.create_buf(true, false, agent_id);
-
-            let buffer = this.buffer_inner(buf_id).expect("just created");
-
-            // 'eol' is turned on by default, so avoid inserting the file's
-            // trailing newline or we'll get an extra line.
-            let contents = if contents.ends_with('\n') {
-                &contents[..contents.len() - 1]
-            } else {
-                &contents
-            };
-
-            if !contents.is_empty() {
-                buffer.replace_text_in_point_range(
-                    Point::zero()..Point::zero(),
-                    contents,
-                    agent_id,
-                );
-            }
-
-            buffer.inner().set_name(file_path).expect("couldn't set name");
-
-            // TODO: do we have to set the buffer's filetype?
-            // vim.filetype.match(buffer.inner())
-
-            Ok(buffer.id())
-        })
-    }
-}
-
-impl AsMut<Self> for Neovim {
-    #[inline]
-    fn as_mut(&mut self) -> &mut Self {
-        self
     }
 }
 

@@ -134,18 +134,18 @@ fn process_terminates_when_all_gitignore_instances_are_dropped() {
     // Wait a bit to ensure the process has time to terminate.
     let mut num_tries = 0;
     let num_max_tries = 10;
-    let retry_internal = time::Duration::from_millis(50);
+    let retry_interval = time::Duration::from_millis(50);
     while num_tries < num_max_tries {
         if !is_process_alive(gitignore_pid) {
             return;
         }
         num_tries += 1;
-        thread::sleep(retry_internal);
+        thread::sleep(retry_interval);
     }
     panic!(
         "process should have terminated after all GitIgnore instances were \
          dropped, but it's still alive after {}ms",
-        num_tries * retry_internal.as_millis() as usize
+        num_tries * retry_interval.as_millis() as usize
     );
 }
 

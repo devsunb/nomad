@@ -253,7 +253,6 @@ dependencies = [
  "event-listener",
  "keyring",
  "neovim",
- "serde",
  "serde_json",
 ]
 

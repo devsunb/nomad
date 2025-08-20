@@ -96,7 +96,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
         file_path: &AbsPath,
         agent_id: AgentId,
     ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
-        Ed::create_buffer(file_path, agent_id, self).await
+        self.with_editor(|ed| ed.create_buffer(file_path, agent_id)).await
     }
 
     /// TODO: docs.

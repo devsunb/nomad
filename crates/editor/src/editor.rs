@@ -12,7 +12,6 @@ use crate::{
     AgentId,
     Api,
     ApiValue,
-    BorrowState,
     Buffer,
     Context,
     Cursor,
@@ -55,7 +54,7 @@ pub trait Editor: 'static + Sized {
     type Fs: fs::Fs;
 
     /// TODO: docs.
-    type Emitter<'this>: notify::Emitter;
+    type Emitter<'a>: notify::Emitter;
 
     /// TODO: docs.
     type Executor: Executor;
@@ -95,10 +94,11 @@ pub trait Editor: 'static + Sized {
 
     /// TODO: docs.
     fn create_buffer(
+        &mut self,
         file_path: &AbsPath,
         agent_id: AgentId,
-        ctx: &mut Context<Self, impl BorrowState>,
-    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>;
+    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>
+    + use<Self>;
 
     /// TODO: docs.
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>>;
@@ -229,14 +229,4 @@ pub trait Editor: 'static + Sized {
     fn with_ctx<R>(self, fun: impl FnOnce(&mut Context<Self>) -> R) -> R {
         fun(&mut Context::from_editor(self))
     }
-}
-
-/// TODO: docs.
-pub trait BaseEditor: Editor {
-    /// TODO: docs.
-    fn create_buffer(
-        file_path: &AbsPath,
-        agent_id: AgentId,
-        ctx: &mut Context<impl AsMut<Self> + Editor, impl BorrowState>,
-    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>;
 }

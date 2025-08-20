@@ -2,24 +2,14 @@
 
 use core::convert::Infallible;
 use core::error::Error;
-use core::fmt;
 use core::ops::Range;
+use core::{fmt, ops};
 
 use abs_path::{AbsPath, AbsPathBuf};
 pub use collab_server::test::TestSessionId as MockSessionId;
 use collab_types::Peer;
 use duplex_stream::{DuplexStream, duplex};
-use editor::notify::{self, MaybeResult};
-use editor::{
-    AgentId,
-    ApiValue,
-    BaseEditor,
-    BorrowState,
-    ByteOffset,
-    Context,
-    Editor,
-};
-use serde::{Deserialize, Serialize};
+use editor::{ByteOffset, Context, Editor, EditorAdapter, notify};
 
 use crate::config;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
@@ -197,7 +187,7 @@ impl AnyError {
 
 impl<Ed, F> CollabEditor for CollabMock<Ed, F>
 where
-    Ed: BaseEditor,
+    Ed: Editor,
     F: fs::filter::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
 {
     type Io = DuplexStream;
@@ -340,128 +330,32 @@ where
     }
 }
 
-impl<Ed, F> Editor for CollabMock<Ed, F>
-where
-    Ed: BaseEditor,
-    F: fs::filter::Filter<Ed::Fs, Error: Send> + Send + Sync + 'static,
-{
-    type Api = <Ed as Editor>::Api;
-    type Buffer<'a> = <Ed as Editor>::Buffer<'a>;
-    type BufferId = <Ed as Editor>::BufferId;
-    type Cursor<'a> = <Ed as Editor>::Cursor<'a>;
-    type CursorId = <Ed as Editor>::CursorId;
-    type Fs = <Ed as Editor>::Fs;
-    type Emitter<'this> = <Ed as Editor>::Emitter<'this>;
-    type Executor = <Ed as Editor>::Executor;
-    type EventHandle = <Ed as Editor>::EventHandle;
-    type Selection<'a> = <Ed as Editor>::Selection<'a>;
-    type SelectionId = <Ed as Editor>::SelectionId;
-
-    type BufferSaveError = <Ed as Editor>::BufferSaveError;
-    type CreateBufferError = <Ed as Editor>::CreateBufferError;
-    type SerializeError = <Ed as Editor>::SerializeError;
-    type DeserializeError = <Ed as Editor>::DeserializeError;
-
-    fn buffer(&mut self, id: Self::BufferId) -> Option<Self::Buffer<'_>> {
-        self.inner.buffer(id)
-    }
-    fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
-        self.inner.buffer_at_path(path)
-    }
-    fn for_each_buffer<Fun>(&mut self, fun: Fun)
-    where
-        Fun: FnMut(Self::Buffer<'_>),
-    {
-        self.inner.for_each_buffer(fun);
-    }
-    async fn create_buffer(
-        file_path: &AbsPath,
-        agent_id: AgentId,
-        ctx: &mut Context<Self, impl BorrowState>,
-    ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <Ed as BaseEditor>::create_buffer(file_path, agent_id, ctx).await
-    }
-    fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
-        self.inner.current_buffer()
-    }
-    fn cursor(&mut self, id: Self::CursorId) -> Option<Self::Cursor<'_>> {
-        self.inner.cursor(id)
-    }
-    fn debug<T: fmt::Debug>(&mut self, value: T) {
-        self.inner.debug(value);
-    }
-    fn fs(&mut self) -> Self::Fs {
-        self.inner.fs()
-    }
-    fn emitter(&mut self) -> Self::Emitter<'_> {
-        self.inner.emitter()
-    }
-    fn executor(&mut self) -> &mut Self::Executor {
-        self.inner.executor()
-    }
-    fn on_buffer_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
-    where
-        Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
-    {
-        self.inner.on_buffer_created(fun)
-    }
-    fn on_cursor_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
-    where
-        Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static,
-    {
-        self.inner.on_cursor_created(fun)
-    }
-    fn on_selection_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
-    where
-        Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
-    {
-        self.inner.on_selection_created(fun)
-    }
-    fn reinstate_panic_hook(&self) -> bool {
-        self.inner.reinstate_panic_hook()
-    }
-    fn selection(
-        &mut self,
-        id: Self::SelectionId,
-    ) -> Option<Self::Selection<'_>> {
-        self.inner.selection(id)
-    }
-    fn serialize<V>(
-        &mut self,
-        value: &V,
-    ) -> impl MaybeResult<ApiValue<Self>, Error = Self::SerializeError>
-    where
-        V: ?Sized + Serialize,
-    {
-        self.inner.serialize(value)
-    }
-    fn deserialize<'de, V>(
-        &mut self,
-        value: ApiValue<Self>,
-    ) -> impl MaybeResult<V, Error = Self::DeserializeError>
-    where
-        V: Deserialize<'de>,
-    {
-        self.inner.deserialize(value)
+impl<Ed: Editor + Default> Default for CollabMock<Ed, ()> {
+    fn default() -> Self {
+        Self::new(Ed::default())
     }
 }
 
-impl<Ed: Editor, F> AsMut<Ed> for CollabMock<Ed, F> {
-    fn as_mut(&mut self) -> &mut Ed {
+impl<Ed: Editor, F> ops::Deref for CollabMock<Ed, F> {
+    type Target = Ed;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<Ed: Editor, F> ops::DerefMut for CollabMock<Ed, F> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.inner
     }
 }
+
+impl<Ed: Editor, F: 'static> EditorAdapter for CollabMock<Ed, F> {}
 
 impl Default for CollabServer {
     fn default() -> Self {
         let (conn_tx, conn_rx) = flume::unbounded();
         Self { conn_rx, conn_tx, inner: Default::default() }
-    }
-}
-
-impl<Ed: Editor + Default> Default for CollabMock<Ed, ()> {
-    fn default() -> Self {
-        Self::new(Ed::default())
     }
 }
 

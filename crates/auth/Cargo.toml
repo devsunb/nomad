@@ -16,7 +16,6 @@ auth-types = { workspace = true, features = ["serde"] }
 editor = { workspace = true }
 event-listener = { workspace = true }
 keyring = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 
 neovim = { workspace = true, optional = true }

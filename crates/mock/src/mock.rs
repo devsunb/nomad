@@ -2,16 +2,7 @@ use core::fmt;
 
 use abs_path::AbsPath;
 use editor::notify::{self, MaybeResult};
-use editor::{
-    AgentId,
-    ApiValue,
-    BaseEditor,
-    BorrowState,
-    Context,
-    Edit,
-    Editor,
-    Shared,
-};
+use editor::{AgentId, ApiValue, Edit, Editor, Shared};
 use executor::BackgroundSpawner;
 use fxhash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -199,12 +190,53 @@ where
             .map(|id| self.buffer_mut(id))
     }
 
-    async fn create_buffer(
-        file_path: &AbsPath,
-        agent_id: AgentId,
-        ctx: &mut Context<Self, impl BorrowState>,
-    ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        <Self as BaseEditor>::create_buffer(file_path, agent_id, ctx).await
+    fn create_buffer(
+        &mut self,
+        _file_path: &AbsPath,
+        _agent_id: AgentId,
+    ) -> impl Future<Output = Result<Self::BufferId, Self::CreateBufferError>>
+    + use<Fs, BgSpawner> {
+        async { todo!() }
+        // let contents = match ctx
+        //     .with_editor(|ed| ed.as_mut().fs())
+        //     .read_file_to_string(file_path)
+        //     .await
+        // {
+        //     Ok(contents) => contents,
+        //
+        //     Err(fs::ReadFileToStringError::ReadFile(
+        //         fs::ReadFileError::NoNodeAtPath(_),
+        //     )) => String::default(),
+        //
+        //     Err(other) => return Err(CreateBufferError { inner: other }),
+        // };
+        //
+        // ctx.with_editor(|this| {
+        //     let buffer_id = this.next_buffer_id.post_inc();
+        //
+        //     this.buffers.insert(
+        //         buffer_id,
+        //         BufferInner::new(buffer_id, file_path.to_owned(), contents),
+        //     );
+        //
+        //     let buffer = this.buffer_mut(buffer_id);
+        //
+        //     let on_buffer_created = buffer.callbacks.with(|callbacks| {
+        //         callbacks
+        //             .values()
+        //             .filter_map(|cb_kind| match cb_kind {
+        //                 CallbackKind::BufferCreated(fun) => Some(fun.clone()),
+        //                 _ => None,
+        //             })
+        //             .collect::<Vec<_>>()
+        //     });
+        //
+        //     for callback in on_buffer_created {
+        //         callback.with_mut(|cb| cb(&buffer, agent_id));
+        //     }
+        //
+        //     Ok(buffer_id)
+        // })
     }
 
     fn current_buffer(&mut self) -> Option<Self::Buffer<'_>> {
@@ -306,70 +338,9 @@ where
     }
 }
 
-impl<Fs, BgSpawner> BaseEditor for Mock<Fs, BgSpawner>
-where
-    Fs: fs::Fs,
-    BgSpawner: BackgroundSpawner,
-{
-    async fn create_buffer(
-        file_path: &AbsPath,
-        agent_id: AgentId,
-        ctx: &mut Context<impl AsMut<Self> + Editor, impl BorrowState>,
-    ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        let contents = match ctx
-            .with_editor(|ed| ed.as_mut().fs())
-            .read_file_to_string(file_path)
-            .await
-        {
-            Ok(contents) => contents,
-
-            Err(fs::ReadFileToStringError::ReadFile(
-                fs::ReadFileError::NoNodeAtPath(_),
-            )) => String::default(),
-
-            Err(other) => return Err(CreateBufferError { inner: other }),
-        };
-
-        ctx.with_editor(|ed| {
-            let this = ed.as_mut();
-
-            let buffer_id = this.next_buffer_id.post_inc();
-
-            this.buffers.insert(
-                buffer_id,
-                BufferInner::new(buffer_id, file_path.to_owned(), contents),
-            );
-
-            let buffer = this.buffer_mut(buffer_id);
-
-            let on_buffer_created = buffer.callbacks.with(|callbacks| {
-                callbacks
-                    .values()
-                    .filter_map(|cb_kind| match cb_kind {
-                        CallbackKind::BufferCreated(fun) => Some(fun.clone()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-            });
-
-            for callback in on_buffer_created {
-                callback.with_mut(|cb| cb(&buffer, agent_id));
-            }
-
-            Ok(buffer_id)
-        })
-    }
-}
-
 impl<Fs: Default> Default for Mock<Fs> {
     fn default() -> Self {
         Self::new(Fs::default())
-    }
-}
-
-impl<Fs, BgSpawner> AsMut<Self> for Mock<Fs, BgSpawner> {
-    fn as_mut(&mut self) -> &mut Self {
-        self
     }
 }
 
