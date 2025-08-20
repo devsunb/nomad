@@ -72,7 +72,7 @@ impl TestEditor for mock::Mock {
 
 impl<Ed: TestEditor, Bs: BorrowState> ContextExt<Ed> for Context<Ed, Bs>
 where
-    for<'a> &'a mut Self: AccessMut<Ed>,
+    Self: AccessMut<Ed>,
 {
     async fn create_scratch_buffer(
         &mut self,

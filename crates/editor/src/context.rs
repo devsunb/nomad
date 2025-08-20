@@ -242,7 +242,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
 
 impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs>
 where
-    for<'a> &'a mut Self: AccessMut<Ed>,
+    Self: AccessMut<Ed>,
 {
     /// TODO: docs.
     #[inline]
@@ -463,21 +463,30 @@ impl<Ed: Editor> AccessMut<Ed> for Context<Ed, NotBorrowed> {
     }
 }
 
-impl<Ed: Editor> Access<Ed> for &Context<Ed, NotBorrowed> {
+impl<Ed: Editor, Bs: BorrowState> Access<Ed> for &Context<Ed, Bs>
+where
+    Context<Ed, Bs>: Access<Ed>,
+{
     #[inline]
     fn with<T>(&self, f: impl FnOnce(&Ed) -> T) -> T {
         (**self).with(f)
     }
 }
 
-impl<Ed: Editor> Access<Ed> for &mut Context<Ed, NotBorrowed> {
+impl<Ed: Editor, Bs: BorrowState> Access<Ed> for &mut Context<Ed, Bs>
+where
+    Context<Ed, Bs>: Access<Ed>,
+{
     #[inline]
     fn with<T>(&self, f: impl FnOnce(&Ed) -> T) -> T {
         (**self).with(f)
     }
 }
 
-impl<Ed: Editor> AccessMut<Ed> for &mut Context<Ed, NotBorrowed> {
+impl<Ed: Editor, Bs: BorrowState> AccessMut<Ed> for &mut Context<Ed, Bs>
+where
+    Context<Ed, Bs>: AccessMut<Ed>,
+{
     #[inline]
     fn with_mut<T>(&mut self, f: impl FnOnce(&mut Ed) -> T) -> T {
         (**self).with_mut(f)
