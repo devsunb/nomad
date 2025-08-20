@@ -8,7 +8,7 @@ use crate::command::{
     CompletionFn,
 };
 use crate::module::Module;
-use crate::notify::{self, MaybeResult, Name, Namespace};
+use crate::notify::{self, Name, Namespace};
 use crate::plugin::{Plugin, PluginId};
 use crate::state::{StateHandle, StateMut};
 use crate::util::OrderedMap;
@@ -47,18 +47,13 @@ impl<Ed: Editor> CommandBuilder<Ed> {
     #[inline]
     pub(crate) fn add_command<Cmd: Command<Ed>>(&mut self, mut command: Cmd) {
         self.assert_namespace_is_available(Cmd::NAME);
-        let handler: CommandHandler<Ed> = Box::new(move |args, ctx| {
-            let args = match Cmd::Args::try_from(args) {
-                Ok(args) => args,
+        let handler: CommandHandler<Ed> =
+            Box::new(move |args, ctx| match Cmd::Args::try_from(args) {
+                Ok(args) => command.call(args, ctx),
                 Err(err) => {
                     ctx.emit_err(err);
-                    return;
                 },
-            };
-            if let Err(err) = command.call(args, ctx).into_result() {
-                ctx.emit_err(err);
-            }
-        });
+            });
         self.handlers.insert(Cmd::NAME, handler);
     }
 

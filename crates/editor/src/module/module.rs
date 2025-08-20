@@ -3,14 +3,13 @@ use core::any;
 use serde::de::DeserializeOwned;
 
 use crate::module::ApiCtx;
-use crate::notify::Name;
 use crate::plugin::PluginId;
 use crate::{Borrowed, Context, Editor};
 
 /// TODO: docs.
 pub trait Module<Ed: Editor>: 'static + Sized {
     /// TODO: docs.
-    const NAME: Name;
+    const NAME: &str;
 
     /// TODO: docs.
     type Config: DeserializeOwned;

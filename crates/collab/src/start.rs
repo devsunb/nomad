@@ -1,7 +1,6 @@
 //! TODO: docs.
 
 use core::convert::Infallible;
-use core::marker::PhantomData;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
@@ -12,7 +11,7 @@ use collab_types::{Peer, PeerId, puff};
 use editor::action::AsyncAction;
 use editor::command::ToCompletionFn;
 use editor::shared::{MultiThreaded, Shared};
-use editor::{Buffer, Context, Editor, notify};
+use editor::{Buffer, Context, Editor};
 use either::Either;
 use fs::walk::FsExt;
 use fs::{Directory, File, Fs, Metadata, Node, Symlink};
@@ -20,7 +19,6 @@ use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
 use puff::directory::LocalDirectoryId;
 use puff::file::LocalFileId;
-use smol_str::ToSmolStr;
 
 use crate::collab::Collab;
 use crate::config::Config;
@@ -396,7 +394,8 @@ async fn read_node<Fs: fs::Fs>(
 }
 
 /// The type of error that can occur when [`Start`]ing a session fails.
-#[derive(cauchy::Debug, cauchy::PartialEq)]
+#[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
+#[display("{_0}")]
 pub enum StartError<Ed: CollabEditor> {
     /// TODO: docs.
     ConnectToServer(Ed::ConnectToServerError),
@@ -405,12 +404,20 @@ pub enum StartError<Ed: CollabEditor> {
     Knock(collab_client::KnockError<Ed::ServerParams>),
 
     /// TODO: docs.
+    #[display(
+        "No buffer is focused, please move the cursor to a text buffer to \
+         determine the project root"
+    )]
     NoBufferFocused,
 
     /// TODO: docs.
     OverlappingProject(OverlappingProjectError),
 
     /// TODO: docs.
+    #[display(
+        "Cannot start a new collaborative editing session at the root of the \
+         filesystem"
+    )]
     ProjectRootIsFsRoot,
 
     /// TODO: docs.
@@ -420,9 +427,11 @@ pub enum StartError<Ed: CollabEditor> {
     SearchProjectRoot(SearchProjectRootError<Ed>),
 
     /// TODO: docs.
+    #[display("The user didn't confirm starting a new session")]
     UserDidNotConfirm,
 
     /// TODO: docs.
+    #[display("The user is not logged in")]
     UserNotLoggedIn,
 }
 
@@ -483,12 +492,11 @@ pub enum ReadProjectError<Ed: CollabEditor> {
 }
 
 /// TODO: docs.
-#[derive(cauchy::Debug, cauchy::PartialEq)]
+#[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
+#[display("{_0}")]
 pub enum SearchProjectRootError<Ed: CollabEditor> {
     /// TODO: docs.
-    BufNameNotAbsolutePath(String),
-
-    /// TODO: docs.
+    #[display("Couldn't determine project root for buffer at {_0}")]
     CouldntFindRoot(AbsPathBuf),
 
     /// TODO: docs.
@@ -498,6 +506,7 @@ pub enum SearchProjectRootError<Ed: CollabEditor> {
     HomeDir(Ed::HomeDirError),
 
     /// TODO: docs.
+    #[display("There's no buffer with ID {_0:?}")]
     InvalidBufId(Ed::BufferId),
 
     /// TODO: docs.
@@ -525,159 +534,6 @@ impl<Fs: fs::Fs> fs::filter::Filter<Fs> for AllButOne<Fs> {
         node_meta: &impl Metadata<Fs = Fs>,
     ) -> Result<bool, Self::Error> {
         Ok(node_meta.id() != self.id)
-    }
-}
-
-/// TODO: docs.
-pub(crate) struct UserNotLoggedInError<B>(PhantomData<B>);
-
-/// TODO: docs.
-struct NoBufferFocusedError<B>(PhantomData<B>);
-
-impl<B> NoBufferFocusedError<B> {
-    fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<B> UserNotLoggedInError<B> {
-    pub(crate) fn new() -> Self {
-        Self(PhantomData)
-    }
-}
-
-impl<Ed: CollabEditor> notify::Error for StartError<Ed> {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        match self {
-            Self::ConnectToServer(err) => err.to_message(),
-            Self::Knock(_err) => todo!(),
-            Self::NoBufferFocused => {
-                NoBufferFocusedError::<Ed>::new().to_message()
-            },
-            Self::OverlappingProject(err) => err.to_message(),
-            Self::ProjectRootIsFsRoot => (
-                notify::Level::Error,
-                notify::Message::from_str(
-                    "cannot start a new collaborative editing session at the \
-                     root of the filesystem",
-                ),
-            ),
-            Self::ReadProject(err) => err.to_message(),
-            Self::SearchProjectRoot(err) => err.to_message(),
-            Self::UserDidNotConfirm => todo!(),
-            Self::UserNotLoggedIn => {
-                UserNotLoggedInError::<Ed>::new().to_message()
-            },
-        }
-    }
-}
-
-impl<Ed: CollabEditor> notify::Error for ReadProjectError<Ed> {
-    default fn to_message(&self) -> (notify::Level, notify::Message) {
-        (notify::Level::Error, notify::Message::from_display(self))
-    }
-}
-
-impl<B> notify::Error for NoBufferFocusedError<B> {
-    default fn to_message(&self) -> (notify::Level, notify::Message) {
-        (notify::Level::Off, notify::Message::new())
-    }
-}
-
-impl<Ed: CollabEditor> notify::Error for SearchProjectRootError<Ed> {
-    default fn to_message(&self) -> (notify::Level, notify::Message) {
-        use SearchProjectRootError::*;
-
-        let mut msg = notify::Message::new();
-
-        match self {
-            BufNameNotAbsolutePath(str) => {
-                msg.push_str("buffer name ")
-                    .push_invalid(str)
-                    .push_str(" is not an absolute path");
-            },
-            CouldntFindRoot(abs_path_buf) => {
-                msg.push_str("couldn't find project root for buffer at ")
-                    .push_info(abs_path_buf);
-            },
-            FindRoot(err) => {
-                msg.push_str(err.to_smolstr());
-            },
-            HomeDir(err) => return err.to_message(),
-            InvalidBufId(buf_id) => {
-                msg.push_str("there's no buffer whose handle is ")
-                    .push_invalid(format!("{buf_id:?}"));
-            },
-            Lsp(err) => return err.to_message(),
-        }
-
-        (notify::Level::Error, msg)
-    }
-}
-
-impl<B> notify::Error for UserNotLoggedInError<B> {
-    default fn to_message(&self) -> (notify::Level, notify::Message) {
-        (notify::Level::Off, notify::Message::new())
-    }
-}
-
-#[cfg(feature = "neovim")]
-mod neovim_error_impls {
-    use neovim::Neovim;
-
-    use super::*;
-
-    impl notify::Error for NoBufferFocusedError<Neovim> {
-        fn to_message(&self) -> (notify::Level, notify::Message) {
-            let msg = "couldn't determine path to project root. Either move \
-                       the cursor to a text buffer, or pass one explicitly";
-            (notify::Level::Error, notify::Message::from_str(msg))
-        }
-    }
-
-    impl notify::Error for SearchProjectRootError<Neovim> {
-        fn to_message(&self) -> (notify::Level, notify::Message) {
-            use SearchProjectRootError::*;
-
-            let mut msg = notify::Message::new();
-
-            match &self {
-                BufNameNotAbsolutePath(buf_name) => {
-                    if buf_name.is_empty() {
-                        msg.push_str("the current buffer's name is empty");
-                    } else {
-                        msg.push_str("buffer name ")
-                            .push_invalid(buf_name)
-                            .push_str(" is not an absolute path");
-                    }
-                },
-                Lsp(err) => return err.to_message(),
-                FindRoot(err) => return err.to_message(),
-                HomeDir(err) => return err.to_message(),
-                InvalidBufId(buf_id) => {
-                    msg.push_str("there's no buffer whose handle is ")
-                        .push_invalid(buf_id.bufnr().to_smolstr());
-                },
-                CouldntFindRoot(buffer_path) => {
-                    msg.push_str("couldn't find project root for buffer at ")
-                        .push_info(buffer_path.to_smolstr())
-                        .push_str(", please pass one explicitly");
-                },
-            }
-
-            (notify::Level::Error, msg)
-        }
-    }
-
-    impl notify::Error for UserNotLoggedInError<Neovim> {
-        fn to_message(&self) -> (notify::Level, notify::Message) {
-            let mut msg = notify::Message::from_str(
-                "need to be logged in to collaborate. You can log in by \
-                 executing ",
-            );
-            msg.push_expected(":Mad login");
-            (notify::Level::Error, msg)
-        }
     }
 }
 

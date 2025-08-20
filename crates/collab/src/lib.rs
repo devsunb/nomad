@@ -1,7 +1,5 @@
 //! TODO: docs.
 
-#![feature(min_specialization)]
-
 mod collab;
 pub mod config;
 mod convert;

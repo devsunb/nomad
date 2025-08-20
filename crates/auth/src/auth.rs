@@ -1,6 +1,5 @@
 use auth_types::AuthInfos;
 use editor::module::{ApiCtx, Module};
-use editor::notify::Name;
 use editor::{Borrowed, Context, Shared};
 
 use crate::AuthEditor;
@@ -54,7 +53,7 @@ impl Auth {
 }
 
 impl<Ed: AuthEditor> Module<Ed> for Auth {
-    const NAME: Name = "auth";
+    const NAME: &str = "auth";
 
     type Config = ();
 

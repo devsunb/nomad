@@ -4,7 +4,6 @@ use std::collections::hash_map::Entry;
 
 use editor::action::AsyncAction;
 use editor::command::ToCompletionFn;
-use editor::notify::Name;
 use editor::{Context, Shared};
 use flume::{Receiver, Sender};
 use fxhash::FxHashMap;
@@ -55,7 +54,7 @@ impl<Ed: CollabEditor> Leave<Ed> {
 }
 
 impl<Ed: CollabEditor> AsyncAction<Ed> for Leave<Ed> {
-    const NAME: Name = "leave";
+    const NAME: &str = "leave";
 
     type Args = ();
 

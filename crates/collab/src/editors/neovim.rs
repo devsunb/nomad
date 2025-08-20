@@ -7,14 +7,13 @@ use std::{env, io};
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
 use collab_types::Peer;
 use collab_types::nomad::ulid;
-use editor::{ByteOffset, Context, Editor, notify};
+use editor::{ByteOffset, Context, Editor};
 use executor::Executor;
 use fs::Directory;
 use mlua::{Function, Table};
 use neovim::buffer::{BufferId, HighlightRangeHandle};
 use neovim::notify::ContextExt;
 use neovim::{Neovim, mlua, oxi};
-use smol_str::ToSmolStr;
 
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::{config, join, leave, start, yank};
@@ -30,32 +29,49 @@ pub struct PeerTooltip {
     cursor_highlight_handle: HighlightRangeHandle,
 }
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq)]
+#[display("couldn't copy {} to clipboard: {}", session_id, inner)]
 pub struct NeovimCopySessionIdError {
     inner: clipboard::ClipboardError,
     session_id: SessionId,
 }
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::Display, cauchy::Error)]
+#[display("couldn't connect to the server: {inner}")]
 pub struct NeovimConnectToServerError {
     inner: io::Error,
 }
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::Display, cauchy::Error)]
 pub enum NeovimDataDirError {
+    #[display("{_0}")]
     Home(NeovimHomeDirError),
+
+    #[display("found data directory at {_0:?}, but it's not an absolute path")]
     XdgDataHomeNotAbsolute(String),
+
+    #[display(
+        "found data directory at {_0:?}, but it's not a valid UTF-8 string"
+    )]
     XdgDataHomeNotUtf8(OsString),
 }
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::Display, cauchy::Error)]
 pub enum NeovimHomeDirError {
+    #[display("Couldn't find the home directory")]
     CouldntFindHome,
+
+    #[display("Found home directory at {_0:?}, but it's not an absolute path")]
     HomeDirNotAbsolute(PathBuf),
+
+    #[display(
+        "Found home directory at {_0:?}, but it's not a valid UTF-8 string"
+    )]
     HomeDirNotUtf8(PathBuf),
 }
 
-#[derive(Debug)]
+#[derive(Debug, derive_more::Display, cauchy::Error)]
+#[display("LSP root at {root_dir} is not an absolute path")]
 pub struct NeovimLspRootError {
     root_dir: String,
 }
@@ -274,8 +290,15 @@ impl CollabEditor for Neovim {
     }
 
     fn on_join_error(error: join::JoinError<Self>, ctx: &mut Context<Self>) {
-        // ctx.notify_error(error);
-        todo!()
+        match error {
+            join::JoinError::UserNotLoggedIn => {
+                ctx.notify_error(
+                    "You must be logged in to join a collaborative editing \
+                     session. You can log in by executing ':Mad login'",
+                );
+            },
+            other => ctx.notify_error(other),
+        }
     }
 
     fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>) {
@@ -288,14 +311,18 @@ impl CollabEditor for Neovim {
     ) {
         match error {
             start::StartError::UserDidNotConfirm => (),
-            other => todo!(),
-            // other => ctx.notify_error(other),
+            start::StartError::UserNotLoggedIn => {
+                ctx.notify_error(
+                    "You must be logged in to start collaborating. You can \
+                     log in by executing ':Mad login'",
+                );
+            },
+            other => ctx.notify_error(other),
         }
     }
 
     fn on_yank_error(error: yank::YankError<Self>, ctx: &mut Context<Self>) {
-        // ctx.notify_error(error);
-        todo!()
+        ctx.notify_error(error);
     }
 
     fn project_filter(
@@ -410,112 +437,6 @@ fn get_lua_value<T: mlua::FromLua>(namespace: &[&str]) -> Option<T> {
         } else {
             table = table.get::<Table>(*key).ok()?;
         }
-    }
-}
-
-impl notify::Error for NeovimCopySessionIdError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut msg = notify::Message::new();
-        msg.push_str("couldn't copy ")
-            .push_info(self.session_id.to_smolstr())
-            .push_str(" to clipboard: ")
-            .push_str(self.inner.to_smolstr());
-        (notify::Level::Error, msg)
-    }
-}
-
-impl notify::Error for NeovimConnectToServerError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut msg = notify::Message::new();
-        msg.push_str("couldn't connect to the server: ")
-            .push_str(self.inner.to_smolstr());
-        (notify::Level::Error, msg)
-    }
-}
-
-impl notify::Error for NeovimLspRootError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut msg = notify::Message::from_str("LSP root at ");
-        msg.push_invalid(&self.root_dir).push_str(" is not an absolute path");
-        (notify::Level::Error, msg)
-    }
-}
-
-// impl notify::Error for NeovimNewSessionError {
-//     fn to_message(&self) -> (notify::Level, notify::Message) {
-//         let mut msg = notify::Message::new();
-//         match self {
-//             Self::Knock(err) => match err {
-//                 client::KnockError::SendKnock(err) => {
-//                     msg.push_str("couldn't send start request to server: ")
-//                         .push_str(err.to_smolstr());
-//                 },
-//                 client::KnockError::RecvWelcome(err) => {
-//                     msg.push_str(
-//                         "couldn't receive start response from server: ",
-//                     )
-//                     .push_str(err.to_smolstr());
-//                 },
-//                 client::KnockError::Bouncer(err) => {
-//                     msg.push_str("authentication failed: ")
-//                         .push_str(err.to_smolstr());
-//                 },
-//                 client::KnockError::SessionEndedBeforeJoining => {
-//                     unreachable!();
-//                 },
-//             },
-//             Self::TcpConnect(err) => {
-//                 msg.push_str("couldn't connect to the server: ")
-//                     .push_str(err.to_smolstr());
-//             },
-//         }
-//         (notify::Level::Error, msg)
-//     }
-// }
-
-impl notify::Error for NeovimDataDirError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut msg = notify::Message::new();
-
-        match self {
-            Self::Home(err) => return err.to_message(),
-            Self::XdgDataHomeNotAbsolute(data_dir) => {
-                msg.push_str("found data directory at ")
-                    .push_invalid(data_dir)
-                    .push_str(", but it's not an absolute path");
-            },
-            Self::XdgDataHomeNotUtf8(data_dir) => {
-                msg.push_str("found data directory at ")
-                    .push_invalid(data_dir.display().to_smolstr())
-                    .push_str(", but it's not a valid UTF-8 string");
-            },
-        }
-
-        (notify::Level::Error, msg)
-    }
-}
-
-impl notify::Error for NeovimHomeDirError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut msg = notify::Message::new();
-
-        match self {
-            Self::CouldntFindHome => {
-                msg.push_str("couldn't find home directory");
-            },
-            Self::HomeDirNotAbsolute(home_dir) => {
-                msg.push_str("found home directory at ")
-                    .push_invalid(home_dir.display().to_smolstr())
-                    .push_str(", but it's not an absolute path");
-            },
-            Self::HomeDirNotUtf8(home_dir) => {
-                msg.push_str("found home directory at ")
-                    .push_invalid(home_dir.display().to_smolstr())
-                    .push_str(", but it's not a valid UTF-8 string");
-            },
-        }
-
-        (notify::Level::Error, msg)
     }
 }
 

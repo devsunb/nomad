@@ -11,7 +11,7 @@ use fxhash::FxHashMap;
 
 use crate::context::BorrowedInner;
 use crate::module::{Module, ModuleId};
-use crate::notify::{Name, Namespace};
+use crate::notify::Namespace;
 use crate::plugin::{PanicInfo, PanicLocation, Plugin, PluginId};
 use crate::{AgentId, Borrowed, Context, Editor, Shared};
 
@@ -293,7 +293,7 @@ impl<Ed: Editor> Plugin<Ed> for ResumeUnwinding {
 }
 
 impl<Ed: Editor> Module<Ed> for ResumeUnwinding {
-    const NAME: Name = "";
+    const NAME: &str = "";
     type Config = ();
 
     fn api(&self, _: &mut crate::module::ApiCtx<Ed>) {

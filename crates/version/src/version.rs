@@ -1,7 +1,6 @@
 use core::fmt;
 
 use editor::module::Constant;
-use editor::notify::Name;
 
 use crate::generated;
 
@@ -48,7 +47,7 @@ struct SemanticVersion {
 }
 
 impl Constant for Version {
-    const NAME: Name = "version";
+    const NAME: &str = "version";
 }
 
 impl fmt::Display for Version {

@@ -9,14 +9,13 @@ use collab_project::fs::{File, FileMut, FsOp, Node, NodeMut};
 use collab_project::text::{CursorId, SelectionId, TextReplacement};
 use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
 use compact_str::format_compact;
-use editor::{AgentId, Buffer, Context, Editor, Shared, notify};
+use editor::{AgentId, Buffer, Context, Editor, Shared};
 use fs::{File as _, Fs, Symlink as _};
 use fxhash::{FxHashMap, FxHashSet};
 use puff::directory::LocalDirectoryId;
 use puff::file::{GlobalFileId, LocalFileId};
 use puff::ops::Rename;
 use smallvec::SmallVec;
-use smol_str::ToSmolStr;
 
 use crate::CollabEditor;
 use crate::convert::Convert;
@@ -38,7 +37,11 @@ pub struct ProjectHandle<Ed: CollabEditor> {
 }
 
 /// TODO: docs.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, derive_more::Display, cauchy::Error, PartialEq)]
+#[display(
+    "cannot start a project at {new_root}, another one is already running at \
+     {existing_root} (sessions cannot overlap)"
+)]
 pub struct OverlappingProjectError {
     /// TODO: docs.
     pub existing_root: AbsPathBuf,
@@ -252,9 +255,10 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                 );
             },
             Message::ProjectResponse(_) => {
-                ctx.emit_error(notify::Message::from_display(
-                    "received unexpected ProjectResponse message",
-                ));
+                tracing::error!(
+                    title = %ctx.namespace().dot_separated(),
+                    "received unexpected ProjectResponse message"
+                );
             },
             Message::RemovedCursor(cursor_deletion) => {
                 self.integrate_cursor_deletion(cursor_deletion, ctx).await
@@ -1661,18 +1665,6 @@ impl<Ed: CollabEditor> Drop for ProjectGuard<Ed> {
         self.projects.starting.with_mut(|set| {
             set.remove(&self.root);
         });
-    }
-}
-
-impl notify::Error for OverlappingProjectError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let mut msg = notify::Message::new();
-        msg.push_str("cannot start a new session at ")
-            .push_info(self.new_root.to_smolstr())
-            .push_str(", another one is already running at ")
-            .push_info(self.existing_root.to_smolstr())
-            .push_str(" (sessions cannot overlap)");
-        (notify::Level::Error, msg)
     }
 }
 

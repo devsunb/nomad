@@ -4,7 +4,6 @@ use core::error::Error;
 
 use abs_path::{AbsPathBuf, NodeName, node};
 use editor::module::{ApiCtx, Empty, Module};
-use editor::notify::Name;
 use editor::plugin::{PanicInfo, Plugin};
 use editor::{Borrowed, Context};
 use either::Either;
@@ -64,7 +63,7 @@ impl Nomad {
 }
 
 impl Plugin<Neovim> for Nomad {
-    const COMMAND_NAME: Name = "Mad";
+    const COMMAND_NAME: &str = "Mad";
 
     fn handle_panic(
         &self,
@@ -88,7 +87,7 @@ impl Plugin<Neovim> for Nomad {
 }
 
 impl Module<Neovim> for Nomad {
-    const NAME: Name = "nomad";
+    const NAME: &str = "nomad";
 
     type Config = Empty;
 

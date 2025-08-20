@@ -719,7 +719,6 @@ dependencies = [
  "neovim",
  "serde",
  "smallvec",
- "smol_str",
  "tracing",
 ]
 

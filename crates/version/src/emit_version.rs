@@ -1,6 +1,6 @@
 use editor::action::Action;
 use editor::command::ToCompletionFn;
-use editor::notify::{Message, Name};
+use editor::notify::{Message};
 use editor::{Borrowed, Context, Editor};
 
 use crate::VERSION;
@@ -17,7 +17,7 @@ impl EmitVersion {
 }
 
 impl<Ed: Editor> Action<Ed> for EmitVersion {
-    const NAME: Name = "version";
+    const NAME: &str = "version";
 
     type Args<'args> = ();
     type Return = ();

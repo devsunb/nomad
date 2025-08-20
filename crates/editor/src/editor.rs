@@ -79,7 +79,7 @@ pub trait Editor: 'static + Sized {
     type BufferSaveError: Debug + 'static;
 
     /// TODO: docs.
-    type CreateBufferError: Debug + notify::Error;
+    type CreateBufferError: Debug;
 
     /// TODO: docs.
     type SerializeError: Debug + notify::Error;

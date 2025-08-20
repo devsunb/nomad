@@ -38,7 +38,6 @@ fxhash = { workspace = true }
 indexmap = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true, features = ["const_new"] }
-smol_str = { workspace = true }
 tracing = { workspace = true }
 
 # Mock-only dependencies.

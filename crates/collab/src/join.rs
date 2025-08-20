@@ -1,6 +1,5 @@
 //! TODO: docs.
 
-use core::fmt;
 use core::ops::Deref;
 use core::ptr::NonNull;
 use std::io;
@@ -18,7 +17,6 @@ use collab_types::{Message, Peer, ProjectRequest, puff};
 use editor::Context;
 use editor::action::AsyncAction;
 use editor::command::{self, ToCompletionFn};
-use editor::notify::{self, Name};
 use editor::shared::{MultiThreaded, Shared};
 use fs::{Directory, File, Fs, Symlink};
 use futures_util::{AsyncReadExt, SinkExt, StreamExt, future, stream};
@@ -38,7 +36,6 @@ use crate::project::{
     Projects,
 };
 use crate::session::Session;
-use crate::start::UserNotLoggedInError;
 
 /// The `Action` used to join an existing collaborative editing session.
 #[derive(cauchy::Clone)]
@@ -147,7 +144,7 @@ impl<Ed: CollabEditor> Join<Ed> {
 }
 
 impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
-    const NAME: Name = "join";
+    const NAME: &str = "join";
 
     type Args = command::Parse<SessionId<Ed>>;
 
@@ -366,7 +363,8 @@ async fn write_file<Fs: fs::Fs>(
 }
 
 /// The type of error that can occur when [`Join`]ing a session fails.
-#[derive(cauchy::Debug, cauchy::PartialEq)]
+#[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
+#[display("{_0}")]
 pub enum JoinError<Ed: CollabEditor> {
     /// TODO: docs.
     ConnectToServer(Ed::ConnectToServerError),
@@ -387,6 +385,7 @@ pub enum JoinError<Ed: CollabEditor> {
     RequestProject(RequestProjectError),
 
     /// TODO: docs.
+    #[display("The user is not logged in")]
     UserNotLoggedIn,
 
     /// TODO: docs.
@@ -395,7 +394,8 @@ pub enum JoinError<Ed: CollabEditor> {
 
 /// The type of error that can occur when requesting the state of the project
 /// from another peer in a session fails.
-#[derive(Debug, cauchy::PartialEq, cauchy::From)]
+#[derive(Debug, derive_more::Display, cauchy::PartialEq, cauchy::From)]
+#[display("{_0}")]
 pub enum RequestProjectError {
     /// TODO: docs.
     DecodeProject(
@@ -419,11 +419,13 @@ pub enum RequestProjectError {
     ),
 
     /// TODO: docs.
+    #[display("The session ended before we could join it")]
     SessionEnded,
 }
 
 /// TODO: docs.
-#[derive(cauchy::Debug, cauchy::PartialEq)]
+#[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
+#[display("{_0}")]
 pub enum WriteProjectError<Fs: fs::Fs> {
     /// TODO: docs.
     CreateDirectory(<Fs::Directory as fs::Directory>::CreateDirectoryError),
@@ -488,52 +490,3 @@ impl Deref for ProjectPtr {
 
 /// SAFETY: `&Project` is not aliased.
 unsafe impl Send for ProjectPtr {}
-
-impl<Ed: CollabEditor> notify::Error for JoinError<Ed> {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        match self {
-            Self::ConnectToServer(err) => err.to_message(),
-            Self::DefaultDirForRemoteProjects(err) => err.to_message(),
-            Self::WriteProject(err) => err.to_message(),
-            Self::Knock(_err) => todo!(),
-            Self::OverlappingProject(err) => err.to_message(),
-            Self::ProjectFilter(_err) => todo!(),
-            Self::RequestProject(err) => err.to_message(),
-            Self::UserNotLoggedIn => {
-                UserNotLoggedInError::<Ed>::new().to_message()
-            },
-        }
-    }
-}
-
-impl<Fs: fs::Fs> notify::Error for WriteProjectError<Fs> {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        let err: &dyn fmt::Display = match self {
-            Self::CreateDirectory(err) => err,
-            Self::CreateFile(err) => err,
-            Self::CreateSymlink(err) => err,
-            Self::ClearRoot(err) => err,
-            Self::DeleteNodeAtRoot(err) => err,
-            Self::CreateRootDirectory(err) => err,
-            Self::GetNodeAtRoot(err) => err,
-            Self::WriteFile(err) => err,
-        };
-        (notify::Level::Error, notify::Message::from_display(err))
-    }
-}
-
-impl notify::Error for RequestProjectError {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        match self {
-            Self::DecodeProject(_err) => todo!(),
-            Self::RecvResponse(_err) => todo!(),
-            Self::SendRequest(_err) => todo!(),
-            Self::SessionEnded => (
-                notify::Level::Error,
-                notify::Message::from_str(
-                    "session ended before we could join it",
-                ),
-            ),
-        }
-    }
-}

@@ -1,6 +1,5 @@
 use auth::AuthInfos;
 use editor::module::{ApiCtx, Module};
-use editor::notify::Name;
 use editor::{Borrowed, Context, Shared};
 
 use crate::config::Config;
@@ -37,7 +36,7 @@ impl<Ed: CollabEditor> Collab<Ed> {
         Leave::from(self).call_inner(ctx).await
     }
 
-    /// Returns a handle to the project for the given [`SessionId`], if any.
+    /// Returns a handle to the project with the given session ID, if any.
     pub fn project(
         &self,
         session_id: SessionId<Ed>,
@@ -63,7 +62,7 @@ impl<Ed: CollabEditor> Collab<Ed> {
 }
 
 impl<Ed: CollabEditor> Module<Ed> for Collab<Ed> {
-    const NAME: Name = "collab";
+    const NAME: &str = "collab";
 
     type Config = Config;
 

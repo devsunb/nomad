@@ -10,7 +10,7 @@ use core::str::FromStr;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use collab_types::Peer;
-use editor::{ByteOffset, Context, Editor, notify};
+use editor::{ByteOffset, Context, Editor};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::{config, join, leave, start, yank};
@@ -39,7 +39,7 @@ pub trait CollabEditor: Editor {
 
     /// The type of error returned by
     /// [`connect_to_server`](CollabEditor::connect_to_server).
-    type ConnectToServerError: Debug + notify::Error;
+    type ConnectToServerError: Debug;
 
     /// The type of error returned by
     /// [`copy_session_id`](CollabEditor::copy_session_id).
@@ -47,13 +47,13 @@ pub trait CollabEditor: Editor {
 
     /// The type of error returned by
     /// [`default_dir_for_remote_projects`](CollabEditor::default_dir_for_remote_projects).
-    type DefaultDirForRemoteProjectsError: Debug + notify::Error;
+    type DefaultDirForRemoteProjectsError: Debug;
 
     /// The type of error returned by [`home_dir`](CollabEditor::home_dir).
-    type HomeDirError: Debug + notify::Error;
+    type HomeDirError: Debug;
 
     /// The type of error returned by [`lsp_root`](CollabEditor::lsp_root).
-    type LspRootError: Debug + notify::Error;
+    type LspRootError: Debug;
 
     /// The type of error returned by
     /// [`project_filter`](CollabEditor::project_filter).
