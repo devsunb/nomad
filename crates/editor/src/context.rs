@@ -1,7 +1,7 @@
 use core::any::Any;
 use core::marker::PhantomData;
 use core::ops::{Deref, DerefMut};
-use core::{fmt, panic};
+use core::panic;
 
 use abs_path::AbsPath;
 use executor::{
@@ -97,12 +97,6 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
         agent_id: AgentId,
     ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
         self.with_editor(|ed| ed.create_buffer(file_path, agent_id)).await
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn debug<T: fmt::Debug>(&mut self, value: T) {
-        self.with_editor(|ed| ed.debug(value));
     }
 
     /// TODO: docs.

@@ -67,11 +67,6 @@ impl<Ed: EditorAdapter> Editor for Ed {
     }
 
     #[inline]
-    fn debug<T: std::fmt::Debug>(&mut self, value: T) {
-        self.deref_mut().debug(value)
-    }
-
-    #[inline]
     fn fs(&mut self) -> Self::Fs {
         self.deref_mut().fs()
     }
