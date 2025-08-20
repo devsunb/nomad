@@ -1,5 +1,5 @@
 use abs_path::AbsPath;
-use editor::notify::{self, MaybeResult};
+use editor::notify::MaybeResult;
 use editor::{AccessMut, AgentId, ApiValue, Edit, Editor, Shared};
 use executor::BackgroundSpawner;
 use fxhash::FxHashMap;
@@ -339,11 +339,5 @@ impl<Fs: Default> Default for Mock<Fs> {
 impl Drop for EventHandle {
     fn drop(&mut self) {
         self.callbacks.inner.with_mut(|map| map.remove(self.key));
-    }
-}
-
-impl<Fs: fs::Fs> notify::Error for CreateBufferError<Fs> {
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        (notify::Level::Error, notify::Message::from_display(&self.inner))
     }
 }

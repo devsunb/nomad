@@ -1,8 +1,6 @@
 use core::error::Error;
-use core::fmt;
 
 use abs_path::{AbsPath, AbsPathBuf};
-use editor::notify;
 use fs::{Directory, File, MetadataNameError, Symlink};
 use futures_util::select;
 use futures_util::stream::{self, StreamExt};
@@ -171,16 +169,5 @@ impl<Fs: fs::Fs> RootMarker<Fs> for GitDirectory {
         use fs::Metadata;
         Ok(metadata.name().map_err(ReadMetadataError::Name)? == ".git"
             && metadata.node_kind().is_dir())
-    }
-}
-
-impl<Fs, M> notify::Error for FindRootError<Fs, M>
-where
-    Fs: fs::Fs,
-    M: RootMarker<Fs>,
-    M::Error: fmt::Display,
-{
-    fn to_message(&self) -> (notify::Level, notify::Message) {
-        (notify::Level::Error, notify::Message::from_display(self))
     }
 }

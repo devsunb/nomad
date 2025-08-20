@@ -14,7 +14,7 @@ use executor::{
 use futures_lite::future::{self, FutureExt};
 
 use crate::module::Module;
-use crate::notify::{self, Emitter, Namespace, NotificationId};
+use crate::notify::Namespace;
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
 use crate::{Access, AccessMut, AgentId, Buffer, Editor, Shared};
@@ -70,28 +70,6 @@ pub struct BorrowedInner<'a, Ed: Editor> {
 }
 
 impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
-    /// TODO: docs.
-    #[inline]
-    pub fn emit_err<Err>(&mut self, err: Err) -> NotificationId
-    where
-        Err: notify::Error,
-    {
-        let namespace = self.namespace().clone();
-        self.with_editor(move |ed| ed.emit_err(&namespace, err))
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn emit_error(&mut self, message: notify::Message) -> NotificationId {
-        self.emit_message(notify::Level::Error, message)
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn emit_info(&mut self, message: notify::Message) -> NotificationId {
-        self.emit_message(notify::Level::Info, message)
-    }
-
     /// TODO: docs.
     #[inline]
     pub fn for_each_buffer(&mut self, fun: impl FnMut(Ed::Buffer<'_>)) {
@@ -162,23 +140,6 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     #[inline]
     pub fn with_editor<T>(&mut self, fun: impl FnOnce(&mut Ed) -> T) -> T {
         self.borrow.with_mut(move |state| fun(state))
-    }
-
-    #[inline]
-    pub(crate) fn emit_message(
-        &mut self,
-        level: notify::Level,
-        message: notify::Message,
-    ) -> NotificationId {
-        let namespace = self.namespace().clone();
-        self.with_editor(move |ed| {
-            ed.emitter().emit(notify::Notification {
-                level,
-                namespace: &namespace,
-                message,
-                updates_prev: None,
-            })
-        })
     }
 
     #[inline]

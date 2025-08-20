@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 editor = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
 
 [build-dependencies]
 chrono = { workspace = true }

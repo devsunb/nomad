@@ -1,6 +1,5 @@
 use editor::action::Action;
 use editor::command::ToCompletionFn;
-use editor::notify::{Message};
 use editor::{Borrowed, Context, Editor};
 
 use crate::VERSION;
@@ -23,7 +22,7 @@ impl<Ed: Editor> Action<Ed> for EmitVersion {
     type Return = ();
 
     fn call(&mut self, _: Self::Args<'_>, ctx: &mut Context<Ed, Borrowed>) {
-        ctx.emit_info(Message::from_display(VERSION));
+        tracing::info!(title = %ctx.namespace().dot_separated(), "{VERSION}");
     }
 }
 

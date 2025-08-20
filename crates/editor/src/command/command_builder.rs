@@ -51,7 +51,8 @@ impl<Ed: Editor> CommandBuilder<Ed> {
             Box::new(move |args, ctx| match Cmd::Args::try_from(args) {
                 Ok(args) => command.call(args, ctx),
                 Err(err) => {
-                    ctx.emit_err(err);
+                    let namespace = ctx.namespace().clone();
+                    ctx.with_editor(move |ed| ed.emit_err(&namespace, err));
                 },
             });
         self.handlers.insert(Cmd::NAME, handler);

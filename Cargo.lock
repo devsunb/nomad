@@ -3418,6 +3418,7 @@ dependencies = [
  "editor",
  "git2",
  "serde",
+ "tracing",
 ]
 
 [[package]]
