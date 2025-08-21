@@ -1,10 +1,11 @@
-use editor::{AgentId, Edit};
+use editor::{AccessMut, AgentId, Edit, Editor};
 use nohash::IntMap as NoHashMap;
 use smallvec::smallvec_inline;
 
+use crate::Neovim;
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{Callbacks, Event, EventKind, Events, EventsBorrow};
-use crate::oxi::api;
+use crate::oxi::{self, api};
 
 #[derive(Clone, Copy)]
 pub(crate) struct OnBytes(pub(crate) BufferId);
@@ -30,29 +31,43 @@ impl Event for OnBytes {
     }
 
     #[inline]
-    fn register(&self, events: EventsBorrow) {
+    fn register(&self, _: EventsBorrow) {
+        todo!();
+    }
+
+    #[inline]
+    fn register2(
+        &self,
+        _: &mut Events,
+        mut nvim: impl AccessMut<Neovim> + 'static,
+    ) {
         let buffer_id = self.0;
 
-        let bufs_state = events.borrow.buffers_state.clone();
-        let events = events.handle;
+        let callback = move |args: api::opts::OnBytesArgs| {
+            nvim.with_mut(|nvim| {
+                let Some(callbacks) = nvim
+                    .events2
+                    .on_buffer_edited
+                    .get(&buffer_id)
+                    .map(|cbs| cbs.cloned())
+                    else {
+                        return true;
+                    };
 
-        let opts = api::opts::BufAttachOpts::builder()
-            .on_bytes(move |args: api::opts::OnBytesArgs| {
-                let Some((callbacks, edited_by)) = events.with_mut(|ev| {
-                    let callbacks = ev.on_buffer_edited.get(&buffer_id)?;
-
-                    let edited_by = ev
+                    let edited_by = nvim
+                        .events2
                         .agent_ids
                         .edited_buffer
                         .remove(&buffer_id)
-                        .unwrap_or(AgentId::UNKNOWN);
+                        .unwrap_or(AgentId::UNKNOWN) ;
 
-                    Some((callbacks.cloned(), edited_by))
-                }) else {
+                let Some(buffer) = nvim.buffer(buffer_id) else {
+                    tracing::error!(
+                        buffer_name = ?api::Buffer::from(buffer_id).get_name().ok(),
+                        "BufEnter triggered for an invalid buffer",
+                    );
                     return true;
                 };
-
-                let buffer = Events::buffer(buffer_id, &events, &bufs_state);
 
                 let edit = Edit {
                     made_by: edited_by,
@@ -67,10 +82,15 @@ impl Event for OnBytes {
 
                 false
             })
-            .build();
+        };
 
         api::Buffer::from(buffer_id)
-            .attach(false, &opts)
+            .attach(
+                false,
+                &api::opts::BufAttachOpts::builder()
+                    .on_bytes(oxi::Function::from_fn_mut(callback))
+                    .build(),
+            )
             .expect("couldn't attach to buffer");
     }
 
