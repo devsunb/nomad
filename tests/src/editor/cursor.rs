@@ -119,6 +119,7 @@ impl<Ed: Editor> CursorEvent<Ed> {
         ctx: &mut Context<Ed>,
     ) -> impl FusedStream<Item = Self> + Unpin + use<Ed> {
         let (tx, rx) = flume::unbounded();
+        let editor = ctx.editor();
 
         mem::forget(ctx.on_cursor_created(move |cursor, created_by| {
             let event = Self::Created(CursorCreation {
@@ -128,25 +129,27 @@ impl<Ed: Editor> CursorEvent<Ed> {
             });
             let _ = tx.send(event);
 
-            mem::forget(cursor.on_moved({
-                let tx = tx.clone();
+            let tx2 = tx.clone();
+            mem::forget(cursor.on_moved(
                 move |cursor, moved_by| {
                     let event = Self::Moved(CursorMovement {
                         buffer_id: cursor.buffer_id(),
                         byte_offset: cursor.byte_offset(),
                         moved_by,
                     });
-                    let _ = tx.send(event);
-                }
-            }));
+                    let _ = tx2.send(event);
+                },
+                editor.clone(),
+            ));
 
-            mem::forget(cursor.on_removed({
-                let tx = tx.clone();
+            let tx2 = tx.clone();
+            mem::forget(cursor.on_removed(
                 move |_selection_id, removed_by| {
                     let event = Self::Removed(removed_by);
-                    let _ = tx.send(event);
-                }
-            }));
+                    let _ = tx2.send(event);
+                },
+                editor.clone(),
+            ));
         }));
 
         rx.into_stream()

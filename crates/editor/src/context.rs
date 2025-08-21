@@ -104,7 +104,8 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     where
         Fun: FnMut(&Ed::Cursor<'_>, AgentId) + 'static,
     {
-        self.with_editor(move |ed| ed.on_cursor_created(fun))
+        let editor = self.editor();
+        self.with_editor(move |ed| ed.on_cursor_created(fun, editor))
     }
 
     /// TODO: docs.
@@ -113,7 +114,8 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     where
         Fun: FnMut(&Ed::Selection<'_>, AgentId) + 'static,
     {
-        self.with_editor(move |ed| ed.on_selection_created(fun))
+        let editor = self.editor();
+        self.with_editor(move |ed| ed.on_selection_created(fun, editor))
     }
 
     /// TODO: docs.

@@ -261,7 +261,7 @@ impl Editor for Neovim {
     fn on_buffer_created<Fun>(
         &mut self,
         mut fun: Fun,
-        access: impl AccessMut<Self> + Clone + 'static,
+        this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
@@ -269,12 +269,16 @@ impl Editor for Neovim {
         self.events2.insert2(
             events::BufReadPost,
             move |(buf, created_by)| fun(buf, created_by),
-            access,
+            this,
         )
     }
 
     #[inline]
-    fn on_cursor_created<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
+    fn on_cursor_created<Fun>(
+        &mut self,
+        mut fun: Fun,
+        _this: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static,
     {
@@ -288,7 +292,11 @@ impl Editor for Neovim {
     }
 
     #[inline]
-    fn on_selection_created<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
+    fn on_selection_created<Fun>(
+        &mut self,
+        mut fun: Fun,
+        _this: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
     {

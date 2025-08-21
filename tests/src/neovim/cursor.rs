@@ -64,15 +64,17 @@ trait ByteOffsetExt {
         use editor::{Buffer, Cursor};
 
         let (tx, rx) = flume::unbounded();
+        let editor = ctx.editor();
 
         ctx.with_borrowed(|ctx| {
             ctx.current_buffer().unwrap().for_each_cursor(move |cursor| {
-                mem::forget(cursor.on_moved({
-                    let tx = tx.clone();
+                let tx2 = tx.clone();
+                mem::forget(cursor.on_moved(
                     move |cursor, _moved_by| {
-                        let _ = tx.send(cursor.byte_offset());
-                    }
-                }));
+                        let _ = tx2.send(cursor.byte_offset());
+                    },
+                    editor.clone(),
+                ));
             })
         });
 

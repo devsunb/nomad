@@ -19,6 +19,7 @@ impl SelectionEvent {
         ctx: &mut Context<Ed>,
     ) -> impl FusedStream<Item = Self> + Unpin + use<Ed> {
         let (tx, rx) = flume::unbounded();
+        let editor = ctx.editor();
 
         let buffer_id = ctx.with_borrowed(|ctx| {
             ctx.current_buffer().expect("no current buffer").id()
@@ -33,20 +34,22 @@ impl SelectionEvent {
                 let byte_range = selection.byte_range();
                 let _ = tx.send(Self::Created(byte_range));
 
-                mem::forget(selection.on_moved({
-                    let tx = tx.clone();
+                let tx2 = tx.clone();
+                mem::forget(selection.on_moved(
                     move |selection, _moved_by| {
                         let byte_range = selection.byte_range();
-                        let _ = tx.send(Self::Moved(byte_range));
-                    }
-                }));
+                        let _ = tx2.send(Self::Moved(byte_range));
+                    },
+                    editor.clone(),
+                ));
 
-                mem::forget(selection.on_removed({
-                    let tx = tx.clone();
+                let tx2 = tx.clone();
+                mem::forget(selection.on_removed(
                     move |_selection_id, _removed_by| {
-                        let _ = tx.send(Self::Removed);
-                    }
-                }));
+                        let _ = tx2.send(Self::Removed);
+                    },
+                    editor.clone(),
+                ));
             },
         ));
 

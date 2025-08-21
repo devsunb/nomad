@@ -112,12 +112,20 @@ pub trait Editor: 'static + Sized {
         Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static;
 
     /// TODO: docs.
-    fn on_cursor_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_cursor_created<Fun>(
+        &mut self,
+        fun: Fun,
+        this: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static;
 
     /// TODO: docs.
-    fn on_selection_created<Fun>(&mut self, fun: Fun) -> Self::EventHandle
+    fn on_selection_created<Fun>(
+        &mut self,
+        fun: Fun,
+        this: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static;
 

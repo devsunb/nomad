@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use editor::{AgentId, Buffer, ByteOffset, Cursor, Shared};
+use editor::{AccessMut, AgentId, Buffer, ByteOffset, Cursor, Shared};
 
 use crate::Neovim;
 use crate::buffer::{BufferId, NeovimBuffer, Point};
@@ -77,7 +77,11 @@ impl Cursor for NeovimCursor<'_> {
     }
 
     #[inline]
-    fn on_moved<Fun>(&self, fun: Fun) -> EventHandle
+    fn on_moved<Fun>(
+        &self,
+        fun: Fun,
+        _editor: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> EventHandle
     where
         Fun: FnMut(&NeovimCursor, AgentId) + 'static,
     {
@@ -124,7 +128,11 @@ impl Cursor for NeovimCursor<'_> {
     }
 
     #[inline]
-    fn on_removed<Fun>(&self, mut fun: Fun) -> EventHandle
+    fn on_removed<Fun>(
+        &self,
+        mut fun: Fun,
+        _editor: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> EventHandle
     where
         Fun: FnMut(BufferId, AgentId) + 'static,
     {

@@ -1,4 +1,4 @@
-use crate::{AgentId, ByteOffset, Editor};
+use crate::{AccessMut, AgentId, ByteOffset, Editor};
 
 /// TODO: docs.
 pub trait Cursor {
@@ -22,7 +22,11 @@ pub trait Cursor {
     ///
     /// The callback is given a reference to this cursor, plus the [`AgentId`]
     /// of the agent that moved it.
-    fn on_moved<Fun>(&self, fun: Fun) -> <Self::Editor as Editor>::EventHandle
+    fn on_moved<Fun>(
+        &self,
+        fun: Fun,
+        editor: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> <Self::Editor as Editor>::EventHandle
     where
         Fun: FnMut(&<Self::Editor as Editor>::Cursor<'_>, AgentId) + 'static;
 
@@ -34,6 +38,7 @@ pub trait Cursor {
     fn on_removed<Fun>(
         &self,
         fun: Fun,
+        editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle
     where
         Fun: FnMut(<Self::Editor as Editor>::CursorId, AgentId) + 'static;

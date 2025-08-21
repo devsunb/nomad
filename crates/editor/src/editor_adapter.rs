@@ -155,7 +155,7 @@ impl<Ed: EditorAdapter> Editor for Ed {
     fn on_buffer_created<Fun>(
         &mut self,
         mut fun: Fun,
-        access: impl AccessMut<Self> + Clone + 'static,
+        this: impl AccessMut<Self> + Clone + 'static,
     ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
@@ -164,28 +164,42 @@ impl<Ed: EditorAdapter> Editor for Ed {
             move |inner, agent_id| {
                 fun(BufferAdapter::from_ref(inner), agent_id);
             },
-            access.map_mut(Deref::deref, DerefMut::deref_mut),
+            this.map_mut(Deref::deref, DerefMut::deref_mut),
         )
     }
 
     #[inline]
-    fn on_cursor_created<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
+    fn on_cursor_created<Fun>(
+        &mut self,
+        mut fun: Fun,
+        this: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static,
     {
-        self.deref_mut().on_cursor_created(move |inner, agent_id| {
-            fun(CursorAdapter::from_ref(inner), agent_id);
-        })
+        self.deref_mut().on_cursor_created(
+            move |inner, agent_id| {
+                fun(CursorAdapter::from_ref(inner), agent_id);
+            },
+            this.map_mut(Deref::deref, DerefMut::deref_mut),
+        )
     }
 
     #[inline]
-    fn on_selection_created<Fun>(&mut self, mut fun: Fun) -> Self::EventHandle
+    fn on_selection_created<Fun>(
+        &mut self,
+        mut fun: Fun,
+        this: impl AccessMut<Self> + Clone + 'static,
+    ) -> Self::EventHandle
     where
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
     {
-        self.deref_mut().on_selection_created(move |inner, agent_id| {
-            fun(SelectionAdapter::from_ref(inner), agent_id);
-        })
+        self.deref_mut().on_selection_created(
+            move |inner, agent_id| {
+                fun(SelectionAdapter::from_ref(inner), agent_id);
+            },
+            this.map_mut(Deref::deref, DerefMut::deref_mut),
+        )
     }
 
     #[inline]
@@ -361,26 +375,34 @@ impl<'a, Ed: EditorAdapter> Cursor for CursorAdapter<'a, Ed> {
     fn on_moved<Fun>(
         &self,
         mut fun: Fun,
+        editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle
     where
         Fun: FnMut(&<Self::Editor as Editor>::Cursor<'_>, AgentId) + 'static,
     {
-        self.inner.on_moved(move |inner, agent_id| {
-            fun(CursorAdapter::from_ref(inner), agent_id);
-        })
+        self.inner.on_moved(
+            move |inner, agent_id| {
+                fun(CursorAdapter::from_ref(inner), agent_id);
+            },
+            editor.map_mut(Deref::deref, DerefMut::deref_mut),
+        )
     }
 
     #[inline]
     fn on_removed<Fun>(
         &self,
         mut fun: Fun,
+        editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle
     where
         Fun: FnMut(<Self::Editor as Editor>::CursorId, AgentId) + 'static,
     {
-        self.inner.on_removed(move |cursor_id, agent_id| {
-            fun(cursor_id, agent_id);
-        })
+        self.inner.on_removed(
+            move |cursor_id, agent_id| {
+                fun(cursor_id, agent_id);
+            },
+            editor.map_mut(Deref::deref, DerefMut::deref_mut),
+        )
     }
 }
 
@@ -406,26 +428,34 @@ impl<'a, Ed: EditorAdapter> Selection for SelectionAdapter<'a, Ed> {
     fn on_moved<Fun>(
         &self,
         mut fun: Fun,
+        editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle
     where
         Fun:
             FnMut(&<Self::Editor as Editor>::Selection<'_>, AgentId) + 'static,
     {
-        self.inner.on_moved(move |inner, agent_id| {
-            fun(SelectionAdapter::from_ref(inner), agent_id);
-        })
+        self.inner.on_moved(
+            move |inner, agent_id| {
+                fun(SelectionAdapter::from_ref(inner), agent_id);
+            },
+            editor.map_mut(Deref::deref, DerefMut::deref_mut),
+        )
     }
 
     #[inline]
     fn on_removed<Fun>(
         &self,
         mut fun: Fun,
+        editor: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> <Self::Editor as Editor>::EventHandle
     where
         Fun: FnMut(<Self::Editor as Editor>::SelectionId, AgentId) + 'static,
     {
-        self.inner.on_removed(move |selection_id, agent_id| {
-            fun(selection_id, agent_id);
-        })
+        self.inner.on_removed(
+            move |selection_id, agent_id| {
+                fun(selection_id, agent_id);
+            },
+            editor.map_mut(Deref::deref, DerefMut::deref_mut),
+        )
     }
 }

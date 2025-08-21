@@ -409,7 +409,11 @@ impl editor::Cursor for Cursor<'_> {
         }
     }
 
-    fn on_moved<Fun>(&self, fun: Fun) -> mock::EventHandle
+    fn on_moved<Fun>(
+        &self,
+        fun: Fun,
+        _: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> mock::EventHandle
     where
         Fun: FnMut(&Cursor<'_>, AgentId) + 'static,
     {
@@ -418,7 +422,11 @@ impl editor::Cursor for Cursor<'_> {
         self.buffer.callbacks.insert(cb_kind)
     }
 
-    fn on_removed<Fun>(&self, fun: Fun) -> mock::EventHandle
+    fn on_removed<Fun>(
+        &self,
+        fun: Fun,
+        _: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> mock::EventHandle
     where
         Fun: FnMut(CursorId, AgentId) + 'static,
     {
@@ -463,7 +471,11 @@ impl editor::Selection for Selection<'_> {
         self.selection_id
     }
 
-    fn on_moved<Fun>(&self, fun: Fun) -> mock::EventHandle
+    fn on_moved<Fun>(
+        &self,
+        fun: Fun,
+        _: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> mock::EventHandle
     where
         Fun: FnMut(&Selection<'_>, AgentId) + 'static,
     {
@@ -474,7 +486,11 @@ impl editor::Selection for Selection<'_> {
         self.buffer.callbacks.insert(cb_kind)
     }
 
-    fn on_removed<Fun>(&self, fun: Fun) -> mock::EventHandle
+    fn on_removed<Fun>(
+        &self,
+        fun: Fun,
+        _: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> mock::EventHandle
     where
         Fun: FnMut(SelectionId, AgentId) + 'static,
     {

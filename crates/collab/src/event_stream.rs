@@ -616,28 +616,30 @@ impl<Ed: CollabEditor> CursorStreams<Ed> {
     fn insert(
         &mut self,
         cursor: &Ed::Cursor<'_>,
-        _editor: impl AccessMut<Ed> + Clone + 'static,
+        editor: impl AccessMut<Ed> + Clone + 'static,
     ) {
-        let moved_handle = cursor.on_moved({
-            let event_tx = self.event_tx.clone();
+        let event_tx = self.event_tx.clone();
+        let moved_handle = cursor.on_moved(
             move |cursor, _moved_by| {
                 let _ = event_tx.send(event::CursorEvent {
                     cursor_id: cursor.id(),
                     kind: event::CursorEventKind::Moved(cursor.byte_offset()),
                 });
-            }
-        });
+            },
+            editor.clone(),
+        );
 
-        let removed_handle = cursor.on_removed({
-            let event_tx = self.event_tx.clone();
+        let event_tx = self.event_tx.clone();
+        let removed_handle = cursor.on_removed(
             move |cursor_id, _removed_by| {
                 let event = event::CursorEvent {
                     cursor_id,
                     kind: event::CursorEventKind::Removed,
                 };
                 let _ = event_tx.send(event);
-            }
-        });
+            },
+            editor.clone(),
+        );
 
         let cursor_handles = [moved_handle, removed_handle];
 
@@ -711,10 +713,10 @@ impl<Ed: CollabEditor> SelectionStreams<Ed> {
     fn insert(
         &mut self,
         selection: &Ed::Selection<'_>,
-        _editor: impl AccessMut<Ed> + Clone + 'static,
+        editor: impl AccessMut<Ed> + Clone + 'static,
     ) {
-        let moved_handle = selection.on_moved({
-            let event_tx = self.event_tx.clone();
+        let event_tx = self.event_tx.clone();
+        let moved_handle = selection.on_moved(
             move |selection, _moved_by| {
                 let _ = event_tx.send(event::SelectionEvent {
                     selection_id: selection.id(),
@@ -722,19 +724,21 @@ impl<Ed: CollabEditor> SelectionStreams<Ed> {
                         selection.byte_range(),
                     ),
                 });
-            }
-        });
+            },
+            editor.clone(),
+        );
 
-        let removed_handle = selection.on_removed({
-            let event_tx = self.event_tx.clone();
+        let event_tx = self.event_tx.clone();
+        let removed_handle = selection.on_removed(
             move |selection_id, _removed_by| {
                 let event = event::SelectionEvent {
                     selection_id,
                     kind: event::SelectionEventKind::Removed,
                 };
                 let _ = event_tx.send(event);
-            }
-        });
+            },
+            editor.clone(),
+        );
 
         let selection_handles = [moved_handle, removed_handle];
 

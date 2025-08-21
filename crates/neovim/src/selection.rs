@@ -2,7 +2,7 @@
 
 use core::ops::Range;
 
-use editor::{AgentId, Buffer, ByteOffset, Selection, Shared};
+use editor::{AccessMut, AgentId, Buffer, ByteOffset, Selection, Shared};
 
 use crate::buffer::{BufferId, NeovimBuffer};
 use crate::events::{EventHandle, Events};
@@ -48,7 +48,11 @@ impl Selection for NeovimSelection<'_> {
     }
 
     #[inline]
-    fn on_moved<Fun>(&self, fun: Fun) -> EventHandle
+    fn on_moved<Fun>(
+        &self,
+        fun: Fun,
+        _editor: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> EventHandle
     where
         Fun: FnMut(&NeovimSelection, AgentId) + 'static,
     {
@@ -98,7 +102,11 @@ impl Selection for NeovimSelection<'_> {
     }
 
     #[inline]
-    fn on_removed<Fun>(&self, mut fun: Fun) -> EventHandle
+    fn on_removed<Fun>(
+        &self,
+        mut fun: Fun,
+        _editor: impl AccessMut<Self::Editor> + Clone + 'static,
+    ) -> EventHandle
     where
         Fun: FnMut(BufferId, AgentId) + 'static,
     {
