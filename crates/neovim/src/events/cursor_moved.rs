@@ -11,7 +11,7 @@ use crate::oxi::{self, api};
 pub(crate) struct CursorMoved(pub(crate) BufferId);
 
 impl Event for CursorMoved {
-    type Args<'a> = (&'a NeovimCursor<'a>, AgentId);
+    type Args<'a> = (NeovimCursor<'a>, AgentId);
     type Container<'ev> = &'ev mut NoHashMap<BufferId, Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -64,10 +64,10 @@ impl Event for CursorMoved {
                     return true;
                 };
 
-                let cursor = NeovimCursor::new(buffer);
+                let mut cursor = NeovimCursor::new(buffer);
 
                 for callback in callbacks {
-                    callback((&cursor, moved_by));
+                    callback((cursor.reborrow(), moved_by));
                 }
 
                 false

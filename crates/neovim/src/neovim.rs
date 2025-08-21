@@ -1,3 +1,5 @@
+use core::mem;
+
 use ::serde::{Deserialize, Serialize};
 use abs_path::AbsPath;
 use editor::notify::Namespace;
@@ -57,10 +59,10 @@ impl Neovim {
     /// TODO: docs.
     #[inline]
     pub fn highlight_range<'a>(
-        &'a self,
+        &'a mut self,
         handle: &'a HighlightRangeHandle,
     ) -> Option<HighlightRange<'a>> {
-        self.buffer_inner(handle.buffer_id())
+        self.buffer(handle.buffer_id())
             .map(|buffer| HighlightRange::new(buffer, handle))
     }
 
@@ -75,16 +77,6 @@ impl Neovim {
     #[inline]
     pub fn tracing_layer<S>(&mut self) -> crate::TracingLayer<S> {
         crate::TracingLayer::new(self)
-    }
-
-    /// Same as [`buffer`](Self::buffer), but it doesn't need an exclusive
-    /// reference.
-    #[inline]
-    pub(crate) fn buffer_inner(
-        &self,
-        buf_id: BufferId,
-    ) -> Option<NeovimBuffer<'_>> {
-        NeovimBuffer::new(buf_id, &self.events, &self.buffers_state)
     }
 
     /// Should only be called by the `#[neovim::plugin]` macro.
@@ -133,16 +125,24 @@ impl Editor for Neovim {
 
     #[inline]
     fn buffer(&mut self, buf_id: Self::BufferId) -> Option<Self::Buffer<'_>> {
-        self.buffer_inner(buf_id)
+        NeovimBuffer::new(buf_id, &mut self.events2, &self.buffers_state)
     }
 
     #[inline]
     fn buffer_at_path(&mut self, path: &AbsPath) -> Option<Self::Buffer<'_>> {
-        oxi::api::list_bufs().find_map(|buf| {
-            let id = BufferId::new(buf);
-            let buffer = self.buffer_inner(id)?;
-            (&*buffer.path() == path).then_some(buffer)
-        })
+        for buf_id in oxi::api::list_bufs().map(BufferId::new) {
+            let Some(buffer) = self.buffer(buf_id) else { continue };
+            if &*buffer.path() == path {
+                // SAFETY: Rust is dumb.
+                let buffer = unsafe {
+                    mem::transmute::<Self::Buffer<'_>, Self::Buffer<'_>>(
+                        buffer,
+                    )
+                };
+                return Some(buffer);
+            }
+        }
+        None
     }
 
     #[inline]
@@ -161,7 +161,7 @@ impl Editor for Neovim {
         Fun: FnMut(Self::Buffer<'_>),
     {
         for buf_id in oxi::api::list_bufs().map(BufferId::new) {
-            if let Some(buffer) = self.buffer_inner(buf_id) {
+            if let Some(buffer) = self.buffer(buf_id) {
                 fun(buffer);
             }
         }
@@ -190,7 +190,7 @@ impl Editor for Neovim {
         this.with_mut(|this| {
             let buf_id = this.create_buf(true, false, agent_id);
 
-            let buffer = this.buffer_inner(buf_id).expect("just created");
+            let mut buffer = this.buffer(buf_id).expect("just created");
 
             // 'eol' is turned on by default, so avoid inserting the file's
             // trailing newline or we'll get an extra line.
@@ -267,7 +267,7 @@ impl Editor for Neovim {
     where
         Fun: FnMut(&Self::Buffer<'_>, AgentId) + 'static,
     {
-        self.events2.insert2(
+        self.events2.insert(
             events::BufReadPost,
             move |(buf, created_by)| fun(buf, created_by),
             this,
@@ -283,11 +283,9 @@ impl Editor for Neovim {
     where
         Fun: FnMut(&Self::Cursor<'_>, AgentId) + 'static,
     {
-        self.events2.insert2(
+        self.events2.insert(
             events::BufEnter,
-            move |(buf, focused_by)| {
-                fun(&NeovimCursor::new(buf.clone()), focused_by)
-            },
+            move |(buf, focused_by)| fun(&NeovimCursor::new(buf), focused_by),
             this,
         )
     }
@@ -301,7 +299,7 @@ impl Editor for Neovim {
     where
         Fun: FnMut(&Self::Selection<'_>, AgentId) + 'static,
     {
-        self.events2.insert2(
+        self.events2.insert(
             events::ModeChanged,
             move |(buf, old_mode, new_mode, changed_by)| {
                 if new_mode.has_selected_range()
@@ -309,7 +307,7 @@ impl Editor for Neovim {
                     // already displaying a selected range.
                     && !old_mode.has_selected_range()
                 {
-                    fun(&NeovimSelection::new(buf.clone()), changed_by);
+                    fun(&NeovimSelection::new(buf), changed_by);
                 }
             },
             this,

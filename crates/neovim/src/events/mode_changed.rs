@@ -10,7 +10,7 @@ use crate::oxi::{self, api};
 pub(crate) struct ModeChanged;
 
 impl Event for ModeChanged {
-    type Args<'a> = (&'a NeovimBuffer<'a>, ModeStr<'a>, ModeStr<'a>, AgentId);
+    type Args<'a> = (NeovimBuffer<'a>, ModeStr<'a>, ModeStr<'a>, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -46,7 +46,7 @@ impl Event for ModeChanged {
                     return true;
                 };
 
-                let Some(buffer) = nvim.buffer(buffer_id) else {
+                let Some(mut buffer) = nvim.buffer(buffer_id) else {
                     tracing::error!(
                         buffer_name = ?args.buffer.get_name().ok(),
                         "ModeChanged triggered for an invalid buffer",
@@ -64,7 +64,12 @@ impl Event for ModeChanged {
                 let new_mode = ModeStr::new(new_mode);
 
                 for callback in callbacks {
-                    callback((&buffer, old_mode, new_mode, AgentId::UNKNOWN));
+                    callback((
+                        buffer.reborrow(),
+                        old_mode,
+                        new_mode,
+                        AgentId::UNKNOWN,
+                    ));
                 }
 
                 false

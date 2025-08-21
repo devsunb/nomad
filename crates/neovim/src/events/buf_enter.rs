@@ -9,7 +9,7 @@ use crate::oxi::{self, api};
 pub(crate) struct BufEnter;
 
 impl Event for BufEnter {
-    type Args<'a> = (&'a NeovimBuffer<'a>, AgentId);
+    type Args<'a> = (NeovimBuffer<'a>, AgentId);
     type Container<'ev> = &'ev mut Option<Callbacks<Self>>;
     type RegisterOutput = AutocmdId;
 
@@ -52,7 +52,7 @@ impl Event for BufEnter {
                     .remove(&buffer_id)
                     .unwrap_or(AgentId::UNKNOWN);
 
-                let Some(buffer) = nvim.buffer(buffer_id) else {
+                let Some(mut buffer) = nvim.buffer(buffer_id) else {
                     tracing::error!(
                         buffer_name = ?args.buffer.get_name().ok(),
                         "BufEnter triggered for an invalid buffer",
@@ -61,7 +61,7 @@ impl Event for BufEnter {
                 };
 
                 for callback in callbacks {
-                    callback((&buffer, focused_by));
+                    callback((buffer.reborrow(), focused_by));
                 }
 
                 false

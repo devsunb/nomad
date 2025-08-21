@@ -141,51 +141,25 @@ impl Events {
     }
 
     pub(crate) fn insert<T: Event>(
-        events: Shared<Self>,
-        event: T,
-        fun: impl FnMut(T::Args<'_>) + 'static,
+        &self,
+        _event: T,
+        _callback: impl FnMut(T::Args<'_>) + 'static,
+        _nvim: impl AccessMut<Neovim> + Clone + 'static,
     ) -> EventHandle {
-        let event_key = events.with_mut(|this| {
-            if let Some(callbacks) = event.container(this).get_mut(event.key())
-            {
-                return callbacks.insert(fun);
-            }
-
-            let output = todo!();
-
-            let mut callbacks = Callbacks::new(output);
-
-            let event_key = callbacks.insert(fun);
-
-            event.container(this).insert(event.key(), callbacks);
-
-            event_key
-        });
-
-        let event_kind = event.kind();
-
-        EventHandle::new(event_key, event_kind, events)
-    }
-
-    pub(crate) fn insert2<T: Event>(
-        &mut self,
-        event: T,
-        callback: impl FnMut(T::Args<'_>) + 'static,
-        nvim: impl AccessMut<Neovim> + Clone + 'static,
-    ) -> EventHandle {
-        let callback_key = if let Some(callbacks) =
-            event.container(self).get_mut(event.key())
-        {
-            callbacks.insert(callback)
-        } else {
-            let register_output = event.register(self, nvim);
-            let mut callbacks = Callbacks::new(register_output);
-            let callback_key = callbacks.insert(callback);
-            event.container(self).insert(event.key(), callbacks);
-            callback_key
-        };
-
-        EventHandle { inner: smallvec_inline![(callback_key, event.kind())] }
+        todo!();
+        // let callback_key = if let Some(callbacks) =
+        //     event.container(self).get_mut(event.key())
+        // {
+        //     callbacks.insert(callback)
+        // } else {
+        //     let register_output = event.register(self, nvim);
+        //     let mut callbacks = Callbacks::new(register_output);
+        //     let callback_key = callbacks.insert(callback);
+        //     event.container(self).insert(event.key(), callbacks);
+        //     callback_key
+        // };
+        //
+        // EventHandle { inner: smallvec_inline![(callback_key, event.kind())] }
     }
 
     pub(crate) fn new(augroup_name: &str) -> Self {

@@ -69,7 +69,7 @@ impl UneditableEndOfLine {
 
 impl BufferLocalOpts {
     #[inline]
-    fn new(buffer_id: BufferId) -> Self {
+    pub(crate) fn new(buffer_id: BufferId) -> Self {
         Self(api::opts::OptionOpts::builder().buffer(buffer_id.into()).build())
     }
 }

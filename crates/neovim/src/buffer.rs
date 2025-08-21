@@ -7,7 +7,7 @@ use core::iter::FusedIterator;
 use core::ops::Range;
 use std::borrow::Cow;
 
-use abs_path::{AbsPath, AbsPathBuf};
+use abs_path::AbsPath;
 use compact_str::CompactString;
 use editor::{
     AccessMut,
@@ -26,15 +26,14 @@ use crate::convert::Convert;
 use crate::cursor::NeovimCursor;
 use crate::decoration_provider::{self, DecorationProvider};
 use crate::events::{self, EventHandle, Events};
-use crate::option::{NeovimOption, UneditableEndOfLine};
+use crate::option::{BufferLocalOpts, NeovimOption, UneditableEndOfLine};
 use crate::oxi::{self, BufHandle, String as NvimString, api, mlua};
 
 /// TODO: docs.
-#[derive(Clone)]
 pub struct NeovimBuffer<'a> {
-    path: AbsPathBuf,
+    path: Cow<'a, AbsPath>,
     id: BufferId,
-    events: &'a Shared<Events>,
+    pub(crate) events: &'a mut Events,
     state: &'a BuffersState,
 }
 
@@ -207,11 +206,6 @@ impl<'a> NeovimBuffer<'a> {
         out.with_mut(Option::take).expect("function wasn't called")
     }
 
-    #[inline]
-    pub(crate) fn events(&self) -> Shared<Events> {
-        self.events.clone()
-    }
-
     /// Returns the text in the given point range.
     #[track_caller]
     #[inline]
@@ -285,7 +279,7 @@ impl<'a> NeovimBuffer<'a> {
     #[inline]
     pub(crate) fn new(
         id: BufferId,
-        events: &'a Shared<Events>,
+        events: &'a mut Events,
         state: &'a BuffersState,
     ) -> Option<Self> {
         let buffer = api::Buffer::from(id);
@@ -295,7 +289,7 @@ impl<'a> NeovimBuffer<'a> {
         }
 
         let path = match buffer.get_name() {
-            Ok(name) => name.to_str().ok()?.parse().ok()?,
+            Ok(name) => Cow::Owned(name.to_str().ok()?.parse().ok()?),
             Err(_) => return None,
         };
 
@@ -391,7 +385,7 @@ impl<'a> NeovimBuffer<'a> {
     #[track_caller]
     #[inline]
     pub(crate) fn replace_text_in_point_range(
-        &self,
+        &mut self,
         mut delete_range: Range<Point>,
         insert_text: &str,
         agent_id: AgentId,
@@ -448,48 +442,46 @@ impl<'a> NeovimBuffer<'a> {
         let insert_after_uneditable_eol = should_clamp_start;
 
         if should_unset_uneditable_eol {
-            self.events.with_mut(|events| {
-                if !events.contains(&events::OnBytes(self.id())) {
-                    return;
-                }
+            if !self.events.contains(&events::OnBytes(self.id())) {
+                return;
+            }
 
-                // We're about to:
-                //
-                // 1) unset the buffer's uneditable eol setting, which will
-                //    trigger a set event on UneditableEndOfLine;
-                // 2) call set_text(), which will trigger an OnBytes event;
-                //
-                // Since both events are triggered by the same replacement, the
-                // edit event handlers should only be called once, so we skip
-                // the next UneditableEndOfLine event if OnBytes is triggered.
-                let is_on_bytes_triggered =
-                    !delete_range.is_empty() || !insert_text.is_empty();
+            // We're about to:
+            //
+            // 1) unset the buffer's uneditable eol setting, which will
+            //    trigger a set event on UneditableEndOfLine;
+            // 2) call set_text(), which will trigger an OnBytes event;
+            //
+            // Since both events are triggered by the same replacement, the
+            // edit event handlers should only be called once, so we skip the
+            // next UneditableEndOfLine event if OnBytes is triggered.
+            let is_on_bytes_triggered =
+                !delete_range.is_empty() || !insert_text.is_empty();
 
-                if is_on_bytes_triggered {
-                    self.state.skip_next_uneditable_eol.set(true);
+            if is_on_bytes_triggered {
+                self.state.skip_next_uneditable_eol.set(true);
 
-                    // Extend the end of the deleted range by one byte
-                    // to account for having deleted the trailing newline.
+                // Extend the end of the deleted range by one byte to account
+                // for having deleted the trailing newline.
+                self.state
+                    .on_bytes_replacement_extend_deletion_end_by_one
+                    .set(true);
+
+                if insert_after_uneditable_eol {
+                    // Make the inserted text start at the next line to ignore
+                    // the newline that we're about to re-add.
                     self.state
-                        .on_bytes_replacement_extend_deletion_end_by_one
+                        .on_bytes_replacement_insertion_starts_at_next_line
                         .set(true);
-
-                    if insert_after_uneditable_eol {
-                        // Make the inserted text start at the next line to
-                        // ignore the newline that we're about to re-add.
-                        self.state
-                            .on_bytes_replacement_insertion_starts_at_next_line
-                            .set(true);
-                    }
-                } else {
-                    // OnBytes is not triggered, so set the AgentId that
-                    // removed the UneditableEndOfLine because we won't skip
-                    // the next event on it.
-                    events.agent_ids.set_uneditable_eol.set(agent_id);
                 }
-            });
+            } else {
+                // OnBytes is not triggered, so set the AgentId that removed
+                // the UneditableEndOfLine because we won't skip the next event
+                // on it.
+                self.events.agent_ids.set_uneditable_eol.set(agent_id);
+            }
 
-            UneditableEndOfLine.set(false, &self.into());
+            UneditableEndOfLine.set(false, &BufferLocalOpts::new(self.id()));
         }
 
         let lines =
@@ -635,6 +627,16 @@ impl<'a> NeovimBuffer<'a> {
         !self.is_empty()
             && self.has_uneditable_eol()
             && point == self.point_of_eof()
+    }
+
+    #[inline]
+    pub(crate) fn reborrow(&mut self) -> NeovimBuffer<'_> {
+        NeovimBuffer {
+            path: Cow::Borrowed(&*self.path),
+            id: self.id,
+            events: self.events,
+            state: self.state,
+        }
     }
 
     /// Returns the byte length of the line at the given index, *without* any
@@ -856,11 +858,12 @@ impl<'a> Buffer for NeovimBuffer<'a> {
                 continue;
             }
 
-            self.events.with_mut(|events| {
-                if events.contains(&events::OnBytes(self.id())) {
-                    events.agent_ids.edited_buffer.insert(self.id(), agent_id);
-                }
-            });
+            if self.events.contains(&events::OnBytes(self.id())) {
+                self.events
+                    .agent_ids
+                    .edited_buffer
+                    .insert(self.id(), agent_id);
+            }
 
             let range = replacement.removed_range();
             let deletion_start = self.point_of_byte(range.start);
@@ -898,7 +901,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
         Fun: FnMut(NeovimCursor),
     {
         if self.is_focused() {
-            fun(NeovimCursor::new(self.clone()));
+            fun(NeovimCursor::new(self.reborrow()));
         }
     }
 
@@ -906,62 +909,61 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     fn on_edited<Fun>(
         &self,
         fun: Fun,
-        _: impl AccessMut<Self::Editor> + Clone + 'static,
+        nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
     where
         Fun: FnMut(&NeovimBuffer, &Edit) + 'static,
     {
         let fun = Shared::<Fun>::new(fun);
 
-        let on_bytes_handle =
-            Events::insert(self.events.clone(), events::OnBytes(self.id()), {
-                let fun = fun.clone();
-                move |(this, edit)| {
-                    fun.with_mut(|fun| fun(this, edit));
+        let fun2 = fun.clone();
+        let on_bytes_handle = self.events.insert(
+            events::OnBytes(self.id()),
+            move |(this, edit)| {
+                fun2.with_mut(|fun| fun(this, edit));
 
-                    if this.has_uneditable_eol() {
-                        // If the buffer has an uneditable eol, then:
-                        //
-                        // - if the buffer was empty and text is inserted the
-                        // eol "activates", and we should notify the user that
-                        // a \n was inserted;
-                        //
-                        // - if all the text is deleted and the buffer is now
-                        // empty the eol "deactivates", and we should notify
-                        // the user that a \n was deleted;
+                if this.has_uneditable_eol() {
+                    // If the buffer has an uneditable eol, then:
+                    //
+                    // - if the buffer was empty and text is inserted the
+                    // eol "activates", and we should notify the user that
+                    // a \n was inserted;
+                    //
+                    // - if all the text is deleted and the buffer is now
+                    // empty the eol "deactivates", and we should notify
+                    // the user that a \n was deleted;
 
-                        let buf_len = this.byte_len();
-                        let edit_len_delta = edit.byte_delta();
-                        let edit_len_delta_abs = edit_len_delta.unsigned_abs();
+                    let buf_len = this.byte_len();
+                    let edit_len_delta = edit.byte_delta();
+                    let edit_len_delta_abs = edit_len_delta.unsigned_abs();
 
-                        let replacement = if edit_len_delta.is_positive()
-                            && edit_len_delta_abs + 1 == buf_len
-                        {
-                            Replacement::insertion(edit_len_delta_abs, "\n")
-                        } else if edit_len_delta.is_negative() && buf_len == 0
-                        {
-                            Replacement::removal(0..1)
-                        } else {
-                            return;
-                        };
+                    let replacement = if edit_len_delta.is_positive()
+                        && edit_len_delta_abs + 1 == buf_len
+                    {
+                        Replacement::insertion(edit_len_delta_abs, "\n")
+                    } else if edit_len_delta.is_negative() && buf_len == 0 {
+                        Replacement::removal(0..1)
+                    } else {
+                        return;
+                    };
 
-                        let edit = Edit {
-                            made_by: AgentId::UNKNOWN,
-                            replacements: smallvec_inline![replacement],
-                        };
+                    let edit = Edit {
+                        made_by: AgentId::UNKNOWN,
+                        replacements: smallvec_inline![replacement],
+                    };
 
-                        fun.with_mut(|fun| fun(this, &edit));
-                    }
+                    fun2.with_mut(|fun| fun(this, &edit));
                 }
-            });
+            },
+            nvim.clone(),
+        );
 
         // Setting/unsetting the uneditable eol behaves as if
         // deleting/inserting a trailing newline, so we need to react to it.
 
         let buffer_id = self.id();
 
-        let uneditable_eol_set_handle = Events::insert(
-            self.events.clone(),
+        let uneditable_eol_set_handle = self.events.insert(
             UneditableEndOfLine,
             move |(buf, was_set, is_set, set_by)| {
                 // Ignore event if setting didn't change, if it changed for a
@@ -999,6 +1001,7 @@ impl<'a> Buffer for NeovimBuffer<'a> {
 
                 fun.with_mut(|fun| fun(buf, &edit));
             },
+            nvim,
         );
 
         on_bytes_handle.merge(uneditable_eol_set_handle)
@@ -1008,15 +1011,15 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     fn on_removed<Fun>(
         &self,
         mut fun: Fun,
-        _: impl AccessMut<Self::Editor> + Clone + 'static,
+        nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
     where
         Fun: FnMut(BufferId, AgentId) + 'static,
     {
-        Events::insert(
-            self.events.clone(),
+        self.events.insert(
             events::BufUnload(self.id()),
             move |(this, removed_by)| fun(this.id(), removed_by),
+            nvim,
         )
     }
 
@@ -1024,15 +1027,15 @@ impl<'a> Buffer for NeovimBuffer<'a> {
     fn on_saved<Fun>(
         &self,
         mut fun: Fun,
-        _: impl AccessMut<Self::Editor> + Clone + 'static,
+        nvim: impl AccessMut<Self::Editor> + Clone + 'static,
     ) -> EventHandle
     where
         Fun: FnMut(&NeovimBuffer, AgentId) + 'static,
     {
-        Events::insert(
-            self.events.clone(),
+        self.events.insert(
             events::BufWritePost(self.id()),
             move |(this, saved_by)| fun(this, saved_by),
+            nvim,
         )
     }
 
