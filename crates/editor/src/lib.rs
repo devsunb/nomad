@@ -1,6 +1,7 @@
 //! TODO: docs.
 
 #![feature(min_specialization)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 mod access;
 pub mod action;
@@ -13,6 +14,7 @@ mod context;
 mod cursor;
 mod editor;
 mod editor_adapter;
+mod event_handle;
 pub mod module;
 pub mod notify;
 pub mod plugin;
@@ -30,5 +32,6 @@ pub use context::{BorrowState, Borrowed, Context, NotBorrowed};
 pub use cursor::Cursor;
 pub use editor::Editor;
 pub use editor_adapter::EditorAdapter;
+pub use event_handle::EventHandle;
 pub use selection::Selection;
 pub use shared::Shared;

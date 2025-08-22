@@ -85,7 +85,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     /// TODO: docs.
     #[inline]
     pub fn editor(&self) -> impl AccessMut<Ed> + Clone + 'static {
-        self.borrow.state_handle().map_mut(Deref::deref, DerefMut::deref_mut)
+        self.state_handle().map_mut(Deref::deref, DerefMut::deref_mut)
     }
 
     /// TODO: docs.
@@ -162,6 +162,11 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
     }
 
     #[inline]
+    pub(crate) fn state_handle(&self) -> Shared<State<Ed>> {
+        self.borrow.state_handle()
+    }
+
+    #[inline]
     fn spawn_local_inner<T: 'static>(
         &mut self,
         fun: impl AsyncFnOnce(&mut Context<Ed>) -> T + 'static,
@@ -185,7 +190,7 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
         let mut ctx = Context::new(NotBorrowedInner {
             namespace: self.namespace().clone(),
             plugin_id: self.plugin_id(),
-            state_handle: self.borrow.state_handle(),
+            state_handle: self.state_handle(),
         });
         LocalTask::new(self.with_editor(move |ed| {
             ed.executor().local_spawner().spawn(async move {
