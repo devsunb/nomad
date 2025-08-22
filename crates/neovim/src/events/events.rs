@@ -9,7 +9,6 @@ use smallvec::{SmallVec, smallvec_inline};
 use crate::Neovim;
 use crate::buffer::BufferId;
 use crate::events::{self, AugroupId, CallbacksContainer, Event};
-use crate::oxi::api;
 
 /// TODO: docs.
 pub struct EventHandle {
@@ -156,13 +155,7 @@ impl Events {
         EventHandle { inner: smallvec_inline![(callback_key, event.kind())] }
     }
 
-    pub(crate) fn new(augroup_name: &str) -> Self {
-        let augroup_id = api::create_augroup(
-            augroup_name,
-            &api::opts::CreateAugroupOpts::builder().clear(true).build(),
-        )
-        .expect("couldn't create augroup");
-
+    pub(crate) fn new(augroup_id: AugroupId) -> Self {
         Self {
             augroup_id,
             agent_ids: Default::default(),

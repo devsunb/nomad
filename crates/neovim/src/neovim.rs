@@ -71,9 +71,10 @@ impl Neovim {
 
     /// Should only be called by the `#[neovim::plugin]` macro.
     #[doc(hidden)]
+    #[track_caller]
     #[inline]
-    pub fn new_plugin(augroup_name: &str) -> Self {
-        Self::new_inner(augroup_name, false)
+    pub fn new_plugin(plugin_name: &str) -> Self {
+        Self::new_inner(plugin_name, false)
     }
 
     #[inline]
@@ -100,17 +101,27 @@ impl Neovim {
         self.buffer(buffer_id).expect("just created the buffer")
     }
 
+    #[track_caller]
     #[cfg(feature = "test")]
-    pub(crate) fn new_test(augroup_name: &str) -> Self {
-        Self::new_inner(augroup_name, true)
+    pub(crate) fn new_test(test_name: &str) -> Self {
+        Self::new_inner(test_name, true)
     }
 
+    #[track_caller]
     #[inline]
-    fn new_inner(augroup_name: &str, reinstate_panic_hook: bool) -> Self {
+    fn new_inner(plugin_name: &str, reinstate_panic_hook: bool) -> Self {
+        let augroup_id = oxi::api::create_augroup(
+            plugin_name,
+            &oxi::api::opts::CreateAugroupOpts::builder().clear(true).build(),
+        )
+        .expect("couldn't create augroup");
+
+        let namespace_id = oxi::api::create_namespace(plugin_name);
+
         Self {
             buffers_state: BuffersState::default(),
-            decoration_provider: DecorationProvider::new(augroup_name),
-            events: Events::new(augroup_name),
+            decoration_provider: DecorationProvider::new(namespace_id),
+            events: Events::new(augroup_id),
             emitter: Default::default(),
             executor: Default::default(),
             reinstate_panic_hook,
