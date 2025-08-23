@@ -1,9 +1,9 @@
 //! TODO: docs.
 
-use editor::{AccessMut, AgentId, Buffer, Context, Editor};
+use editor::{AccessMut, AgentId, Buffer, Context};
 
 use crate::Neovim;
-use crate::buffer::BufferId;
+use crate::buffer::{BufferExt, BufferId};
 use crate::oxi::api;
 
 /// TODO: docs.
@@ -30,11 +30,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
     /// TODO: docs..
     fn create_and_focus_scratch_buffer(&mut self) -> BufferId {
         let buffer_id = self.create_scratch_buffer();
-        self.with_mut(|nvim| {
-            nvim.buffer(buffer_id)
-                .expect("just created the buffer")
-                .schedule_focus(AgentId::UNKNOWN)
-        });
+        api::Buffer::from(buffer_id).focus();
         buffer_id
     }
 

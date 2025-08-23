@@ -54,6 +54,14 @@ pub trait BufferExt {
             + point.byte_offset
     }
 
+    /// Sets the buffer of the currently focused window to this buffer.
+    #[inline]
+    fn focus(&self) {
+        api::Window::current()
+            .set_buf(&self.buffer())
+            .expect("couldn't set window buffer");
+    }
+
     /// Whether the [`UneditableEndOfLine`] is enabled for the buffer.
     #[inline]
     fn has_uneditable_eol(&self) -> bool {

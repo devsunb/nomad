@@ -400,9 +400,9 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
         let set_uneditable_eol_agent_id =
             self.nvim.events.agent_ids.set_uneditable_eol.clone();
 
-        // We schedule this because editing text in the buffer buffer will
-        // immediately trigger an OnBytes event, which would panic due to a
-        // double mutable borrow of Neovim.
+        // We schedule this because editing text in the buffer will immediately
+        // trigger an OnBytes event, which would panic due to a double mutable
+        // borrow of Neovim.
         oxi::schedule(move |()| {
             let mut buffer = api::Buffer::from(buffer_id);
 
@@ -430,9 +430,7 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
         // We schedule this because setting the current window's buffer will
         // immediately trigger a BufEnter event, which would panic due to a
         // double mutable borrow of Neovim.
-        oxi::schedule(move |()| {
-            api::Window::current().set_buf(&buffer).expect("buffer is valid");
-        });
+        oxi::schedule(move |()| buffer.focus());
     }
 
     #[inline]
