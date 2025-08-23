@@ -392,6 +392,9 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
             .filter(|repl| !repl.is_no_op())
             .collect::<SmallVec<[_; 1]>>();
 
+        let is_on_bytes_subscribed_to =
+            self.nvim.events.contains(&events::OnBytes(buffer_id));
+
         let buffers_state = self.nvim.buffers_state.clone();
 
         let edited_buffer_agent_id =
@@ -415,6 +418,7 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
                     deletion_start..deletion_end,
                     replacement.inserted_text(),
                     agent_id,
+                    is_on_bytes_subscribed_to,
                     &buffers_state,
                     &edited_buffer_agent_id,
                     &set_uneditable_eol_agent_id,
@@ -485,6 +489,7 @@ fn replace_text_in_point_range(
     mut delete_range: Range<Point>,
     insert_text: &str,
     agent_id: AgentId,
+    is_on_bytes_subscribed_to: bool,
     buffers_state: &BuffersState,
     edited_buffer_agent_id: &Shared<AgentId>,
     set_uneditable_eol_agent_id: &events::SetUneditableEolAgentIds,
@@ -540,6 +545,13 @@ fn replace_text_in_point_range(
     // replacement is delete 6..6, insert "World").
     let insert_after_uneditable_eol = should_clamp_start;
 
+    let is_on_bytes_triggered = is_on_bytes_subscribed_to
+        && (!delete_range.is_empty() || !insert_text.is_empty());
+
+    if is_on_bytes_triggered {
+        edited_buffer_agent_id.set(agent_id);
+    }
+
     if should_unset_uneditable_eol {
         // We're about to:
         //
@@ -551,8 +563,6 @@ fn replace_text_in_point_range(
         // Since both events are triggered by the same replacement, the
         // edit event handlers should only be called once, so we skip the
         // next UneditableEndOfLine event if OnBytes is triggered.
-        let is_on_bytes_triggered =
-            !delete_range.is_empty() || !insert_text.is_empty();
 
         if is_on_bytes_triggered {
             edited_buffer_agent_id.set(agent_id);
