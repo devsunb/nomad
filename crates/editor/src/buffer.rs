@@ -70,6 +70,16 @@ pub trait Buffer {
     fn path(&self) -> Cow<'_, AbsPath>;
 
     /// TODO: docs.
+    #[inline]
+    fn schedule_deletion(
+        &mut self,
+        byte_range: Range<ByteOffset>,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static {
+        self.schedule_replacement(Replacement::deletion(byte_range), agent_id)
+    }
+
+    /// TODO: docs.
     fn schedule_edit<R>(
         &mut self,
         replacements: R,
@@ -83,6 +93,30 @@ pub trait Buffer {
         &mut self,
         agent_id: AgentId,
     ) -> impl Future<Output = ()> + 'static;
+
+    /// TODO: docs.
+    #[inline]
+    fn schedule_insertion(
+        &mut self,
+        byte_offset: ByteOffset,
+        text: impl Into<SmolStr>,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static {
+        self.schedule_replacement(
+            Replacement::insertion(byte_offset, text),
+            agent_id,
+        )
+    }
+
+    /// TODO: docs.
+    #[inline]
+    fn schedule_replacement(
+        &mut self,
+        replacement: Replacement,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static {
+        self.schedule_edit(core::iter::once(replacement), agent_id)
+    }
 
     /// TODO: docs.
     fn schedule_save(
@@ -139,6 +173,12 @@ impl Edit {
 impl Replacement {
     /// TODO: docs.
     #[inline]
+    pub fn deletion(byte_range: Range<ByteOffset>) -> Self {
+        Self::new(byte_range, "")
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn inserted_text(&self) -> &str {
         &self.inserted_text
     }
@@ -163,12 +203,6 @@ impl Replacement {
         inserted_text: impl Into<SmolStr>,
     ) -> Self {
         Self { removed_range, inserted_text: inserted_text.into() }
-    }
-
-    /// TODO: docs.
-    #[inline]
-    pub fn removal(byte_range: Range<ByteOffset>) -> Self {
-        Self::new(byte_range, "")
     }
 
     /// TODO: docs.

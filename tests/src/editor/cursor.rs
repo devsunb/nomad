@@ -8,7 +8,6 @@ use editor::{
     Context,
     Cursor,
     Editor,
-    Replacement,
 };
 use futures_util::FutureExt;
 use futures_util::stream::{FusedStream, StreamExt};
@@ -22,8 +21,7 @@ pub(crate) async fn on_cursor_moved_1(ctx: &mut Context<impl TestEditor>) {
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buf_id.clone()).unwrap();
-        buf.schedule_edit([Replacement::insertion(0, "Hello world")], agent_id)
-            .boxed_local()
+        buf.schedule_insertion(0, "Hello world", agent_id).boxed_local()
     })
     .await;
 

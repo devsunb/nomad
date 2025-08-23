@@ -279,7 +279,7 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
                     {
                         Replacement::insertion(edit_len_delta_abs, "\n")
                     } else if edit_len_delta.is_negative() && buf_len == 0 {
-                        Replacement::removal(0..1)
+                        Replacement::deletion(0..1)
                     } else {
                         return;
                     };
@@ -320,7 +320,7 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
                 let replacement = match (was_set, is_set) {
                     // The trailing newline was deleted.
                     (true, false) => {
-                        Replacement::removal(byte_len..byte_len + 1)
+                        Replacement::deletion(byte_len..byte_len + 1)
                     },
                     // The trailing newline was added.
                     (false, true) => {

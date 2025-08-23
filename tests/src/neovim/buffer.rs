@@ -26,13 +26,13 @@ async fn deleting_trailing_newline_is_like_unsetting_eol(
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
         assert_eq!(buf.get_text(), "Hello\n");
-        let _ = buf.schedule_edit([Replacement::removal(0..6)], agent_id);
+        let _ = buf.schedule_deletion(0..6, agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
 
     assert_eq!(edit.made_by, agent_id);
-    assert_eq!(&*edit.replacements, &[Replacement::removal(0..6)]);
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(0..6)]);
 
     let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
     assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
@@ -54,8 +54,7 @@ async fn inserting_after_trailing_newline_unsets_eol(
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
         assert_eq!(buf.get_text(), "Hello\n");
-        let _ =
-            buf.schedule_edit([Replacement::insertion(6, "World")], agent_id);
+        let _ = buf.schedule_insertion(6, "World", agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
@@ -83,7 +82,7 @@ async fn inserting_nothing_after_trailing_newline_does_nothing(
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
         assert_eq!(buf.get_text(), "Hello\n");
-        let _ = buf.schedule_edit([Replacement::insertion(6, "")], agent_id);
+        let _ = buf.schedule_insertion(6, "", agent_id);
     });
 
     let sleep = async_io::Timer::after(Duration::from_millis(500));
@@ -114,7 +113,8 @@ async fn replacement_including_trailing_newline_unsets_eol(
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
         assert_eq!(buf.get_text(), "Hello\n");
-        let _ = buf.schedule_edit([Replacement::new(2..6, "y")], agent_id);
+        let _ =
+            buf.schedule_replacement(Replacement::new(2..6, "y"), agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
@@ -145,7 +145,7 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
     let edit = edit_stream.next().await.unwrap();
 
     assert!(edit.made_by.is_unknown());
-    assert_eq!(&*edit.replacements, &[Replacement::removal(5..6)]);
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(5..6)]);
 }
 
 #[neovim::test]
@@ -183,8 +183,7 @@ async fn inserting_in_empty_buf_with_eol_causes_newline_insertion(
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
-        let _ =
-            buf.schedule_edit([Replacement::insertion(0, "foo")], agent_id);
+        let _ = buf.schedule_insertion(0, "foo", agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
@@ -211,16 +210,16 @@ async fn deleting_all_in_buf_with_eol_causes_newline_deletion(
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
         assert_eq!(buf.get_text(), "Hello\n");
-        let _ = buf.schedule_edit([Replacement::removal(0..5)], agent_id);
+        let _ = buf.schedule_deletion(0..5, agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
     assert_eq!(edit.made_by, agent_id);
-    assert_eq!(&*edit.replacements, &[Replacement::removal(0..5)]);
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(0..5)]);
 
     let edit = edit_stream.next().await.unwrap();
     assert!(edit.made_by.is_unknown());
-    assert_eq!(&*edit.replacements, &[Replacement::removal(0..1)]);
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(0..1)]);
 }
 
 #[neovim::test]

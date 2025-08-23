@@ -38,7 +38,7 @@ pub(crate) async fn fuzz_edits(
                 let _ = ctx
                     .buffer(buf_id.clone())
                     .unwrap()
-                    .schedule_edit(iter::once(replacement.clone()), agent_id);
+                    .schedule_replacement(replacement.clone(), agent_id);
             });
 
             // Wait to be notified about the edit we just made.
