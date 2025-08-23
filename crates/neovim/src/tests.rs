@@ -19,11 +19,24 @@ pub trait NeovimExt: AccessMut<Neovim> {
             let scratch_buf_count = nvim.scratch_buffer_count;
             let file_name = format!("scratch-{scratch_buf_count}");
             nvim.scratch_buffer_count += 1;
+
             let file_path: abs_path::AbsPathBuf = std::env::temp_dir()
                 .join(file_name)
                 .try_into()
                 .expect("it's valid");
-            nvim.create_buffer(&file_path, AgentId::UNKNOWN).id()
+
+            let buffer = nvim.create_buffer(&file_path, AgentId::UNKNOWN);
+
+            api::set_option_value(
+                "swapfile",
+                false,
+                &api::opts::OptionOpts::builder()
+                    .buffer(buffer.clone())
+                    .build(),
+            )
+            .expect("couldn't turn off 'swapfile'");
+
+            buffer.id()
         })
     }
 
