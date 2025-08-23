@@ -14,7 +14,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
     }
 
     /// TODO: docs..
-    fn create_scratch_buffer(&mut self) -> BufferId {
+    fn create_scratch_buffer(&mut self, agent_id: AgentId) -> BufferId {
         self.with_mut(|nvim| {
             let scratch_buf_count = nvim.scratch_buffer_count;
             let file_name = format!("scratch-{scratch_buf_count}");
@@ -25,7 +25,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
                 .try_into()
                 .expect("it's valid");
 
-            let buffer = nvim.create_buffer(&file_path, AgentId::UNKNOWN);
+            let buffer = nvim.create_buffer(&file_path, agent_id);
 
             api::set_option_value(
                 "swapfile",
@@ -42,7 +42,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
 
     /// TODO: docs..
     fn create_and_focus_scratch_buffer(&mut self) -> BufferId {
-        let buffer_id = self.create_scratch_buffer();
+        let buffer_id = self.create_scratch_buffer(AgentId::UNKNOWN);
         api::Buffer::from(buffer_id).focus();
         buffer_id
     }

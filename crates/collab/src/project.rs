@@ -273,7 +273,7 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
                 let _ = self.integrate_fs_op(rename, ctx).await;
             },
             Message::SavedTextFile(file_id) => {
-                let _ = self.integrate_file_save(file_id, ctx).await;
+                self.integrate_file_save(file_id, ctx);
             },
         }
     }
@@ -402,27 +402,25 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         move_tooltip.await;
     }
 
-    async fn integrate_file_save(
+    fn integrate_file_save(
         &self,
         global_id: GlobalFileId,
         ctx: &mut Context<Ed>,
-    ) -> Result<(), Ed::BufferSaveError> {
+    ) {
         let Some((buf_id, agent_id)) = self.with_project(|proj| {
             let file_id = proj.inner.local_file_of_global(global_id)?;
             let buf_id = proj.id_maps.file2buffer.get(&file_id)?.clone();
             Some((buf_id, proj.agent_id))
         }) else {
-            return Ok(());
+            return;
         };
 
         ctx.with_borrowed(|ctx| {
             let mut buffer = ctx.buffer(buf_id).expect("invalid buffer ID");
             if Ed::should_remote_save_cause_local_save(&buffer) {
-                buffer.schedule_save(agent_id)
-            } else {
-                Ok(())
+                let _ = buffer.schedule_save(agent_id);
             }
-        })
+        });
     }
 
     /// TODO: docs.
@@ -606,10 +604,11 @@ impl<Ed: CollabEditor> ProjectHandle<Ed> {
         };
 
         ctx.with_borrowed(|ctx| {
-            ctx.buffer(buffer_id).expect("buffer exists").schedule_edit(
-                replacements.into_iter().map(Convert::convert),
-                agent_id,
-            );
+            let _ =
+                ctx.buffer(buffer_id).expect("buffer exists").schedule_edit(
+                    replacements.into_iter().map(Convert::convert),
+                    agent_id,
+                );
         });
     }
 

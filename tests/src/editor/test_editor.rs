@@ -1,4 +1,31 @@
+use core::fmt::Display;
+
 use editor::{AccessMut, AgentId, BorrowState, Buffer, Context, Editor};
+use futures_util::FutureExt;
+
+pub(crate) trait ContextExt<Ed: Editor> {
+    fn create_and_focus(
+        &mut self,
+        file_path: &abs_path::AbsPath,
+        agent_id: AgentId,
+    ) -> impl Future<Output = Ed::BufferId>
+    where
+        Ed::CreateBufferError: Display;
+
+    fn create_scratch_buffer(
+        &mut self,
+        agent_id: AgentId,
+    ) -> impl Future<Output = Ed::BufferId>
+    where
+        Ed: TestEditor;
+
+    fn create_and_focus_scratch_buffer(
+        &mut self,
+        agent_id: AgentId,
+    ) -> impl Future<Output = Ed::BufferId>
+    where
+        Ed: TestEditor;
+}
 
 pub(crate) trait TestEditor: Editor {
     fn create_scratch_buffer(
@@ -7,28 +34,16 @@ pub(crate) trait TestEditor: Editor {
     ) -> impl Future<Output = Self::BufferId>;
 }
 
-pub(crate) trait ContextExt<Ed: TestEditor> {
-    fn create_scratch_buffer(
-        &mut self,
-        agent_id: AgentId,
-    ) -> impl Future<Output = Ed::BufferId>;
-
-    fn create_and_focus_scratch_buffer(
-        &mut self,
-        agent_id: AgentId,
-    ) -> impl Future<Output = Ed::BufferId>;
-}
-
 #[cfg(feature = "neovim")]
 impl TestEditor for neovim::Neovim {
     async fn create_scratch_buffer(
         mut this: impl AccessMut<Self>,
-        _: AgentId,
+        agent_id: AgentId,
     ) -> Self::BufferId {
         use neovim::oxi::api::{self, opts};
         use neovim::tests::NeovimExt;
 
-        let buf_id = this.create_scratch_buffer();
+        let buf_id = this.create_scratch_buffer(agent_id);
 
         // The (fix)eol options mess us the fuzzy edits tests because inserting
         // text when the buffer is empty will also cause a trailing \n to be
@@ -68,27 +83,62 @@ impl TestEditor for mock::Mock {
     }
 }
 
-impl<Ed: TestEditor, Bs: BorrowState> ContextExt<Ed> for Context<Ed, Bs>
+impl<Ed: Editor, Bs: BorrowState> ContextExt<Ed> for Context<Ed, Bs>
 where
     Self: AccessMut<Ed>,
 {
+    async fn create_and_focus(
+        &mut self,
+        file_path: &abs_path::AbsPath,
+        agent_id: AgentId,
+    ) -> Ed::BufferId
+    where
+        Ed::CreateBufferError: Display,
+    {
+        match self.create_buffer(file_path, agent_id).await {
+            Ok(buffer_id) => {
+                focus_buffer::<Ed>(self, buffer_id.clone(), agent_id).await;
+                buffer_id
+            },
+            Err(err) => {
+                panic!("couldn't create buffer at {file_path}: {err}")
+            },
+        }
+    }
+
     async fn create_scratch_buffer(
         &mut self,
         agent_id: AgentId,
-    ) -> Ed::BufferId {
+    ) -> Ed::BufferId
+    where
+        Ed: TestEditor,
+    {
         Ed::create_scratch_buffer(self, agent_id).await
     }
 
     async fn create_and_focus_scratch_buffer(
         &mut self,
         agent_id: AgentId,
-    ) -> Ed::BufferId {
+    ) -> Ed::BufferId
+    where
+        Ed: TestEditor,
+    {
         let buffer_id = self.create_scratch_buffer(agent_id).await;
-        self.with_editor(|ed| {
-            if let Some(mut buffer) = ed.buffer(buffer_id.clone()) {
-                buffer.schedule_focus(agent_id);
-            }
-        });
+        focus_buffer::<Ed>(self, buffer_id.clone(), agent_id).await;
         buffer_id
     }
+}
+
+async fn focus_buffer<Ed: Editor>(
+    mut ctx: impl AccessMut<Ed>,
+    buffer_id: Ed::BufferId,
+    agent_id: AgentId,
+) {
+    ctx.with_mut(|ed| {
+        ed.buffer(buffer_id.clone())
+            .expect("invalid buffer ID")
+            .schedule_focus(agent_id)
+            .boxed_local()
+    })
+    .await
 }

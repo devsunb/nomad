@@ -1,3 +1,4 @@
+use core::convert::Infallible;
 use core::mem;
 
 use ::serde::{Deserialize, Serialize};
@@ -145,7 +146,7 @@ impl Editor for Neovim {
     type Selection<'a> = NeovimSelection<'a>;
     type SelectionId = BufferId;
 
-    type BufferSaveError = oxi::api::Error;
+    type BufferSaveError = Infallible;
     type CreateBufferError = fs::ReadFileToStringError<real_fs::RealFs>;
     type SerializeError = serde::NeovimSerializeError;
     type DeserializeError = serde::NeovimDeserializeError;

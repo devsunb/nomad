@@ -35,8 +35,10 @@ pub(crate) async fn fuzz_edits(
 
             // Apply the replacement to the buffer.
             ctx.with_borrowed(|ctx| {
-                let mut buf = ctx.buffer(buf_id.clone()).unwrap();
-                buf.schedule_edit(iter::once(replacement.clone()), agent_id);
+                let _ = ctx
+                    .buffer(buf_id.clone())
+                    .unwrap()
+                    .schedule_edit(iter::once(replacement.clone()), agent_id);
             });
 
             // Wait to be notified about the edit we just made.

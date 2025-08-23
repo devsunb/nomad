@@ -9,7 +9,7 @@ publish.workspace = true
 [features]
 nightly = ["nvim-oxi/neovim-nightly"]
 test = ["nvim-oxi/test", "nvim-oxi/test-terminator"]
-tracing = ["dep:flume", "dep:tracing-subscriber"]
+tracing = ["dep:tracing-subscriber"]
 
 [dependencies]
 abs-path = { workspace = true }
@@ -20,6 +20,8 @@ concurrent-queue = { workspace = true }
 derive_more = { workspace = true }
 editor = { workspace = true }
 executor = { workspace = true, features = ["async-task"] }
+flume = { workspace = true }
+futures-util = { workspace = true }
 fs = { workspace = true }
 neovim-macros = { path = "./macros" }
 nohash = { workspace = true }
@@ -33,7 +35,6 @@ strsim = { workspace = true }
 thread-pool = { workspace = true }
 tracing = { workspace = true }
 
-flume = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true }
 
 [lints]

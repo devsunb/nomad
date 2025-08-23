@@ -6,6 +6,8 @@ use fs::Fs;
 use futures_lite::future::{self, FutureExt};
 use mock::{EditorExt, Mock};
 
+use crate::editor::ContextExt;
+
 #[test]
 fn replicate_simple_project() {
     let fs1 = mock::fs! {
@@ -30,7 +32,7 @@ fn replicate_simple_project() {
     let run_peer1 = peer1.run_all(async move |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer1"));
         let agent_id = ctx.new_agent_id();
-        ctx.create_and_focus(path!("/foo/mars.txt"), agent_id).await.unwrap();
+        ctx.create_and_focus(path!("/foo/mars.txt"), agent_id).await;
         let session_id = collab.start(ctx).await.unwrap();
         session_id_tx.send(session_id).unwrap();
     });

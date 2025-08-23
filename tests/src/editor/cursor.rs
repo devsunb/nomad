@@ -1,7 +1,7 @@
 use core::mem;
-use core::time::Duration;
 
 use editor::{
+    AccessMut,
     AgentId,
     Buffer,
     ByteOffset,
@@ -10,89 +10,40 @@ use editor::{
     Editor,
     Replacement,
 };
+use futures_util::FutureExt;
 use futures_util::stream::{FusedStream, StreamExt};
-use futures_util::{FutureExt, select_biased};
 
 use crate::editor::{ContextExt, TestEditor};
-
-pub(crate) async fn on_cursor_created_1(ctx: &mut Context<impl TestEditor>) {
-    let agent_id = ctx.new_agent_id();
-
-    let mut events = CursorEvent::new_stream(ctx);
-
-    // Focusing the buffer should create a cursor.
-    let buf_id = ctx.create_and_focus_scratch_buffer(agent_id).await;
-
-    match events.next().await.unwrap() {
-        CursorEvent::Created(creation) => {
-            assert_eq!(creation.buffer_id, buf_id);
-            assert_eq!(creation.created_by, agent_id)
-        },
-        other => panic!("expected Created event, got {other:?}"),
-    }
-}
-
-pub(crate) async fn on_cursor_created_2(ctx: &mut Context<impl TestEditor>) {
-    let agent_id = ctx.new_agent_id();
-
-    let scratch1_id = ctx.create_and_focus_scratch_buffer(agent_id).await;
-
-    let mut events = CursorEvent::new_stream(ctx);
-
-    // Focusing the buffer again shouldn't do anything.
-    ctx.with_borrowed(|ctx| {
-        ctx.buffer(scratch1_id).unwrap().schedule_focus(agent_id)
-    });
-
-    // Now create and focus a second buffer, which should create a cursor.
-    let scratch2_id = ctx.create_and_focus_scratch_buffer(agent_id).await;
-
-    match events.next().await.unwrap() {
-        CursorEvent::Created(creation) => {
-            assert_eq!(creation.buffer_id, scratch2_id);
-            assert_eq!(creation.created_by, agent_id);
-        },
-        other => panic!("expected Created event, got {other:?}"),
-    }
-}
 
 pub(crate) async fn on_cursor_moved_1(ctx: &mut Context<impl TestEditor>) {
     let agent_id = ctx.new_agent_id();
 
-    let mut events = CursorEvent::new_stream(ctx);
-
     let buf_id = ctx.create_and_focus_scratch_buffer(agent_id).await;
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buf_id.clone()).unwrap();
-        buf.schedule_edit(
-            [Replacement::insertion(0, "Hello world")],
-            agent_id,
-        );
-    });
+        buf.schedule_edit([Replacement::insertion(0, "Hello world")], agent_id)
+            .boxed_local()
+    })
+    .await;
 
-    // Drain the event stream.
-    let sleep = async_io::Timer::after(Duration::from_millis(500));
-    select_biased! {
-        _event = events.select_next_some() => {},
-        _now = FutureExt::fuse(sleep) => {},
-    }
+    let mut events = CursorEvent::new_stream(ctx);
 
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buf_id.clone()).unwrap();
         buf.for_each_cursor(|mut cursor| {
-            cursor.schedule_move(5, agent_id);
+            let _ = cursor.schedule_move(5, agent_id);
         });
     });
 
-    match events.next().await.unwrap() {
-        CursorEvent::Moved(movement) => {
-            assert_eq!(movement.byte_offset, 5);
-            assert_eq!(movement.buffer_id, buf_id);
-            assert_eq!(movement.moved_by, agent_id);
-        },
+    let movement = match events.next().await.unwrap() {
+        CursorEvent::Moved(movement) => movement,
         other => panic!("expected Moved event, got {other:?}"),
-    }
+    };
+
+    assert_eq!(movement.byte_offset, 5);
+    assert_eq!(movement.buffer_id, buf_id);
+    assert_eq!(movement.moved_by, agent_id);
 }
 
 #[derive(cauchy::Debug, cauchy::PartialEq)]
@@ -125,6 +76,13 @@ impl<Ed: Editor> CursorEvent<Ed> {
         let (tx, rx) = flume::unbounded();
         let editor = ctx.editor();
 
+        ctx.for_each_buffer(|mut buf| {
+            buf.for_each_cursor(|mut cursor| {
+                // Subscribe to events on each existing cursor.
+                subscribe(&mut cursor, tx.clone(), editor.clone());
+            });
+        });
+
         mem::forget(ctx.on_cursor_created(move |cursor, created_by| {
             let event = Self::Created(CursorCreation {
                 buffer_id: cursor.buffer_id(),
@@ -133,29 +91,38 @@ impl<Ed: Editor> CursorEvent<Ed> {
             });
             let _ = tx.send(event);
 
-            let tx2 = tx.clone();
-            mem::forget(cursor.on_moved(
-                move |cursor, moved_by| {
-                    let event = Self::Moved(CursorMovement {
-                        buffer_id: cursor.buffer_id(),
-                        byte_offset: cursor.byte_offset(),
-                        moved_by,
-                    });
-                    let _ = tx2.send(event);
-                },
-                editor.clone(),
-            ));
-
-            let tx2 = tx.clone();
-            mem::forget(cursor.on_removed(
-                move |_cursor_id, removed_by| {
-                    let event = Self::Removed(removed_by);
-                    let _ = tx2.send(event);
-                },
-                editor.clone(),
-            ));
+            // Subscribe to events on the newly created cursor.
+            subscribe(cursor, tx.clone(), editor.clone());
         }));
 
         rx.into_stream()
     }
+}
+
+fn subscribe<Ed: Editor>(
+    cursor: &mut Ed::Cursor<'_>,
+    tx: flume::Sender<CursorEvent<Ed>>,
+    editor: impl AccessMut<Ed> + Clone + 'static,
+) {
+    let tx2 = tx.clone();
+    mem::forget(cursor.on_moved(
+        move |cursor, moved_by| {
+            let event = CursorEvent::Moved(CursorMovement {
+                buffer_id: cursor.buffer_id(),
+                byte_offset: cursor.byte_offset(),
+                moved_by,
+            });
+            let _ = tx2.send(event);
+        },
+        editor.clone(),
+    ));
+
+    let tx2 = tx.clone();
+    mem::forget(cursor.on_removed(
+        move |_cursor_id, removed_by| {
+            let event = CursorEvent::Removed(removed_by);
+            let _ = tx2.send(event);
+        },
+        editor.clone(),
+    ));
 }

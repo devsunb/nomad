@@ -2,6 +2,8 @@
 
 use std::panic;
 
+use futures_util::FutureExt;
+
 use crate::oxi::{self, lua, mlua};
 
 /// Returns whether the given module is available, i.e. whether in can be
@@ -20,9 +22,21 @@ pub fn is_module_available(module_name: &str) -> bool {
     inner(module_name).unwrap_or_default()
 }
 
-pub(crate) trait CallbackExt<T, U>:
-    FnMut(T) -> U + Sized + 'static
+pub(crate) fn schedule<F>(f: F) -> impl Future<Output = ()> + 'static
+where
+    F: FnOnce() + 'static + Sized,
 {
+    let (tx, rx) = flume::bounded(1);
+
+    oxi::schedule(move |()| {
+        f();
+        let _ = tx.send(());
+    });
+
+    rx.into_recv_async().map(|_res| ())
+}
+
+pub(crate) trait CallbackExt<T, U>: FnMut(T) -> U + Sized {
     /// TODO: docs.
     fn catch_unwind(mut self) -> impl CallbackExt<T, Option<U>> {
         move |arg: T| match panic::catch_unwind(panic::AssertUnwindSafe(
@@ -49,7 +63,7 @@ pub(crate) trait CallbackExt<T, U>:
     /// TODO: docs.
     fn map<U2>(
         mut self,
-        mut f: impl FnMut(U) -> U2 + 'static,
+        mut f: impl FnMut(U) -> U2,
     ) -> impl CallbackExt<T, U2> {
         move |arg: T| f(self(arg))
     }
@@ -57,6 +71,7 @@ pub(crate) trait CallbackExt<T, U>:
     /// TODO: docs.
     fn into_function(self) -> oxi::Function<T, U>
     where
+        Self: FnMut(T) -> U + 'static,
         T: lua::Poppable,
         U: lua::Pushable,
     {
@@ -64,4 +79,4 @@ pub(crate) trait CallbackExt<T, U>:
     }
 }
 
-impl<F, T, U> CallbackExt<T, U> for F where F: FnMut(T) -> U + 'static {}
+impl<F, T, U> CallbackExt<T, U> for F where F: FnMut(T) -> U {}

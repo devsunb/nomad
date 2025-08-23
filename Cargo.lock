@@ -1927,6 +1927,7 @@ dependencies = [
  "executor",
  "flume",
  "fs",
+ "futures-util",
  "neovim-macros",
  "nohash",
  "nvim-oxi",

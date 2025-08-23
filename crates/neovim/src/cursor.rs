@@ -3,10 +3,10 @@
 use editor::{AccessMut, AgentId, Buffer, ByteOffset, Cursor, Shared};
 use nvim_oxi::api;
 
-use crate::Neovim;
 use crate::buffer::{BufferId, NeovimBuffer, Point};
 use crate::buffer_ext::BufferExt;
 use crate::events::{self, EventHandle};
+use crate::{Neovim, utils};
 
 /// TODO: docs.
 pub struct NeovimCursor<'a> {
@@ -134,7 +134,11 @@ impl Cursor for NeovimCursor<'_> {
 
     #[track_caller]
     #[inline]
-    fn schedule_move(&mut self, offset: ByteOffset, agent_id: AgentId) {
+    fn schedule_move(
+        &mut self,
+        offset: ByteOffset,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static {
         debug_assert!(
             offset <= self.buffer.byte_len(),
             "offset {offset:?} is past end of buffer, length is {:?}",
@@ -156,7 +160,7 @@ impl Cursor for NeovimCursor<'_> {
         // We schedule this because setting the cursor will immediately trigger
         // a CursorMoved event, which would panic due to a double mutable
         // borrow of Neovim.
-        nvim_oxi::schedule(move |()| {
+        utils::schedule(move || {
             api::Window::current()
                 .set_cursor(point.line_idx + 1, point.byte_offset)
                 .expect("couldn't set cursor");

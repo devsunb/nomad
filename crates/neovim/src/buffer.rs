@@ -17,14 +17,15 @@ use editor::{
     Replacement,
     Shared,
 };
+use futures_util::FutureExt;
 use smallvec::{SmallVec, smallvec_inline};
 
 pub use crate::buffer_ext::BufferExt;
 use crate::convert::Convert;
 use crate::cursor::NeovimCursor;
 use crate::option::{BufferLocalOpts, NeovimOption, UneditableEndOfLine};
-use crate::oxi::{self, BufHandle, api};
-use crate::{Neovim, decoration_provider, events};
+use crate::oxi::{BufHandle, api};
+use crate::{Neovim, decoration_provider, events, utils};
 
 /// TODO: docs.
 pub struct NeovimBuffer<'a> {
@@ -381,7 +382,11 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
     }
 
     #[inline]
-    fn schedule_edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    fn schedule_edit<R>(
+        &mut self,
+        replacements: R,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static
     where
         R: IntoIterator<Item = Replacement>,
     {
@@ -406,7 +411,7 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
         // We schedule this because editing text in the buffer will immediately
         // trigger an OnBytes event, which would panic due to a double mutable
         // borrow of Neovim.
-        oxi::schedule(move |()| {
+        utils::schedule(move || {
             let mut buffer = api::Buffer::from(buffer_id);
 
             for replacement in replacements {
@@ -424,31 +429,38 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
                     &set_uneditable_eol_agent_id,
                 )
             }
-        });
+        })
     }
 
     #[inline]
-    fn schedule_focus(&mut self, _agent_id: AgentId) {
+    fn schedule_focus(
+        &mut self,
+        _agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static {
         let buffer = self.inner.clone();
 
         // We schedule this because setting the current window's buffer will
         // immediately trigger a BufEnter event, which would panic due to a
         // double mutable borrow of Neovim.
-        oxi::schedule(move |()| buffer.focus());
+        utils::schedule(move || buffer.focus())
     }
 
     #[inline]
     fn schedule_save(
         &mut self,
         _agent_id: AgentId,
-    ) -> Result<(), <Self::Editor as editor::Editor>::BufferSaveError> {
+    ) -> impl Future<
+        Output = Result<(), <Self::Editor as editor::Editor>::BufferSaveError>,
+    > + 'static {
         // We schedule this because writing the buffer will immediately trigger
         // a BufWritePost event, which would panic due to a double mutable
         // borrow of Neovim.
         //
         // TODO: save agent ID.
-        oxi::schedule(|()| api::command("write"));
-        Ok(())
+        utils::schedule(|| {
+            api::command("write").expect("saving buffer failed");
+        })
+        .map(|()| Ok(()))
     }
 }
 
