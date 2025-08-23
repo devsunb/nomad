@@ -52,11 +52,16 @@ fn set_panic_hook(seed: u64) {
     // Make sure to only set the hook once, even if multiple tests are run in
     // parallel.
     static SET_HOOK: sync::Once = sync::Once::new();
+
     SET_HOOK.call_once(|| {
         let prev_hook = panic::take_hook();
         panic::set_hook(Box::new(move |info| {
-            let seed = FUZZ_SEED.with(|s| s.get().expect("seed has been set"));
-            eprintln!("fuzz run failed with seed {seed}");
+            match FUZZ_SEED.with(|s| s.get()) {
+                Some(seed) => eprintln!("fuzz run failed with seed {seed:?}"),
+                None => eprintln!(
+                    "fuzz run failed due to a panic on a background thread"
+                ),
+            }
             prev_hook(info);
         }));
     });
