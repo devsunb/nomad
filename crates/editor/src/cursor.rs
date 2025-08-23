@@ -41,5 +41,9 @@ pub trait Cursor {
         Fun: FnMut(<Self::Editor as Editor>::CursorId, AgentId) + 'static;
 
     /// TODO: docs.
-    fn schedule_move(&mut self, offset: ByteOffset, agent_id: AgentId);
+    fn schedule_move(
+        &mut self,
+        offset: ByteOffset,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static;
 }

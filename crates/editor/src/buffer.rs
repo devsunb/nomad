@@ -70,18 +70,27 @@ pub trait Buffer {
     fn path(&self) -> Cow<'_, AbsPath>;
 
     /// TODO: docs.
-    fn schedule_edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    fn schedule_edit<R>(
+        &mut self,
+        replacements: R,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static
     where
         R: IntoIterator<Item = Replacement>;
 
     /// TODO: docs.
-    fn schedule_focus(&mut self, agent_id: AgentId);
+    fn schedule_focus(
+        &mut self,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static;
 
     /// TODO: docs.
     fn schedule_save(
         &mut self,
         agent_id: AgentId,
-    ) -> Result<(), <Self::Editor as Editor>::BufferSaveError>;
+    ) -> impl Future<
+        Output = Result<(), <Self::Editor as Editor>::BufferSaveError>,
+    > + 'static;
 }
 
 /// TODO: docs.

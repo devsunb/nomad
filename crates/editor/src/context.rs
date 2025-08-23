@@ -17,7 +17,7 @@ use crate::module::Module;
 use crate::notify::Namespace;
 use crate::plugin::{Plugin, PluginId};
 use crate::state::State;
-use crate::{Access, AccessMut, AgentId, Buffer, Editor, Shared};
+use crate::{Access, AccessMut, AgentId, Editor, Shared};
 
 /// TODO: docs.
 pub trait BorrowState {
@@ -220,22 +220,6 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs>
 where
     Self: AccessMut<Ed>,
 {
-    /// TODO: docs.
-    #[inline]
-    pub async fn create_and_focus(
-        &mut self,
-        file_path: &AbsPath,
-        agent_id: AgentId,
-    ) -> Result<Ed::BufferId, Ed::CreateBufferError> {
-        let buffer_id = self.create_buffer(file_path, agent_id).await?;
-        self.with_editor(|ed| {
-            if let Some(mut buffer) = ed.buffer(buffer_id.clone()) {
-                buffer.schedule_focus(agent_id);
-            }
-        });
-        Ok(buffer_id)
-    }
-
     /// TODO: docs.
     #[inline]
     pub async fn create_buffer(

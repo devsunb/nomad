@@ -1,3 +1,4 @@
+use core::future;
 use core::ops::{Deref, DerefMut, Range};
 use std::borrow::Cow;
 
@@ -301,7 +302,11 @@ impl<'a> editor::Buffer for Buffer<'a> {
         Cow::Borrowed(&self.file_path)
     }
 
-    fn schedule_edit<R>(&mut self, replacements: R, agent_id: AgentId)
+    fn schedule_edit<R>(
+        &mut self,
+        replacements: R,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static
     where
         R: IntoIterator<Item = Replacement>,
     {
@@ -340,21 +345,30 @@ impl<'a> editor::Buffer for Buffer<'a> {
         for callback in on_buffer_edited {
             callback.with_mut(|cb| cb(self, &edit));
         }
+
+        future::ready(())
     }
 
-    fn schedule_focus(&mut self, agent_id: AgentId) {
+    fn schedule_focus(
+        &mut self,
+        agent_id: AgentId,
+    ) -> impl Future<Output = ()> + 'static {
         *self.current_buffer = Some(self.id);
 
         if self.cursors.is_empty() {
             self.create_cursor(0, agent_id);
         }
+
+        future::ready(())
     }
 
     fn schedule_save(
         &mut self,
         _agent_id: AgentId,
-    ) -> Result<(), <Self::Editor as editor::Editor>::BufferSaveError> {
-        todo!()
+    ) -> impl Future<
+        Output = Result<(), <Self::Editor as editor::Editor>::BufferSaveError>,
+    > + 'static {
+        async move { todo!() }
     }
 }
 
@@ -387,7 +401,11 @@ impl editor::Cursor for Cursor<'_> {
         self.cursor_id
     }
 
-    fn schedule_move(&mut self, offset: ByteOffset, agent_id: AgentId) {
+    fn schedule_move(
+        &mut self,
+        offset: ByteOffset,
+        agent_id: AgentId,
+    ) -> impl future::Future<Output = ()> + 'static {
         self.offset = offset;
 
         let on_cursor_moved = self.buffer.callbacks.with(|callbacks| {
@@ -407,6 +425,8 @@ impl editor::Cursor for Cursor<'_> {
         for callback in on_cursor_moved {
             callback.with_mut(|cb| cb(self, agent_id));
         }
+
+        future::ready(())
     }
 
     fn on_moved<Fun>(
