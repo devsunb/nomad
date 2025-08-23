@@ -24,7 +24,7 @@ pub use crate::buffer_ext::BufferExt;
 use crate::convert::Convert;
 use crate::cursor::NeovimCursor;
 use crate::option::{BufferLocalOpts, NeovimOption, UneditableEndOfLine};
-use crate::oxi::{BufHandle, api};
+use crate::oxi::{self, BufHandle, api};
 use crate::{Neovim, decoration_provider, events, utils};
 
 /// TODO: docs.
@@ -139,12 +139,19 @@ impl<'a> NeovimBuffer<'a> {
             return None;
         }
 
-        let path = match inner.get_name() {
-            Ok(name) => Cow::Owned(name.to_str().ok()?.parse().ok()?),
-            Err(_) => return None,
-        };
+        let buftype = api::get_option_value::<oxi::String>(
+            "buftype",
+            &api::opts::OptionOpts::builder().buffer(inner.clone()).build(),
+        )
+        .ok()?;
 
-        Some(Self { inner, path, nvim })
+        if !buftype.is_empty() {
+            return None;
+        }
+
+        let path = inner.get_name().ok()?.to_str().ok()?.parse().ok()?;
+
+        Some(Self { inner, path: Cow::Owned(path), nvim })
     }
 
     #[inline]
