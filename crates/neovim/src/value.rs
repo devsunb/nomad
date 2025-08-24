@@ -84,6 +84,7 @@ impl lua::Poppable for NeovimValue {
     unsafe fn pop(
         lua_state: *mut lua::ffi::State,
     ) -> Result<Self, lua::Error> {
+        // SAFETY: up to the caller.
         unsafe { Object::pop(lua_state).map(|object| Self { object }) }
     }
 }
@@ -94,6 +95,7 @@ impl lua::Pushable for NeovimValue {
         self,
         lstate: *mut lua::ffi::State,
     ) -> Result<std::ffi::c_int, lua::Error> {
+        // SAFETY: up to the caller.
         unsafe { self.object.push(lstate) }
     }
 }

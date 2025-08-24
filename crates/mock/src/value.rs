@@ -124,16 +124,16 @@ impl TryFrom<Value> for serde_json::Value {
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         use serde::de::Error;
         match value {
-            Value::Null => Ok(serde_json::Value::Null),
-            Value::Bool(bool) => Ok(serde_json::Value::Bool(bool)),
-            Value::Number(number) => Ok(serde_json::Value::Number(number)),
-            Value::String(string) => Ok(serde_json::Value::String(string)),
-            Value::List(list) => Ok(serde_json::Value::Array(
+            Value::Null => Ok(Self::Null),
+            Value::Bool(bool) => Ok(Self::Bool(bool)),
+            Value::Number(number) => Ok(Self::Number(number)),
+            Value::String(string) => Ok(Self::String(string)),
+            Value::List(list) => Ok(Self::Array(
                 list.into_iter()
                     .map(TryInto::try_into)
                     .collect::<Result<_, _>>()?,
             )),
-            Value::Map(map) => Ok(serde_json::Value::Object(
+            Value::Map(map) => Ok(Self::Object(
                 map.into_iter()
                     .map(|(k, v)| v.try_into().map(|v| (k, v)))
                     .collect::<Result<_, _>>()?,

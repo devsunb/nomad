@@ -178,6 +178,7 @@ impl<T: ?Sized> SharedContainer<T> for Rc<WithCell<T>> {
         WithCell::get(self)
     }
 
+    #[allow(clippy::use_self)]
     fn into_inner(self) -> Option<T>
     where
         T: Sized,
@@ -185,6 +186,7 @@ impl<T: ?Sized> SharedContainer<T> for Rc<WithCell<T>> {
         Rc::into_inner(self).map(|cell| cell.value.into_inner())
     }
 
+    #[allow(clippy::use_self)]
     fn new(value: T) -> Self
     where
         T: Sized,
@@ -192,6 +194,7 @@ impl<T: ?Sized> SharedContainer<T> for Rc<WithCell<T>> {
         Rc::new(WithCell::new(value))
     }
 
+    #[allow(clippy::use_self)]
     fn strong_count(&self) -> usize {
         Rc::strong_count(self)
     }
@@ -225,6 +228,7 @@ impl<T: ?Sized> SharedContainer<T> for Arc<Mutex<T>> {
         self.with(Clone::clone)
     }
 
+    #[allow(clippy::use_self)]
     #[track_caller]
     fn into_inner(self) -> Option<T>
     where
@@ -235,6 +239,7 @@ impl<T: ?Sized> SharedContainer<T> for Arc<Mutex<T>> {
             .map(|mutex| mutex.into_inner().expect("Mutex was poisoned"))
     }
 
+    #[allow(clippy::use_self)]
     fn new(value: T) -> Self
     where
         T: Sized,
@@ -242,6 +247,7 @@ impl<T: ?Sized> SharedContainer<T> for Arc<Mutex<T>> {
         Arc::new(Mutex::new(value))
     }
 
+    #[allow(clippy::use_self)]
     fn strong_count(&self) -> usize {
         Arc::strong_count(self)
     }

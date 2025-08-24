@@ -158,7 +158,7 @@ impl fs::Directory for Directory {
     async fn parent(&self) -> Result<Option<Self>, Self::ParentError> {
         let Some(parent_path) = self.path().parent() else { return Ok(None) };
         let metadata = async_fs::metadata(parent_path).await?;
-        Ok(Some(Directory { path: parent_path.to_owned(), metadata }))
+        Ok(Some(Self { path: parent_path.to_owned(), metadata }))
     }
 
     #[inline]

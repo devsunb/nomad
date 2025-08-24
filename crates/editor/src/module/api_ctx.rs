@@ -193,7 +193,7 @@ impl<Ed: Editor> ApiCtx<'_, Ed> {
 impl<Ed: Editor> ConfigBuilder<Ed> {
     #[inline]
     fn add_module<M: Module<Ed>>(&mut self, module: &'static M) -> &mut Self {
-        self.submodules.insert(M::NAME, ConfigBuilder::new(module))
+        self.submodules.insert(M::NAME, Self::new(module))
     }
 
     #[inline]

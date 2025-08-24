@@ -164,6 +164,7 @@ impl VimNotifyProvider for NvimNotify {
     fn to_notification_id(&mut self, record: oxi::Object) -> NotificationId {
         fn inner(record: oxi::Object) -> Option<NotificationId> {
             let dict = match record.kind() {
+                // SAFETY: the object's kind is a `Dictionary`.
                 oxi::ObjectKind::Dictionary => unsafe {
                     record.into_dictionary_unchecked()
                 },
@@ -171,6 +172,7 @@ impl VimNotifyProvider for NvimNotify {
             };
             let id = dict.get("id")?;
             let id = match id.kind() {
+                // SAFETY: the object's kind is an `Integer`.
                 oxi::ObjectKind::Integer => unsafe {
                     id.as_integer_unchecked()
                 },

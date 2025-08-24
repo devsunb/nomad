@@ -44,7 +44,7 @@ impl<K, V, S> List for indexmap::IndexMap<K, V, S> {
     }
 
     fn len(&self) -> usize {
-        indexmap::IndexMap::len(self)
+        Self::len(self)
     }
 
     fn remove(&mut self, idx: usize) -> Self::Value {

@@ -566,7 +566,7 @@ impl Project {
 
 impl<'proj> State<'proj> {
     #[inline]
-    pub(crate) fn text_ctx(&self) -> &'proj text::TextCtx {
+    pub(crate) fn text_ctx(self) -> &'proj text::TextCtx {
         &self.contexts.text
     }
 }

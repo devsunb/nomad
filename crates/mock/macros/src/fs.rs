@@ -147,9 +147,9 @@ impl ToTokens for Symlink {
 impl ToTokens for NodeName {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         match self {
-            NodeName::Ident(name) => name.to_tokens(tokens),
-            NodeName::Lit(name) => name.to_tokens(tokens),
-            NodeName::Reference(name) => name.to_tokens(tokens),
+            Self::Ident(name) => name.to_tokens(tokens),
+            Self::Lit(name) => name.to_tokens(tokens),
+            Self::Reference(name) => name.to_tokens(tokens),
         }
     }
 }

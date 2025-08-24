@@ -69,6 +69,7 @@ impl<Ev: Event> CallbacksContainer<Ev> for Option<Callbacks<Ev>> {
         *self = Some(callbacks);
     }
 
+    #[allow(clippy::use_self)]
     #[track_caller]
     #[inline]
     fn remove(&mut self, _: ()) -> Option<Callbacks<Ev>> {

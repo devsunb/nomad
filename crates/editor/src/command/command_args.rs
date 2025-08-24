@@ -466,6 +466,8 @@ impl<T: Error> notify::Error for ParseFromCommandArgsError<'_, T> {
 /// Remove this when std's implementation is stabilized.
 #[inline]
 fn maybe_uninit_uninit_array<T, const N: usize>() -> [MaybeUninit<T>; N] {
+    // SAFETY: we're initializing a bunch of `MaybeUninit`s, which don't
+    // require initialization.
     unsafe { mem::MaybeUninit::uninit().assume_init() }
 }
 
@@ -476,6 +478,7 @@ fn maybe_uninit_uninit_array<T, const N: usize>() -> [MaybeUninit<T>; N] {
 unsafe fn maybe_uninit_array_assume_init<T, const N: usize>(
     array: [MaybeUninit<T>; N],
 ) -> [T; N] {
+    // SAFETY: up to the caller.
     unsafe { (&array as *const [MaybeUninit<T>; N] as *const [T; N]).read() }
 }
 

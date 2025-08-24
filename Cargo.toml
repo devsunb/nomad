@@ -90,7 +90,12 @@ needless_collect = "deny"
 same_name_method = "deny"
 too_many_arguments = "deny"
 too_many_lines = "deny"
+trivially_copy_pass_by_ref = "warn"
+undocumented_unsafe_blocks = "deny"
 unwrap_used = "deny"
+use_self = "warn"
+wildcard_dependencies = "deny"
+wildcard_imports = "warn"
 
 [workspace.lints.rust]
 future_incompatible = { level = "deny", priority = -1 }
