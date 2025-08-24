@@ -30,7 +30,7 @@ pub(crate) struct Events {
     pub(crate) on_uneditable_eol_set:
         Option<Callbacks<events::SetUneditableEndOfLine>>,
 
-    /// The callback registered to the [`BufReadPost`] event, or `None` if no
+    /// The callback registered to the [`BufferCreated`] event, or `None` if no
     /// callback have been registered to that event.
     pub(crate) on_buffer_created: Option<Callbacks<events::BufferCreated>>,
 
@@ -43,10 +43,10 @@ pub(crate) struct Events {
     /// callback have been registered to that event.
     pub(crate) on_buffer_focused: Option<Callbacks<events::BufEnter>>,
 
-    /// Map from a buffer's ID to the callbacks registered to the [`BufUnload`]
-    /// event on that buffer.
+    /// Map from a buffer's ID to the callbacks registered to the
+    /// [`BufferRemoved`] event on that buffer.
     pub(crate) on_buffer_removed:
-        NoHashMap<BufferId, Callbacks<events::BufUnload>>,
+        NoHashMap<BufferId, Callbacks<events::BufferRemoved>>,
 
     /// Map from a buffer's ID to the callbacks registered to the
     /// [`BufWritePost`] event on that buffer.
@@ -109,7 +109,7 @@ pub(crate) enum EventKind {
     BufEnter(events::BufEnter),
     BufLeave(events::BufLeave),
     BufferCreated(events::BufferCreated),
-    BufUnload(events::BufUnload),
+    BufferRemoved(events::BufferRemoved),
     BufWritePost(events::BufWritePost),
     CursorMoved(events::CursorMoved),
     ModeChanged(events::ModeChanged),
@@ -179,7 +179,7 @@ impl Events {
                 BufEnter(ev) => self.remove_callback(ev, cb_key),
                 BufLeave(ev) => self.remove_callback(ev, cb_key),
                 BufferCreated(ev) => self.remove_callback(ev, cb_key),
-                BufUnload(ev) => self.remove_callback(ev, cb_key),
+                BufferRemoved(ev) => self.remove_callback(ev, cb_key),
                 BufWritePost(ev) => self.remove_callback(ev, cb_key),
                 CursorMoved(ev) => self.remove_callback(ev, cb_key),
                 ModeChanged(ev) => self.remove_callback(ev, cb_key),

@@ -360,8 +360,8 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
     {
         let buffer_id = self.id();
         self.nvim.events.insert(
-            events::BufUnload(buffer_id),
-            move |(this, removed_by)| fun(this.id(), removed_by),
+            events::BufferRemoved(buffer_id),
+            move |(buffer_id, removed_by)| fun(buffer_id, removed_by),
             nvim,
         )
     }

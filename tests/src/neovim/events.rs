@@ -80,3 +80,35 @@ async fn on_buffer_created_doesnt_fire_when_named_buffer_is_renamed(
     ctx.command("file bar.txt");
     assert_eq!(num_times_fired.take(), 0);
 }
+
+#[neovim::test]
+async fn on_buffer_removed_fires_when_named_buffer_is_renamed_to_empty_name(
+    ctx: &mut Context<Neovim>,
+) {
+    ctx.command("edit foo.txt");
+
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let editor = ctx.editor();
+
+    let (buffer_id, _handle) = ctx.with_borrowed(|ctx| {
+        let mut buffer = ctx.current_buffer().unwrap();
+
+        let handle = buffer.on_removed(
+            {
+                let num_times_fired = num_times_fired.clone();
+                move |_, _| num_times_fired.with_mut(|n| *n += 1)
+            },
+            editor,
+        );
+
+        (buffer.id(), handle)
+    });
+
+    // In our model of an editor, a buffer is always associated with an
+    // absolute file path, so giving the buffer an empty name should
+    // be the same as removing it.
+    oxi::api::Buffer::from(buffer_id).set_name("").unwrap();
+
+    assert_eq!(num_times_fired.take(), 1);
+}
