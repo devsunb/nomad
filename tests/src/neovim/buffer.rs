@@ -34,7 +34,7 @@ async fn deleting_trailing_newline_is_like_unsetting_eol(
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::deletion(0..6)]);
 
-    let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
     assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
     assert!(!api::get_option_value::<bool>("fixeol", &opts).unwrap());
 }
@@ -62,7 +62,7 @@ async fn inserting_after_trailing_newline_unsets_eol(
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(6, "World")]);
 
-    let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
     assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
     assert!(!api::get_option_value::<bool>("fixeol", &opts).unwrap());
 }
@@ -93,7 +93,7 @@ async fn inserting_nothing_after_trailing_newline_does_nothing(
         _now = FutureExt::fuse(sleep) => {},
     }
 
-    let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
     assert!(api::get_option_value::<bool>("eol", &opts).unwrap());
     assert!(api::get_option_value::<bool>("fixeol", &opts).unwrap());
 }
@@ -122,7 +122,7 @@ async fn replacement_including_trailing_newline_unsets_eol(
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::new(2..6, "y")]);
 
-    let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
     assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
     assert!(!api::get_option_value::<bool>("fixeol", &opts).unwrap());
 }
@@ -138,7 +138,7 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
 
     let mut edit_stream = Edit::new_stream(buffer_id, ctx);
 
-    let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
     api::set_option_value("eol", false, &opts).unwrap();
     api::set_option_value("fixeol", false, &opts).unwrap();
 
@@ -157,7 +157,7 @@ async fn setting_eol_is_like_inserting_trailing_newline(
     // Eol is only relevant in non-empty buffers.
     ctx.feedkeys("iHello");
 
-    let opts = opts::OptionOpts::builder().buffer(buffer_id.into()).build();
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
     api::set_option_value("eol", false, &opts).unwrap();
     api::set_option_value("fixeol", false, &opts).unwrap();
 

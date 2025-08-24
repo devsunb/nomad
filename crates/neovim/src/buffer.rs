@@ -141,7 +141,7 @@ impl<'a> NeovimBuffer<'a> {
 
         let buftype = api::get_option_value::<oxi::String>(
             "buftype",
-            &api::opts::OptionOpts::builder().buffer(inner.clone()).build(),
+            &api::opts::OptionOpts::builder().buf(inner.clone()).build(),
         )
         .ok()?;
 

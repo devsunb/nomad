@@ -30,9 +30,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
             api::set_option_value(
                 "swapfile",
                 false,
-                &api::opts::OptionOpts::builder()
-                    .buffer(buffer.clone())
-                    .build(),
+                &api::opts::OptionOpts::builder().buf(buffer.clone()).build(),
             )
             .expect("couldn't turn off 'swapfile'");
 

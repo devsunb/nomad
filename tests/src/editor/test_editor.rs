@@ -49,7 +49,7 @@ impl TestEditor for neovim::Neovim {
         // The (fix)eol options mess us the fuzzy edits tests because inserting
         // text when the buffer is empty will also cause a trailing \n to be
         // inserted, so unset them.
-        let opts = opts::OptionOpts::builder().buffer(buf_id.into()).build();
+        let opts = opts::OptionOpts::builder().buf(buf_id.into()).build();
         api::set_option_value::<bool>("eol", false, &opts).unwrap();
         api::set_option_value::<bool>("fixeol", false, &opts).unwrap();
 
