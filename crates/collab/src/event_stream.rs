@@ -513,7 +513,7 @@ impl<Ed: CollabEditor> BufferStreams<Ed> {
     fn insert(&mut self, mut buffer: Buffer<'_, Ed>, agent_id: AgentId) {
         let event_tx = self.event_tx.clone();
         let edits_handle = buffer.on_edited(move |buf, edit| {
-            if edit.made_by != agent_id {
+            if edit.made_by == agent_id {
                 return;
             }
             let _ = event_tx.send(event::BufferEvent::Edited(
