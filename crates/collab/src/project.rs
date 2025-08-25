@@ -101,7 +101,8 @@ pub(crate) struct NewProjectArgs<Ed: CollabEditor> {
 }
 
 #[derive(cauchy::Default)]
-pub(crate) struct IdMaps<Ed: Editor> {
+#[doc(hidden)]
+pub struct IdMaps<Ed: Editor> {
     pub(crate) buffer2file: FxHashMap<Ed::BufferId, LocalFileId>,
     pub(crate) cursor2cursor: FxHashMap<Ed::CursorId, CursorId>,
     pub(crate) file2buffer: FxHashMap<LocalFileId, Ed::BufferId>,

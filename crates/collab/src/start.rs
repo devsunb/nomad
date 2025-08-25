@@ -50,6 +50,120 @@ pub struct Start<Ed: CollabEditor> {
 }
 
 impl<Ed: CollabEditor> Start<Ed> {
+    /// Constructs a [`Project`] by reading the contents of the file or
+    /// directory at the given path.
+    #[allow(clippy::too_many_lines)]
+    pub async fn read_project(
+        root_path: &AbsPath,
+        local_id: PeerId,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(Project, EventStream<Ed>, IdMaps<Ed>), ReadProjectError<Ed>>
+    {
+        let fs = ctx.fs();
+
+        let root_node = fs
+            .node_at_path(root_path)
+            .await
+            .map_err(ReadProjectError::GetRoot)?
+            .ok_or_else(|| {
+                ReadProjectError::NoNodeAtRootPath(root_path.to_owned())
+            })?;
+
+        let (project_root, project_filter) = match root_node {
+            Node::Directory(dir) => {
+                let filter = Ed::project_filter(&dir, ctx)
+                    .map_err(ReadProjectError::ProjectFilter)?;
+                (dir, Either::Left(filter))
+            },
+            // The user wants to collaborate on a single file. The root must
+            // always be a directory, so we just use its parent together with a
+            // filter that ignores all its siblings.
+            Node::File(file) => {
+                let parent = file
+                    .parent()
+                    .await
+                    .map_err(ReadProjectError::FileParent)?;
+                let filter = AllButOne::<Ed::Fs> { id: file.id() };
+                (parent, Either::Right(filter))
+            },
+            Node::Symlink(_) => {
+                return Err(ReadProjectError::RootIsSymlink(
+                    root_path.to_owned(),
+                ));
+            },
+        };
+
+        let (project, stream_builder, node_id_maps) = ctx
+            .spawn_background(async move {
+                let walker = fs.walk(&project_root).filter(project_filter);
+
+                let mut project_builder = Project::builder(local_id);
+                let project_builder_mut = Shared::new(&mut project_builder);
+
+                let mut stream_builder =
+                    EventStreamBuilder::new(&project_root);
+                let stream_builder_mut = Shared::new(&mut stream_builder);
+
+                let mut node_id_maps = NodeIdMaps::default();
+                let node_id_maps_mut = Shared::new(&mut node_id_maps);
+
+                walker
+                    .for_each(async |parent_path, node_meta| {
+                        read_node(
+                            parent_path,
+                            node_meta,
+                            &project_root,
+                            &project_builder_mut,
+                            &stream_builder_mut,
+                            &node_id_maps_mut,
+                            &fs,
+                        )
+                        .await
+                    })
+                    .await
+                    .map_err(ReadProjectError::WalkRoot)?;
+
+                Ok((
+                    project_builder.build(),
+                    stream_builder
+                        .push_filter(walker.into_inner().into_filter()),
+                    node_id_maps,
+                ))
+            })
+            .await?;
+
+        let mut event_stream = stream_builder.build(ctx);
+
+        let mut id_maps = IdMaps::default();
+
+        // Start watching the opened buffers that are part of the project.
+        ctx.for_each_buffer(|buffer| {
+            let buffer_path = buffer.path();
+
+            let Some(path_in_proj) = buffer_path.strip_prefix(root_path)
+            else {
+                return;
+            };
+
+            let file_id = match project.node_at_path(path_in_proj) {
+                Some(ProjectNode::File(ProjectFile::Text(file))) => file.id(),
+                _ => return,
+            };
+
+            if let Some(node_id) = node_id_maps.file2node.get(&file_id) {
+                let buffer_id = buffer.id();
+                event_stream.watch_buffer(buffer, node_id.clone());
+                id_maps.buffer2file.insert(buffer_id.clone(), file_id);
+                id_maps.file2buffer.insert(file_id, buffer_id);
+            }
+        });
+
+        id_maps.node2dir = node_id_maps.node2dir;
+        id_maps.node2file = node_id_maps.node2file;
+
+        Ok((project, event_stream, id_maps))
+    }
+
     #[allow(clippy::too_many_lines)]
     pub(crate) async fn call_inner(
         &self,
@@ -103,7 +217,7 @@ impl<Ed: CollabEditor> Start<Ed> {
             .map_err(StartError::Knock)?;
 
         let (project, event_stream, id_maps) =
-            read_project(project_guard.root(), welcome.peer_id, ctx)
+            Self::read_project(project_guard.root(), welcome.peer_id, ctx)
                 .await
                 .map_err(StartError::ReadProject)?;
 
@@ -200,112 +314,6 @@ async fn search_project_root<Ed: CollabEditor>(
         .parent()
         .map(ToOwned::to_owned)
         .ok_or(SearchProjectRootError::CouldntFindRoot(buffer_path))
-}
-
-/// Constructs a [`Project`] by reading the contents of the file or directory
-/// at the given path.
-#[allow(clippy::too_many_lines)]
-async fn read_project<Ed: CollabEditor>(
-    root_path: &AbsPath,
-    local_id: PeerId,
-    ctx: &mut Context<Ed>,
-) -> Result<(Project, EventStream<Ed>, IdMaps<Ed>), ReadProjectError<Ed>> {
-    let fs = ctx.fs();
-
-    let root_node = fs
-        .node_at_path(root_path)
-        .await
-        .map_err(ReadProjectError::GetRoot)?
-        .ok_or_else(|| {
-            ReadProjectError::NoNodeAtRootPath(root_path.to_owned())
-        })?;
-
-    let (project_root, project_filter) = match root_node {
-        Node::Directory(dir) => {
-            let filter = Ed::project_filter(&dir, ctx)
-                .map_err(ReadProjectError::ProjectFilter)?;
-            (dir, Either::Left(filter))
-        },
-        // The user wants to collaborate on a single file. The root must always
-        // be a directory, so we just use its parent together with a filter
-        // that ignores all its siblings.
-        Node::File(file) => {
-            let parent =
-                file.parent().await.map_err(ReadProjectError::FileParent)?;
-            let filter = AllButOne::<Ed::Fs> { id: file.id() };
-            (parent, Either::Right(filter))
-        },
-        Node::Symlink(_) => {
-            return Err(ReadProjectError::RootIsSymlink(root_path.to_owned()));
-        },
-    };
-
-    let (project, stream_builder, node_id_maps) = ctx
-        .spawn_background(async move {
-            let walker = fs.walk(&project_root).filter(project_filter);
-
-            let mut project_builder = Project::builder(local_id);
-            let project_builder_mut = Shared::new(&mut project_builder);
-
-            let mut stream_builder = EventStreamBuilder::new(&project_root);
-            let stream_builder_mut = Shared::new(&mut stream_builder);
-
-            let mut node_id_maps = NodeIdMaps::default();
-            let node_id_maps_mut = Shared::new(&mut node_id_maps);
-
-            walker
-                .for_each(async |parent_path, node_meta| {
-                    read_node(
-                        parent_path,
-                        node_meta,
-                        &project_root,
-                        &project_builder_mut,
-                        &stream_builder_mut,
-                        &node_id_maps_mut,
-                        &fs,
-                    )
-                    .await
-                })
-                .await
-                .map_err(ReadProjectError::WalkRoot)?;
-
-            Ok((
-                project_builder.build(),
-                stream_builder.push_filter(walker.into_inner().into_filter()),
-                node_id_maps,
-            ))
-        })
-        .await?;
-
-    let mut event_stream = stream_builder.build(ctx);
-
-    let mut id_maps = IdMaps::default();
-
-    // Start watching the opened buffers that are part of the project.
-    ctx.for_each_buffer(|buffer| {
-        let buffer_path = buffer.path();
-
-        let Some(path_in_proj) = buffer_path.strip_prefix(root_path) else {
-            return;
-        };
-
-        let file_id = match project.node_at_path(path_in_proj) {
-            Some(ProjectNode::File(ProjectFile::Text(file))) => file.id(),
-            _ => return,
-        };
-
-        if let Some(node_id) = node_id_maps.file2node.get(&file_id) {
-            let buffer_id = buffer.id();
-            event_stream.watch_buffer(buffer, node_id.clone());
-            id_maps.buffer2file.insert(buffer_id.clone(), file_id);
-            id_maps.file2buffer.insert(file_id, buffer_id);
-        }
-    });
-
-    id_maps.node2dir = node_id_maps.node2dir;
-    id_maps.node2file = node_id_maps.node2file;
-
-    Ok((project, event_stream, id_maps))
 }
 
 /// TODO: docs.
@@ -534,26 +542,5 @@ impl<Fs: fs::Fs> fs::filter::Filter<Fs> for AllButOne<Fs> {
         node_meta: &impl Metadata<Fs = Fs>,
     ) -> Result<bool, Self::Error> {
         Ok(node_meta.id() != self.id)
-    }
-}
-
-#[cfg(feature = "benches")]
-pub mod benches {
-    //! TODO: docs.
-
-    use super::*;
-
-    /// TODO: docs.
-    #[inline]
-    pub async fn read_project<Ed>(
-        project_root: <Ed::Fs as fs::Fs>::Directory,
-        ctx: &mut Context<Ed>,
-    ) -> Result<(), ReadProjectError<Ed>>
-    where
-        Ed: CollabEditor,
-    {
-        super::read_project(project_root.path(), PeerId::new(1), ctx)
-            .await
-            .map(|_| ())
     }
 }

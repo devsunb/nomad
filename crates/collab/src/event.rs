@@ -1,3 +1,5 @@
+//! TODO: docs.
+
 use core::ops::Range;
 
 use abs_path::AbsPathBuf;
@@ -5,9 +7,11 @@ use editor::{ByteOffset, Editor, Replacement};
 use fs::{DirectoryEvent, FileEvent};
 use smallvec::SmallVec;
 
+pub use crate::event_stream::{EventError, EventStream};
+
 /// TODO: docs.
 #[derive(cauchy::Debug)]
-pub(crate) enum Event<Ed: Editor> {
+pub enum Event<Ed: Editor> {
     /// TODO: docs.
     Buffer(BufferEvent<Ed>),
 
@@ -24,36 +28,62 @@ pub(crate) enum Event<Ed: Editor> {
     Selection(SelectionEvent<Ed>),
 }
 
+/// TODO: docs.
 #[derive(cauchy::Debug)]
-pub(crate) enum BufferEvent<Ed: Editor> {
+pub enum BufferEvent<Ed: Editor> {
+    /// TODO: docs.
     Created(Ed::BufferId, AbsPathBuf),
+
+    /// TODO: docs.
     Edited(Ed::BufferId, SmallVec<[Replacement; 1]>),
+
+    /// TODO: docs.
     Removed(Ed::BufferId),
+    /// TODO: docs.
     Saved(Ed::BufferId),
 }
 
+/// TODO: docs.
 #[derive(cauchy::Debug)]
-pub(crate) struct CursorEvent<Ed: Editor> {
-    pub(crate) cursor_id: Ed::CursorId,
-    pub(crate) kind: CursorEventKind<Ed>,
+pub struct CursorEvent<Ed: Editor> {
+    /// TODO: docs.
+    pub cursor_id: Ed::CursorId,
+
+    /// TODO: docs.
+    pub kind: CursorEventKind<Ed>,
 }
 
+/// TODO: docs.
 #[derive(cauchy::Debug)]
-pub(crate) enum CursorEventKind<Ed: Editor> {
+pub enum CursorEventKind<Ed: Editor> {
+    /// TODO: docs.
     Created(Ed::BufferId, ByteOffset),
+
+    /// TODO: docs.
     Moved(ByteOffset),
+
+    /// TODO: docs.
     Removed,
 }
 
+/// TODO: docs.
 #[derive(cauchy::Debug)]
-pub(crate) struct SelectionEvent<Ed: Editor> {
-    pub(crate) selection_id: Ed::SelectionId,
-    pub(crate) kind: SelectionEventKind<Ed>,
+pub struct SelectionEvent<Ed: Editor> {
+    /// TODO: docs.
+    pub selection_id: Ed::SelectionId,
+    /// TODO: docs.
+    pub kind: SelectionEventKind<Ed>,
 }
 
+/// TODO: docs.
 #[derive(cauchy::Debug)]
-pub(crate) enum SelectionEventKind<Ed: Editor> {
+pub enum SelectionEventKind<Ed: Editor> {
+    /// TODO: docs.
     Created(Ed::BufferId, Range<ByteOffset>),
+
+    /// TODO: docs.
     Moved(Range<ByteOffset>),
+
+    /// TODO: docs.
     Removed,
 }

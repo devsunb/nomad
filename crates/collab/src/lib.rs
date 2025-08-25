@@ -4,7 +4,7 @@ mod collab;
 pub mod config;
 mod convert;
 mod editors;
-mod event;
+pub mod event;
 mod event_stream;
 pub mod join;
 pub mod leave;
@@ -16,6 +16,7 @@ pub mod start;
 pub mod yank;
 
 pub use collab::Collab;
+pub use collab_types::PeerId;
 #[cfg(feature = "mock")]
 pub use editors::mock;
 pub use editors::{CollabEditor, SessionId};

@@ -12,8 +12,9 @@ pub(crate) fn run(group: &mut BenchmarkGroup<'_, WallTime>) {
 
 #[cfg(neovim_repo)]
 mod read_neovim {
-    use collab::CollabEditor;
     use collab::mock::CollabMock;
+    use collab::start::Start;
+    use collab::{CollabEditor, PeerId};
     use criterion::BenchmarkId;
     use editor::{Context, Editor};
     use executor::Executor;
@@ -83,12 +84,14 @@ mod read_neovim {
 
         group.bench_function(bench_id, |b| {
             b.iter(|| {
-                let project_root = project_root.clone();
-
                 ctx.block_on(async move |ctx| {
-                    collab::start::benches::read_project(project_root, ctx)
-                        .await
-                        .unwrap()
+                    Start::<Ed>::read_project(
+                        project_root.path(),
+                        PeerId::new(1),
+                        ctx,
+                    )
+                    .await
+                    .unwrap()
                 });
             });
         });

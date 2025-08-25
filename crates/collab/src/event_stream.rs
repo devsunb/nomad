@@ -17,7 +17,7 @@ use crate::start::{AllButOne, ProjectFilter};
 type FxIndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 
 /// TODO: docs.
-pub(crate) struct EventStream<Ed: CollabEditor> {
+pub struct EventStream<Ed: CollabEditor> {
     /// The [`AgentId`] of the `Session` that owns `Self`.
     agent_id: AgentId,
     /// Map from a file's node ID to the ID of the corresponding buffer.
@@ -41,6 +41,17 @@ pub(crate) struct EventStream<Ed: CollabEditor> {
     selection_streams: SelectionStreams<Ed>,
 }
 
+/// The type of error that can occur when [`EventStream::next`] fails.
+#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
+#[display("{_0}")]
+pub enum EventError<Ed: CollabEditor> {
+    /// The project filter returned an error.
+    Filter(<Ed::ProjectFilter as Filter<Ed::Fs>>::Error),
+
+    /// We couldn't get the node at the given path.
+    NodeAtPath(<Ed::Fs as Fs>::NodeAtPathError),
+}
+
 /// A builder for [`EventStream`]s.
 ///
 /// Unlike the [`EventStream`] it'll be built into, this type is *not* generic
@@ -61,17 +72,6 @@ pub(crate) struct NeedsProjectFilter;
 /// An [`EventStreamBuilder`] typestate indicating that it's ready to be built.
 pub(crate) struct Done<F> {
     filter: F,
-}
-
-/// The type of error that can occur when [`EventStream::next`] fails.
-#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
-#[display("{_0}")]
-pub enum EventError<Ed: CollabEditor> {
-    /// The project filter returned an error.
-    Filter(<Ed::ProjectFilter as Filter<Ed::Fs>>::Error),
-
-    /// We couldn't get the node at the given path.
-    NodeAtPath(<Ed::Fs as Fs>::NodeAtPathError),
 }
 
 struct BufferStreams<Ed: CollabEditor> {
@@ -146,7 +146,8 @@ impl<Ed: CollabEditor> EventStream<Ed> {
         self.agent_id
     }
 
-    pub(crate) async fn next(
+    /// TODO: docs.
+    pub async fn next(
         &mut self,
         ctx: &mut Context<Ed>,
     ) -> Result<Event<Ed>, EventError<Ed>> {

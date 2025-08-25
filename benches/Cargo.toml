@@ -19,7 +19,7 @@ mock = { workspace = true }
 thread-pool = { workspace = true }
 
 # Collab-related dependencies.
-collab = { workspace = true, optional = true, features = ["benches", "mock"] }
+collab = { workspace = true, optional = true, features = ["mock"] }
 gitignore = { workspace = true, optional = true }
 real-fs = { workspace = true, optional = true }
 

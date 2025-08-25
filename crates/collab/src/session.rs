@@ -42,11 +42,13 @@ pub enum SessionError<Ed: CollabEditor> {
 }
 
 impl<Ed: CollabEditor> Session<Ed> {
-    pub(crate) fn id(&self) -> SessionId<Ed> {
+    /// Returns the ID of this session.
+    pub fn id(&self) -> SessionId<Ed> {
         self.project_handle.session_id()
     }
 
-    pub(crate) fn project_root(&self) -> AbsPathBuf {
+    /// Returns the path to the root of the project this session is for.
+    pub fn project_root(&self) -> AbsPathBuf {
         self.project_handle.root()
     }
 
