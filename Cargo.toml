@@ -19,6 +19,7 @@ async-io = "2"
 async-net = "2"
 async-task = "4"
 auth-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
+bincode = "2"
 cargo_metadata = "0.22"
 cauchy = { git = "ssh://git@github.com/nomad/cauchy.git" }
 chrono = { version = "0.4", default-features = false }

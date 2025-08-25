@@ -730,7 +730,10 @@ dependencies = [
  "cauchy",
  "collab-types",
  "derive_more",
+ "fs",
+ "futures-lite",
  "fxhash",
+ "mock",
  "nohash",
  "serde",
  "smallvec",
@@ -2450,7 +2453,7 @@ dependencies = [
 [[package]]
 name = "puff"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/puff.git#17631658e7fadd19ac8b023f31527a51f500f23c"
+source = "git+ssh://git@github.com/nomad/puff.git#3b49345700ec438fc179f2687e4763cbd0833921"
 dependencies = [
  "abs-path",
  "fxhash",
@@ -3003,6 +3006,7 @@ dependencies = [
  "auth",
  "cauchy",
  "collab",
+ "collab-project",
  "editor",
  "executor",
  "flume",

@@ -195,6 +195,65 @@ impl Project {
     }
 
     /// TODO: docs.
+    #[cfg(feature = "mock")]
+    #[inline]
+    pub fn from_mock(
+        peer_id: PeerId,
+        directory: mock::fs::MockDirectory,
+    ) -> Self {
+        use core::pin::pin;
+
+        use ::fs::{Directory as _, File as _, Node, Symlink as _};
+        use futures_lite::FutureExt;
+
+        async fn push_dir(
+            dir: mock::fs::MockDirectory,
+            builder: &mut ProjectBuilder,
+        ) -> Result<(), Box<dyn core::error::Error>> {
+            use futures_lite::StreamExt;
+
+            let mut stream = pin!(dir.list_nodes().await?);
+
+            while let Some(node_res) = stream.next().await {
+                match node_res? {
+                    Node::File(file) => {
+                        let contents = file.read().await?;
+                        match str::from_utf8(&contents) {
+                            Ok(str) => {
+                                builder.push_text_file(file.path(), str)?;
+                            },
+                            Err(_) => {
+                                builder
+                                    .push_binary_file(file.path(), contents)?;
+                            },
+                        }
+                    },
+                    Node::Directory(dir) => {
+                        builder.push_directory(dir.path())?;
+                        push_dir(dir, builder).boxed_local().await?;
+                    },
+                    Node::Symlink(symlink) => {
+                        let target_path = symlink.read_path().await?;
+                        builder.push_symlink(symlink.path(), target_path)?;
+                    },
+                }
+            }
+
+            Ok(())
+        }
+
+        let mut builder = Self::builder(peer_id);
+
+        if let Err(err) =
+            futures_lite::future::block_on(push_dir(directory, &mut builder))
+        {
+            panic!("{err}");
+        }
+
+        builder.build()
+    }
+
+    /// TODO: docs.
     #[inline]
     pub fn integrate_binary_edit(
         &mut self,
@@ -561,6 +620,70 @@ impl Project {
     ) -> Option<text::TextStateMut<'_>> {
         let (state, fs) = self.state_mut();
         text::TextStateMut::new(fs.file_mut(file_id), state)
+    }
+}
+
+#[cfg(feature = "mock")]
+impl From<&Project> for mock::fs::MockFs {
+    #[track_caller]
+    #[inline]
+    fn from(proj: &Project) -> Self {
+        use ::fs::{Directory as _, File as _, Fs as _};
+        use futures_lite::FutureExt;
+
+        use crate::fs::{Directory, File, Node};
+
+        async fn push_directory(
+            dir: Directory<'_>,
+            fs: &mut mock::fs::MockFs,
+        ) -> Result<(), Box<dyn core::error::Error>> {
+            let parent = fs.dir(dir.path()).await?;
+
+            for child in dir.children() {
+                match child {
+                    Node::Directory(directory) => {
+                        let name = directory.try_name().expect("not root");
+                        parent.create_directory(name).await?;
+                        push_directory(directory, fs).boxed_local().await?;
+                    },
+                    Node::File(file) => match file {
+                        File::Binary(binary) => {
+                            parent
+                                .create_file(file.name())
+                                .await?
+                                .write(binary.contents())
+                                .await?;
+                        },
+                        File::Symlink(symlink) => {
+                            let target_path = symlink.target_path();
+                            parent
+                                .create_symlink(file.name(), target_path)
+                                .await?;
+                        },
+                        File::Text(text) => {
+                            parent
+                                .create_file(file.name())
+                                .await?
+                                .write_chunks(text.contents().chunks())
+                                .await?;
+                        },
+                    },
+                }
+            }
+
+            Ok(())
+        }
+
+        let mut fs = mock::fs::MockFs::default();
+
+        if let Err(err) = futures_lite::future::block_on(push_directory(
+            proj.root(),
+            &mut fs,
+        )) {
+            panic!("{err}");
+        }
+
+        fs
     }
 }
 
