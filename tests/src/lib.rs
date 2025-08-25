@@ -7,6 +7,7 @@
 #![cfg_attr(coverage_nightly, feature(coverage_attribute))]
 
 mod collab;
+mod collab_project;
 mod editor;
 mod fs;
 mod gitignore;

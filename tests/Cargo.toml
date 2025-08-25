@@ -20,6 +20,7 @@ async-io = { workspace = true }
 auth = { workspace = true, features = ["mock"] }
 cauchy = { workspace = true }
 collab = { workspace = true, features = ["mock"] }
+collab-project = { workspace = true, features = ["mock", "serde"] }
 editor = { workspace = true }
 executor = { workspace = true }
 flume = { workspace = true }
