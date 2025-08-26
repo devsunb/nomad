@@ -28,13 +28,14 @@ struct DecorationProviderInner {
 }
 
 /// The highlight ranges to be drawn in a given buffer.
+#[derive(Debug)]
 struct HighlightRanges {
     buffer_id: BufferId,
     inner: SlotMap<slotmap::DefaultKey, HighlightRangeInner>,
 }
 
+#[derive(Debug)]
 struct HighlightRangeInner {
-    extmark_id: Option<u32>,
     highlight_group_name: CompactString,
     point_range: Range<Point>,
 }
@@ -91,7 +92,6 @@ impl DecorationProvider {
         highlight_group_name: &str,
     ) -> HighlightRange {
         let range_inner = HighlightRangeInner {
-            extmark_id: None,
             highlight_group_name: highlight_group_name.into(),
             point_range,
         };
@@ -184,27 +184,24 @@ impl DecorationProvider {
 impl HighlightRanges {
     fn redraw(&mut self, namespace_id: u32) {
         for range in self.inner.values_mut() {
-            let mut opts = api::opts::SetExtmarkOpts::builder();
-
-            opts.end_row(range.point_range.end.line_idx)
+            let opts = api::opts::SetExtmarkOpts::builder()
+                .end_row(range.point_range.end.line_idx)
                 .end_col(range.point_range.end.byte_offset)
                 .ephemeral(true)
-                .hl_group(&*range.highlight_group_name);
+                .hl_group(&*range.highlight_group_name)
+                .build();
 
-            if let Some(extmark_id) = range.extmark_id {
-                opts.id(extmark_id);
-            }
-
-            let extmark_id = api::Buffer::from(self.buffer_id)
+            // NOTE: not in the docs, but when setting ephemeral extmarks
+            // nvim_buf_set_extmark always returns 0 as the extmark ID, which
+            // isn't a valid ID because it's not positive.
+            api::Buffer::from(self.buffer_id)
                 .set_extmark(
                     namespace_id,
                     range.point_range.start.line_idx,
                     range.point_range.start.byte_offset,
-                    &opts.build(),
+                    &opts,
                 )
                 .expect("couldn't set extmark");
-
-            range.extmark_id = Some(extmark_id);
         }
     }
 }
