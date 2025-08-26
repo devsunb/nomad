@@ -477,3 +477,51 @@ impl<'a, Ed: EditorAdapter> Selection for SelectionAdapter<'a, Ed> {
         )
     }
 }
+
+impl<'a, Ed: EditorAdapter> Deref for BufferAdapter<'a, Ed> {
+    type Target = <<Ed as Deref>::Target as Editor>::Buffer<'a>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'a, Ed: EditorAdapter> DerefMut for BufferAdapter<'a, Ed> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<'a, Ed: EditorAdapter> Deref for CursorAdapter<'a, Ed> {
+    type Target = <<Ed as Deref>::Target as Editor>::Cursor<'a>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'a, Ed: EditorAdapter> DerefMut for CursorAdapter<'a, Ed> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}
+
+impl<'a, Ed: EditorAdapter> Deref for SelectionAdapter<'a, Ed> {
+    type Target = <<Ed as Deref>::Target as Editor>::Selection<'a>;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'a, Ed: EditorAdapter> DerefMut for SelectionAdapter<'a, Ed> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
+}

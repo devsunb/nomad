@@ -74,36 +74,7 @@ pub struct SelectionInner {
 }
 
 impl<'a> Buffer<'a> {
-    pub(crate) fn into_cursor(
-        self,
-        cursor_id: CursorId,
-    ) -> Option<Cursor<'a>> {
-        debug_assert_eq!(cursor_id.buffer_id(), self.id());
-        self.cursors
-            .contains_key(cursor_id.id_in_buffer)
-            .then_some(Cursor { buffer: self, cursor_id })
-    }
-
-    pub(crate) fn into_selection(
-        self,
-        selection_id: SelectionId,
-    ) -> Option<Selection<'a>> {
-        debug_assert_eq!(selection_id.buffer_id(), self.id());
-        self.selections
-            .contains_key(selection_id.id_in_buffer)
-            .then_some(Selection { buffer: self, selection_id })
-    }
-
-    pub(crate) fn reborrow(&mut self) -> Buffer<'_> {
-        Buffer {
-            inner: self.inner,
-            callbacks: self.callbacks,
-            current_buffer: self.current_buffer,
-            fs: self.fs,
-        }
-    }
-
-    fn create_cursor(
+    pub fn create_cursor(
         &mut self,
         byte_offset: ByteOffset,
         agent_id: AgentId,
@@ -131,6 +102,35 @@ impl<'a> Buffer<'a> {
         }
 
         cursor
+    }
+
+    pub(crate) fn into_cursor(
+        self,
+        cursor_id: CursorId,
+    ) -> Option<Cursor<'a>> {
+        debug_assert_eq!(cursor_id.buffer_id(), self.id());
+        self.cursors
+            .contains_key(cursor_id.id_in_buffer)
+            .then_some(Cursor { buffer: self, cursor_id })
+    }
+
+    pub(crate) fn into_selection(
+        self,
+        selection_id: SelectionId,
+    ) -> Option<Selection<'a>> {
+        debug_assert_eq!(selection_id.buffer_id(), self.id());
+        self.selections
+            .contains_key(selection_id.id_in_buffer)
+            .then_some(Selection { buffer: self, selection_id })
+    }
+
+    pub(crate) fn reborrow(&mut self) -> Buffer<'_> {
+        Buffer {
+            inner: self.inner,
+            callbacks: self.callbacks,
+            current_buffer: self.current_buffer,
+            fs: self.fs,
+        }
     }
 }
 

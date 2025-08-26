@@ -1,8 +1,14 @@
 use abs_path::{AbsPath, AbsPathBuf, path};
-use collab::event::{BufferEvent, Event, EventStream};
+use collab::event::{
+    BufferEvent,
+    CursorEvent,
+    CursorEventKind,
+    Event,
+    EventStream,
+};
 use collab::mock::CollabMock;
 use collab::{CollabEditor, PeerId};
-use editor::{Buffer, Context, Replacement};
+use editor::{Buffer, ByteOffset, Context, Cursor, Replacement};
 use mock::{EditorExt, Mock};
 
 #[test]
@@ -55,6 +61,37 @@ fn creating_buffer_emits_event() {
     });
 }
 
+#[test]
+fn moving_cursor_emits_event() {
+    let fs = mock::fs! {
+        "foo.txt": "hello world",
+    };
+
+    CollabMock::new(Mock::new(fs)).block_on(async |ctx| {
+        let agent_id = ctx.new_agent_id();
+
+        let foo_id =
+            ctx.create_buffer(path!("/foo.txt"), agent_id).await.unwrap();
+
+        let foo_cursor_id = ctx.with_borrowed(|ctx| {
+            ctx.buffer(foo_id).unwrap().create_cursor(5, agent_id).id()
+        });
+
+        let mut event_stream = EventStream::new(path!("/"), ctx).await;
+
+        ctx.with_borrowed(|ctx| {
+            let _ =
+                ctx.cursor(foo_cursor_id).unwrap().schedule_move(6, agent_id);
+        });
+
+        let (cursor_id, new_offset) =
+            event_stream.next_as_cursor_moved(ctx).await;
+
+        assert_eq!(cursor_id, foo_cursor_id);
+        assert_eq!(new_offset, 6);
+    });
+}
+
 trait EventStreamExt<Ed: CollabEditor> {
     fn event_stream(&mut self) -> &mut EventStream<Ed>;
 
@@ -101,6 +138,34 @@ trait EventStreamExt<Ed: CollabEditor> {
                     (buffer_id, file_path)
                 },
                 other => panic!("expected Created event, got {other:?}"),
+            }
+        }
+    }
+
+    fn next_as_cursor(
+        &mut self,
+        ctx: &mut Context<Ed>,
+    ) -> impl Future<Output = CursorEvent<Ed>> {
+        async move {
+            match self.event_stream().next(ctx).await {
+                Ok(Event::Cursor(event)) => event,
+                Ok(other) => panic!("expected CursorEvent, got {other:?}"),
+                Err(err) => panic!("{err}"),
+            }
+        }
+    }
+
+    fn next_as_cursor_moved(
+        &mut self,
+        ctx: &mut Context<Ed>,
+    ) -> impl Future<Output = (Ed::CursorId, ByteOffset)> {
+        async move {
+            let event = self.next_as_cursor(ctx).await;
+            match event.kind {
+                CursorEventKind::Moved(new_offset) => {
+                    (event.cursor_id, new_offset)
+                },
+                other => panic!("expected Moved event, got {other:?}"),
             }
         }
     }
