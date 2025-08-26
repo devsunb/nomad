@@ -1,9 +1,8 @@
-use core::cmp::Ordering;
 use core::fmt;
 use core::num::NonZeroU64;
 
 /// TODO: docs.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AgentId(u64);
 
 impl AgentId {
@@ -31,9 +30,11 @@ impl AgentId {
 
 impl fmt::Debug for AgentId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let field: &dyn fmt::Debug =
-            if self.is_unknown() { &format_args!("UNKNOWN") } else { &self.0 };
-        f.debug_tuple("AgentId").field(field).finish()
+        if self.is_unknown() {
+            f.write_str("AgentId::UNKNOWN")
+        } else {
+            f.debug_tuple("AgentId").field(&self.0).finish()
+        }
     }
 }
 
@@ -41,23 +42,5 @@ impl Default for AgentId {
     #[inline]
     fn default() -> Self {
         Self::UNKNOWN
-    }
-}
-
-impl PartialEq for AgentId {
-    #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.partial_cmp(other) == Some(Ordering::Equal)
-    }
-}
-
-impl PartialOrd for AgentId {
-    #[inline]
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.is_unknown() || other.is_unknown() {
-            None
-        } else {
-            self.0.partial_cmp(&other.0)
-        }
     }
 }

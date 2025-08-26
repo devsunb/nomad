@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use editor::{Buffer, Context, Edit, Replacement};
+use editor::{AgentId, Buffer, Context, Edit, Replacement};
 use futures_util::future::FutureExt;
 use futures_util::select_biased;
 use futures_util::stream::StreamExt;
@@ -144,7 +144,7 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
 
     let edit = edit_stream.next().await.unwrap();
 
-    assert!(edit.made_by.is_unknown());
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::deletion(5..6)]);
 }
 
@@ -167,7 +167,7 @@ async fn setting_eol_is_like_inserting_trailing_newline(
 
     let edit = edit_stream.next().await.unwrap();
 
-    assert!(edit.made_by.is_unknown());
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(5, "\n")]);
 }
 
@@ -191,7 +191,7 @@ async fn inserting_in_empty_buf_with_eol_causes_newline_insertion(
     assert_eq!(&*edit.replacements, &[Replacement::insertion(0, "foo")]);
 
     let edit = edit_stream.next().await.unwrap();
-    assert!(edit.made_by.is_unknown());
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(3, "\n")]);
 }
 
@@ -218,7 +218,7 @@ async fn deleting_all_in_buf_with_eol_causes_newline_deletion(
     assert_eq!(&*edit.replacements, &[Replacement::deletion(0..5)]);
 
     let edit = edit_stream.next().await.unwrap();
-    assert!(edit.made_by.is_unknown());
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::deletion(0..1)]);
 }
 
