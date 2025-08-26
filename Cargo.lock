@@ -2454,7 +2454,7 @@ dependencies = [
 [[package]]
 name = "puff"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/puff.git#a921e31170a20cc71448ef80055a6e14d8d7d292"
+source = "git+ssh://git@github.com/nomad/puff.git#58780673d9f95abba8028b6f350e5285b5690496"
 dependencies = [
  "abs-path",
  "fxhash",
