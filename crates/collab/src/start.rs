@@ -4,17 +4,17 @@ use core::convert::Infallible;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthInfos;
-use collab_project::fs::{File as ProjectFile, Node as ProjectNode};
+use collab_project::fs::{FileMut, NodeMut};
 use collab_project::{Project, ProjectBuilder};
 use collab_server::client as collab_client;
 use collab_types::{Peer, PeerId, puff};
 use editor::command::ToCompletionFn;
 use editor::module::AsyncAction;
 use editor::shared::{MultiThreaded, Shared};
-use editor::{Buffer, Context, Editor};
+use editor::{Buffer, Context, Cursor, Editor};
 use either::Either;
 use fs::walk::FsExt;
-use fs::{Directory, File, Fs, Metadata, Node, Symlink};
+use fs::{Directory, File as _, Fs, Metadata, Node, Symlink};
 use futures_util::AsyncReadExt;
 use fxhash::FxHashMap;
 use puff::directory::LocalDirectoryId;
@@ -93,7 +93,7 @@ impl<Ed: CollabEditor> Start<Ed> {
             },
         };
 
-        let (project, stream_builder, node_id_maps) = ctx
+        let (mut project, stream_builder, node_id_maps) = ctx
             .spawn_background(async move {
                 let walker = fs.walk(&project_root).filter(project_filter);
 
@@ -137,7 +137,7 @@ impl<Ed: CollabEditor> Start<Ed> {
         let mut id_maps = IdMaps::default();
 
         // Start watching the opened buffers that are part of the project.
-        ctx.for_each_buffer(|buffer| {
+        ctx.for_each_buffer(|mut buffer| {
             let buffer_path = buffer.path();
 
             let Some(path_in_proj) = buffer_path.strip_prefix(root_path)
@@ -145,17 +145,34 @@ impl<Ed: CollabEditor> Start<Ed> {
                 return;
             };
 
-            let file_id = match project.node_at_path(path_in_proj) {
-                Some(ProjectNode::File(ProjectFile::Text(file))) => file.id(),
-                _ => return,
+            let Some(NodeMut::File(FileMut::Text(mut file))) =
+                project.node_at_path_mut(path_in_proj)
+            else {
+                return;
             };
 
-            if let Some(node_id) = node_id_maps.file2node.get(&file_id) {
-                let buffer_id = buffer.id();
-                event_stream.watch_buffer(buffer, node_id.clone());
-                id_maps.buffer2file.insert(buffer_id.clone(), file_id);
-                id_maps.file2buffer.insert(file_id, buffer_id);
-            }
+            let Some(node_id) = node_id_maps.file2node.get(&file.id()) else {
+                return;
+            };
+
+            let buffer_id = buffer.id();
+            event_stream.watch_buffer(&mut buffer, node_id.clone());
+            id_maps.buffer2file.insert(buffer_id.clone(), file.id());
+            id_maps.file2buffer.insert(file.id(), buffer_id);
+
+            buffer.for_each_cursor(|mut cursor| {
+                let (cursor_id, _) = file.create_cursor(cursor.byte_offset());
+                event_stream.watch_cursor(&mut cursor);
+                id_maps.cursor2cursor.insert(cursor.id(), cursor_id);
+            });
+
+            // buffer.for_each_selection(|selection| {
+            //     let byte_range = selection.byte_range();
+            //     let (selection_id, _) = file.create_selection(byte_range);
+            //     id_maps
+            //         .selection2selection
+            //         .insert(selection.id(), selection_id);
+            // });
         });
 
         id_maps.node2dir = node_id_maps.node2dir;
@@ -458,7 +475,7 @@ pub enum ReadNodeError<Fs: fs::Fs> {
     NodeName(fs::MetadataNameError),
 
     /// TODO: docs.
-    ReadFile(<Fs::File as File>::ReadError),
+    ReadFile(<Fs::File as fs::File>::ReadError),
 
     /// TODO: docs.
     ReadSymlink(<Fs::Symlink as Symlink>::ReadError),
@@ -476,7 +493,7 @@ pub enum ReadProjectError<Ed: CollabEditor> {
     NoNodeAtRootPath(AbsPathBuf),
 
     /// TODO: docs.
-    FileParent(<<Ed::Fs as Fs>::File as File>::ParentError),
+    FileParent(<<Ed::Fs as Fs>::File as fs::File>::ParentError),
 
     /// The project filter couldn't be created.
     ProjectFilter(Ed::ProjectFilterError),

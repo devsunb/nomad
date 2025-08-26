@@ -272,6 +272,12 @@ impl<'a, S> TextFileMut<'a, S> {
         TextFile { inner: self.inner.as_file(), state: self.state.as_ref() }
     }
 
+    /// Returns this text file's ID.
+    #[inline]
+    pub fn id(&self) -> LocalFileId {
+        self.inner.local_id()
+    }
+
     #[inline]
     pub(crate) fn inner_mut(&mut self) -> &mut PuffFileMut<'a, S> {
         &mut self.inner

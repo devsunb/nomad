@@ -192,14 +192,14 @@ impl<Ed: CollabEditor> EventStream<Ed> {
 
     pub(crate) fn watch_buffer(
         &mut self,
-        buffer: Buffer<'_, Ed>,
+        buffer: &mut Buffer<'_, Ed>,
         file_id: <Ed::Fs as fs::Fs>::NodeId,
     ) {
         self.buf_id_of_file_id.insert(file_id, buffer.id());
         self.buffer_streams.insert(buffer, self.agent_id);
     }
 
-    pub(crate) fn watch_cursor(&mut self, cursor: Cursor<'_, Ed>) {
+    pub(crate) fn watch_cursor(&mut self, cursor: &mut Cursor<'_, Ed>) {
         self.cursor_streams.insert(cursor);
     }
 
@@ -241,8 +241,8 @@ impl<Ed: CollabEditor> EventStream<Ed> {
                 let fs::Node::File(file) = node else { return Ok(None) };
 
                 let is_watched = ctx.with_borrowed(|ctx| {
-                    if let Some(buffer) = ctx.buffer(buffer_id.clone()) {
-                        self.watch_buffer(buffer, file.id());
+                    if let Some(mut buffer) = ctx.buffer(buffer_id.clone()) {
+                        self.watch_buffer(&mut buffer, file.id());
                         true
                     } else {
                         false
@@ -273,8 +273,9 @@ impl<Ed: CollabEditor> EventStream<Ed> {
             event::CursorEventKind::Created(buffer_id, _) => {
                 if self.buffer_streams.is_watched(buffer_id) {
                     ctx.with_borrowed(|ctx| {
-                        let cursor = ctx.cursor(event.cursor_id.clone())?;
-                        self.watch_cursor(cursor);
+                        let mut cursor =
+                            ctx.cursor(event.cursor_id.clone())?;
+                        self.watch_cursor(&mut cursor);
                         Some(event)
                     })
                 } else {
@@ -440,8 +441,8 @@ impl<Ed: CollabEditor> EventStream<Ed> {
             fs::Node::File(file) => {
                 self.file_streams.insert(file);
                 ctx.with_borrowed(|ctx| {
-                    if let Some(buffer) = ctx.buffer_at_path(file.path()) {
-                        self.watch_buffer(buffer, file.id());
+                    if let Some(mut buffer) = ctx.buffer_at_path(file.path()) {
+                        self.watch_buffer(&mut buffer, file.id());
                     }
                 });
             },
@@ -511,7 +512,7 @@ where
 
 impl<Ed: CollabEditor> BufferStreams<Ed> {
     /// Starts receiving [`event::BufferEvent`]s on the given buffer.
-    fn insert(&mut self, mut buffer: Buffer<'_, Ed>, agent_id: AgentId) {
+    fn insert(&mut self, buffer: &mut Buffer<'_, Ed>, agent_id: AgentId) {
         let event_tx = self.event_tx.clone();
         let edits_handle = buffer.on_edited(move |buf, edit| {
             if edit.made_by == agent_id {
@@ -590,7 +591,7 @@ impl<Ed: CollabEditor> BufferStreams<Ed> {
 
 impl<Ed: CollabEditor> CursorStreams<Ed> {
     /// Starts receiving [`event::CursorEvent`]s on the given cursor.
-    fn insert(&mut self, mut cursor: Cursor<'_, Ed>) {
+    fn insert(&mut self, cursor: &mut Cursor<'_, Ed>) {
         let event_tx = self.event_tx.clone();
         let moved_handle = cursor.on_moved(move |cursor, _moved_by| {
             let _ = event_tx.send(event::CursorEvent {
