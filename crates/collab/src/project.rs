@@ -452,16 +452,20 @@ impl<Ed: CollabEditor> Project<Ed> {
     ) {
         self.remote_peers.remove(peer_id);
 
-        let (cursor_ids, _selection_ids) =
+        let (cursor_ids, selection_ids) =
             self.inner.integrate_peer_disconnection(peer_id);
 
-        let tooltips = cursor_ids
-            .into_iter()
-            .flat_map(|cursor_id| self.peer_tooltips.remove(&cursor_id))
-            .collect::<SmallVec<[_; 1]>>();
+        for cursor_id in cursor_ids {
+            if let Some(tooltip) = self.peer_tooltips.remove(&cursor_id) {
+                Ed::remove_peer_tooltip(tooltip, ctx).await;
+            }
+        }
 
-        for tooltip in tooltips {
-            Ed::remove_peer_tooltip(tooltip, ctx).await;
+        for selection_id in selection_ids {
+            if let Some(selection) = self.peer_selections.remove(&selection_id)
+            {
+                Ed::remove_peer_selection(selection, ctx).await;
+            }
         }
     }
 
