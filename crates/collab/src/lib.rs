@@ -1,5 +1,7 @@
 //! TODO: docs.
 
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
 mod collab;
 pub mod config;
 mod convert;

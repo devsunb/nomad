@@ -135,8 +135,7 @@ pub trait CollabEditor: Editor {
     /// Called when the [`Leave`](leave::Leave) action returns an error.
     fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>);
 
-    /// Called when [`run`](session::Session::run)nig a session returns
-    /// an error.
+    /// Called when running a session returns an error.
     fn on_session_error(
         error: session::SessionError<Self>,
         ctx: &mut Context<Self>,

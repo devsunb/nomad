@@ -460,7 +460,7 @@ pub enum StartError<Ed: CollabEditor> {
     UserNotLoggedIn,
 }
 
-/// The type of error that can occur when reading a [`FsNode`] fails.
+/// The type of error that can occur when reading a [`fs::Node`] fails.
 #[derive(cauchy::Debug, derive_more::Display, cauchy::PartialEq)]
 #[display("{_0}")]
 pub enum ReadNodeError<Fs: fs::Fs> {
