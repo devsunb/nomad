@@ -370,6 +370,13 @@ impl<'a, S: IsVisible> TextFileMut<'a, S> {
         PeerId::new(self.inner.as_file().created_by())
     }
 
+    /// A shorthand method which calls [`edit`](Self::edit) with a single
+    /// deletion.
+    #[inline]
+    pub fn delete(&mut self, delete_range: Range<ByteOffset>) -> TextEdit {
+        self.replace(delete_range, SmolStr::default())
+    }
+
     /// TODO: docs.
     #[track_caller]
     #[inline]
@@ -381,6 +388,31 @@ impl<'a, S: IsVisible> TextFileMut<'a, S> {
         let local_id = self.state.local_id();
         let creator_id = self.created_by();
         self.contents_mut().edit(replacements, file_id, local_id, creator_id)
+    }
+
+    /// A shorthand method which calls [`edit`](Self::edit) with a single
+    /// insertion.
+    #[inline]
+    pub fn insert(
+        &mut self,
+        at_offset: ByteOffset,
+        text: impl Into<SmolStr>,
+    ) -> TextEdit {
+        self.replace(at_offset..at_offset, text)
+    }
+
+    /// A shorthand method which calls [`edit`](Self::edit) with a single
+    /// replacement.
+    #[inline]
+    pub fn replace(
+        &mut self,
+        delete_range: Range<ByteOffset>,
+        insert_text: impl Into<SmolStr>,
+    ) -> TextEdit {
+        self.edit([TextReplacement {
+            deleted_range: delete_range,
+            inserted_text: insert_text.into(),
+        }])
     }
 }
 
