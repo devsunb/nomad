@@ -33,8 +33,8 @@ fn replicate_simple_project() {
         let collab = Collab::from(&Auth::logged_in("peer1"));
         let agent_id = ctx.new_agent_id();
         ctx.create_and_focus(path!("/foo/mars.txt"), agent_id).await;
-        let session_id = collab.start(ctx).await.unwrap();
-        session_id_tx.send(session_id).unwrap();
+        let session_infos = collab.start(ctx).await.unwrap();
+        session_id_tx.send(session_infos.id()).unwrap();
     });
 
     let run_peer2 = peer2.run(async move |ctx| {

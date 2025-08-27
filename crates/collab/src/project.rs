@@ -266,6 +266,31 @@ impl<Ed: CollabEditor> Project<Ed> {
         }
     }
 
+    /// Returns the [`text::CursorMut`] corresponding to the cursor with the
+    /// given ID.
+    #[track_caller]
+    fn cursor_of_cursor_id(
+        &mut self,
+        cursor_id: &Ed::CursorId,
+    ) -> collab_project::text::CursorMut<'_> {
+        let Some(&project_cursor_id) =
+            self.id_maps.cursor2cursor.get(cursor_id)
+        else {
+            panic!("unknown cursor ID: {cursor_id:?}");
+        };
+
+        let Ok(maybe_cursor) = self.inner.cursor_mut(project_cursor_id) else {
+            panic!("cursor ID {cursor_id:?} maps to a remote peer's cursor")
+        };
+
+        match maybe_cursor {
+            Some(cursor) => cursor,
+            None => {
+                panic!("cursor ID {cursor_id:?} maps to a deleted cursor")
+            },
+        }
+    }
+
     async fn integrate_binary_edit(
         &mut self,
         edit: binary::BinaryEdit,
@@ -541,178 +566,6 @@ impl<Ed: CollabEditor> Project<Ed> {
         });
     }
 
-    async fn synchronize_file_modification(
-        &mut self,
-        modification: fs::FileModification<Ed::Fs>,
-        ctx: &mut Context<Ed>,
-    ) -> Result<Option<Message>, SynchronizeError<Ed>> {
-        enum FileContents {
-            Binary(Arc<[u8]>),
-            Text(crop::Rope),
-        }
-
-        enum FileDiff {
-            Binary(Vec<u8>),
-            Text(SmallVec<[TextReplacement; 1]>),
-        }
-
-        let root_path = self.root_path.clone();
-
-        let file_mut = match self.project_node(&modification.file_id) {
-            NodeMut::File(file) => file,
-            NodeMut::Directory(_) => {
-                panic!("received a FileModification event on a directory")
-            },
-        };
-
-        let file_path = root_path.concat(file_mut.path());
-
-        // Get the file's contents before the modification.
-        let file_contents = match file_mut.as_file() {
-            File::Binary(file) => FileContents::Binary(file.contents().into()),
-            File::Text(file) => FileContents::Text(file.contents().clone()),
-            File::Symlink(_) => {
-                panic!("received a FileModification event on a symlink")
-            },
-        };
-
-        let fs = ctx.fs();
-
-        // Compute a diff with the current file contents in the background.
-        let compute_diff = ctx.spawn_background(async move {
-            let Some(node_contents) = fs.contents_at_path(&file_path).await?
-            else {
-                return Ok(None);
-            };
-
-            Ok(match (file_contents, node_contents) {
-                (FileContents::Binary(lhs), FsNodeContents::Binary(rhs)) => {
-                    (*lhs != *rhs).then_some(FileDiff::Binary(rhs))
-                },
-                (FileContents::Text(lhs), FsNodeContents::Text(rhs)) => {
-                    text_diff(lhs, &rhs).map(FileDiff::Text)
-                },
-                _ => None,
-            })
-        });
-
-        let file_diff = match compute_diff.await {
-            Ok(Some(file_diff)) => file_diff,
-            Ok(None) => return Ok(None),
-            Err(err) => return Err(SynchronizeError::ContentsAtPath(err)),
-        };
-
-        // Apply the diff.
-        Ok(Some(match (file_mut, file_diff) {
-            (FileMut::Binary(mut file), FileDiff::Binary(contents)) => {
-                Message::EditedBinary(file.replace(contents))
-            },
-            (FileMut::Text(mut file), FileDiff::Text(replacements)) => {
-                Message::EditedText(file.edit(replacements))
-            },
-            _ => unreachable!(),
-        }))
-    }
-
-    async fn synchronize_node_creation(
-        &mut self,
-        creation: fs::NodeCreation<Ed::Fs>,
-        ctx: &mut Context<Ed>,
-    ) -> Result<Option<Message>, SynchronizeError<Ed>> {
-        let node_contents =
-            match ctx.fs().contents_at_path(&creation.node_path).await {
-                Ok(Some(contents)) => contents,
-
-                // The node must've already been deleted or moved.
-                //
-                // FIXME: doing nothing can be problematic if we're about to
-                // receive deletions/moves for the node.
-                Ok(None) => return Ok(None),
-
-                Err(err) => return Err(SynchronizeError::ContentsAtPath(err)),
-            };
-
-        let node_id = creation.node_id;
-
-        let node_path = creation.node_path;
-
-        let mut components = node_path.components();
-
-        let node_name =
-            components.next_back().expect("root can't be created").to_owned();
-
-        let parent_path = components.as_path();
-
-        let parent_path_in_project = parent_path
-            .strip_prefix(&self.root_path)
-            .expect("the new parent has to be in the project");
-
-        let Some(parent) = self.inner.node_at_path_mut(parent_path_in_project)
-        else {
-            panic!(
-                "parent path {parent_path_in_project:?} doesn't exist in the \
-                 project"
-            );
-        };
-
-        let NodeMut::Directory(mut parent) = parent else {
-            panic!("parent is not a directory");
-        };
-
-        let Ok((creation, file_mut)) = (match node_contents {
-            FsNodeContents::Directory => {
-                match parent.create_directory(node_name) {
-                    Ok((creation, dir_mut)) => {
-                        let dir_id = dir_mut.as_directory().id();
-                        self.id_maps.node2dir.insert(node_id, dir_id);
-                        return Ok(Some(Message::CreatedDirectory(creation)));
-                    },
-                    Err(err) => Err(err),
-                }
-            },
-            FsNodeContents::Text(text_contents) => {
-                parent.create_text_file(node_name, text_contents)
-            },
-            FsNodeContents::Binary(binary_contents) => {
-                parent.create_binary_file(node_name, binary_contents)
-            },
-            FsNodeContents::Symlink(target_path) => {
-                parent.create_symlink(node_name, target_path)
-            },
-        }) else {
-            unreachable!("no duplicate node names");
-        };
-
-        let file_id = file_mut.as_file().id();
-        self.id_maps.node2file.insert(node_id, file_id);
-        Ok(Some(Message::CreatedFile(creation)))
-    }
-
-    /// Returns the [`text::CursorMut`] corresponding to the cursor with the
-    /// given ID.
-    #[track_caller]
-    fn cursor_of_cursor_id(
-        &mut self,
-        cursor_id: &Ed::CursorId,
-    ) -> collab_project::text::CursorMut<'_> {
-        let Some(&project_cursor_id) =
-            self.id_maps.cursor2cursor.get(cursor_id)
-        else {
-            panic!("unknown cursor ID: {cursor_id:?}");
-        };
-
-        let Ok(maybe_cursor) = self.inner.cursor_mut(project_cursor_id) else {
-            panic!("cursor ID {cursor_id:?} maps to a remote peer's cursor")
-        };
-
-        match maybe_cursor {
-            Some(cursor) => cursor,
-            None => {
-                panic!("cursor ID {cursor_id:?} maps to a deleted cursor")
-            },
-        }
-    }
-
     fn map_peers<T, Collector: FromIterator<T>>(
         &self,
         fun: impl FnMut(&Peer) -> T,
@@ -904,6 +757,153 @@ impl<Ed: CollabEditor> Project<Ed> {
                 panic!("unknown node ID: {:?}", id_change.old_id);
             },
         }
+    }
+
+    async fn synchronize_file_modification(
+        &mut self,
+        modification: fs::FileModification<Ed::Fs>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<Option<Message>, SynchronizeError<Ed>> {
+        enum FileContents {
+            Binary(Arc<[u8]>),
+            Text(crop::Rope),
+        }
+
+        enum FileDiff {
+            Binary(Vec<u8>),
+            Text(SmallVec<[TextReplacement; 1]>),
+        }
+
+        let root_path = self.root_path.clone();
+
+        let file_mut = match self.project_node(&modification.file_id) {
+            NodeMut::File(file) => file,
+            NodeMut::Directory(_) => {
+                panic!("received a FileModification event on a directory")
+            },
+        };
+
+        let file_path = root_path.concat(file_mut.path());
+
+        // Get the file's contents before the modification.
+        let file_contents = match file_mut.as_file() {
+            File::Binary(file) => FileContents::Binary(file.contents().into()),
+            File::Text(file) => FileContents::Text(file.contents().clone()),
+            File::Symlink(_) => {
+                panic!("received a FileModification event on a symlink")
+            },
+        };
+
+        let fs = ctx.fs();
+
+        // Compute a diff with the current file contents in the background.
+        let compute_diff = ctx.spawn_background(async move {
+            let Some(node_contents) = fs.contents_at_path(&file_path).await?
+            else {
+                return Ok(None);
+            };
+
+            Ok(match (file_contents, node_contents) {
+                (FileContents::Binary(lhs), FsNodeContents::Binary(rhs)) => {
+                    (*lhs != *rhs).then_some(FileDiff::Binary(rhs))
+                },
+                (FileContents::Text(lhs), FsNodeContents::Text(rhs)) => {
+                    text_diff(lhs, &rhs).map(FileDiff::Text)
+                },
+                _ => None,
+            })
+        });
+
+        let file_diff = match compute_diff.await {
+            Ok(Some(file_diff)) => file_diff,
+            Ok(None) => return Ok(None),
+            Err(err) => return Err(SynchronizeError::ContentsAtPath(err)),
+        };
+
+        // Apply the diff.
+        Ok(Some(match (file_mut, file_diff) {
+            (FileMut::Binary(mut file), FileDiff::Binary(contents)) => {
+                Message::EditedBinary(file.replace(contents))
+            },
+            (FileMut::Text(mut file), FileDiff::Text(replacements)) => {
+                Message::EditedText(file.edit(replacements))
+            },
+            _ => unreachable!(),
+        }))
+    }
+
+    async fn synchronize_node_creation(
+        &mut self,
+        creation: fs::NodeCreation<Ed::Fs>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<Option<Message>, SynchronizeError<Ed>> {
+        let node_contents =
+            match ctx.fs().contents_at_path(&creation.node_path).await {
+                Ok(Some(contents)) => contents,
+
+                // The node must've already been deleted or moved.
+                //
+                // FIXME: doing nothing can be problematic if we're about to
+                // receive deletions/moves for the node.
+                Ok(None) => return Ok(None),
+
+                Err(err) => return Err(SynchronizeError::ContentsAtPath(err)),
+            };
+
+        let node_id = creation.node_id;
+
+        let node_path = creation.node_path;
+
+        let mut components = node_path.components();
+
+        let node_name =
+            components.next_back().expect("root can't be created").to_owned();
+
+        let parent_path = components.as_path();
+
+        let parent_path_in_project = parent_path
+            .strip_prefix(&self.root_path)
+            .expect("the new parent has to be in the project");
+
+        let Some(parent) = self.inner.node_at_path_mut(parent_path_in_project)
+        else {
+            panic!(
+                "parent path {parent_path_in_project:?} doesn't exist in the \
+                 project"
+            );
+        };
+
+        let NodeMut::Directory(mut parent) = parent else {
+            panic!("parent is not a directory");
+        };
+
+        let Ok((creation, file_mut)) = (match node_contents {
+            FsNodeContents::Directory => {
+                match parent.create_directory(node_name) {
+                    Ok((creation, dir_mut)) => {
+                        let dir_id = dir_mut.as_directory().id();
+                        self.id_maps.node2dir.insert(node_id, dir_id);
+                        return Ok(Some(Message::CreatedDirectory(creation)));
+                    },
+                    Err(err) => Err(err),
+                }
+            },
+            FsNodeContents::Text(text_contents) => {
+                parent.create_text_file(node_name, text_contents)
+            },
+            FsNodeContents::Binary(binary_contents) => {
+                parent.create_binary_file(node_name, binary_contents)
+            },
+            FsNodeContents::Symlink(target_path) => {
+                parent.create_symlink(node_name, target_path)
+            },
+        }) else {
+            unreachable!("no duplicate node names");
+        };
+
+        let file_id = file_mut.as_file().id();
+        self.id_maps.node2file.insert(node_id, file_id);
+        Ok(Some(Message::CreatedFile(creation)))
     }
 
     fn synchronize_node_deletion(
