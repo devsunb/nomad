@@ -6,7 +6,7 @@ use std::io;
 use abs_path::AbsPathBuf;
 use collab_server::client as collab_client;
 use collab_types::{Message, Peer, PeerId};
-use editor::{Access, AccessMut, Context, Shared};
+use editor::{Access, Context, Shared};
 use flume::Receiver;
 use futures_util::{FutureExt, SinkExt, StreamExt, pin_mut, select_biased};
 use fxhash::FxHashMap;
@@ -255,15 +255,6 @@ impl<Ed: CollabEditor> Session<Ed> {
 impl Access<FxHashMap<PeerId, Peer>> for RemotePeers {
     fn with<R>(&self, fun: impl FnOnce(&FxHashMap<PeerId, Peer>) -> R) -> R {
         self.inner.with(fun)
-    }
-}
-
-impl AccessMut<FxHashMap<PeerId, Peer>> for RemotePeers {
-    fn with_mut<R>(
-        &mut self,
-        fun: impl FnOnce(&mut FxHashMap<PeerId, Peer>) -> R,
-    ) -> R {
-        self.inner.with_mut(fun)
     }
 }
 

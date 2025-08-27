@@ -7,9 +7,8 @@ use abs_path::{AbsPath, AbsPathBuf};
 use collab_project::fs::{File, FileMut, FsOp, Node, NodeMut};
 use collab_project::text::{CursorId, SelectionId, TextReplacement};
 use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
-use compact_str::format_compact;
 use editor::{Access, AgentId, Buffer, Context, Editor};
-use fs::{File as _, Fs, Symlink as _};
+use fs::{File as _, Fs as _, Symlink as _};
 use fxhash::FxHashMap;
 use puff::directory::LocalDirectoryId;
 use puff::file::{GlobalFileId, LocalFileId};
@@ -18,14 +17,7 @@ use smallvec::SmallVec;
 
 use crate::CollabEditor;
 use crate::convert::Convert;
-use crate::event::{
-    BufferEvent,
-    CursorEvent,
-    CursorEventKind,
-    Event,
-    SelectionEvent,
-    SelectionEventKind,
-};
+use crate::event::{self, Event};
 use crate::session::RemotePeers;
 
 /// TODO: docs.
@@ -640,10 +632,10 @@ impl<Ed: CollabEditor> Project<Ed> {
 
     fn synchronize_buffer(
         &mut self,
-        event: BufferEvent<Ed>,
+        event: event::BufferEvent<Ed>,
     ) -> Option<Message> {
         match event {
-            BufferEvent::Created(buffer_id, file_path) => {
+            event::BufferEvent::Created(buffer_id, file_path) => {
                 let path_in_proj = file_path
                     .strip_prefix(&self.root_path)
                     .expect("the buffer is backed by a file in the project");
@@ -659,21 +651,21 @@ impl<Ed: CollabEditor> Project<Ed> {
 
                 None
             },
-            BufferEvent::Edited(buffer_id, replacements) => {
+            event::BufferEvent::Edited(buffer_id, replacements) => {
                 let text_edit = self
                     .text_file_of_buffer(&buffer_id)
                     .edit(replacements.into_iter().map(Convert::convert));
 
                 Some(Message::EditedText(text_edit))
             },
-            BufferEvent::Removed(buffer_id) => {
+            event::BufferEvent::Removed(buffer_id) => {
                 let ids = &mut self.id_maps;
                 if let Some(file_id) = ids.buffer2file.remove(&buffer_id) {
                     ids.file2buffer.remove(&file_id);
                 }
                 None
             },
-            BufferEvent::Saved(buffer_id) => {
+            event::BufferEvent::Saved(buffer_id) => {
                 let file_id =
                     self.text_file_of_buffer(&buffer_id).as_file().global_id();
 
@@ -682,9 +674,12 @@ impl<Ed: CollabEditor> Project<Ed> {
         }
     }
 
-    fn synchronize_cursor(&mut self, event: CursorEvent<Ed>) -> Message {
+    fn synchronize_cursor(
+        &mut self,
+        event: event::CursorEvent<Ed>,
+    ) -> Message {
         match event.kind {
-            CursorEventKind::Created(buffer_id, byte_offset) => {
+            event::CursorEventKind::Created(buffer_id, byte_offset) => {
                 let (cursor_id, creation) = self
                     .text_file_of_buffer(&buffer_id)
                     .create_cursor(byte_offset);
@@ -693,14 +688,14 @@ impl<Ed: CollabEditor> Project<Ed> {
 
                 Message::CreatedCursor(creation)
             },
-            CursorEventKind::Moved(byte_offset) => {
+            event::CursorEventKind::Moved(byte_offset) => {
                 let movement = self
                     .cursor_of_cursor_id(&event.cursor_id)
                     .r#move(byte_offset);
 
                 Message::MovedCursor(movement)
             },
-            CursorEventKind::Removed => {
+            event::CursorEventKind::Removed => {
                 let deletion =
                     self.cursor_of_cursor_id(&event.cursor_id).delete();
 
@@ -968,9 +963,12 @@ impl<Ed: CollabEditor> Project<Ed> {
         }
     }
 
-    fn synchronize_selection(&mut self, event: SelectionEvent<Ed>) -> Message {
+    fn synchronize_selection(
+        &mut self,
+        event: event::SelectionEvent<Ed>,
+    ) -> Message {
         match event.kind {
-            SelectionEventKind::Created(buffer_id, byte_range) => {
+            event::SelectionEventKind::Created(buffer_id, byte_range) => {
                 let (selection_id, creation) = self
                     .text_file_of_buffer(&buffer_id)
                     .create_selection(byte_range);
@@ -981,14 +979,14 @@ impl<Ed: CollabEditor> Project<Ed> {
 
                 Message::CreatedSelection(creation)
             },
-            SelectionEventKind::Moved(byte_range) => {
+            event::SelectionEventKind::Moved(byte_range) => {
                 let movement = self
                     .selection_of_selection_id(&event.selection_id)
                     .r#move(byte_range);
 
                 Message::MovedSelection(movement)
             },
-            SelectionEventKind::Removed => {
+            event::SelectionEventKind::Removed => {
                 let removal = self
                     .selection_of_selection_id(&event.selection_id)
                     .delete();
@@ -1033,6 +1031,7 @@ mod impl_integrate_fs_op {
 
     use abs_path::{NodeName, NodeNameBuf};
     use collab_project::fs::{ResolveConflict, SyncAction};
+    use compact_str::format_compact;
     use fs::Directory;
     use futures_util::FutureExt;
     use puff::node::IsVisible;
