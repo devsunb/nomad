@@ -1,3 +1,5 @@
+use std::collections::hash_map;
+
 use abs_path::AbsPathBuf;
 use editor::context::{Buffer, Context, Cursor, EventHandle, Selection};
 use editor::{AgentId, Buffer as _, Cursor as _, Selection as _, Shared};
@@ -513,6 +515,16 @@ where
 impl<Ed: CollabEditor> BufferStreams<Ed> {
     /// Starts receiving [`event::BufferEvent`]s on the given buffer.
     fn insert(&mut self, buffer: &mut Buffer<'_, Ed>, agent_id: AgentId) {
+        let buffer_handles = match self.handles.entry(buffer.id()) {
+            hash_map::Entry::Occupied(_) => {
+                panic!(
+                    "already receiving events for buffer at {:?}",
+                    buffer.path()
+                );
+            },
+            hash_map::Entry::Vacant(vacant) => vacant,
+        };
+
         let event_tx = self.event_tx.clone();
         let edits_handle = buffer.on_edited(move |buf, edit| {
             if edit.made_by == agent_id {
@@ -538,9 +550,7 @@ impl<Ed: CollabEditor> BufferStreams<Ed> {
             }
         });
 
-        let buffer_handles = [edits_handle, removed_handle, saved_handle];
-
-        self.handles.insert(buffer.id(), buffer_handles);
+        buffer_handles.insert([edits_handle, removed_handle, saved_handle]);
     }
 
     /// Returns whether the buffer with the given ID is currently being
@@ -592,6 +602,13 @@ impl<Ed: CollabEditor> BufferStreams<Ed> {
 impl<Ed: CollabEditor> CursorStreams<Ed> {
     /// Starts receiving [`event::CursorEvent`]s on the given cursor.
     fn insert(&mut self, cursor: &mut Cursor<'_, Ed>) {
+        let cursor_handles = match self.handles.entry(cursor.id()) {
+            hash_map::Entry::Occupied(_) => {
+                panic!("already receiving cursor events for {:?}", cursor.id())
+            },
+            hash_map::Entry::Vacant(vacant) => vacant,
+        };
+
         let event_tx = self.event_tx.clone();
         let moved_handle = cursor.on_moved(move |cursor, _moved_by| {
             let _ = event_tx.send(event::CursorEvent {
@@ -610,9 +627,7 @@ impl<Ed: CollabEditor> CursorStreams<Ed> {
                 let _ = event_tx.send(event);
             });
 
-        let cursor_handles = [moved_handle, removed_handle];
-
-        self.handles.insert(cursor.id(), cursor_handles);
+        cursor_handles.insert([moved_handle, removed_handle]);
     }
 
     fn new(ctx: &mut Context<Ed>) -> Self {
@@ -681,6 +696,16 @@ impl<Fs: fs::Fs> FileStreams<Fs> {
 impl<Ed: CollabEditor> SelectionStreams<Ed> {
     /// Starts receiving [`event::SelectionEvent`]s on the given selection.
     fn insert(&mut self, mut selection: Selection<'_, Ed>) {
+        let selection_handles = match self.handles.entry(selection.id()) {
+            hash_map::Entry::Occupied(_) => {
+                panic!(
+                    "already receiving selection events for {:?}",
+                    selection.id()
+                );
+            },
+            hash_map::Entry::Vacant(vacant) => vacant,
+        };
+
         let event_tx = self.event_tx.clone();
         let moved_handle = selection.on_moved(move |selection, _moved_by| {
             let _ = event_tx.send(event::SelectionEvent {
@@ -699,9 +724,7 @@ impl<Ed: CollabEditor> SelectionStreams<Ed> {
                 let _ = event_tx.send(event);
             });
 
-        let selection_handles = [moved_handle, removed_handle];
-
-        self.handles.insert(selection.id(), selection_handles);
+        selection_handles.insert([moved_handle, removed_handle]);
     }
 
     fn new(ctx: &mut Context<Ed>) -> Self {

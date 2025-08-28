@@ -2,7 +2,6 @@ use abs_path::{AbsPathBuf, path};
 use collab::event::BufferEvent;
 use collab::mock::CollabMock;
 use collab::{Peer, PeerId};
-use futures_lite::future;
 use mock::{EditorExt, Mock};
 
 #[test]
@@ -28,7 +27,7 @@ fn remote_peer_tooltip_is_moved_after_integrating_edit() {
     // Insert a comma after the "o".
     let insert_comma = foo.insert(5, ",");
 
-    let fut = CollabMock::new(Mock::new(fs)).run(async move |ctx| {
+    CollabMock::new(Mock::new(fs)).block_on(async move |ctx| {
         let agent_id = ctx.new_agent_id();
 
         let mut proj = collab::project::Project {
@@ -68,6 +67,4 @@ fn remote_peer_tooltip_is_moved_after_integrating_edit() {
         // the space.
         assert_eq!(*proj.peer_tooltips.get(&cursor_id).unwrap(), 7);
     });
-
-    future::block_on(fut);
 }
