@@ -67,11 +67,10 @@ pub struct CursorId {
 }
 
 /// TODO: docs.
-pub struct CursorRef<'a> {
-    file: PuffFileState<'a>,
+pub struct CursorRef<'a, S = Visible> {
+    file: TextFile<'a, S>,
     id: CursorId,
     offset: ByteOffset,
-    state: State<'a>,
 }
 
 /// TODO: docs.
@@ -431,15 +430,39 @@ impl CursorId {
 }
 
 impl<'a> CursorRef<'a> {
+    #[inline]
+    pub(crate) fn from_id(id: CursorId, proj: &'a Project) -> Option<Self> {
+        let cursor = proj.state().text_ctx().cursors.get(id.inner)?;
+
+        let file = match proj.fs().file(cursor.file_id()) {
+            PuffFileState::Visible(file) => file,
+            _ => return None,
+        };
+
+        let FileContents::Text(contents) = file.metadata() else {
+            unreachable!("cursors can only be created on TextFiles");
+        };
+
+        let local_id = proj.peer_id();
+        let creator_id = PeerId::new(file.created_by());
+
+        Some(Self {
+            file: TextFile::new(file, proj.state()),
+            id: cursor.id().into(),
+            offset: contents.resolve_cursor(
+                cursor.data(),
+                local_id,
+                creator_id,
+            )?,
+        })
+    }
+}
+
+impl<'a, S: IsVisible> CursorRef<'a, S> {
     /// TODO: docs.
     #[inline]
-    pub fn file(&self) -> Option<TextFile<'a>> {
-        match self.file {
-            PuffFileState::Visible(file) => {
-                Some(TextFile::new(file, self.state))
-            },
-            _ => None,
-        }
+    pub fn file(&self) -> TextFile<'a, S> {
+        self.file
     }
 
     /// TODO: docs.
@@ -458,31 +481,6 @@ impl<'a> CursorRef<'a> {
     #[inline]
     pub fn owner(&self) -> PeerId {
         self.id.owner()
-    }
-
-    #[inline]
-    pub(crate) fn from_id(id: CursorId, proj: &'a Project) -> Option<Self> {
-        let cursor = proj.state().text_ctx().cursors.get(id.inner)?;
-
-        let file = proj.fs().file(cursor.file_id());
-
-        let FileContents::Text(contents) = file.metadata() else {
-            unreachable!("cursors can only be created on TextFiles");
-        };
-
-        let local_id = proj.peer_id();
-        let creator_id = PeerId::new(file.created_by());
-
-        Some(Self {
-            id: cursor.id().into(),
-            offset: contents.resolve_cursor(
-                cursor.data(),
-                local_id,
-                creator_id,
-            )?,
-            file,
-            state: proj.state(),
-        })
     }
 }
 
@@ -779,7 +777,7 @@ impl TextContents {
     ) -> cola::Anchor {
         self.replica
             .get(local_id, creator_id)
-            .create_anchor(offset, cola::AnchorBias::Left)
+            .create_anchor(offset, cola::AnchorBias::Right)
     }
 
     #[inline]
@@ -1122,8 +1120,8 @@ impl<'a> Iterator for Cursors<'a> {
     }
 }
 
-impl<'a> Iterator for TextFileCursors<'a> {
-    type Item = CursorRef<'a>;
+impl<'a, S: IsVisible> Iterator for TextFileCursors<'a, S> {
+    type Item = CursorRef<'a, S>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -1142,9 +1140,8 @@ impl<'a> Iterator for TextFileCursors<'a> {
             };
             Some(CursorRef {
                 id: annotation.id().into(),
-                file: PuffFileState::Visible(self.file.inner),
+                file: self.file,
                 offset,
-                state: self.file.state,
             })
         } else {
             self.next()
