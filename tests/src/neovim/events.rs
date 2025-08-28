@@ -6,7 +6,7 @@ use neovim::{Neovim, oxi};
 use real_fs::RealFs;
 
 #[neovim::test]
-async fn on_buffer_created_doesnt_fire_for_nameless_buffers(
+async fn on_buffer_created_doesnt_fire_for_unnamed_buffers(
     ctx: &mut Context<Neovim>,
 ) {
     let num_times_fired = Shared::<u8>::new(0);
@@ -21,7 +21,7 @@ async fn on_buffer_created_doesnt_fire_for_nameless_buffers(
     ctx.command(format!("edit {}", tempfile.path()));
     assert_eq!(num_times_fired.take(), 1);
 
-    // The event shouldn't fire when creating a nameless buffer.
+    // The event shouldn't fire when creating an unnamed buffer.
     ctx.command("enew");
     assert_eq!(num_times_fired.take(), 0);
 }
@@ -44,7 +44,7 @@ fn on_buffer_created_fires_when_creating_buffer_not_backed_by_a_file(
 }
 
 #[neovim::test]
-fn on_buffer_created_fires_when_nameless_buffer_is_renamed(
+fn on_buffer_created_fires_when_unnamed_buffer_is_renamed(
     ctx: &mut Context<Neovim>,
 ) {
     let num_times_fired = Shared::<u8>::new(0);
@@ -54,7 +54,7 @@ fn on_buffer_created_fires_when_nameless_buffer_is_renamed(
         move |_, _| num_times_fired.with_mut(|n| *n += 1)
     });
 
-    // The event shouldn't fire when creating a nameless buffer.
+    // The event shouldn't fire when creating an unnamed buffer.
     ctx.command("enew");
     assert_eq!(num_times_fired.take(), 0);
 
@@ -152,4 +152,22 @@ fn on_cursor_created_doesnt_fire_when_splitting_current_buffer(
     // the current buffer, so make sure we guard against that.
     ctx.command(format!("split {buffer_path}"));
     assert_eq!(num_times_fired.take(), 0);
+}
+
+#[neovim::test]
+fn on_cursor_created_fires_when_editing_buffer_from_unnamed_buffer(
+    ctx: &mut Context<Neovim>,
+) {
+    ctx.command("enew");
+
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let _handle = ctx.on_cursor_created({
+        let num_times_fired = num_times_fired.clone();
+        move |_, _| num_times_fired.with_mut(|n| *n += 1)
+    });
+
+    ctx.command(format!("edit {}", path!("/foo/bar.txt")));
+
+    assert_eq!(num_times_fired.take(), 1);
 }
