@@ -102,8 +102,8 @@ impl Neovim {
             self.events.agent_ids.created_buffer.insert(buffer_id, agent_id);
         }
 
-        if self.events.contains(&events::BufEnter) {
-            self.events.agent_ids.focused_buffer.insert(buffer_id, agent_id);
+        if self.events.contains(&events::CursorCreated) {
+            self.events.agent_ids.created_cursor.insert(buffer_id, agent_id);
         }
 
         self.buffer(buffer_id).expect("just created the buffer")
@@ -312,8 +312,8 @@ impl Editor for Neovim {
         Fun: FnMut(Self::Cursor<'_>, AgentId) + 'static,
     {
         self.events.insert(
-            events::BufEnter,
-            move |(buf, focused_by)| fun(NeovimCursor::from(buf), focused_by),
+            events::CursorCreated,
+            move |(buf, created_by)| fun(NeovimCursor::from(buf), created_by),
             this,
         )
     }

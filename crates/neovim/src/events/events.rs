@@ -39,9 +39,9 @@ pub(crate) struct Events {
     pub(crate) on_buffer_edited:
         NoHashMap<BufferId, Callbacks<events::OnBytes>>,
 
-    /// The callback registered to the [`BufEnter`] event, or `None` if no
-    /// callback has been registered to that event.
-    pub(crate) on_buffer_focused: Option<Callbacks<events::BufEnter>>,
+    /// The callbacks registered on the [`CursorCreated`] event, or `None` if
+    /// no callback has been registered on that event.
+    pub(crate) on_cursor_created: Option<Callbacks<events::CursorCreated>>,
 
     /// Map from a buffer's ID to the callbacks registered to the
     /// [`BufferRemoved`] event on that buffer.
@@ -74,11 +74,11 @@ pub(crate) struct AgentIds {
     /// TODO: docs.
     pub(crate) created_buffer: NoHashMap<BufferId, AgentId>,
 
+    /// TODO: docs.
+    pub(crate) created_cursor: NoHashMap<BufferId, AgentId>,
+
     /// The [`AgentId`] of the agent that last scheduled an edit on a buffer.
     pub(crate) edited_buffer: Shared<AgentId>,
-
-    /// TODO: docs.
-    pub(crate) focused_buffer: NoHashMap<BufferId, AgentId>,
 
     /// TODO: docs.
     pub(crate) moved_cursor: NoHashMap<BufferId, AgentId>,
@@ -107,7 +107,7 @@ pub(crate) struct Callbacks<Ev: Event> {
 
 #[derive(Debug)]
 pub(crate) enum EventKind {
-    BufEnter(events::BufEnter),
+    CursorCreated(events::CursorCreated),
     BufLeave(events::BufLeave),
     BufferCreated(events::BufferCreated),
     BufferRemoved(events::BufferRemoved),
@@ -161,7 +161,7 @@ impl Events {
             agent_ids: Default::default(),
             on_buffer_created: Default::default(),
             on_buffer_edited: Default::default(),
-            on_buffer_focused: Default::default(),
+            on_cursor_created: Default::default(),
             on_buffer_removed: Default::default(),
             on_buffer_saved: Default::default(),
             on_buffer_unfocused: Default::default(),
@@ -177,7 +177,7 @@ impl Events {
 
         for (cb_key, event_kind) in event_handle.inner.into_iter() {
             match &event_kind {
-                BufEnter(ev) => self.remove_callback(ev, cb_key),
+                CursorCreated(ev) => self.remove_callback(ev, cb_key),
                 BufLeave(ev) => self.remove_callback(ev, cb_key),
                 BufferCreated(ev) => self.remove_callback(ev, cb_key),
                 BufferRemoved(ev) => self.remove_callback(ev, cb_key),

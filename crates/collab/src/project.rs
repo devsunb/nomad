@@ -582,8 +582,6 @@ impl<Ed: CollabEditor> Project<Ed> {
                 .get_mut(&cursor.id())
                 .expect("there must be a tooltip for each remote cursor");
 
-            println!("Moving tooltip to {:?}", cursor.offset());
-
             let _ = Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx).await;
         }
     }
