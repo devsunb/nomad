@@ -1,5 +1,5 @@
 use abs_path::path;
-use editor::{Buffer, Context, Shared};
+use editor::{Buffer, Context, Cursor, Shared};
 use fs::File;
 use neovim::tests::NeovimExt;
 use neovim::{Neovim, oxi};
@@ -169,5 +169,24 @@ fn on_cursor_created_fires_when_editing_buffer_from_unnamed_buffer(
 
     ctx.command(format!("edit {}", path!("/foo/bar.txt")));
 
+    assert_eq!(num_times_fired.take(), 1);
+}
+
+#[neovim::test]
+fn on_cursor_moved_fires_when_window_is_split(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let _handle = ctx.with_borrowed(|ctx| {
+        ctx.cursor(buffer_id).unwrap().on_moved({
+            let num_times_fired = num_times_fired.clone();
+            move |_, _| num_times_fired.with_mut(|n| *n += 1)
+        })
+    });
+
+    // Each window keeps its own cursor state, so splitting the current window
+    // should cause the event to fire.
+    ctx.command("split");
     assert_eq!(num_times_fired.take(), 1);
 }
