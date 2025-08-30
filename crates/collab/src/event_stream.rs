@@ -268,28 +268,36 @@ impl<Ed: CollabEditor> EventStream<Ed> {
 
     fn handle_cursor_event(
         &mut self,
-        event: event::CursorEvent<Ed>,
+        mut event: event::CursorEvent<Ed>,
         ctx: &mut Context<Ed>,
     ) -> Option<event::CursorEvent<Ed>> {
-        match &event.kind {
-            event::CursorEventKind::Created(buffer_id, _) => {
-                if self.buffer_streams.is_watched(buffer_id) {
-                    ctx.with_borrowed(|ctx| {
-                        let mut cursor =
-                            ctx.cursor(event.cursor_id.clone())?;
-                        self.watch_cursor(&mut cursor);
-                        Some(event)
-                    })
-                } else {
-                    None
+        match &mut event.kind {
+            event::CursorEventKind::Created(buffer_id, offset) => {
+                // We only care about cursors in buffers that are part of the
+                // project.
+                if !self.buffer_streams.is_watched(buffer_id) {
+                    return None;
                 }
+
+                ctx.with_borrowed(|ctx| {
+                    if let Some(mut cursor) =
+                        ctx.cursor(event.cursor_id.clone())
+                    {
+                        // The cursor's position may have changed since the
+                        // event was sent, so update the event's offset to the
+                        // current one.
+                        *offset = cursor.byte_offset();
+                        self.watch_cursor(&mut cursor);
+                    }
+                });
             },
-            event::CursorEventKind::Moved(_) => Some(event),
+            event::CursorEventKind::Moved(_) => (),
             event::CursorEventKind::Removed => {
                 self.cursor_streams.remove(&event.cursor_id);
-                Some(event)
             },
         }
+
+        Some(event)
     }
 
     #[allow(clippy::too_many_lines)]
