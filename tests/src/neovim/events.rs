@@ -1,5 +1,5 @@
 use abs_path::path;
-use editor::{Buffer, Context, Cursor, Shared};
+use editor::{AgentId, Buffer, Context, Cursor, Shared};
 use fs::File;
 use neovim::tests::NeovimExt;
 use neovim::{Neovim, oxi};
@@ -79,6 +79,31 @@ fn on_buffer_created_doesnt_fire_when_named_buffer_is_renamed(
     // The event shouldn't fire when a named buffer is renamed.
     ctx.command("file bar.txt");
     assert_eq!(num_times_fired.take(), 0);
+}
+
+#[neovim::test]
+async fn on_buffer_created_fires_when_creating_buffer_via_the_editor_api(
+    ctx: &mut Context<Neovim>,
+) {
+    let agent_id = ctx.new_agent_id();
+
+    let created_by = Shared::<AgentId>::new(AgentId::UNKNOWN);
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let _handle = ctx.on_buffer_created({
+        let created_by = created_by.clone();
+        let num_times_fired = num_times_fired.clone();
+        move |_, agent_id| {
+            created_by.set(agent_id);
+            num_times_fired.with_mut(|n| *n += 1);
+        }
+    });
+
+    let tempfile = RealFs::default().tempfile().await.unwrap();
+    ctx.create_buffer(tempfile.path(), agent_id).await.unwrap();
+
+    assert_eq!(created_by.take(), agent_id);
+    assert_eq!(num_times_fired.take(), 1);
 }
 
 #[neovim::test]
