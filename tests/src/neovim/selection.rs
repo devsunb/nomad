@@ -1,11 +1,12 @@
 use core::time::Duration;
 
 use editor::Context;
-use futures_util::{FutureExt, StreamExt, select_biased};
+use futures_util::StreamExt;
 use neovim::Neovim;
 use neovim::tests::NeovimExt;
 
 use crate::editor::selection::SelectionEvent;
+use crate::utils::FutureExt;
 
 #[neovim::test]
 async fn charwise_simple(ctx: &mut Context<Neovim>) {
@@ -177,15 +178,12 @@ async fn blockwise_is_ignored(ctx: &mut Context<Neovim>) {
 
     ctx.feedkeys("<C-v>");
 
-    let sleep = async_io::Timer::after(Duration::from_millis(500));
-
-    select_biased! {
-        _event = events.select_next_some() => {
-            panic!(
-                "blockwise selections are not currently supported, we \
-                 shouldn't emit an event!"
-            )
-        },
-        _now = FutureExt::fuse(sleep) => {},
+    if let Some(_event) =
+        events.select_next_some().timeout(Duration::from_millis(500)).await
+    {
+        panic!(
+            "blockwise selections are not currently supported, we shouldn't \
+             emit an event!"
+        )
     }
 }

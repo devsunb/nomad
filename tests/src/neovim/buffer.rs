@@ -1,8 +1,6 @@
 use core::time::Duration;
 
 use editor::{AgentId, Buffer, Context, Edit, Replacement};
-use futures_util::future::FutureExt;
-use futures_util::select_biased;
 use futures_util::stream::StreamExt;
 use neovim::Neovim;
 use neovim::buffer::BufferExt;
@@ -10,6 +8,7 @@ use neovim::oxi::api::{self, opts};
 use neovim::tests::NeovimExt;
 
 use crate::editor::buffer::EditExt;
+use crate::utils::FutureExt;
 
 #[neovim::test]
 async fn deleting_trailing_newline_is_like_unsetting_eol(
@@ -85,12 +84,12 @@ async fn inserting_nothing_after_trailing_newline_does_nothing(
         let _ = buf.schedule_insertion(6, "", agent_id);
     });
 
-    let sleep = async_io::Timer::after(Duration::from_millis(500));
-    select_biased! {
-        edit = edit_stream.select_next_some() => {
-            panic!("expected no edits, got {edit:?}");
-        },
-        _now = FutureExt::fuse(sleep) => {},
+    if let Some(edit) = edit_stream
+        .select_next_some()
+        .timeout(Duration::from_millis(500))
+        .await
+    {
+        panic!("expected no edits, got {edit:?}");
     }
 
     let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();

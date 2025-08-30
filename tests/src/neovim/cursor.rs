@@ -3,12 +3,12 @@ use core::time::Duration;
 
 use editor::{AgentId, ByteOffset, Context, Cursor};
 use futures_util::stream::{FusedStream, StreamExt};
-use futures_util::{FutureExt, select_biased};
 use neovim::Neovim;
 use neovim::buffer::BufferId;
 use neovim::tests::NeovimExt;
 
 use crate::editor::{CursorCreation, CursorEvent};
+use crate::utils::FutureExt;
 
 #[neovim::test]
 async fn normal_to_insert_with_i(ctx: &mut Context<Neovim>) {
@@ -22,12 +22,10 @@ async fn normal_to_insert_with_i(ctx: &mut Context<Neovim>) {
     // insert mode with "i" shouldn't change the offset.
     ctx.enter_insert_with_i();
 
-    let sleep = async_io::Timer::after(Duration::from_millis(500));
-    select_biased! {
-        offset = offsets.select_next_some() => {
-            panic!("expected no offsets, got {offset:?}");
-        },
-        _now = FutureExt::fuse(sleep) => {},
+    if let Some(offset) =
+        offsets.select_next_some().timeout(Duration::from_millis(500)).await
+    {
+        panic!("expected no offsets, got {offset:?}");
     }
 }
 
