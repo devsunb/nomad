@@ -245,7 +245,7 @@ impl<Ed: CollabEditor> Project<Ed> {
         ctx: &mut Context<Ed>,
     ) -> Result<Option<Message>, SynchronizeError<Ed>> {
         match event {
-            Event::Buffer(event) => Ok(self.synchronize_buffer(event)),
+            Event::Buffer(event) => Ok(self.synchronize_buffer(event, ctx)),
             Event::Cursor(event) => Ok(Some(self.synchronize_cursor(event))),
             Event::Directory(event) => {
                 self.synchronize_directory(event, ctx).await
@@ -652,26 +652,11 @@ impl<Ed: CollabEditor> Project<Ed> {
     pub fn synchronize_buffer(
         &mut self,
         event: event::BufferEvent<Ed>,
+        ctx: &mut Context<Ed>,
     ) -> Option<Message> {
         match event {
             event::BufferEvent::Created(buffer_id, file_path) => {
-                let path_in_proj = file_path
-                    .strip_prefix(&self.root_path)
-                    .expect("the buffer is backed by a file in the project");
-
-                let Node::File(File::Text(file)) =
-                    self.inner.node_at_path(path_in_proj)?
-                else {
-                    return None;
-                };
-
-                let ids = &mut self.id_maps;
-                ids.buffer2file.insert(buffer_id.clone(), file.local_id());
-                ids.file2buffer.insert(file.local_id(), buffer_id);
-
-                // TODO: create tooltips and selections for the cursors and
-                // selections of remote peers in the buffer.
-
+                self.synchronize_buffer_created(buffer_id, file_path, ctx);
                 None
             },
             event::BufferEvent::Edited(buffer_id, replacements) => {
@@ -692,6 +677,58 @@ impl<Ed: CollabEditor> Project<Ed> {
                 let file_id = self.text_file_of_buffer(&buffer_id).global_id();
                 Some(Message::SavedTextFile(file_id))
             },
+        }
+    }
+
+    /// Synchronizes the project's state with the creation of a new buffer
+    /// backed by the file at the given path.
+    pub fn synchronize_buffer_created(
+        &mut self,
+        buffer_id: Ed::BufferId,
+        file_path: AbsPathBuf,
+        ctx: &mut Context<Ed>,
+    ) {
+        let path_in_proj = file_path
+            .strip_prefix(&self.root_path)
+            .expect("the buffer is backed by a file in the project");
+
+        let Some(Node::File(File::Text(file))) =
+            self.inner.node_at_path(path_in_proj)
+        else {
+            return;
+        };
+
+        // Record the mapping between the buffer ID and the file ID for O(1)
+        // lookups in both directions.
+        self.id_maps.buffer2file.insert(buffer_id.clone(), file.local_id());
+        self.id_maps.file2buffer.insert(file.local_id(), buffer_id.clone());
+
+        // Display the cursors of the remote peers in the buffer.
+        for cursor in file.cursors() {
+            let Some(owner) = self.remote_peers.get(cursor.owner()) else {
+                continue;
+            };
+            let tooltip = Ed::create_peer_tooltip(
+                owner,
+                cursor.offset(),
+                buffer_id.clone(),
+                ctx,
+            );
+            self.peer_tooltips.insert(cursor.id(), tooltip);
+        }
+
+        // Display the selections of the remote peers in the buffer.
+        for selection in file.selections() {
+            let Some(owner) = self.remote_peers.get(selection.owner()) else {
+                continue;
+            };
+            let peer_selection = Ed::create_peer_selection(
+                owner,
+                selection.offset_range(),
+                buffer_id.clone(),
+                ctx,
+            );
+            self.peer_selections.insert(selection.id(), peer_selection);
         }
     }
 
