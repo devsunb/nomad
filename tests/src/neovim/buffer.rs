@@ -222,6 +222,50 @@ async fn deleting_all_in_buf_with_eol_causes_newline_deletion(
 }
 
 #[neovim::test]
+async fn dd_in_last_line_with_no_eol_deletes_trailing_newline(
+    ctx: &mut Context<Neovim>,
+) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
+    api::set_option_value("eol", false, &opts).unwrap();
+    api::set_option_value("fixeol", false, &opts).unwrap();
+
+    ctx.feedkeys("iHello<CR>");
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    // The buffer contains "Hello\n" and the cursor is on the 2nd (empty) row.
+    //
+    // When executing 'dd', the coordinates of the start position given to the
+    // `on_bytes` callback are:
+    //
+    // start_row: 1
+    // start_col: 0
+    // start_byte: 5
+    //
+    // which are semantically inconsistent because a byte offset of 5 means
+    // that the edit starts between the 'o' and the '\n', while a
+    // (start_row, start_col) of (1, 0) means that it starts after the '\n'.
+    //
+    // Interestingly, deleting the line by pressing backspace in the same
+    // situation results in:
+    //
+    // start_row: 0
+    // start_col: 5
+    // start_byte: 5
+    //
+    // which is what I would expect 'dd' to result in as well.
+    //
+    // Boring semantics aside, let's just make sure we handle this correctly on
+    // our side.
+    ctx.feedkeys("dd");
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(5..6)]);
+}
+
+#[neovim::test]
 fn grapheme_offsets_empty(ctx: &mut Context<Neovim>) {
     let buffer_id = ctx.create_and_focus_scratch_buffer();
 

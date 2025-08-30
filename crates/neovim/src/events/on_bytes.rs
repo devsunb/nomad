@@ -131,7 +131,7 @@ fn replacement_of_on_bytes(
         old_end_len,
         new_end_row,
         new_end_col,
-        _new_end_len,
+        new_end_len,
     ) = args;
 
     debug_assert_eq!(buf, buffer.buffer());
@@ -143,6 +143,11 @@ fn replacement_of_on_bytes(
 
     let deletion_end =
         start_offset + old_end_len + should_extend_end_by_one as usize;
+
+    // Fast path for pure deletions.
+    if new_end_len == 0 {
+        return Replacement::deletion(deletion_start..deletion_end);
+    }
 
     let mut insertion_start =
         Point { line_idx: start_row, byte_offset: start_col };
