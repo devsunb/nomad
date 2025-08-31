@@ -513,13 +513,13 @@ fn num_bytes_in_line_after_trailine_newline(ctx: &mut Context<Neovim>) {
 }
 
 #[neovim::test]
-fn empty_buffer_with_fixeol_has_newline(ctx: &mut Context<Neovim>) {
+fn empty_buffer_with_fixeol_is_empty(ctx: &mut Context<Neovim>) {
     let buffer_id = ctx.create_and_focus_scratch_buffer();
 
     ctx.with_borrowed(|ctx| {
         let buf = ctx.buffer(buffer_id).unwrap();
-        assert_eq!(buf.byte_len(), 1);
-        assert_eq!(buf.get_text(), "\n");
+        assert_eq!(buf.byte_len(), 0);
+        assert_eq!(buf.get_text(), "");
     });
 }
 

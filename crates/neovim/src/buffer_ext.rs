@@ -197,8 +197,8 @@ pub trait BufferExt {
             .and_then(|line_count| buffer.get_offset(line_count))
             .expect("buffer is valid");
         // Workaround for https://github.com/neovim/neovim/issues/34272.
-        if byte_len == 1 && !self.has_uneditable_eol() {
-            self.num_bytes_in_line_after(0)
+        if byte_len == 1 && self.num_bytes_in_line_after(0) == 0 {
+            0
         } else {
             byte_len
         }
