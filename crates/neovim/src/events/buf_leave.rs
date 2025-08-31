@@ -36,7 +36,7 @@ impl Event for BufLeave {
         events: &Events,
         mut nvim: impl AccessMut<Neovim> + 'static,
     ) -> AutocmdId {
-        let callback = (move |args: api::types::AutocmdCallbackArgs| {
+        let on_buf_leave = (move |args: api::types::AutocmdCallbackArgs| {
             nvim.with_mut(|nvim| {
                 let buffer_id = BufferId::from(args.buffer.clone());
 
@@ -75,7 +75,7 @@ impl Event for BufLeave {
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
                 .buffer(self.0.into())
-                .callback(callback)
+                .callback(on_buf_leave)
                 .build(),
         )
         .expect("couldn't create autocmd on BufLeave")

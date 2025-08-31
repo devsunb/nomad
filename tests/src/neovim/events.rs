@@ -198,6 +198,24 @@ fn on_cursor_created_fires_when_editing_buffer_from_unnamed_buffer(
 }
 
 #[neovim::test]
+async fn on_cursor_created_doesnt_fire_when_creating_buffer_via_the_editor_api(
+    ctx: &mut Context<Neovim>,
+) {
+    let num_times_fired = Shared::<u8>::new(0);
+
+    let _handle = ctx.on_cursor_created({
+        let num_times_fired = num_times_fired.clone();
+        move |_, _| {
+            num_times_fired.with_mut(|n| *n += 1);
+        }
+    });
+
+    let tempfile = RealFs::default().tempfile().await.unwrap();
+    ctx.create_buffer(tempfile.path(), AgentId::UNKNOWN).await.unwrap();
+    assert_eq!(num_times_fired.take(), 0);
+}
+
+#[neovim::test]
 fn on_cursor_moved_fires_when_window_is_split(ctx: &mut Context<Neovim>) {
     let buffer_id = ctx.create_and_focus_scratch_buffer();
 
