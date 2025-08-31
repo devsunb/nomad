@@ -87,7 +87,7 @@ impl<'a> NeovimBuffer<'a> {
         highlight_group_name: &str,
     ) -> HighlightRangeHandle {
         debug_assert!(byte_range.start <= byte_range.end);
-        debug_assert!(byte_range.end <= self.inner.byte_len());
+        debug_assert!(byte_range.end <= self.byte_len());
         let start = self.point_of_byte(byte_range.start);
         let end = self.point_of_byte(byte_range.end);
         HighlightRangeHandle {
@@ -176,7 +176,7 @@ impl<'a> HighlightRange<'a> {
     #[inline]
     pub fn r#move(&self, byte_range: Range<ByteOffset>) {
         debug_assert!(byte_range.start <= byte_range.end);
-        debug_assert!(byte_range.end <= self.buffer.byte_len());
+        debug_assert!(byte_range.end <= self.buffer.num_bytes());
         let start = self.buffer.point_of_byte(byte_range.start);
         let end = self.buffer.point_of_byte(byte_range.end);
         self.handle.inner.r#move(start..end);
@@ -223,7 +223,7 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
 
     #[inline]
     fn byte_len(&self) -> ByteOffset {
-        self.inner.byte_len()
+        self.inner.num_bytes()
     }
 
     #[inline]
@@ -278,7 +278,7 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
                     // empty the eol "deactivates", and we should notify
                     // the user that a \n was deleted;
 
-                    let buf_len = this.inner.byte_len();
+                    let buf_len = this.byte_len();
                     let edit_len_delta = edit.byte_delta();
                     let edit_len_delta_abs = edit_len_delta.unsigned_abs();
 
@@ -318,7 +318,7 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
                     return;
                 }
 
-                let byte_len = buf.inner.byte_len();
+                let byte_len = buf.byte_len();
 
                 // Eol-settings don't apply on empty buffers.
                 if byte_len == 0 {

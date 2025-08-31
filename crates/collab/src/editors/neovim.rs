@@ -130,7 +130,7 @@ impl PeerTooltip {
         buffer: &oxi::api::Buffer,
         cursor_offset: ByteOffset,
     ) -> Range<Point> {
-        debug_assert!(cursor_offset <= buffer.byte_len());
+        debug_assert!(cursor_offset <= buffer.num_bytes());
 
         let highlight_start = buffer.point_of_byte(cursor_offset);
 

@@ -19,19 +19,6 @@ pub trait BufferExt {
     /// Returns the buffer that all the methods in this trait will operate on.
     fn buffer(&self) -> api::Buffer;
 
-    /// Returns the number of bytes in the buffer.
-    #[track_caller]
-    #[inline]
-    fn byte_len(&self) -> ByteOffset {
-        let buffer = self.buffer();
-        let byte_len = buffer
-            .line_count()
-            .and_then(|line_count| buffer.get_offset(line_count))
-            .expect("buffer is valid");
-        // Workaround for https://github.com/neovim/neovim/issues/34272.
-        if byte_len == 1 && self.has_uneditable_eol() { 0 } else { byte_len }
-    }
-
     /// Converts the given [`Point`] into the corresponding [`ByteOffset`] in
     /// the buffer.
     #[track_caller]
@@ -59,7 +46,7 @@ pub trait BufferExt {
     /// Returns whether the buffer contains no bytes.
     #[inline]
     fn is_empty(&self) -> bool {
-        self.byte_len() == 0
+        self.num_bytes() == 0
     }
 
     /// Returns whether the buffer is focused.
@@ -181,11 +168,11 @@ pub trait BufferExt {
         &self,
         byte_offset: ByteOffset,
     ) -> GraphemeOffsets<'_> {
-        debug_assert!(byte_offset <= self.byte_len());
+        debug_assert!(byte_offset <= self.num_bytes());
         let point = self.point_of_byte(byte_offset);
         GraphemeOffsets {
             buffer: self.buffer(),
-            byte_len: self.byte_len(),
+            byte_len: self.num_bytes(),
             byte_offset,
             current_line: Some(self.line_after(point.newline_offset)),
             point,
@@ -198,6 +185,23 @@ pub trait BufferExt {
     #[inline]
     fn name(&self) -> NvimString {
         self.buffer().get_name().expect("buffer is valid")
+    }
+
+    /// Returns the number of bytes in the buffer.
+    #[track_caller]
+    #[inline]
+    fn num_bytes(&self) -> ByteOffset {
+        let buffer = self.buffer();
+        let byte_len = buffer
+            .line_count()
+            .and_then(|line_count| buffer.get_offset(line_count))
+            .expect("buffer is valid");
+        // Workaround for https://github.com/neovim/neovim/issues/34272.
+        if byte_len == 1 && !self.has_uneditable_eol() {
+            self.num_bytes_in_line_after(0)
+        } else {
+            byte_len
+        }
     }
 
     /// Returns the number of bytes to the left of the given newline offset.
@@ -219,7 +223,7 @@ pub trait BufferExt {
         debug_assert!(newline_offset <= self.num_newlines());
 
         // TODO: benchmark whether this is actually faster than
-        // `self.line(line_idx).len()`.
+        // `self.line_after(newline_offset).len()`.
         self.buffer()
             .call::<_, _, ByteOffset>(move |()| {
                 api::call_function(
@@ -237,10 +241,6 @@ pub trait BufferExt {
     /// Returns the number of newline characters in the buffer.
     #[inline]
     fn num_newlines(&self) -> usize {
-        // Workaround for https://github.com/neovim/neovim/issues/34272.
-        if self.is_empty() {
-            return 0;
-        }
         let num_rows = self.buffer().line_count().expect("buffer is valid");
         num_rows - !self.has_uneditable_eol() as usize
     }
@@ -252,7 +252,7 @@ pub trait BufferExt {
         // Fast paths.
         if byte_offset == 0 {
             return 0;
-        } else if byte_offset == self.byte_len() {
+        } else if byte_offset == self.num_bytes() {
             return self.num_newlines();
         }
 
@@ -287,7 +287,7 @@ pub trait BufferExt {
     #[track_caller]
     #[inline]
     fn point_of_byte(&self, byte_offset: ByteOffset) -> Point {
-        debug_assert!(byte_offset <= self.byte_len());
+        debug_assert!(byte_offset <= self.num_bytes());
         let newline_offset = self.num_newlines_before_byte(byte_offset);
         let line_byte_offset = self.num_bytes_before_newline(newline_offset);
         Point::new(newline_offset, byte_offset - line_byte_offset)
@@ -409,7 +409,7 @@ pub trait BufferExt {
         //
         // Clearly that doesn't work if you're already at the end of the file.
         let end_offset =
-            self.num_bytes_before_newline(end_row).min(self.byte_len());
+            self.num_bytes_before_newline(end_row).min(self.num_bytes());
 
         start_offset..end_offset
     }

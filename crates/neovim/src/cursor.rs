@@ -104,9 +104,9 @@ impl Cursor for NeovimCursor<'_> {
         agent_id: AgentId,
     ) -> impl Future<Output = ()> + 'static {
         debug_assert!(
-            offset <= self.buffer.byte_len(),
+            offset <= self.buffer.num_bytes(),
             "offset {offset:?} is past end of buffer, length is {:?}",
-            self.buffer.byte_len()
+            self.buffer.num_bytes()
         );
 
         let buffer_id = self.buffer_id();
