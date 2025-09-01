@@ -415,7 +415,9 @@ fn apply_replacement(
         apply_replacement_whose_deletion_ends_before_fixeol(
             buffer,
             deletion_start..deletion_end,
+            deletion_range.len(),
             insert_text,
+            buffer_edited,
         );
         return;
     }
@@ -449,6 +451,9 @@ fn apply_replacement(
             .num_bytes_in_line_after(deletion_end.newline_offset - 1),
     };
 
+    // We've clamped the end of the deletion range, so it's 1 byte shorter.
+    let deletion_len = deletion_range.len() - 1;
+
     // If the text ends with a newline, we can remove the newline and clamp the
     // end of the deleted range to the previous point.
     //
@@ -458,15 +463,15 @@ fn apply_replacement(
         apply_replacement_whose_deletion_ends_before_fixeol(
             buffer,
             deletion_start..clamped_end,
+            deletion_len,
             &insert_text[..insert_text.len() - 1],
+            buffer_edited,
         );
         return;
     }
 
     // Enqueue the re-insertion of the newline that this replacement deletes.
     if let Some(buffer_edited) = buffer_edited {
-        // We've clamped the end of the deletion range, so it's 1 byte shorter.
-        let deletion_len = deletion_range.len() - 1;
         let len_after_edit =
             buffer.num_bytes() - deletion_len + insert_text.len();
         let re_insert_newline = Replacement::insertion(len_after_edit, "\n");
@@ -479,22 +484,57 @@ fn apply_replacement(
     apply_replacement_whose_deletion_ends_before_fixeol(
         buffer,
         deletion_start..clamped_end,
+        deletion_len,
         insert_text,
+        buffer_edited,
     );
 }
 
 fn apply_replacement_whose_deletion_ends_before_fixeol(
     buffer: &mut api::Buffer,
     delete_range: Range<Point>,
+    deletion_len: ByteOffset,
     insert_text: &str,
+    buffer_edited: Option<&events::BufferEditedRegisterOutput>,
 ) {
     debug_assert!(!buffer.is_point_after_uneditable_eol(delete_range.end));
+    debug_assert!(!(delete_range.is_empty() && insert_text.is_empty()));
+    debug_assert_eq!(
+        deletion_len,
+        buffer.byte_of_point(delete_range.end)
+            - buffer.byte_of_point(delete_range.start)
+    );
 
     let lines = insert_text
         .lines()
         // If the text has a trailing newline, Neovim expects an additional
         // empty line to be included.
         .chain(insert_text.ends_with('\n').then_some(""));
+
+    if let Some(buffer_edited) = buffer_edited
+        && buffer.has_uneditable_eol()
+    {
+        // If the buffer goes from empty to not empty, the trailing EOL
+        // "activates".
+        if buffer.is_empty() {
+            let insert_newline =
+                Replacement::insertion(insert_text.len(), "\n");
+            buffer_edited.enqueue(Edit {
+                made_by: AgentId::UNKNOWN,
+                replacements: smallvec_inline![insert_newline],
+            });
+        }
+
+        // Viceversa, if the buffer goes from not empty to empty, the trailing
+        // EOL "deactivates".
+        if deletion_len + 1 == buffer.num_bytes() && insert_text.is_empty() {
+            let delete_newline = Replacement::deletion(0..1);
+            buffer_edited.enqueue(Edit {
+                made_by: AgentId::UNKNOWN,
+                replacements: smallvec_inline![delete_newline],
+            });
+        }
+    }
 
     buffer
         .set_text(
@@ -560,6 +600,9 @@ fn apply_deletion_ending_after_fixeol(
         byte_offset: buffer.num_bytes_in_line_after(end.newline_offset - 1),
     };
 
+    // We've clamped the end of the deletion range, so it's 1 byte shorter.
+    let deletion_len = deletion_len - 1;
+
     if clamped_end == start {
         let Some(buffer_edited) = buffer_edited else { return };
         let num_bytes = buffer.num_bytes();
@@ -574,9 +617,6 @@ fn apply_deletion_ending_after_fixeol(
 
     // Enqueue the re-insertion of the newline that this deletion deletes.
     if let Some(buffer_edited) = buffer_edited {
-        // We've clamped the end of the deletion range, so it's 1 byte
-        // shorter.
-        let deletion_len = deletion_len - 1;
         let len_after_edit = buffer.num_bytes() - deletion_len;
         let re_insert_newline = Replacement::insertion(len_after_edit, "\n");
         buffer_edited.enqueue(Edit {
@@ -588,7 +628,9 @@ fn apply_deletion_ending_after_fixeol(
     apply_replacement_whose_deletion_ends_before_fixeol(
         buffer,
         start..clamped_end,
+        deletion_len,
         "",
+        buffer_edited,
     );
 }
 
