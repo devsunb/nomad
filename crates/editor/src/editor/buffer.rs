@@ -160,18 +160,22 @@ impl Edit {
     /// bytes were removed.
     #[inline]
     pub fn byte_delta(&self) -> isize {
-        self.replacements
-            .iter()
-            .map(|replacement| {
-                let num_inserted = replacement.inserted_text.len() as isize;
-                let num_deleted = replacement.removed_range.len() as isize;
-                num_inserted - num_deleted
-            })
-            .sum()
+        self.replacements.iter().map(Replacement::byte_delta).sum()
     }
 }
 
 impl Replacement {
+    /// Returns the net change in bytes from this [`Replacement`].
+    ///
+    /// Positive values indicate bytes were added, negative values indicate
+    /// bytes were removed.
+    #[inline]
+    pub fn byte_delta(&self) -> isize {
+        let num_inserted = self.inserted_text.len() as isize;
+        let num_deleted = self.removed_range.len() as isize;
+        num_inserted - num_deleted
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn deletion(byte_range: Range<ByteOffset>) -> Self {
