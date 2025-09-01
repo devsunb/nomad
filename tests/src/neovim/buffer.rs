@@ -11,7 +11,7 @@ use crate::editor::buffer::EditExt;
 use crate::utils::FutureExt;
 
 #[neovim::test]
-async fn deleting_trailing_newline_is_like_unsetting_eol(
+async fn trailing_newline_is_reinserted_after_deleting_it(
     ctx: &mut Context<Neovim>,
 ) {
     let agent_id = ctx.new_agent_id();
@@ -25,21 +25,20 @@ async fn deleting_trailing_newline_is_like_unsetting_eol(
     ctx.with_borrowed(|ctx| {
         let mut buf = ctx.buffer(buffer_id).unwrap();
         assert_eq!(buf.get_text(), "Hello\n");
-        let _ = buf.schedule_deletion(0..6, agent_id);
+        let _ = buf.schedule_deletion(5..6, agent_id);
     });
 
     let edit = edit_stream.next().await.unwrap();
 
     assert_eq!(edit.made_by, agent_id);
-    assert_eq!(&*edit.replacements, &[Replacement::deletion(0..6)]);
+    assert_eq!(&*edit.replacements, &[Replacement::deletion(5..6)]);
 
-    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
-    assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
-    assert!(!api::get_option_value::<bool>("fixeol", &opts).unwrap());
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(5, "\n")]);
 }
 
 #[neovim::test]
-async fn inserting_after_trailing_newline_unsets_eol(
+async fn trailing_newline_is_inserted_after_inserting_after_it(
     ctx: &mut Context<Neovim>,
 ) {
     let agent_id = ctx.new_agent_id();
@@ -61,9 +60,8 @@ async fn inserting_after_trailing_newline_unsets_eol(
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(6, "World")]);
 
-    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
-    assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
-    assert!(!api::get_option_value::<bool>("fixeol", &opts).unwrap());
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(11, "\n")]);
 }
 
 #[neovim::test]
@@ -98,7 +96,7 @@ async fn inserting_nothing_after_trailing_newline_does_nothing(
 }
 
 #[neovim::test]
-async fn replacement_including_trailing_newline_unsets_eol(
+async fn trailing_newline_is_reinserted_after_replacement_deletes_it(
     ctx: &mut Context<Neovim>,
 ) {
     let agent_id = ctx.new_agent_id();
@@ -121,9 +119,8 @@ async fn replacement_including_trailing_newline_unsets_eol(
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::new(2..6, "y")]);
 
-    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
-    assert!(!api::get_option_value::<bool>("eol", &opts).unwrap());
-    assert!(!api::get_option_value::<bool>("fixeol", &opts).unwrap());
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(3, "\n")]);
 }
 
 #[neovim::test]

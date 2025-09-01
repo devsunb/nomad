@@ -91,7 +91,7 @@ pub(crate) struct BufferLocalOpts(api::opts::OptionOpts);
 
 impl UneditableEndOfLine {
     #[inline]
-    pub(crate) fn get_inner(
+    fn get_inner(
         eol: impl FnOnce() -> bool,
         fix_eol: impl FnOnce() -> bool,
         binary: impl FnOnce() -> bool,
