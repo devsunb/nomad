@@ -46,11 +46,12 @@ pub(crate) trait NeovimOption: 'static + Sized {
         mut fun: impl FnMut(api::Buffer, Self::Value, Self::Value) -> bool
         + 'static,
     ) -> AutocmdId {
-        let on_option_set = (move |args: api::types::AutocmdCallbackArgs| {
+        let on_option_set = (move |_: api::types::AutocmdCallbackArgs| {
+            let buffer = api::Buffer::current();
             // Don't call the function if the autocmd is triggered for a
             // different buffer.
-            api::Buffer::from(buffer_id) == args.buffer
-                && fun(args.buffer, Self::old_value(), Self::new_value())
+            api::Buffer::from(buffer_id) == buffer
+                && fun(buffer, Self::old_value(), Self::new_value())
         })
         .catch_unwind()
         .map(|maybe_detach| maybe_detach.unwrap_or(true))
@@ -67,12 +68,14 @@ pub(crate) trait NeovimOption: 'static + Sized {
         .expect("couldn't create autocmd on OptionSet")
     }
 
+    #[track_caller]
     fn old_value() -> Self::Value {
         api::get_vvar("option_old").expect("couldn't get option_old")
     }
 
+    #[track_caller]
     fn new_value() -> Self::Value {
-        api::get_vvar("option_old").expect("couldn't get option_old")
+        api::get_vvar("option_new").expect("couldn't get option_new")
     }
 }
 
@@ -159,9 +162,11 @@ impl NeovimOption for UneditableEndOfLine {
         + 'static,
     ) -> AutocmdId {
         let on_option_set = (move |args: api::types::AutocmdCallbackArgs| {
+            let buffer = api::Buffer::current();
+
             // Don't call the function if the autocmd is triggered for a
             // different buffer.
-            if api::Buffer::from(buffer_id) != args.buffer {
+            if api::Buffer::from(buffer_id) != buffer {
                 return false;
             }
 
@@ -178,7 +183,7 @@ impl NeovimOption for UneditableEndOfLine {
                 other => panic!("unexpected option name: {other}"),
             };
 
-            let opts = BufferLocalOpts::new(args.buffer.clone());
+            let opts = BufferLocalOpts::new(buffer.clone());
 
             let option = |option_value: bool| match option {
                 Option::Binary => Self::get_inner(
@@ -198,11 +203,7 @@ impl NeovimOption for UneditableEndOfLine {
                 ),
             };
 
-            fun(
-                args.buffer,
-                option(Self::old_value()),
-                option(Self::new_value()),
-            )
+            fun(buffer, option(Self::old_value()), option(Self::new_value()))
         })
         .catch_unwind()
         .map(|maybe_detach| maybe_detach.unwrap_or(true))

@@ -451,7 +451,7 @@ fn apply_replacement(
             .num_bytes_in_line_after(deletion_end.newline_offset - 1),
     };
 
-    // We've clamped the end of the deletion range, so it's 1 byte shorter.
+    // We've clamped the end of the deletion range, so it's now 1 byte shorter.
     let deletion_len = deletion_range.len() - 1;
 
     // If the text ends with a newline, we can remove the newline and clamp the
@@ -473,7 +473,7 @@ fn apply_replacement(
     // Enqueue the re-insertion of the newline that this replacement deletes.
     if let Some(buffer_edited) = buffer_edited {
         let len_after_edit =
-            buffer.num_bytes() - deletion_len + insert_text.len();
+            buffer.num_bytes() - deletion_range.len() + insert_text.len();
         let re_insert_newline = Replacement::insertion(len_after_edit, "\n");
         buffer_edited.enqueue(Edit {
             made_by: AgentId::UNKNOWN,

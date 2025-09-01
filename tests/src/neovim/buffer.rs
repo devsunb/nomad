@@ -29,10 +29,10 @@ async fn trailing_newline_is_reinserted_after_deleting_it(
     });
 
     let edit = edit_stream.next().await.unwrap();
-
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::deletion(5..6)]);
 
+    let edit = edit_stream.next().await.unwrap();
     assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(5, "\n")]);
 }
@@ -56,10 +56,10 @@ async fn trailing_newline_is_inserted_after_inserting_after_it(
     });
 
     let edit = edit_stream.next().await.unwrap();
-
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(6, "World")]);
 
+    let edit = edit_stream.next().await.unwrap();
     assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(11, "\n")]);
 }
@@ -115,10 +115,10 @@ async fn trailing_newline_is_reinserted_after_replacement_deletes_it(
     });
 
     let edit = edit_stream.next().await.unwrap();
-
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::new(2..6, "y")]);
 
+    let edit = edit_stream.next().await.unwrap();
     assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(3, "\n")]);
 }
@@ -139,7 +139,6 @@ async fn unsetting_eol_is_like_deleting_trailing_newline(
     api::set_option_value("fixeol", false, &opts).unwrap();
 
     let edit = edit_stream.next().await.unwrap();
-
     assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::deletion(5..6)]);
 }
@@ -162,7 +161,6 @@ async fn setting_eol_is_like_inserting_trailing_newline(
     api::set_option_value("eol", true, &opts).unwrap();
 
     let edit = edit_stream.next().await.unwrap();
-
     assert_eq!(edit.made_by, AgentId::UNKNOWN);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(5, "\n")]);
 }

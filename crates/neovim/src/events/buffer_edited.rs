@@ -171,10 +171,10 @@ impl Event for BufferEdited {
 
         let on_manual_trigger = {
             let queued_edits = queued_edits.clone();
-            move |args: api::types::AutocmdCallbackArgs| {
+            move |_: api::types::AutocmdCallbackArgs| {
                 // Don't call the function if the autocmd is triggered for a
                 // different buffer.
-                if api::Buffer::from(buffer_id) != args.buffer {
+                if api::Buffer::from(buffer_id) != api::Buffer::current() {
                     return false;
                 }
 
