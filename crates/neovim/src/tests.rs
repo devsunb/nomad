@@ -26,8 +26,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
             .try_into()
             .expect("it's valid");
 
-        let buffer_id = Neovim::create_buffer_sync(self, &file_path, agent_id)
-            .expect("couldn't create buffer");
+        let buffer_id = Neovim::create_buffer_sync(self, &file_path, agent_id);
 
         let buffer = api::Buffer::from(buffer_id);
 

@@ -337,8 +337,8 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
     ) -> impl Future<Output = ()> + 'static {
         let buffer = self.inner.clone();
 
-        if self.nvim.events.contains(&events::CursorCreated) {
-            self.nvim.events.agent_ids.created_cursor = agent_id;
+        if let Some(callbacks) = &mut self.nvim.events.on_cursor_created {
+            callbacks.register_output_mut().set_created_by(agent_id);
         }
 
         // We schedule this because setting the current window's buffer will

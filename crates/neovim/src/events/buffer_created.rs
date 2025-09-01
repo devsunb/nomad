@@ -37,7 +37,7 @@ impl Event for BufferCreated {
     ) -> Self::RegisterOutput {
         let old_name_was_empty = Shared::<bool>::new(false);
 
-        let callback = {
+        let on_buf_file_pre = {
             let old_name_was_empty = old_name_was_empty.clone();
             move |args: api::types::AutocmdCallbackArgs| {
                 old_name_was_empty.set(args.buffer.name().is_empty());
@@ -50,7 +50,7 @@ impl Event for BufferCreated {
             ["BufFilePre"],
             &api::opts::CreateAutocmdOpts::builder()
                 .group(events.augroup_id)
-                .callback(callback)
+                .callback(on_buf_file_pre)
                 .build(),
         )
         .expect("couldn't create autocmd");

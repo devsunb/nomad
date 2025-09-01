@@ -71,9 +71,6 @@ pub(crate) struct AgentIds {
     pub(crate) created_buffer: AgentId,
 
     /// TODO: docs.
-    pub(crate) created_cursor: AgentId,
-
-    /// TODO: docs.
     pub(crate) moved_cursor: NoHashMap<BufferId, AgentId>,
 
     /// TODO: docs.
@@ -211,6 +208,11 @@ impl<Ev: Event> Callbacks<Ev> {
     #[inline]
     pub(crate) fn register_output(&self) -> &Ev::RegisterOutput {
         &self.register_output
+    }
+
+    #[inline]
+    pub(crate) fn register_output_mut(&mut self) -> &mut Ev::RegisterOutput {
+        &mut self.register_output
     }
 
     #[inline]

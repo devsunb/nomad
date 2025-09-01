@@ -84,22 +84,29 @@ impl Neovim {
         this: &mut This,
         file_path: &AbsPath,
         agent_id: AgentId,
-    ) -> Result<BufferId, oxi::api::Error> {
+    ) -> BufferId {
         this.with_mut(|this| {
             if this.events.contains(&events::BufferCreated) {
                 this.events.agent_ids.created_buffer = agent_id;
+            }
+            if let Some(callbacks) = &mut this.events.on_cursor_created {
+                // 'bufload' triggers BufEnter, so make CursorCreated skip the
+                // next event.
+                callbacks.register_output_mut().set_skip_next();
             }
         });
 
         let buffer = oxi::api::call_function::<_, oxi::api::Buffer>(
             "bufadd",
             (file_path.as_str(),),
-        )?;
+        )
+        .expect("couldn't bufadd");
 
         // We expect an integer because 'bufload' returns 0 on success.
-        oxi::api::call_function::<_, u8>("bufload", (buffer.handle(),))?;
+        oxi::api::call_function::<_, u8>("bufload", (buffer.handle(),))
+            .expect("couldn't bufload");
 
-        Ok(BufferId::from(buffer))
+        BufferId::from(buffer)
     }
 
     #[track_caller]
@@ -145,7 +152,7 @@ impl Editor for Neovim {
     type SelectionId = BufferId;
 
     type BufferSaveError = Infallible;
-    type CreateBufferError = oxi::api::Error;
+    type CreateBufferError = core::convert::Infallible;
     type SerializeError = serde::NeovimSerializeError;
     type DeserializeError = serde::NeovimDeserializeError;
 
@@ -199,7 +206,7 @@ impl Editor for Neovim {
         file_path: &AbsPath,
         agent_id: AgentId,
     ) -> Result<Self::BufferId, Self::CreateBufferError> {
-        Self::create_buffer_sync(&mut this, file_path, agent_id)
+        Ok(Self::create_buffer_sync(&mut this, file_path, agent_id))
     }
 
     #[inline]
