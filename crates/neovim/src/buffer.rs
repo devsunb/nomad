@@ -1,9 +1,9 @@
 //! TODO: docs.
 
 use core::cmp::Ordering;
-use core::fmt;
 use core::hash::{Hash, Hasher};
 use core::ops::{self, Range};
+use core::{fmt, iter};
 use std::borrow::Cow;
 
 use abs_path::AbsPath;
@@ -591,7 +591,9 @@ fn apply_deletion_ending_after_fixeol(
     // start of the buffer), we can just delete the last n lines.
     if start.byte_offset == 0 {
         let line_range = start.newline_offset..end.newline_offset;
-        buffer.set_lines(line_range, true, [""]).expect("couldn't set lines");
+        buffer
+            .set_lines(line_range, true, iter::empty::<&str>())
+            .expect("couldn't set lines");
         return;
     }
 
