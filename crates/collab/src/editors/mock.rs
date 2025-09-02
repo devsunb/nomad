@@ -9,6 +9,7 @@ use abs_path::{AbsPath, AbsPathBuf};
 pub use collab_server::test::TestSessionId as MockSessionId;
 use collab_types::Peer;
 use duplex_stream::{DuplexStream, duplex};
+use editor::context::Borrowed;
 use editor::{ByteOffset, Context, Editor, EditorAdapter};
 
 use crate::editors::{ActionForSelectedSession, CollabEditor};
@@ -295,6 +296,8 @@ where
     ) {
         *tooltip = tooltip_offset;
     }
+
+    fn on_init(_: &mut Context<Self, Borrowed>) {}
 
     fn on_join_error(_: join::JoinError<Self>, _: &mut Context<Self>) {
         unimplemented!()

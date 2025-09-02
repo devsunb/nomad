@@ -1,3 +1,4 @@
+use core::cell::Cell;
 use core::fmt;
 use core::ops::Range;
 use std::ffi::OsString;
@@ -5,8 +6,9 @@ use std::path::PathBuf;
 use std::{env, io};
 
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
-use collab_types::Peer;
 use collab_types::nomad::ulid;
+use collab_types::{Peer, PeerId};
+use editor::context::Borrowed;
 use editor::module::{Action, Module};
 use editor::{ByteOffset, Context, Editor};
 use executor::Executor;
@@ -26,11 +28,12 @@ pub struct NeovimPeerSelection {
     selection_highlight_handle: HighlightRangeHandle,
 }
 
-pub struct PeerTooltip {
-    /// The buffer this tooltip is in.
+/// Holds the state needed to display a remote peer's cursor in a buffer.
+pub struct PeerCursor {
+    /// The buffer the cursor is in.
     buffer: oxi::api::Buffer,
 
-    /// The extmark ID of the highlight representing the remote peer's cursor.
+    /// The extmark ID of the highlight representing the cursor's head.
     cursor_extmark_id: u32,
 
     /// The ID of the namespace the
@@ -88,6 +91,12 @@ pub struct NeovimLspRootError {
     root_dir: String,
 }
 
+/// The highlight group used to highlight the extmark representing a remote
+/// peer's cursor.
+struct PeerCursorHighlightGroup {
+    suffix: u8,
+}
+
 /// An [`AbsPath`] wrapper whose `Display` impl replaces the path's home
 /// directory with `~`.
 struct TildePath<'a> {
@@ -95,7 +104,7 @@ struct TildePath<'a> {
     home_dir: Option<&'a AbsPath>,
 }
 
-impl PeerTooltip {
+impl PeerCursor {
     /// Creates a new tooltip representing the given remote peer's cursor at
     /// the given byte offset in the given buffer.
     fn create(
@@ -109,7 +118,7 @@ impl PeerTooltip {
         let opts = oxi::api::opts::SetExtmarkOpts::builder()
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
-            .hl_group("TermCursor")
+            .hl_group(PeerCursorHighlightGroup::new(peer.id))
             .build();
 
         let cursor_extmark_id = buffer
@@ -187,7 +196,7 @@ impl PeerTooltip {
             .id(self.cursor_extmark_id)
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
-            .hl_group("TermCursor")
+            .hl_group(PeerCursorHighlightGroup::new(self.peer.id))
             .build();
 
         let new_extmark_id = self
@@ -211,10 +220,78 @@ impl PeerTooltip {
     }
 }
 
+impl PeerCursorHighlightGroup {
+    thread_local! {
+        static GROUP_IDS: Cell<[u32; PeerCursorHighlightGroup::MAX_HIGHLIGHT_GROUPS as usize]>
+            = Cell::new([0; _]);
+    }
+
+    /// The number of distinct highlight groups we create to represent remote
+    /// peers' cursors.
+    const MAX_HIGHLIGHT_GROUPS: u8 = 16;
+
+    /// The prefix of each highlight group name.
+    const NAME_PREFIX: &'static str = "NomadCollabPeerCursor";
+
+    fn create(self) -> u32 {
+        let name = self.name();
+
+        oxi::api::set_hl(
+            0,
+            name.as_ref(),
+            &oxi::api::opts::SetHighlightOpts::builder()
+                .link("Cursor")
+                .build(),
+        )
+        .expect("couldn't create highlight group");
+
+        oxi::api::get_hl_id_by_name(name.as_ref())
+            .expect("couldn't get highlight group ID")
+    }
+
+    fn create_all() {
+        debug_assert!(
+            Self::GROUP_IDS.with(|ids| ids
+                .as_array_of_cells()
+                .iter()
+                .all(|id| id.get() == 0)),
+            "highlight groups have already been created"
+        );
+
+        Self::GROUP_IDS.with(|group_ids| {
+            let group_ids = group_ids.as_array_of_cells();
+            for (hl_group, group_id) in Self::iter().zip(group_ids) {
+                group_id.set(hl_group.create());
+            }
+        });
+    }
+
+    fn id(&self) -> u32 {
+        let idx = self.suffix as usize - 1;
+        Self::GROUP_IDS.with(|ids| ids.as_array_of_cells()[idx].get())
+    }
+
+    fn iter() -> impl Iterator<Item = Self> {
+        (0..Self::MAX_HIGHLIGHT_GROUPS).map(|idx| Self { suffix: idx + 1 })
+    }
+
+    fn name(&self) -> impl AsRef<str> {
+        compact_str::format_compact!("{}{}", Self::NAME_PREFIX, self.suffix)
+    }
+
+    fn new(peer_id: PeerId) -> Self {
+        Self {
+            suffix: (peer_id.into_u64()
+                % (Self::MAX_HIGHLIGHT_GROUPS as u64 + 1))
+                as u8,
+        }
+    }
+}
+
 impl CollabEditor for Neovim {
     type Io = async_net::TcpStream;
     type PeerSelection = NeovimPeerSelection;
-    type PeerTooltip = PeerTooltip;
+    type PeerTooltip = PeerCursor;
     type ProjectFilter = Option<gitignore::GitIgnore>;
     type ServerParams = collab_types::nomad::NomadParams;
 
@@ -291,7 +368,7 @@ impl CollabEditor for Neovim {
     ) -> Self::PeerTooltip {
         let buffer = oxi::api::Buffer::from(buffer_id);
         let namespace_id = ctx.with_editor(|nvim| nvim.namespace_id());
-        PeerTooltip::create(remote_peer, buffer, tooltip_offset, namespace_id)
+        PeerCursor::create(remote_peer, buffer, tooltip_offset, namespace_id)
     }
 
     async fn default_dir_for_remote_projects(
@@ -386,6 +463,10 @@ impl CollabEditor for Neovim {
         _: &mut Context<Self>,
     ) {
         tooltip.r#move(tooltip_offset);
+    }
+
+    fn on_init(_: &mut Context<Self, Borrowed>) {
+        PeerCursorHighlightGroup::create_all();
     }
 
     fn on_join_error(error: join::JoinError<Self>, ctx: &mut Context<Self>) {
@@ -577,6 +658,13 @@ fn get_lua_value<T: mlua::FromLua>(namespace: &[&str]) -> Option<T> {
         } else {
             table = table.get::<Table>(*key).ok()?;
         }
+    }
+}
+
+impl oxi::api::SetExtmarkHlGroup for PeerCursorHighlightGroup {
+    #[inline]
+    fn into_object(self) -> oxi::Object {
+        self.id().into()
     }
 }
 

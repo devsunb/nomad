@@ -70,6 +70,10 @@ impl<Ed: CollabEditor> Module<Ed> for Collab<Ed> {
             .with_function(Yank::from(self));
     }
 
+    fn on_init(&self, ctx: &mut Context<Ed, Borrowed<'_>>) {
+        Ed::on_init(ctx);
+    }
+
     fn on_new_config(
         &self,
         new_config: Self::Config,

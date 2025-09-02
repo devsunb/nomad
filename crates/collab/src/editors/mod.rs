@@ -10,6 +10,7 @@ use core::str::FromStr;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use collab_types::Peer;
+use editor::context::Borrowed;
 use editor::{ByteOffset, Context, Editor};
 use futures_util::{AsyncRead, AsyncWrite};
 
@@ -128,6 +129,9 @@ pub trait CollabEditor: Editor {
         tooltip_offset: ByteOffset,
         ctx: &mut Context<Self>,
     );
+
+    /// Called when the [`Collab`](crate::Collab) module is initialized.
+    fn on_init(ctx: &mut Context<Self, Borrowed>);
 
     /// Called when the [`Join`](join::Join) action returns an error.
     fn on_join_error(error: join::JoinError<Self>, ctx: &mut Context<Self>);
