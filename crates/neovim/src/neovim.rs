@@ -34,9 +34,6 @@ pub struct Neovim {
     /// TODO: docs.
     executor: executor::NeovimExecutor,
 
-    /// TODO: docs.
-    reinstate_panic_hook: bool,
-
     #[cfg(feature = "test")]
     pub(crate) scratch_buffer_count: u32,
 }
@@ -75,8 +72,23 @@ impl Neovim {
     #[doc(hidden)]
     #[track_caller]
     #[inline]
-    pub fn new_plugin(plugin_name: &str) -> Self {
-        Self::new_inner(plugin_name, false)
+    pub fn new(plugin_name: &str) -> Self {
+        let augroup_id = oxi::api::create_augroup(
+            plugin_name,
+            &oxi::api::opts::CreateAugroupOpts::builder().clear(true).build(),
+        )
+        .expect("couldn't create augroup");
+
+        let namespace_id = oxi::api::create_namespace(plugin_name);
+
+        Self {
+            decoration_provider: DecorationProvider::new(namespace_id),
+            events: Events::new(augroup_id),
+            emitter: Default::default(),
+            executor: Default::default(),
+            #[cfg(feature = "test")]
+            scratch_buffer_count: 0,
+        }
     }
 
     #[inline]
@@ -107,34 +119,6 @@ impl Neovim {
             .expect("couldn't bufload");
 
         BufferId::from(buffer)
-    }
-
-    #[track_caller]
-    #[cfg(feature = "test")]
-    pub(crate) fn new_test(test_name: &str) -> Self {
-        Self::new_inner(test_name, true)
-    }
-
-    #[track_caller]
-    #[inline]
-    fn new_inner(plugin_name: &str, reinstate_panic_hook: bool) -> Self {
-        let augroup_id = oxi::api::create_augroup(
-            plugin_name,
-            &oxi::api::opts::CreateAugroupOpts::builder().clear(true).build(),
-        )
-        .expect("couldn't create augroup");
-
-        let namespace_id = oxi::api::create_namespace(plugin_name);
-
-        Self {
-            decoration_provider: DecorationProvider::new(namespace_id),
-            events: Events::new(augroup_id),
-            emitter: Default::default(),
-            executor: Default::default(),
-            reinstate_panic_hook,
-            #[cfg(feature = "test")]
-            scratch_buffer_count: 0,
-        }
     }
 }
 
@@ -308,12 +292,17 @@ impl Editor for Neovim {
 
     #[inline]
     fn reinstate_panic_hook(&self) -> bool {
-        self.reinstate_panic_hook
+        cfg!(feature = "test")
     }
 
     #[inline]
     fn remove_event(&mut self, event_handle: Self::EventHandle) {
         self.events.remove_event(event_handle);
+    }
+
+    #[inline]
+    fn rng_seed(&self) -> Option<u64> {
+        cfg!(feature = "test").then_some(42)
     }
 
     #[inline]

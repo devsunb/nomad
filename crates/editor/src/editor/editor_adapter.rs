@@ -213,8 +213,8 @@ impl<Ed: EditorAdapter> Editor for Ed {
     }
 
     #[inline]
-    fn rng_seed(&mut self) -> Option<u64> {
-        self.deref_mut().rng_seed()
+    fn rng_seed(&self) -> Option<u64> {
+        self.deref().rng_seed()
     }
 
     #[inline]

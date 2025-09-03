@@ -19,7 +19,7 @@ pub(crate) fn plugin(_attr: TokenStream, item: TokenStream) -> TokenStream {
                 static API: ::core::cell::LazyCell::<::neovim::oxi::Dictionary>
                     = ::core::cell::LazyCell::new(|| {
                         let plugin = #fun_body;
-                        let neovim = ::neovim::Neovim::new_plugin(#plugin_name);
+                        let neovim = ::neovim::Neovim::new(#plugin_name);
                         ::editor::module::Plugin::api(plugin, neovim).into()
                     });
             };

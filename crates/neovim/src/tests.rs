@@ -102,7 +102,7 @@ pub mod test_macro {
         Out: oxi::IntoResult<()>,
         Out::Error: fmt::Debug,
     {
-        || Neovim::new_test(test_name).with_ctx(test_fn)
+        || Neovim::new(test_name).with_ctx(test_fn)
     }
 
     pub fn async_test<Out>(
@@ -127,7 +127,7 @@ pub mod test_macro {
                 })
             });
 
-            Neovim::new_test(test_name).with_ctx(move |ctx| {
+            Neovim::new(test_name).with_ctx(move |ctx| {
                 ctx.spawn_local(async move |ctx| {
                     let res = test_fn(ctx)
                         .await

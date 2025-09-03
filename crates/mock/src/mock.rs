@@ -305,6 +305,10 @@ impl Editor for Mock {
             .with_mut(|map| map.remove(event_handle.key));
     }
 
+    fn rng_seed(&self) -> Option<u64> {
+        Some(42)
+    }
+
     fn selection(
         &mut self,
         selection_id: Self::SelectionId,

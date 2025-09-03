@@ -127,7 +127,7 @@ impl<Ed: Editor> State<Ed> {
     }
 
     #[inline]
-    pub(crate) fn new(mut editor: Ed) -> Self {
+    pub(crate) fn new(editor: Ed) -> Self {
         const RESUME_UNWINDING: &ResumeUnwinding = &ResumeUnwinding;
 
         let rng: StdRng = editor

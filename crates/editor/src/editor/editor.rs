@@ -145,7 +145,7 @@ pub trait Editor: 'static + Sized {
     fn remove_event(&mut self, event_handle: Self::EventHandle);
 
     /// TODO: docs.
-    fn rng_seed(&mut self) -> Option<u64> {
+    fn rng_seed(&self) -> Option<u64> {
         None
     }
 
