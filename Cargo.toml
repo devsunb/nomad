@@ -47,6 +47,7 @@ keyring = { git = "https://git@github.com/open-source-cooperative/keyring-rs.git
 nohash = "0.2"
 notify = "8"
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
+open = "5"
 pin-project-lite = "0.2"
 rand = "0.9"
 rand_chacha = "0.9"
