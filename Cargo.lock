@@ -253,6 +253,7 @@ dependencies = [
  "derive_more",
  "editor",
  "event-listener",
+ "futures-util",
  "keyring",
  "neovim",
  "open",

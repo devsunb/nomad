@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 
 use auth_types::{AuthInfos, GitHubAccessToken, OAuthState};
 use editor::{Access, Context, Editor};
+use futures_util::{FutureExt, future, pin_mut};
 use rand::Rng;
 use url::Url;
 
@@ -27,11 +28,27 @@ pub(crate) async fn login<Ed: Editor>(
         async move { login_request(&auth_server_url, &oauth_state).await }
     });
 
-    let open_browser = ctx.spawn_background(async move {
-        open_browser(&auth_server_url, &oauth_state)
-    });
+    let open_browser = ctx
+        .spawn_background(async move {
+            open_browser(&auth_server_url, &oauth_state)
+        })
+        .fuse();
 
-    todo!();
+    pin_mut!(login_request);
+    pin_mut!(open_browser);
+
+    let login_result = loop {
+        match future::select(&mut login_request, &mut open_browser).await {
+            future::Either::Left((login_result, _)) => break login_result,
+            future::Either::Right((open_result, _)) => {
+                open_result.map_err(GitHubLoginError::OpenBrowser)?;
+            },
+        }
+    };
+
+    login_result
+        .map_err(GitHubLoginError::LoginRequest)
+        .map(|_github_access_token| AuthInfos { github_handle: todo!() })
 }
 
 async fn login_request(
