@@ -1,4 +1,5 @@
-use auth_types::{AccessToken, PeerHandle};
+use auth_types::AccessToken;
+use collab_types::PeerHandle;
 use editor::{Access, Shared};
 
 /// TODO: docs.

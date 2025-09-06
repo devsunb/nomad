@@ -34,7 +34,7 @@ pub trait CollabEditor: Editor {
     type ProjectFilter: fs::filter::Filter<Self::Fs, Error: Send> + Send + Sync;
 
     /// TODO: docs.
-    type ServerParams: collab_types::Params<
+    type ServerParams: collab_server::Params<
             AuthenticateInfos: From<auth::AuthInfos>,
             SessionId: FromStr<Err: Error>,
         >;
@@ -199,7 +199,7 @@ pub enum ActionForSelectedSession {
 
 /// TODO: docs.
 pub type SessionId<Ed> =
-    <<Ed as CollabEditor>::ServerParams as collab_types::Params>::SessionId;
+    <<Ed as CollabEditor>::ServerParams as collab_server::Params>::SessionId;
 
 /// TODO: docs.
 pub(crate) type MessageRx<Ed> = collab_server::client::Receiver<Reader<Ed>>;

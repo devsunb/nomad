@@ -3,7 +3,8 @@
 use std::io;
 use std::sync::LazyLock;
 
-use auth_types::{GitHubAccessToken, GitHubHandle, OAuthState};
+use auth_types::{GitHubAccessToken, OAuthState};
+use collab_types::GitHubHandle;
 use editor::{Access, Context, Editor};
 use futures_util::{FutureExt, future, pin_mut};
 use rand::Rng;

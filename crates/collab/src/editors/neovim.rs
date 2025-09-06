@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::{env, io};
 
 use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
-use collab_types::nomad::ulid;
 use collab_types::{Peer, PeerId};
 use editor::context::Borrowed;
 use editor::module::{Action, Module};
@@ -17,6 +16,7 @@ use mlua::{Function, Table};
 use neovim::buffer::{BufferExt, BufferId, HighlightRangeHandle, Point};
 use neovim::notify::ContextExt;
 use neovim::{Neovim, mlua, oxi};
+use nomad_collab_params::ulid;
 
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::session::{SessionError, SessionInfos};
@@ -294,7 +294,7 @@ impl CollabEditor for Neovim {
     type PeerSelection = NeovimPeerSelection;
     type PeerTooltip = PeerCursor;
     type ProjectFilter = Option<gitignore::GitIgnore>;
-    type ServerParams = collab_types::nomad::NomadParams;
+    type ServerParams = nomad_collab_params::NomadParams;
 
     type ConnectToServerError = NeovimConnectToServerError;
     type CopySessionIdError = NeovimCopySessionIdError;

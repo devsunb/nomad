@@ -1,6 +1,6 @@
 //! TODO: docs.
 
-use auth_types::PeerHandle;
+use collab_types::PeerHandle;
 use editor::command::ToCompletionFn;
 use editor::module::AsyncAction;
 use editor::{Access, Context, Shared};

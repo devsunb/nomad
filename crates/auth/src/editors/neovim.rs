@@ -1,4 +1,5 @@
-use auth_types::{AccessToken, PeerHandle};
+use auth_types::AccessToken;
+use collab_types::PeerHandle;
 use editor::context::Borrowed;
 use editor::{Access, Context};
 use neovim::Neovim;
@@ -14,7 +15,7 @@ impl AuthEditor for Neovim {
         _: &mut Context<Self, Borrowed>,
     ) -> impl Future<Output = Box<keyring::CredentialBuilder>> + Send + 'static
     {
-        async move { keyring::default_credential_builder() }
+        async { keyring::default_credential_builder() }
     }
 
     async fn login(

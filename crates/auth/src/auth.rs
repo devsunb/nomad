@@ -38,7 +38,7 @@ impl Auth {
     #[track_caller]
     pub fn logged_in<Gh>(github_handle: Gh) -> Self
     where
-        Gh: TryInto<auth_types::GitHubHandle>,
+        Gh: TryInto<collab_types::GitHubHandle>,
         Gh::Error: core::fmt::Debug,
     {
         let github_handle =
@@ -50,7 +50,7 @@ impl Auth {
             access_token: auth_types::AccessToken::GitHub(
                 auth_types::GitHubAccessToken::new(github_handle.as_str()),
             ),
-            peer_handle: auth_types::PeerHandle::GitHub(github_handle),
+            peer_handle: collab_types::PeerHandle::GitHub(github_handle),
         });
 
         this

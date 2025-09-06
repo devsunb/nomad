@@ -5,7 +5,8 @@ mod neovim;
 
 use core::fmt::Debug;
 
-use auth_types::{AccessToken, PeerHandle};
+use auth_types::AccessToken;
+use collab_types::PeerHandle;
 use editor::context::Borrowed;
 use editor::{Access, Context, Editor};
 

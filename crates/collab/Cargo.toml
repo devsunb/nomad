@@ -9,12 +9,12 @@ publish.workspace = true
 [features]
 mock = ["collab-server/server", "collab-server/test", "dep:duplex-stream"]
 neovim = [
-  "collab-types/nomad",
   "dep:async-net",
   "dep:clipboard",
   "dep:gitignore",
   "dep:home",
   "dep:neovim",
+  "dep:nomad-collab-params",
 ]
 
 [dependencies]
@@ -49,6 +49,7 @@ clipboard = { workspace = true, optional = true }
 gitignore = { workspace = true, optional = true }
 home = { workspace = true, optional = true }
 neovim = { workspace = true, optional = true }
+nomad-collab-params = { workspace = true, optional = true }
 
 [lints]
 workspace = true

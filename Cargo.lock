@@ -250,6 +250,7 @@ dependencies = [
  "abs-path",
  "auth-types",
  "cauchy",
+ "collab-types",
  "derive_more",
  "editor",
  "event-listener",
@@ -266,14 +267,12 @@ dependencies = [
 
 [[package]]
 name = "auth-types"
-version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#0436ede2906af112fa8f9d398faadf5a51bef408"
+version = "0.1.0-dev"
 dependencies = [
  "base64",
- "cauchy",
- "derive_more",
+ "rand",
+ "rand_chacha",
  "serde",
- "smol_str",
 ]
 
 [[package]]
@@ -733,6 +732,7 @@ dependencies = [
  "home",
  "indexmap",
  "neovim",
+ "nomad-collab-params",
  "rand",
  "serde",
  "smallvec",
@@ -760,7 +760,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#0436ede2906af112fa8f9d398faadf5a51bef408"
+source = "git+ssh://git@github.com/nomad/collab-server.git#bbeede09c4a77f5b083f36960c997f1879052ba8"
 dependencies = [
  "bincode",
  "cauchy",
@@ -778,9 +778,8 @@ dependencies = [
 [[package]]
 name = "collab-types"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#0436ede2906af112fa8f9d398faadf5a51bef408"
+source = "git+ssh://git@github.com/nomad/collab-server.git#bbeede09c4a77f5b083f36960c997f1879052ba8"
 dependencies = [
- "auth-types",
  "bytes",
  "cauchy",
  "cola",
@@ -792,7 +791,6 @@ dependencies = [
  "serde",
  "smallvec",
  "smol_str",
- "ulid",
 ]
 
 [[package]]
@@ -1061,7 +1059,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#0436ede2906af112fa8f9d398faadf5a51bef408"
+source = "git+ssh://git@github.com/nomad/collab-server.git#bbeede09c4a77f5b083f36960c997f1879052ba8"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1335,7 +1333,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#0436ede2906af112fa8f9d398faadf5a51bef408"
+source = "git+ssh://git@github.com/nomad/collab-server.git#bbeede09c4a77f5b083f36960c997f1879052ba8"
 dependencies = [
  "flume",
  "futures-util",
@@ -1380,7 +1378,7 @@ dependencies = [
  "js-sys",
  "libc",
  "r-efi",
- "wasi 0.14.3+wasi-0.2.4",
+ "wasi 0.14.4+wasi-0.2.4",
  "wasm-bindgen",
 ]
 
@@ -2011,7 +2009,7 @@ dependencies = [
 [[package]]
 name = "message-channel"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#0436ede2906af112fa8f9d398faadf5a51bef408"
+source = "git+ssh://git@github.com/nomad/collab-server.git#bbeede09c4a77f5b083f36960c997f1879052ba8"
 dependencies = [
  "bincode",
  "cauchy",
@@ -2174,6 +2172,18 @@ name = "nohash"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a0f889fb66f7acdf83442c35775764b51fed3c606ab9cee51500dbde2cf528ca"
+
+[[package]]
+name = "nomad-collab-params"
+version = "0.1.0-dev"
+dependencies = [
+ "auth-types",
+ "cauchy",
+ "collab-server",
+ "derive_more",
+ "serde",
+ "ulid",
+]
 
 [[package]]
 name = "nomad-neovim"
@@ -2967,7 +2977,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3889,9 +3899,9 @@ checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
 name = "wasi"
-version = "0.14.3+wasi-0.2.4"
+version = "0.14.4+wasi-0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a51ae83037bdd272a9e28ce236db8c07016dd0d50c27038b3f407533c030c95"
+checksum = "88a5f4a424faf49c3c2c344f166f0662341d470ea185e939657aaff130f0ec4a"
 dependencies = [
  "wit-bindgen",
 ]

@@ -432,7 +432,7 @@ impl collab_server::Authenticator for MockAuthenticator {
     }
 }
 
-impl collab_types::Params for MockParams {
+impl collab_server::Params for MockParams {
     const MAX_FRAME_LEN: u32 = 64;
 
     type AuthenticateInfos = collab_types::PeerHandle;

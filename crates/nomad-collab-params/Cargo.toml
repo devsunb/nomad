@@ -1,0 +1,23 @@
+[package]
+name = "nomad-collab-params"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]
+
+[dependencies]
+auth-types = { workspace = true, features = ["serde"] }
+cauchy = { workspace = true }
+collab-server = { workspace = true }
+derive_more = { workspace = true }
+ulid = { workspace = true, features = ["serde"] }
+
+serde = { workspace = true, optional = true, features = ["derive"] }
+
+[lints]
+workspace = true
