@@ -19,7 +19,7 @@ use editor::{
 use futures_util::FutureExt;
 use smallvec::{SmallVec, smallvec_inline};
 
-pub use crate::buffer_ext::BufferExt;
+pub use crate::buffer_ext::{BufferExt, GraphemeOffsets};
 use crate::convert::Convert;
 use crate::cursor::NeovimCursor;
 use crate::oxi::{self, BufHandle, api};

@@ -64,7 +64,7 @@ pub trait NeovimExt: AccessMut<Neovim> {
     /// implicit `<Esc>` will be added to put it back in normal mode.
     ///
     /// If you want to enter insert mode, use
-    /// [`enter_insert_with_i`](ContextExt::enter_insert_with_i).
+    /// [`enter_insert_with_i`](NeovimExt::enter_insert_with_i).
     fn feedkeys(&self, keys: &str) {
         let keys = api::replace_termcodes(keys, true, false, true);
         api::feedkeys(&keys, c"x", false);

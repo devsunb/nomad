@@ -37,7 +37,8 @@ pub trait BufferExt {
             .expect("couldn't set window buffer");
     }
 
-    /// Whether the [`UneditableEndOfLine`] is enabled for the buffer.
+    /// Whether a trailing newline character will be added when writing the
+    /// buffer to disk if it doesn't already end with one.
     #[inline]
     fn has_uneditable_eol(&self) -> bool {
         UneditableEndOfLine.get(&BufferLocalOpts::new(self.buffer()))
@@ -55,7 +56,11 @@ pub trait BufferExt {
         api::Buffer::current() == self.buffer()
     }
 
-    /// Returns whether the given point is after the [`UneditableEndOfLine`].
+    /// Returns whether the given point is after the implicit, uneditable
+    /// newline at the end of the buffer.
+    ///
+    /// See [`has_uneditable_eol()`](BufferExt::has_uneditable_eol) for more
+    /// infos.
     #[inline]
     fn is_point_after_uneditable_eol(&self, point: Point) -> bool {
         !self.is_empty()
@@ -67,7 +72,8 @@ pub trait BufferExt {
     /// *without* any trailing newline character.
     ///
     /// Note that if you just want to know the *length* of the line, you should
-    /// use [`num_bytes_in_line()`](BufferExt::num_bytes_in_line) instead.
+    /// use [`num_bytes_in_line_after()`](BufferExt::num_bytes_in_line_after)
+    /// instead.
     #[track_caller]
     #[inline]
     fn line_after(&self, newline_offset: usize) -> NvimString {
