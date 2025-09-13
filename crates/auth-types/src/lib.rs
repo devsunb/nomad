@@ -10,6 +10,6 @@ pub use github_access_token::GitHubAccessToken;
 pub use github_client_id::GitHubClientId;
 pub use oauth_state::{OAuthState, OAuthStateFromStrError};
 
-/// The [`GitHubClientId`] assigned to Nomad.
+/// The [`GitHubClientId`] assigned to Nomad's OAuth app.
 pub const NOMAD_GITHUB_CLIENT_ID: GitHubClientId =
-    GitHubClientId("Iv23liZkCzK2uYG2jbkh");
+    GitHubClientId("Ov23liDqf1zOSVXAoVJq");

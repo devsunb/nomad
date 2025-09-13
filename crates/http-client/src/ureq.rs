@@ -34,4 +34,3 @@ impl<Spawner: BackgroundSpawner + Sync> HttpClient for UreqClient<Spawner> {
         })
     }
 }
-
