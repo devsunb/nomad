@@ -1,4 +1,5 @@
 use core::ops::Deref;
+use core::time::Duration;
 use std::process::{Command, Stdio};
 use std::{thread, time};
 
@@ -9,9 +10,10 @@ use gitignore::{CreateError, GitIgnore, IgnoreError};
 use real_fs::RealFs;
 use thread_pool::ThreadPool;
 
+use crate::utils::FutureExt;
+
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
-#[ignore = "halts in CI"]
 fn simple() {
     let repo = GitRepository::init(mock::fs! {
         "a.txt": "",
@@ -25,7 +27,6 @@ fn simple() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
-#[ignore = "halts in CI"]
 fn changes_to_gitignore_are_picked_up() {
     let repo = GitRepository::init(mock::fs! {
         "a.txt": "",
@@ -43,7 +44,6 @@ fn changes_to_gitignore_are_picked_up() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
-#[ignore = "halts in CI"]
 fn slashed_dirs_are_ignored() {
     let repo = GitRepository::init(mock::fs! {
         "target": {},
@@ -219,12 +219,17 @@ impl GitRepository {
         }
     }
 
+    #[track_caller]
     fn is_ignored(
         &self,
         path: impl AsRef<AbsPath>,
     ) -> Result<bool, IgnoreError> {
         future::block_on(async {
-            self.gitignore.is_ignored(path.as_ref()).await
+            self.gitignore
+                .is_ignored(path.as_ref())
+                .timeout(Duration::from_secs(10))
+                .await
+                .expect("timed out waiting for gitignore response")
         })
     }
 }
