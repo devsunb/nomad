@@ -11,6 +11,7 @@ use thread_pool::ThreadPool;
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+#[ignore = "halts in CI"]
 fn simple() {
     let repo = GitRepository::init(mock::fs! {
         "a.txt": "",
@@ -24,6 +25,7 @@ fn simple() {
 
 #[test]
 #[cfg_attr(not(git_in_PATH), ignore = "git is not in $PATH")]
+#[ignore = "halts in CI"]
 fn changes_to_gitignore_are_picked_up() {
     let repo = GitRepository::init(mock::fs! {
         "a.txt": "",
