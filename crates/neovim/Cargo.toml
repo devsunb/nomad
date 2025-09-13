@@ -21,8 +21,8 @@ derive_more = { workspace = true }
 editor = { workspace = true }
 executor = { workspace = true, features = ["async-task"] }
 flume = { workspace = true }
-futures-util = { workspace = true }
 fs = { workspace = true }
+futures-util = { workspace = true }
 neovim-macros = { path = "./macros" }
 nohash = { workspace = true }
 nvim-oxi = { workspace = true, features = ["libuv", "mlua", "neovim-0-11"] }
