@@ -1,0 +1,28 @@
+[package]
+name = "http-client"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[features]
+json = ["dep:serde_json"]
+reqwest = ["dep:reqwest"]
+ureq = ["dep:ureq", "dep:executor"]
+
+[dependencies]
+http = { workspace = true }
+url = { workspace = true }
+
+executor = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true, features = [
+  "charset",
+  "http2",
+  "rustls-tls",
+] }
+serde_json = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
+
+[lints]
+workspace = true
