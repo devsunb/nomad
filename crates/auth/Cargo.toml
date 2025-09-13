@@ -8,11 +8,7 @@ publish.workspace = true
 
 [features]
 mock = []
-github = [
-  "nomad-collab-params/github-authenticator",
-  "dep:reqwest",
-  "dep:nomad-collab-params",
-]
+github = ["nomad-collab-params/github-authenticator", "dep:nomad-collab-params"]
 neovim = [
   "github",
   "keyring/apple-native",
@@ -30,7 +26,7 @@ editor = { workspace = true }
 event-listener = { workspace = true }
 futures-util = { workspace = true }
 http = { workspace = true }
-http-client = { workspace = true, features = ["reqwest"] }
+http-client = { workspace = true }
 keyring = { workspace = true }
 open = { workspace = true }
 rand = { workspace = true }
@@ -40,7 +36,6 @@ url = { workspace = true, features = ["serde"] }
 
 neovim = { workspace = true, optional = true }
 nomad-collab-params = { workspace = true, optional = true }
-reqwest = { workspace = true, optional = true, features = ["json"] }
 
 [lints]
 workspace = true

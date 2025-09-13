@@ -82,6 +82,7 @@ impl<Ed: EditorAdapter> Editor for Ed {
     type Emitter<'a> = <<Self as Deref>::Target as Editor>::Emitter<'a>;
     type Executor = <<Self as Deref>::Target as Editor>::Executor;
     type EventHandle = <<Self as Deref>::Target as Editor>::EventHandle;
+    type HttpClient = <<Self as Deref>::Target as Editor>::HttpClient;
     type Selection<'a> = SelectionAdapter<'a, Self>;
     type SelectionId = <<Self as Deref>::Target as Editor>::SelectionId;
     type BufferSaveError =
@@ -149,6 +150,11 @@ impl<Ed: EditorAdapter> Editor for Ed {
     #[inline]
     fn executor(&mut self) -> &mut Self::Executor {
         self.deref_mut().executor()
+    }
+
+    #[inline]
+    fn http_client(&self) -> &Self::HttpClient {
+        self.deref().http_client()
     }
 
     #[inline]

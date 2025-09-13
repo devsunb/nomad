@@ -8,12 +8,14 @@ publish.workspace = true
 
 [features]
 json = ["dep:serde_json"]
+mock = ["dep:axum-core"]
 reqwest = ["dep:reqwest"]
 ureq = ["dep:ureq", "dep:executor"]
 
 [dependencies]
 http = { workspace = true }
 
+axum-core = { workspace = true, optional = true }
 executor = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true, features = [
   "charset",

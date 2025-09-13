@@ -101,6 +101,12 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
 
     /// TODO: docs.
     #[inline]
+    pub fn http_client(&mut self) -> Ed::HttpClient {
+        self.with_editor(|ed| ed.http_client().clone())
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn on_buffer_created(
         &mut self,
         mut fun: impl FnMut(context::Buffer<'_, Ed>, AgentId) + 'static,

@@ -262,7 +262,6 @@ dependencies = [
  "nomad-collab-params",
  "open",
  "rand",
- "reqwest",
  "serde",
  "serde_json",
  "url",
@@ -283,6 +282,25 @@ name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+
+[[package]]
+name = "axum-core"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68464cd0412f486726fb3373129ef5d2993f90c34bc2bc1c1e9943b2f4fc7ca6"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "http",
+ "http-body",
+ "http-body-util",
+ "mime",
+ "pin-project-lite",
+ "rustversion",
+ "sync_wrapper",
+ "tower-layer",
+ "tower-service",
+]
 
 [[package]]
 name = "backtrace"
@@ -1092,6 +1110,7 @@ dependencies = [
  "fs",
  "futures-lite",
  "fxhash",
+ "http-client",
  "rand",
  "serde",
  "smallvec",
@@ -1549,6 +1568,7 @@ dependencies = [
 name = "http-client"
 version = "0.1.0-dev"
 dependencies = [
+ "axum-core",
  "executor",
  "http",
  "reqwest",
@@ -2136,6 +2156,7 @@ dependencies = [
  "fs",
  "futures-lite",
  "fxhash",
+ "http-client",
  "indexmap",
  "mock-macros",
  "pin-project-lite",
@@ -2177,6 +2198,7 @@ dependencies = [
  "flume",
  "fs",
  "futures-util",
+ "http-client",
  "neovim-macros",
  "nohash",
  "nvim-oxi",
@@ -2189,6 +2211,7 @@ dependencies = [
  "thread-pool",
  "tracing",
  "tracing-subscriber",
+ "ureq",
 ]
 
 [[package]]

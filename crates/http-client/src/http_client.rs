@@ -1,7 +1,7 @@
 use core::error::Error;
 
 /// A trait representing an HTTP client.
-pub trait HttpClient: Clone + Send {
+pub trait HttpClient: Clone + Send + Sync {
     /// The type of error that can occur after [`send`](HttpClient::send)ing a
     /// request.
     type Error: Error + Send;
@@ -23,4 +23,3 @@ impl<T: HttpClient + Sync> HttpClient for &T {
         (*self).send(request).await
     }
 }
-

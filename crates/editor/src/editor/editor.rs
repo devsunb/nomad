@@ -51,6 +51,9 @@ pub trait Editor: 'static + Sized {
     type EventHandle;
 
     /// TODO: docs.
+    type HttpClient: http_client::HttpClient;
+
+    /// TODO: docs.
     type Selection<'a>: Selection<Editor = Self>;
 
     /// TODO: docs.
@@ -110,6 +113,9 @@ pub trait Editor: 'static + Sized {
 
     /// TODO: docs.
     fn executor(&mut self) -> &mut Self::Executor;
+
+    /// TODO: docs.
+    fn http_client(&self) -> &Self::HttpClient;
 
     /// TODO: docs.
     fn on_buffer_created<Fun>(

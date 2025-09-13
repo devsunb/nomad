@@ -16,7 +16,7 @@ impl<Spawner> UreqClient<Spawner> {
     }
 }
 
-impl<Spawner: BackgroundSpawner> HttpClient for UreqClient<Spawner> {
+impl<Spawner: BackgroundSpawner + Sync> HttpClient for UreqClient<Spawner> {
     type Error = ureq::Error;
 
     fn send(
@@ -34,3 +34,4 @@ impl<Spawner: BackgroundSpawner> HttpClient for UreqClient<Spawner> {
         })
     }
 }
+

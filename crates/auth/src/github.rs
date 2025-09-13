@@ -21,11 +21,11 @@ static GITHUB_AUTHORIZE_URL: LazyLock<Url> = LazyLock::new(|| {
 pub(crate) async fn login<Ed: Editor>(
     config: impl Access<Config>,
     ctx: &mut Context<Ed>,
-) -> Result<(GitHubAccessToken, GitHubHandle), GitHubLoginError<reqwest::Client>>
+) -> Result<(GitHubAccessToken, GitHubHandle), GitHubLoginError<Ed::HttpClient>>
 {
     let auth_server_url = config.with(|config| config.server_url.clone());
     let oauth_state = OAuthState::from_bytes(ctx.with_rng(Rng::random));
-    let http_client = reqwest::Client::new();
+    let http_client = ctx.http_client();
 
     let login_request = ctx.spawn_background({
         let auth_server_url = auth_server_url.clone();

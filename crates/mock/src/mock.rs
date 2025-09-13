@@ -29,6 +29,7 @@ pub struct Mock<Fs = MockFs, BgSpawner = Spawner> {
     emitter: Emitter,
     executor: Executor<BgSpawner>,
     fs: Fs,
+    http_client: http_client::MockHttpClient,
     next_buffer_id: BufferId,
 }
 
@@ -94,6 +95,7 @@ impl<Fs> Mock<Fs> {
             emitter: Default::default(),
             executor: Default::default(),
             fs,
+            http_client: Default::default(),
             next_buffer_id: BufferId(1),
         }
     }
@@ -115,6 +117,7 @@ where
             emitter: self.emitter,
             executor: self.executor.with_background_spawner(spawner),
             fs: self.fs,
+            http_client: self.http_client,
             next_buffer_id: self.next_buffer_id,
         }
     }
@@ -150,6 +153,7 @@ impl Editor for Mock {
     type Executor = Executor<Spawner>;
     type Fs = MockFs;
     type Emitter<'this> = &'this mut Emitter;
+    type HttpClient = http_client::MockHttpClient;
     type Selection<'a> = Selection<'a>;
     type SelectionId = SelectionId;
 
@@ -255,6 +259,10 @@ impl Editor for Mock {
 
     fn executor(&mut self) -> &mut Self::Executor {
         &mut self.executor
+    }
+
+    fn http_client(&self) -> &Self::HttpClient {
+        &self.http_client
     }
 
     fn on_buffer_created<Fun>(

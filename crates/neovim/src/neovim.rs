@@ -1,6 +1,7 @@
 use core::convert::Infallible;
 use core::mem;
 
+use ::executor::Executor;
 use ::serde::{Deserialize, Serialize};
 use abs_path::AbsPath;
 use editor::module::Plugin;
@@ -20,6 +21,10 @@ use crate::events::{self, EventHandle, Events};
 use crate::selection::NeovimSelection;
 use crate::{api, executor, notify, oxi, serde, value};
 
+type HttpClient = http_client::UreqClient<
+    <<Neovim as Editor>::Executor as Executor>::BackgroundSpawner,
+>;
+
 /// TODO: docs.
 pub struct Neovim {
     /// TODO: docs.
@@ -33,6 +38,8 @@ pub struct Neovim {
 
     /// TODO: docs.
     executor: executor::NeovimExecutor,
+
+    http_client: HttpClient,
 
     #[cfg(feature = "test")]
     pub(crate) scratch_buffer_count: u32,
@@ -81,11 +88,17 @@ impl Neovim {
 
         let namespace_id = oxi::api::create_namespace(plugin_name);
 
+        let mut executor = executor::NeovimExecutor::default();
+
         Self {
             decoration_provider: DecorationProvider::new(namespace_id),
             events: Events::new(augroup_id),
             emitter: Default::default(),
-            executor: Default::default(),
+            http_client: HttpClient::new(
+                ureq::Agent::new_with_defaults(),
+                executor.background_spawner().clone(),
+            ),
+            executor,
             #[cfg(feature = "test")]
             scratch_buffer_count: 0,
         }
@@ -132,6 +145,9 @@ impl Editor for Neovim {
     type Emitter<'this> = &'this mut notify::NeovimEmitter;
     type Executor = executor::NeovimExecutor;
     type EventHandle = EventHandle;
+    type HttpClient = http_client::UreqClient<
+        <Self::Executor as Executor>::BackgroundSpawner,
+    >;
     type Selection<'a> = NeovimSelection<'a>;
     type SelectionId = BufferId;
 
@@ -207,6 +223,11 @@ impl Editor for Neovim {
     #[inline]
     fn executor(&mut self) -> &mut Self::Executor {
         &mut self.executor
+    }
+
+    #[inline]
+    fn http_client(&self) -> &Self::HttpClient {
+        &self.http_client
     }
 
     #[inline]
