@@ -4,7 +4,7 @@ use auth_types::GitHubAccessToken;
 use collab_types::GitHubHandle;
 use url::Url;
 
-const GITHUB_USER_ENDPOINT_URL: LazyLock<Url> = LazyLock::new(|| {
+static GITHUB_USER_ENDPOINT_URL: LazyLock<Url> = LazyLock::new(|| {
     Url::parse("https://api.github.com/user").expect("valid URL")
 });
 
@@ -33,7 +33,7 @@ impl<'http_client> GitHubAuthenticator<'http_client> {
     ) -> Result<GitHubHandle, GitHubAuthError> {
         let response = self
             .http_client
-            .get((&*GITHUB_USER_ENDPOINT_URL).clone())
+            .get((*GITHUB_USER_ENDPOINT_URL).clone())
             .header("Authorization", format!("token {access_token}"))
             .header("Accept", "application/vnd.github.v3+json")
             .header("User-Agent", "Nomad")
