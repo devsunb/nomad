@@ -10,7 +10,6 @@ mod reqwest;
 #[cfg(feature = "ureq")]
 mod ureq;
 
-pub use http::{Request, Response};
 pub use http_client::HttpClient;
 #[cfg(feature = "ureq")]
 pub use ureq::UreqClient;

@@ -255,6 +255,7 @@ dependencies = [
  "editor",
  "event-listener",
  "futures-util",
+ "http",
  "http-client",
  "keyring",
  "neovim",

@@ -7,6 +7,7 @@ use auth_types::{GitHubAccessToken, OAuthState};
 use collab_types::GitHubHandle;
 use editor::{Access, Context, Editor};
 use futures_util::{FutureExt, future, pin_mut};
+use http_client::HttpClient;
 use nomad_collab_params::GitHubAuthenticator;
 use rand::Rng;
 use url::Url;
@@ -20,7 +21,8 @@ static GITHUB_AUTHORIZE_URL: LazyLock<Url> = LazyLock::new(|| {
 pub(crate) async fn login<Ed: Editor>(
     config: impl Access<Config>,
     ctx: &mut Context<Ed>,
-) -> Result<(GitHubAccessToken, GitHubHandle), GitHubLoginError> {
+) -> Result<(GitHubAccessToken, GitHubHandle), GitHubLoginError<reqwest::Client>>
+{
     let auth_server_url = config.with(|config| config.server_url.clone());
     let oauth_state = OAuthState::from_bytes(ctx.with_rng(Rng::random));
     let http_client = reqwest::Client::new();
@@ -42,16 +44,14 @@ pub(crate) async fn login<Ed: Editor>(
     pin_mut!(login_request);
     pin_mut!(open_browser);
 
-    let login_result = loop {
+    let access_token = loop {
         match future::select(&mut login_request, &mut open_browser).await {
-            future::Either::Left((login_result, _)) => break login_result,
+            future::Either::Left((login_result, _)) => break login_result?,
             future::Either::Right((open_result, _)) => {
                 open_result.map_err(GitHubLoginError::OpenBrowser)?;
             },
         }
     };
-
-    let access_token = login_result.map_err(GitHubLoginError::LoginRequest)?;
 
     let github_handle = GitHubAuthenticator { http_client }
         .authenticate(&access_token)
@@ -61,16 +61,28 @@ pub(crate) async fn login<Ed: Editor>(
     Ok((access_token, github_handle))
 }
 
-async fn login_request(
-    http_client: &reqwest::Client,
+async fn login_request<Client: HttpClient>(
+    http_client: &Client,
     auth_server_url: &Url,
     oauth_state: &OAuthState,
-) -> reqwest::Result<GitHubAccessToken> {
+) -> Result<GitHubAccessToken, GitHubLoginError<Client>> {
     let login_url = auth_server_url
         .join(&format!("/github/login/{oauth_state}"))
         .expect("route is valid");
 
-    http_client.get(login_url).send().await?.json::<GitHubAccessToken>().await
+    let request = http::Request::builder()
+        .method(http::Method::GET)
+        .uri(login_url.to_string())
+        .body(String::new())
+        .expect("all the fields are valid");
+
+    let response = http_client
+        .send(request)
+        .await
+        .map_err(GitHubLoginError::LoginRequest)?;
+
+    serde_json::from_str::<GitHubAccessToken>(response.body())
+        .map_err(GitHubLoginError::DeserializeResponse)
 }
 
 fn open_browser(
@@ -93,16 +105,21 @@ fn open_browser(
 }
 
 /// TODO: docs.
-#[derive(Debug, derive_more::Display)]
+#[derive(cauchy::Debug, derive_more::Display)]
 #[display("{_0}")]
-pub enum GitHubLoginError {
+pub enum GitHubLoginError<Client: HttpClient> {
     /// Authenticating with the access token received from the server failed.
     #[display("{_0}")]
     Authenticate(nomad_collab_params::GitHubAuthError),
 
+    /// The body of the authentication response we got from GitHub couldn't be
+    /// deserialized into a token.
+    #[display("Couldn't deserialize response into authentication token: {_0}")]
+    DeserializeResponse(serde_json::Error),
+
     /// The login request to the authentication server failed.
     #[display("Login request to the authentication server failed: {_0}")]
-    LoginRequest(reqwest::Error),
+    LoginRequest(Client::Error),
 
     /// The user's web browser couldn't be opened.
     #[display("Couldn't open URL in web browser: {_0}")]
