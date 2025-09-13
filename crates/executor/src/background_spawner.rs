@@ -6,7 +6,7 @@ pub trait BackgroundSpawner: Clone + Send + 'static {
     type Task<T: Send + 'static>: Task<T> + Send;
 
     /// TODO: docs.
-    fn spawn<Fut>(&mut self, fut: Fut) -> Self::Task<Fut::Output>
+    fn spawn<Fut>(&self, fut: Fut) -> Self::Task<Fut::Output>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static;

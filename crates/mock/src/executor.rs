@@ -142,7 +142,7 @@ impl LocalSpawner for Spawner {
 impl BackgroundSpawner for Spawner {
     type Task<T: Send + 'static> = async_task::Task<T>;
 
-    fn spawn<Fut>(&mut self, fut: Fut) -> Self::Task<Fut::Output>
+    fn spawn<Fut>(&self, fut: Fut) -> Self::Task<Fut::Output>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,

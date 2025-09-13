@@ -38,7 +38,7 @@ impl BackgroundSpawner for ThreadPool {
     type Task<T: Send + 'static> = ThreadPoolTask<T>;
 
     #[inline]
-    fn spawn<Fut>(&mut self, future: Fut) -> Self::Task<Fut::Output>
+    fn spawn<Fut>(&self, future: Fut) -> Self::Task<Fut::Output>
     where
         Fut: Future + Send + 'static,
         Fut::Output: Send + 'static,
