@@ -17,8 +17,8 @@ cauchy = { workspace = true }
 derive_more = { workspace = true }
 futures-util = { workspace = true, features = ["alloc", "async-await-macro"] }
 
-flume = { workspace = true, optional = true }
 either = { workspace = true, optional = true }
+flume = { workspace = true, optional = true }
 send-future = { workspace = true, optional = true }
 
 [lints]
