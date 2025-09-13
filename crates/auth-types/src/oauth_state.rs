@@ -21,6 +21,7 @@ impl OAuthState {
         Self(bytes)
     }
 
+    #[allow(clippy::wrong_self_convention)]
     #[inline]
     fn to_str(&self) -> impl AsRef<str> {
         struct Base64Encoded {
