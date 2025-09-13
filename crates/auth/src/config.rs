@@ -12,7 +12,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            server_url: Url::parse("https://auth.collab.foo")
+            server_url: Url::parse("https://auth.nomad.foo")
                 .expect("valid URL"),
         }
     }
