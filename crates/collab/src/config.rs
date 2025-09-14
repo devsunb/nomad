@@ -5,7 +5,11 @@ use core::ops::Deref;
 use std::rc::Rc;
 
 use abs_path::AbsPathBuf;
+use collab_types::smol_str::format_smolstr;
 use serde::de::{Deserialize, Deserializer};
+
+const DEFAULT_DOMAIN: &str = "collab.nomad.foo";
+const DEFAULT_PORT: u16 = 3000;
 
 /// TODO: docs.
 #[derive(Debug, Default, serde::Deserialize)]
@@ -28,7 +32,11 @@ pub struct ServerAddress {
 
 impl Default for ServerAddress {
     fn default() -> Self {
-        Self { inner: "collab.nomad.foo:64420".to_owned().into() }
+        Self {
+            inner: format_smolstr!("{DEFAULT_DOMAIN}:{DEFAULT_PORT}")
+                .as_str()
+                .into(),
+        }
     }
 }
 
