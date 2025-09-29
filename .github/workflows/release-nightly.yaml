@@ -72,18 +72,10 @@ jobs:
   release-nightly:
     needs: setup
     uses: ./.github/workflows/build-and-release.yaml
+    secrets: inherit
     with:
       checkout-ref: main
       is-stable: false
       release-name: "Nomad Nightly – ${{ needs.setup.outputs.formatted_date }}"
       release-body: "TODO"
       release-tag: ${{ needs.setup.outputs.nightly_tag }}
-    secrets:
-      cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      ssh-private-keys: |
-        ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-        ${{ secrets.CAUCHY_DEPLOY_KEY }}
-        ${{ secrets.COLLAB_DEPLOY_KEY }}
-        ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-        ${{ secrets.PANDO_DEPLOY_KEY }}
-        ${{ secrets.PUFF_DEPLOY_KEY }}

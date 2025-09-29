@@ -23,14 +23,6 @@ on:
         description: "The tag to attach the release to"
         required: true
         type: string
-    secrets:
-      cachix-auth-token:
-        description: "Auth token for pushing Nix artifacts to Cachix"
-        required: true
-      # TODO: remove after publishing private crates.
-      ssh-private-keys:
-        description: "SSH deploy keys for private repositories"
-        required: true
 
 jobs:
   build-neovim:
@@ -52,8 +44,14 @@ jobs:
       - name: Install Nix
         uses: ./.github/actions/setup-nix
         with:
-          cachix-auth-token: ${{ secrets.cachix-auth-token }}
-          ssh-private-keys: ${{ secrets.ssh-private-keys }}
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          ssh-private-keys: |
+            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
+            ${{ secrets.CAUCHY_DEPLOY_KEY }}
+            ${{ secrets.COLLAB_DEPLOY_KEY }}
+            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
+            ${{ secrets.PANDO_DEPLOY_KEY }}
+            ${{ secrets.PUFF_DEPLOY_KEY }}
 
       - name: Build the Neovim release artifacts
         run: nix build ${{ matrix.release-artifacts-package }}
