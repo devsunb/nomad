@@ -1,7 +1,8 @@
 /// A GitHub OAuth client ID.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(transparent))]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize,
+)]
+#[serde(transparent)]
 pub struct GitHubClientId(pub(crate) &'static str);
 
 impl GitHubClientId {

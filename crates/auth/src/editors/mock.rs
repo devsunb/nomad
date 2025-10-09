@@ -2,8 +2,7 @@
 
 use core::ops;
 
-use auth_types::AccessToken;
-use collab_types::PeerHandle;
+use auth_types::JsonWebToken;
 use editor::context::Borrowed;
 use editor::{Access, Context, Editor, EditorAdapter};
 
@@ -33,7 +32,7 @@ impl<Ed: Editor> AuthEditor for AuthMock<Ed> {
     async fn login(
         _: impl Access<config::Config>,
         _: &mut Context<Self>,
-    ) -> Result<(AccessToken, PeerHandle), Self::LoginError> {
+    ) -> Result<JsonWebToken, Self::LoginError> {
         todo!()
     }
 

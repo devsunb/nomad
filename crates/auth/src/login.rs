@@ -1,12 +1,11 @@
 //! TODO: docs.
 
-use collab_types::PeerHandle;
 use editor::command::ToCompletionFn;
 use editor::module::AsyncAction;
 use editor::{Access, Context, Shared};
+use peer_handle::PeerHandle;
 
-use crate::auth_state::AuthInfos;
-use crate::credential_store::{self, CredentialStore};
+use crate::credential_store::CredentialStore;
 use crate::{Auth, AuthEditor, AuthState, Config};
 
 /// TODO: docs.
@@ -22,25 +21,23 @@ impl Login {
         &self,
         ctx: &mut Context<Ed>,
     ) -> Result<(), LoginError<Ed>> {
-        if let Some(peer_handle) = self.state.with(|maybe_infos| {
-            maybe_infos.as_ref().map(|infos| infos.peer_handle.clone())
+        if let Some(peer_handle) = self.state.with(|maybe_jwt| {
+            maybe_jwt.as_ref().map(|jwt| jwt.claims().username.clone())
         }) {
             return Err(LoginError::AlreadyLoggedIn(peer_handle));
         }
 
-        let (access_token, peer_handle) = Ed::login(self.config.clone(), ctx)
+        let jwt = Ed::login(self.config.clone(), ctx)
             .await
             .map_err(LoginError::Login)?;
 
-        let auth_infos = AuthInfos { access_token, peer_handle };
-
-        self.state.set_logged_in(auth_infos.clone());
+        self.state.set_logged_in(jwt.clone());
 
         // Persisting the credentials blocks, so do it in the background.
         let credential_store = self.credential_store.clone();
-        ctx.spawn_background(async move {
-            credential_store.persist(auth_infos).await
-        })
+        ctx.spawn_background(
+            async move { credential_store.persist(&jwt).await },
+        )
         .await
         .map_err(Into::into)
     }
@@ -59,15 +56,11 @@ impl<Ed: AuthEditor> AsyncAction<Ed> for Login {
 }
 
 /// TODO: docs.
-#[derive(cauchy::Debug, derive_more::Display, cauchy::Error)]
+#[derive(cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::From)]
 pub enum LoginError<Ed: AuthEditor> {
     /// TODO: docs.
     #[display("Already logged in as {_0}")]
     AlreadyLoggedIn(PeerHandle),
-
-    /// TODO: docs.
-    #[display("Couldn't get credentials from keyring: {_0}")]
-    GetCredential(keyring::Error),
 
     /// TODO: docs.
     #[display("{_0}")]
@@ -75,7 +68,7 @@ pub enum LoginError<Ed: AuthEditor> {
 
     /// TODO: docs.
     #[display("Couldn't persist credentials: {_0}")]
-    PersistCredentials(keyring::Error),
+    PersistCredentials(#[from] keyring::Error),
 }
 
 impl From<&Auth> for Login {
@@ -90,14 +83,4 @@ impl From<&Auth> for Login {
 
 impl<Ed: AuthEditor> ToCompletionFn<Ed> for Login {
     fn to_completion_fn(&self) {}
-}
-
-impl<Ed: AuthEditor> From<credential_store::Error> for LoginError<Ed> {
-    fn from(err: credential_store::Error) -> Self {
-        use credential_store::Error::*;
-        match err {
-            GetCredential(err) => Self::GetCredential(err),
-            Op(err) => Self::PersistCredentials(err),
-        }
-    }
 }

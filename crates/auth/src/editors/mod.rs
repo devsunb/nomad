@@ -5,8 +5,7 @@ mod neovim;
 
 use core::fmt::Debug;
 
-use auth_types::AccessToken;
-use collab_types::PeerHandle;
+use auth_types::JsonWebToken;
 use editor::context::Borrowed;
 use editor::{Access, Context, Editor};
 
@@ -26,7 +25,7 @@ pub trait AuthEditor: Editor {
     fn login(
         config: impl Access<config::Config>,
         ctx: &mut Context<Self>,
-    ) -> impl Future<Output = Result<(AccessToken, PeerHandle), Self::LoginError>>;
+    ) -> impl Future<Output = Result<JsonWebToken, Self::LoginError>>;
 
     /// Called when the [`Login`](login::Login) action returns an error.
     fn on_login_error(error: login::LoginError<Self>, ctx: &mut Context<Self>);

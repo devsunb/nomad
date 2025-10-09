@@ -105,7 +105,6 @@ const fn base64_engine() -> impl base64::Engine {
     base64::engine::general_purpose::URL_SAFE_NO_PAD
 }
 
-#[cfg(feature = "serde")]
 mod serde_impls {
     use super::*;
 

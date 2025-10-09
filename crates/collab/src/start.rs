@@ -182,7 +182,7 @@ impl<Ed: CollabEditor> Start<Ed> {
         &self,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, StartError<Ed>> {
-        let auth_infos = self
+        let jwt = self
             .auth_state
             .with(Clone::clone)
             .ok_or(StartError::UserNotLoggedIn)?;
@@ -212,7 +212,7 @@ impl<Ed: CollabEditor> Start<Ed> {
             .split();
 
         let knock = collab_client::Knock::<Ed::ServerParams> {
-            auth_infos: auth_infos.into(),
+            auth_infos: jwt.into(),
             session_intent: collab_client::SessionIntent::StartNew(
                 project_name.to_owned(),
             ),

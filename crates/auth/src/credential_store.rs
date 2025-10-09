@@ -1,7 +1,9 @@
+use core::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
+use auth_types::JsonWebToken;
+
 use crate::async_once_lock::AsyncOnceLock;
-use crate::auth_state::AuthInfos;
 
 #[derive(Clone, Default)]
 pub(crate) struct CredentialStore {
@@ -9,33 +11,35 @@ pub(crate) struct CredentialStore {
     builder: Arc<AsyncOnceLock<Box<keyring::CredentialBuilder>>>,
 }
 
+#[derive(Debug, derive_more::Display, cauchy::From)]
+#[display("{_0}")]
 pub(crate) enum Error {
-    GetCredential(keyring::Error),
-    Op(keyring::Error),
+    GetCredential(<JsonWebToken as FromStr>::Err),
+    Op(#[from] keyring::Error),
 }
 
 impl CredentialStore {
     const APP_NAME: &str = "nomad";
     const SECRET_NAME: &str = "auth-infos";
 
-    pub(crate) async fn delete(&self) -> Result<(), Error> {
-        self.entry().await?.delete_credential().map_err(Error::Op)
+    pub(crate) async fn delete(&self) -> Result<(), keyring::Error> {
+        self.entry().await?.delete_credential()
     }
 
-    pub(crate) async fn persist(&self, infos: AuthInfos) -> Result<(), Error> {
-        let entry = self.entry().await?;
-        let json = match serde_json::to_string(&infos) {
-            Ok(json) => json,
-            Err(_) => unreachable!("Serialize impl never fails"),
-        };
-        entry.set_password(&json).map_err(Error::Op)
+    pub(crate) async fn persist(
+        &self,
+        jwt: &JsonWebToken,
+    ) -> Result<(), keyring::Error> {
+        self.entry().await?.set_password(jwt.as_str())
     }
 
-    pub(crate) async fn retrieve(&self) -> Result<Option<AuthInfos>, Error> {
+    pub(crate) async fn retrieve(
+        &self,
+    ) -> Result<Option<JsonWebToken>, Error> {
         match self.entry().await?.get_password() {
-            Ok(json) => Ok(serde_json::from_str(&json).ok()),
+            Ok(jwt) => jwt.parse().map(Some).map_err(Error::GetCredential),
             Err(keyring::Error::NoEntry) => Ok(None),
-            Err(err) => Err(Error::Op(err)),
+            Err(err) => Err(err.into()),
         }
     }
 
@@ -46,7 +50,7 @@ impl CredentialStore {
         let _ = self.builder.set(builder);
     }
 
-    async fn entry(&self) -> Result<&keyring::Entry, Error> {
+    async fn entry(&self) -> Result<&keyring::Entry, keyring::Error> {
         match &self.entry.get() {
             Some(entry) => Ok(entry),
             None => {
@@ -55,8 +59,7 @@ impl CredentialStore {
                     .wait()
                     .await
                     .build(None, Self::APP_NAME, Self::SECRET_NAME)
-                    .map(keyring::Entry::new_with_credential)
-                    .map_err(Error::GetCredential)?;
+                    .map(keyring::Entry::new_with_credential)?;
                 Ok(self.entry.get_or_init(|| entry))
             },
         }

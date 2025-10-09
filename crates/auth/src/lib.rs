@@ -14,7 +14,8 @@ pub mod login;
 pub mod logout;
 
 pub use auth::Auth;
-pub use auth_state::{AuthInfos, AuthState};
+pub use auth_state::AuthState;
+pub use auth_types::{Claims, JsonWebToken};
 pub use config::Config;
 pub use editors::AuthEditor;
 #[cfg(feature = "mock")]

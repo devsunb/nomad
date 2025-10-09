@@ -4,7 +4,7 @@ use editor::command::ToCompletionFn;
 use editor::module::AsyncAction;
 use editor::{Context, Editor};
 
-use crate::credential_store::{self, CredentialStore};
+use crate::credential_store::CredentialStore;
 use crate::{Auth, AuthEditor, AuthState};
 
 /// TODO: docs.
@@ -44,15 +44,11 @@ impl<Ed: AuthEditor> AsyncAction<Ed> for Logout {
 }
 
 /// TODO: docs.
-#[derive(Debug, derive_more::Display, cauchy::Error)]
+#[derive(Debug, derive_more::Display, cauchy::Error, cauchy::From)]
 pub enum LogoutError {
     /// TODO: docs.
     #[display("Couldn't delete credentials from keyring: {_0}")]
-    DeleteCredential(keyring::Error),
-
-    /// TODO: docs.
-    #[display("Couldn't get credentials from keyring: {_0}")]
-    GetCredential(keyring::Error),
+    DeleteCredential(#[from] keyring::Error),
 
     /// TODO: docs.
     #[display("Not logged in")]
@@ -70,14 +66,4 @@ impl From<&Auth> for Logout {
 
 impl<Ed: Editor> ToCompletionFn<Ed> for Logout {
     fn to_completion_fn(&self) {}
-}
-
-impl From<credential_store::Error> for LogoutError {
-    fn from(err: credential_store::Error) -> Self {
-        use credential_store::Error::*;
-        match err {
-            GetCredential(err) => Self::GetCredential(err),
-            Op(err) => Self::DeleteCredential(err),
-        }
-    }
 }

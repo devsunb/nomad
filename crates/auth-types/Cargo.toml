@@ -6,14 +6,14 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
-[features]
-default = ["serde"]
-serde = ["dep:serde"]
-
 [dependencies]
 base64 = { workspace = true }
-
-serde = { workspace = true, optional = true, features = ["derive"] }
+cauchy = { workspace = true }
+derive_more = { workspace = true }
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
+peer-handle = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+smol_str = { workspace = true, features = ["serde"] }
 
 [dev-dependencies]
 rand = { workspace = true }

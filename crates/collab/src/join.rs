@@ -49,7 +49,7 @@ impl<Ed: CollabEditor> Join<Ed> {
         session_id: SessionId<Ed>,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, JoinError<Ed>> {
-        let auth_infos = self
+        let jwt = self
             .auth_state
             .with(Clone::clone)
             .ok_or(JoinError::UserNotLoggedIn)?;
@@ -62,7 +62,7 @@ impl<Ed: CollabEditor> Join<Ed> {
             .split();
 
         let knock = collab_client::Knock::<Ed::ServerParams> {
-            auth_infos: auth_infos.into(),
+            auth_infos: jwt.into(),
             session_intent: collab_client::SessionIntent::JoinExisting(
                 session_id,
             ),

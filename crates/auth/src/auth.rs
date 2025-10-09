@@ -38,7 +38,7 @@ impl Auth {
     #[track_caller]
     pub fn logged_in<Gh>(github_handle: Gh) -> Self
     where
-        Gh: TryInto<collab_types::GitHubHandle>,
+        Gh: TryInto<peer_handle::GitHubHandle>,
         Gh::Error: core::fmt::Debug,
     {
         let github_handle =
@@ -50,7 +50,7 @@ impl Auth {
             access_token: auth_types::AccessToken::GitHub(
                 auth_types::GitHubAccessToken::new(github_handle.as_str()),
             ),
-            peer_handle: collab_types::PeerHandle::GitHub(github_handle),
+            peer_handle: peer_handle::PeerHandle::GitHub(github_handle),
         });
 
         this
@@ -82,15 +82,16 @@ impl<Ed: AuthEditor> Module<Ed> for Auth {
         let auth_state = self.state();
         let store = self.credential_store.clone();
         ctx.spawn_and_detach(async move |ctx| {
-            if let Some(infos) = ctx
-                // Retrieving the credentials blocks, so do it in the
-                // background.
+            // Retrieving the credentials blocks, so do it in the background.
+            match ctx
                 .spawn_background(async move { store.retrieve().await })
                 .await
-                .ok()
-                .flatten()
             {
-                auth_state.set_logged_in(infos);
+                Ok(Some(jwt)) => auth_state.set_logged_in(jwt),
+                Ok(None) => {},
+                Err(err) => {
+                    tracing::error!("couldn't retrieve credentials: {err}")
+                },
             }
         });
     }

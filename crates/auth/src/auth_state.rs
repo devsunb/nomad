@@ -1,16 +1,15 @@
-use auth_types::AccessToken;
-use collab_types::PeerHandle;
+use auth_types::JsonWebToken;
 use editor::{Access, Shared};
 
 /// TODO: docs.
 #[derive(Clone, Default)]
 pub struct AuthState {
-    inner: Shared<Option<AuthInfos>>,
+    inner: Shared<Option<JsonWebToken>>,
 }
 
 impl AuthState {
-    pub(crate) fn set_logged_in(&self, infos: AuthInfos) {
-        self.inner.set(Some(infos));
+    pub(crate) fn set_logged_in(&self, jwt: JsonWebToken) {
+        self.inner.set(Some(jwt));
     }
 
     /// Sets the state to logged out, returning whether it was logged in
@@ -20,30 +19,8 @@ impl AuthState {
     }
 }
 
-/// TODO: docs.
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct AuthInfos {
-    /// TODO: docs.
-    pub access_token: AccessToken,
-
-    /// TODO: docs.
-    pub peer_handle: PeerHandle,
-}
-
-impl Access<Option<AuthInfos>> for AuthState {
-    fn with<R>(&self, fun: impl FnOnce(&Option<AuthInfos>) -> R) -> R {
+impl Access<Option<JsonWebToken>> for AuthState {
+    fn with<R>(&self, fun: impl FnOnce(&Option<JsonWebToken>) -> R) -> R {
         self.inner.with(fun)
-    }
-}
-
-impl From<AuthInfos> for AccessToken {
-    fn from(auth_infos: AuthInfos) -> Self {
-        auth_infos.access_token
-    }
-}
-
-impl From<AuthInfos> for PeerHandle {
-    fn from(auth_infos: AuthInfos) -> Self {
-        auth_infos.peer_handle
     }
 }

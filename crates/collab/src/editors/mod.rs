@@ -35,7 +35,7 @@ pub trait CollabEditor: Editor {
 
     /// TODO: docs.
     type ServerParams: collab_server::Params<
-            AuthenticateInfos: From<auth::AuthInfos>,
+            AuthenticateInfos: From<auth::JsonWebToken>,
             SessionId: FromStr<Err: Error>,
         >;
 

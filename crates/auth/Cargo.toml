@@ -8,7 +8,7 @@ publish.workspace = true
 
 [features]
 mock = []
-github = ["nomad-collab-params/github-authenticator", "dep:nomad-collab-params"]
+github = []
 neovim = [
   "github",
   "keyring/apple-native",
@@ -18,9 +18,8 @@ neovim = [
 
 [dependencies]
 abs-path = { workspace = true }
-auth-types = { workspace = true, features = ["serde"] }
+auth-types = { workspace = true }
 cauchy = { workspace = true }
-collab-types = { workspace = true }
 derive_more = { workspace = true }
 editor = { workspace = true }
 event-listener = { workspace = true }
@@ -29,6 +28,7 @@ http = { workspace = true }
 http-client = { workspace = true }
 keyring = { workspace = true }
 open = { workspace = true }
+peer-handle = { workspace = true }
 rand = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -36,7 +36,6 @@ tracing = { workspace = true }
 url = { workspace = true, features = ["serde"] }
 
 neovim = { workspace = true, optional = true }
-nomad-collab-params = { workspace = true, optional = true }
 
 [lints]
 workspace = true

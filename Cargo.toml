@@ -49,11 +49,13 @@ git2 = { version = "0.20", default-features = false }
 home = "0.5"
 http = "1.3"
 indexmap = "2"
+jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 keyring = { git = "https://git@github.com/open-source-cooperative/keyring-rs.git", branch = "v4", default-features = false }
 nohash = "0.2"
 notify = "8"
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
 open = "5"
+peer-handle = { git = "ssh://git@github.com/nomad/collab-server.git" }
 pin-project-lite = "0.2"
 rand = "0.9"
 rand_chacha = "0.9"

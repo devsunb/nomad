@@ -4,12 +4,10 @@ use core::pin::pin;
 use std::io;
 use std::sync::LazyLock;
 
-use auth_types::{GitHubAccessToken, OAuthState};
-use collab_types::GitHubHandle;
+use auth_types::{JsonWebToken, OAuthState};
 use editor::{Access, Context, Editor};
 use futures_util::{FutureExt, future, pin_mut};
 use http_client::HttpClient;
-use nomad_collab_params::GitHubAuthenticator;
 use rand::Rng;
 use url::Url;
 
@@ -22,8 +20,7 @@ static GITHUB_AUTHORIZE_URL: LazyLock<Url> = LazyLock::new(|| {
 pub(crate) async fn login<Ed: Editor>(
     config: impl Access<Config>,
     ctx: &mut Context<Ed>,
-) -> Result<(GitHubAccessToken, GitHubHandle), GitHubLoginError<Ed::HttpClient>>
-{
+) -> Result<JsonWebToken, GitHubLoginError<Ed::HttpClient>> {
     let auth_server_url = config.with(|config| config.server_url.clone());
     let oauth_state = OAuthState::from_bytes(ctx.with_rng(Rng::random));
     let http_client = ctx.http_client();
@@ -40,28 +37,21 @@ pub(crate) async fn login<Ed: Editor>(
 
     pin_mut!(open_browser);
 
-    let access_token = loop {
+    loop {
         match future::select(&mut login_request, &mut open_browser).await {
-            future::Either::Left((login_result, _)) => break login_result?,
+            future::Either::Left((login_result, _)) => break login_result,
             future::Either::Right((open_result, _)) => {
                 open_result.map_err(GitHubLoginError::OpenBrowser)?;
             },
         }
-    };
-
-    let github_handle = GitHubAuthenticator { http_client: &http_client }
-        .authenticate(&access_token)
-        .await
-        .map_err(GitHubLoginError::Authenticate)?;
-
-    Ok((access_token, github_handle))
+    }
 }
 
 async fn login_request<Client: HttpClient>(
     http_client: &Client,
     auth_server_url: &Url,
     oauth_state: &OAuthState,
-) -> Result<GitHubAccessToken, GitHubLoginError<Client>> {
+) -> Result<JsonWebToken, GitHubLoginError<Client>> {
     let login_url = auth_server_url
         .join(&format!("/github/login/{oauth_state}"))
         .expect("route is valid");
@@ -77,7 +67,7 @@ async fn login_request<Client: HttpClient>(
         .await
         .map_err(GitHubLoginError::LoginRequest)?;
 
-    serde_json::from_str::<GitHubAccessToken>(response.body())
+    serde_json::from_str::<JsonWebToken>(response.body())
         .map_err(GitHubLoginError::DeserializeResponse)
 }
 

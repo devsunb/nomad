@@ -1,5 +1,4 @@
-use auth_types::AccessToken;
-use collab_types::PeerHandle;
+use auth_types::JsonWebToken;
 use editor::context::Borrowed;
 use editor::{Access, Context};
 use neovim::Neovim;
@@ -21,17 +20,15 @@ impl AuthEditor for Neovim {
     async fn login(
         config: impl Access<config::Config>,
         ctx: &mut Context<Self>,
-    ) -> Result<(AccessToken, PeerHandle), Self::LoginError> {
-        let (access_token, github_handle) = github::login(config, ctx).await?;
+    ) -> Result<JsonWebToken, Self::LoginError> {
+        let jwt = github::login(config, ctx).await?;
 
         ctx.notify_info(format_args!(
-            "Successfully logged in as '{github_handle}'",
+            "Successfully logged in as '{}'",
+            jwt.claims().username,
         ));
 
-        Ok((
-            AccessToken::GitHub(access_token),
-            PeerHandle::GitHub(github_handle),
-        ))
+        Ok(jwt)
     }
 
     fn on_login_error(
