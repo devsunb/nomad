@@ -1,7 +1,6 @@
 //! TODO: docs.
 
 use core::pin::pin;
-use core::str::FromStr;
 use std::io;
 use std::sync::LazyLock;
 
@@ -68,7 +67,8 @@ async fn login_request<Client: HttpClient>(
         .await
         .map_err(GitHubLoginError::LoginRequest)?;
 
-    response.body().parse().map_err(GitHubLoginError::ParseResponse)
+    JsonWebToken::from_str_on_client(response.body())
+        .map_err(GitHubLoginError::ParseResponse)
 }
 
 fn open_browser(
@@ -104,6 +104,6 @@ pub enum GitHubLoginError<Client: HttpClient> {
 
     /// The body of the response we got from the auth server couldn't be parsed
     /// into a JWT.
-    #[display("Couldn't deserialize response into authentication token: {_0}")]
-    ParseResponse(<JsonWebToken as FromStr>::Err),
+    #[display("Couldn't parse response as valid JWT: {_0}")]
+    ParseResponse(auth_types::jsonwebtoken::errors::Error),
 }

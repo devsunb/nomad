@@ -7,8 +7,8 @@ use crate::{EmailAddress, PeerHandle};
 
 type UnixEpoch = u64;
 
-/// The claims contained in the JWT returned by Nomad's authentication server
-/// after a successful login.
+/// The claims contained in the JWT returned by Nomad's auth server after a
+/// successful login.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Claims {
     /// The JWT's `aud` claim.

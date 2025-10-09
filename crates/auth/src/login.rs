@@ -1,9 +1,9 @@
 //! TODO: docs.
 
+use auth_types::PeerHandle;
 use editor::command::ToCompletionFn;
 use editor::module::AsyncAction;
 use editor::{Access, Context, Shared};
-use peer_handle::PeerHandle;
 
 use crate::credential_store::CredentialStore;
 use crate::{Auth, AuthEditor, AuthState, Config};

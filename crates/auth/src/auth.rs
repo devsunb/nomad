@@ -38,7 +38,7 @@ impl Auth {
     #[track_caller]
     pub fn logged_in<Gh>(github_handle: Gh) -> Self
     where
-        Gh: TryInto<peer_handle::GitHubHandle>,
+        Gh: TryInto<auth_types::GitHubHandle>,
         Gh::Error: core::fmt::Debug,
     {
         let github_handle =
@@ -47,7 +47,7 @@ impl Auth {
         let this = Self::default();
 
         this.state.set_logged_in(auth_types::JsonWebToken::mock(
-            peer_handle::PeerHandle::GitHub(github_handle),
+            auth_types::PeerHandle::GitHub(github_handle),
         ));
 
         this

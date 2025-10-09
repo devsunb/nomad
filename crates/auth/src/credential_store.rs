@@ -1,4 +1,3 @@
-use core::str::FromStr;
 use std::sync::{Arc, OnceLock};
 
 use auth_types::JsonWebToken;
@@ -14,7 +13,7 @@ pub(crate) struct CredentialStore {
 #[derive(Debug, derive_more::Display, cauchy::From)]
 #[display("{_0}")]
 pub(crate) enum Error {
-    GetCredential(<JsonWebToken as FromStr>::Err),
+    GetCredential(#[from] auth_types::jsonwebtoken::errors::Error),
     Op(#[from] keyring::Error),
 }
 
@@ -37,7 +36,9 @@ impl CredentialStore {
         &self,
     ) -> Result<Option<JsonWebToken>, Error> {
         match self.entry().await?.get_password() {
-            Ok(jwt) => jwt.parse().map(Some).map_err(Error::GetCredential),
+            Ok(jwt) => JsonWebToken::from_str_on_client(&jwt)
+                .map(Some)
+                .map_err(Into::into),
             Err(keyring::Error::NoEntry) => Ok(None),
             Err(err) => Err(err.into()),
         }

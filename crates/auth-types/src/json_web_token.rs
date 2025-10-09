@@ -1,10 +1,9 @@
-use core::str::FromStr;
-use std::borrow::Cow;
 use std::sync::{Arc, LazyLock};
 
 use jsonwebtoken::Algorithm;
 
 use crate::Claims;
+use crate::audience::{Audience, Client, CollabServer};
 
 static AUTH_SERVER_JWT_SIGNING_PUBLIC_KEY: LazyLock<
     jsonwebtoken::DecodingKey,
@@ -20,8 +19,7 @@ static AUTH_SERVER_JWT_SIGNING_PUBLIC_KEY: LazyLock<
         .expect("public key is valid")
 });
 
-/// The JWT returned by Nomad's authentication server, along with its parsed
-/// [`Claims`].
+/// The JWT returned by Nomad's auth server, along with its parsed [`Claims`].
 #[derive(Clone)]
 pub struct JsonWebToken {
     contents: Arc<str>,
@@ -37,6 +35,39 @@ impl JsonWebToken {
     /// Returns the token's claims.
     pub fn claims(&self) -> &Claims {
         &self.claims
+    }
+
+    /// Parses the string as a `JsonWebToken`, validating against the given
+    /// audience type.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str<Aud: Audience>(
+        str: &str,
+    ) -> Result<Self, jsonwebtoken::errors::Error> {
+        let mut validation = jsonwebtoken::Validation::new(Algorithm::ES256);
+        Aud::set_audience(&mut validation);
+        validation.set_issuer(&[crate::JWT_ISSUER]);
+
+        let token_data = jsonwebtoken::decode::<Claims>(
+            str,
+            &AUTH_SERVER_JWT_SIGNING_PUBLIC_KEY,
+            &jsonwebtoken::Validation::new(Algorithm::ES256),
+        )?;
+
+        Ok(Self { contents: str.into(), claims: token_data.claims })
+    }
+
+    /// Calls [`from_str`](Self::from_str) with the [`Client`] audience.
+    pub fn from_str_on_client(
+        str: &str,
+    ) -> Result<Self, jsonwebtoken::errors::Error> {
+        Self::from_str::<Client>(str)
+    }
+
+    /// Calls [`from_str`](Self::from_str) with the [`CollabServer`] audience.
+    pub fn from_str_on_collab_server(
+        str: &str,
+    ) -> Result<Self, jsonwebtoken::errors::Error> {
+        Self::from_str::<CollabServer>(str)
     }
 
     /// Creates a mock `JsonWebToken` for the given user.
@@ -68,40 +99,6 @@ impl JsonWebToken {
         .expect("couldn't encode mock JWT");
 
         Self { contents: contents.into(), claims }
-    }
-}
-
-impl FromStr for JsonWebToken {
-    type Err = jsonwebtoken::errors::Error;
-
-    fn from_str(str: &str) -> Result<Self, Self::Err> {
-        let token_data = jsonwebtoken::decode::<Claims>(
-            str,
-            &AUTH_SERVER_JWT_SIGNING_PUBLIC_KEY,
-            &jsonwebtoken::Validation::new(Algorithm::ES256),
-        )?;
-
-        Ok(Self { contents: str.into(), claims: token_data.claims })
-    }
-}
-
-impl serde::Serialize for JsonWebToken {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.contents)
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for JsonWebToken {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        <Cow<str>>::deserialize(deserializer)?
-            .parse()
-            .map_err(serde::de::Error::custom)
     }
 }
 
