@@ -18,7 +18,8 @@ impl Audience for Client {
 pub struct CollabServer;
 
 impl CollabServer {
-    const AUDIENCE: &'static str = "collab.nomad.foo";
+    /// TODO: docs.
+    pub const AUDIENCE: &'static str = "collab.nomad.foo";
 }
 
 impl Audience for CollabServer {
