@@ -3,7 +3,7 @@ use std::io;
 use abs_path::{AbsPath, AbsPathBuf};
 use futures_util::{AsyncWriteExt, stream};
 
-use crate::{Directory, Metadata, RealFs};
+use crate::{Directory, IoErrorExt, Metadata, RealFs};
 
 /// TODO: docs.
 pub struct File {
@@ -49,7 +49,9 @@ impl fs::File for File {
 
     #[inline]
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        async_fs::remove_file(self.path()).await
+        async_fs::remove_file(self.path()).await.with_context(|| {
+            format!("couldn't delete file at {}", self.path())
+        })
     }
 
     #[inline]
@@ -63,13 +65,21 @@ impl fs::File for File {
 
     #[inline]
     async fn r#move(&self, new_path: &AbsPath) -> Result<(), Self::MoveError> {
-        crate::move_node(self.path(), new_path).await
+        crate::move_node(self.path(), new_path).await.with_context(|| {
+            format!("couldn't move file at {} to {}", self.path(), new_path)
+        })
     }
 
     #[inline]
     async fn parent(&self) -> Result<Directory, Self::ParentError> {
         let parent_path = self.path().parent().expect("has a parent");
-        let metadata = async_fs::metadata(parent_path).await?;
+        let metadata =
+            async_fs::metadata(parent_path).await.with_context(|| {
+                format!(
+                    "couldn't get metadata for directory at {}",
+                    parent_path
+                )
+            })?;
         Ok(Directory { path: parent_path.to_owned(), metadata })
     }
 
@@ -80,7 +90,9 @@ impl fs::File for File {
 
     #[inline]
     async fn read(&self) -> Result<Vec<u8>, Self::ReadError> {
-        async_fs::read(self.path()).await
+        async_fs::read(self.path())
+            .await
+            .with_context(|| format!("couldn't read file at {}", self.path()))
     }
 
     #[inline]
@@ -105,6 +117,9 @@ impl fs::File for File {
             file.sync_all().await?;
             Ok(())
         })
-        .await?
+        .await
+        .with_context(|| {
+            format!("couldn't write to file at {}", self.path())
+        })?
     }
 }

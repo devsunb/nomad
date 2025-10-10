@@ -263,7 +263,7 @@ impl<Ed: CollabEditor> Start<Ed> {
 
         ctx.with_namespace([
             ctx.namespace().plugin_name(),
-            <Collab<Ed> as Module<Ed>>::NAME,
+            Collab::<Ed>::NAME,
         ])
         .spawn_local(async move |ctx| {
             if let Err(err) = session.run(ctx).await {
@@ -341,8 +341,7 @@ async fn search_project_root<Ed: CollabEditor>(
 }
 
 /// TODO: docs.
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 async fn read_node<Fs: fs::Fs>(
     parent_path: &AbsPath,
     node_meta: Fs::Metadata,

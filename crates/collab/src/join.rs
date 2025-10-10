@@ -141,7 +141,7 @@ impl<Ed: CollabEditor> Join<Ed> {
 
         ctx.with_namespace([
             ctx.namespace().plugin_name(),
-            <Collab<Ed> as Module<Ed>>::NAME,
+            Collab::<Ed>::NAME,
         ])
         .spawn_local(async move |ctx| {
             if let Err(err) = session.run(ctx).await {

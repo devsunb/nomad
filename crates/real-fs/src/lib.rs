@@ -2,6 +2,7 @@
 
 mod directory;
 mod file;
+mod io_error_ext;
 mod metadata;
 mod real_fs;
 mod symlink;
@@ -10,6 +11,7 @@ mod temp;
 
 pub use directory::Directory;
 pub use file::File;
+use io_error_ext::IoErrorExt;
 pub use metadata::Metadata;
 pub use real_fs::{Inode, RealFs};
 pub use symlink::Symlink;

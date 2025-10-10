@@ -5,7 +5,7 @@ use abs_path::{AbsPath, AbsPathBuf, NodeName};
 use futures_util::select_biased;
 use futures_util::stream::{self, Stream, StreamExt};
 
-use crate::{File, Metadata, RealFs, Symlink};
+use crate::{File, IoErrorExt, Metadata, RealFs, Symlink};
 
 /// TODO: docs.
 #[derive(Clone)]
@@ -34,7 +34,9 @@ impl fs::Directory for Directory {
         directory_name: &NodeName,
     ) -> Result<Self, Self::CreateDirectoryError> {
         let path = self.path.clone().join(directory_name);
-        async_fs::create_dir(&path).await?;
+        async_fs::create_dir(&path)
+            .await
+            .with_context(|| format!("couldn't create directory at {path}"))?;
         let metadata = async_fs::metadata(&path).await?;
         Ok(Self { metadata, path })
     }
@@ -45,7 +47,11 @@ impl fs::Directory for Directory {
         file_name: &NodeName,
     ) -> Result<File, Self::CreateFileError> {
         let path = self.path.clone().join(file_name);
-        let file = File::open_options().create_new(true).open(&path).await?;
+        let file = File::open_options()
+            .create_new(true)
+            .open(&path)
+            .await
+            .with_context(|| format!("couldn't create file at {path}"))?;
         let metadata = file.metadata().await?;
         Ok(File { file: file.into(), metadata, path })
     }
@@ -59,7 +65,9 @@ impl fs::Directory for Directory {
         #[cfg(unix)]
         {
             let path = self.path.clone().join(symlink_name);
-            async_fs::unix::symlink(target_path, &path).await?;
+            async_fs::unix::symlink(target_path, &path).await.with_context(
+                || format!("couldn't create symlink at {path}"),
+            )?;
             let metadata = async_fs::metadata(&path).await?;
             Ok(Symlink { metadata, path })
         }
@@ -67,16 +75,24 @@ impl fs::Directory for Directory {
 
     #[inline]
     async fn clear(&self) -> Result<(), Self::ClearError> {
-        async_fs::remove_dir_all(self.path()).await?;
-        async_fs::create_dir(self.path()).await?;
-        Ok(())
+        async {
+            async_fs::remove_dir_all(self.path()).await?;
+            async_fs::create_dir(self.path()).await
+        }
+        .await
+        .with_context(|| {
+            format!("couldn't clear directory at {}", self.path())
+        })
     }
 
     #[inline]
     async fn delete(self) -> Result<(), Self::DeleteError> {
-        async_fs::remove_dir_all(self.path()).await
+        async_fs::remove_dir_all(self.path()).await.with_context(|| {
+            format!("couldn't delete directory at {}", self.path())
+        })
     }
 
+    #[allow(clippy::too_many_lines)]
     #[inline]
     async fn list_metas(
         &self,
@@ -84,7 +100,12 @@ impl fs::Directory for Directory {
         impl Stream<Item = Result<Metadata, Self::ReadMetadataError>> + use<>,
         Self::ListError,
     > {
-        let read_dir = async_fs::read_dir(self.path()).await?.fuse();
+        let read_dir = async_fs::read_dir(self.path())
+            .await
+            .with_context(|| {
+                format!("couldn't read directory at {}", self.path())
+            })?
+            .fuse();
         let get_metadata = stream::FuturesUnordered::new();
         Ok(Box::pin(stream::unfold(
             (read_dir, get_metadata, self.path().to_owned()),
@@ -103,8 +124,13 @@ impl fs::Directory for Directory {
                                     PathBuf::from(dir_path.as_str())
                                         .join(&node_name);
                                 let meta =
-                                    async_fs::symlink_metadata(entry_path)
-                                        .await?;
+                                    async_fs::symlink_metadata(&entry_path)
+                                        .await
+                                        .with_context(|| {
+                                            format!(
+                                                "couldn't get metadata for entry at {}", entry_path.display()
+                                            )
+                                        })?;
                                 Ok((meta, node_name))
                             });
                         },
@@ -151,13 +177,24 @@ impl fs::Directory for Directory {
 
     #[inline]
     async fn r#move(&self, new_path: &AbsPath) -> Result<(), Self::MoveError> {
-        crate::move_node(self.path(), new_path).await
+        crate::move_node(self.path(), new_path).await.with_context(|| {
+            format!(
+                "couldn't move directory at {} to {}",
+                self.path(),
+                new_path
+            )
+        })
     }
 
     #[inline]
     async fn parent(&self) -> Result<Option<Self>, Self::ParentError> {
         let Some(parent_path) = self.path().parent() else { return Ok(None) };
-        let metadata = async_fs::metadata(parent_path).await?;
+        let metadata =
+            async_fs::metadata(parent_path).await.with_context(|| {
+                format!(
+                    "couldn't get metadata for directory at {parent_path}",
+                )
+            })?;
         Ok(Some(Self { path: parent_path.to_owned(), metadata }))
     }
 
