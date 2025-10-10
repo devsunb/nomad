@@ -9,11 +9,12 @@ static AUTH_SERVER_JWT_SIGNING_PUBLIC_KEY: LazyLock<
     jsonwebtoken::DecodingKey,
 > = LazyLock::new(|| {
     #[cfg(not(feature = "tests"))]
-    let contents = include_bytes!("../auth_server_jwt_signing_public_key.pem");
+    let contents =
+        include_bytes!("../data/auth_server_jwt_signing_public_key.pem");
 
     #[cfg(feature = "tests")]
     let contents =
-        include_bytes!("../tests/auth_server_jwt_signing_public_key.pem");
+        include_bytes!("../data/tests/auth_server_jwt_signing_public_key.pem");
 
     jsonwebtoken::DecodingKey::from_ec_pem(contents)
         .expect("public key is valid")
@@ -86,10 +87,11 @@ impl JsonWebToken {
             username,
         };
 
-        let signing_key = jsonwebtoken::EncodingKey::from_ec_pem(
-            include_bytes!("../tests/auth_server_jwt_signing_private_key.pem"),
-        )
-        .expect("private key is valid");
+        let signing_key =
+            jsonwebtoken::EncodingKey::from_ec_pem(include_bytes!(
+                "../data/tests/auth_server_jwt_signing_private_key.pem"
+            ))
+            .expect("private key is valid");
 
         let contents = jsonwebtoken::encode(
             &jsonwebtoken::Header::new(Algorithm::ES256),

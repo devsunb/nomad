@@ -15,7 +15,7 @@ use collab_project::fs::{
 use collab_server::client as collab_client;
 use collab_types::{Message, Peer, ProjectRequest, puff};
 use editor::command::{self, ToCompletionFn};
-use editor::module::AsyncAction;
+use editor::module::{AsyncAction, Module};
 use editor::shared::{MultiThreaded, Shared};
 use editor::{Access, Context};
 use either::Either;
@@ -139,7 +139,11 @@ impl<Ed: CollabEditor> Join<Ed> {
             _remove_on_drop: self.sessions.insert(session_infos.clone()),
         };
 
-        ctx.spawn_local(async move |ctx| {
+        ctx.with_namespace([
+            ctx.namespace().plugin_name(),
+            <Collab<Ed> as Module<Ed>>::NAME,
+        ])
+        .spawn_local(async move |ctx| {
             if let Err(err) = session.run(ctx).await {
                 Ed::on_session_error(err, ctx);
             }

@@ -9,7 +9,7 @@ use collab_project::{Project, ProjectBuilder};
 use collab_server::client as collab_client;
 use collab_types::{PeerId, puff};
 use editor::command::ToCompletionFn;
-use editor::module::AsyncAction;
+use editor::module::{AsyncAction, Module};
 use editor::shared::{MultiThreaded, Shared};
 use editor::{Access, Buffer, Context, Cursor, Editor};
 use either::Either;
@@ -261,7 +261,11 @@ impl<Ed: CollabEditor> Start<Ed> {
 
         Ed::on_session_started(&session_infos, ctx).await;
 
-        ctx.spawn_local(async move |ctx| {
+        ctx.with_namespace([
+            ctx.namespace().plugin_name(),
+            <Collab<Ed> as Module<Ed>>::NAME,
+        ])
+        .spawn_local(async move |ctx| {
             if let Err(err) = session.run(ctx).await {
                 Ed::on_session_error(err, ctx);
             }

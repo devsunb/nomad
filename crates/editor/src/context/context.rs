@@ -17,7 +17,7 @@ use rand::rngs::StdRng;
 use crate::context::{self, EventHandle, ResumeUnwinding, State};
 use crate::editor::{AgentId, Editor};
 use crate::module::{Module, Plugin, PluginId};
-use crate::notify::Namespace;
+use crate::notify::{self, Namespace};
 use crate::{Access, AccessMut, Shared};
 
 /// TODO: docs.
@@ -422,6 +422,17 @@ impl<Ed: Editor> Context<Ed, NotBorrowed> {
             });
             fun(&mut ctx)
         })
+    }
+
+    /// TODO: docs.
+    #[track_caller]
+    #[inline]
+    pub fn with_namespace<I>(&mut self, namespace: I) -> &mut Self
+    where
+        I: IntoIterator<Item = notify::Name>,
+    {
+        self.borrow.namespace = FromIterator::from_iter(namespace);
+        self
     }
 
     /// TODO: docs.

@@ -35,6 +35,12 @@ impl Namespace {
 
     /// TODO: docs.
     #[inline]
+    pub fn plugin_name(&self) -> Name {
+        self.names[0]
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub(crate) fn new(plugin_name: Name) -> Self {
         Self { names: smallvec![plugin_name] }
     }
@@ -49,5 +55,19 @@ impl Namespace {
     #[inline]
     pub(crate) fn pop(&mut self) {
         self.names.pop();
+    }
+}
+
+impl FromIterator<Name> for Namespace {
+    #[track_caller]
+    fn from_iter<T: IntoIterator<Item = Name>>(iter: T) -> Self {
+        let names = iter.into_iter().collect::<SmallVec<_>>();
+        if names.is_empty() {
+            panic!(
+                "a Namespace must have at least one name representing the \
+                 plugin name"
+            );
+        }
+        Self { names }
     }
 }
