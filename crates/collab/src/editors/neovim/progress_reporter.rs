@@ -1,3 +1,4 @@
+use core::fmt;
 use core::time::Duration;
 
 use abs_path::NodeNameBuf;
@@ -48,12 +49,20 @@ impl ProgressReporter<Neovim> for NeovimProgressReporter {
             let mut prev_id = None;
 
             loop {
+                let prefix: &dyn fmt::Display = if !message.is_last {
+                    &format_args!("{} ", SPINNER_FRAMES[spinner_frame_idx])
+                } else if message.level == notify::Level::Error {
+                    &""
+                } else {
+                    &"✔ "
+                };
+
                 prev_id = ctx.with_editor(|nvim| {
                     Some(nvim.emitter().emit(notify::Notification {
                         level: message.level,
                         message: notify::Message::from_display(format_args!(
-                            "{} {}",
-                            SPINNER_FRAMES[spinner_frame_idx], message.text,
+                            "{prefix}{}",
+                            message.text,
                         )),
                         namespace: &namespace,
                         updates_prev: prev_id,
@@ -82,12 +91,12 @@ impl ProgressReporter<Neovim> for NeovimProgressReporter {
 
     fn report_join_progress(
         &mut self,
-        mut state: JoinState<'_>,
+        mut state: JoinState<'_, Neovim>,
         _: &mut Context<Neovim>,
     ) {
         let text = loop {
             match &state {
-                JoinState::ConnectingToServer { server_addr } => {
+                JoinState::ConnectingToServer(server_addr) => {
                     self.server_address = Some(server_addr.to_owned());
                     state = JoinState::JoiningSession;
                 },
@@ -100,26 +109,26 @@ impl ProgressReporter<Neovim> for NeovimProgressReporter {
                     break format!("Connecting to server at {server_addr}");
                 },
 
-                JoinState::ReceivingProject { project_name } => {
+                JoinState::ReceivingProject(project_name) => {
                     self.project_name = Some((**project_name).to_owned());
                     break format!("Receiving files for {project_name}");
                 },
 
-                JoinState::WritingProject { root_path } => {
+                JoinState::WritingProject(root_path) => {
                     let project_name = self.project_name.as_ref().expect(
                         "WritingProject must be preceded by ReceivingProject",
                     );
                     break format!("Writing {project_name} to {root_path}");
                 },
 
-                JoinState::Done => break "Joined session".to_owned(),
+                JoinState::Done(_) => break "Joined session".to_owned(),
             }
         };
 
         let message = Message {
             level: notify::Level::Info,
             text: text.to_owned(),
-            is_last: matches!(state, JoinState::Done),
+            is_last: matches!(state, JoinState::Done(_)),
         };
 
         if let Err(err) = self.message_tx.try_send(message) {
@@ -132,12 +141,12 @@ impl ProgressReporter<Neovim> for NeovimProgressReporter {
 
     fn report_start_progress(
         &mut self,
-        mut state: StartState<'_>,
+        mut state: StartState<'_, Neovim>,
         _: &mut Context<Neovim>,
     ) {
         let text = loop {
             match &state {
-                StartState::ConnectingToServer { server_addr } => {
+                StartState::ConnectingToServer(server_addr) => {
                     self.server_address = Some(server_addr.to_owned());
                     state = StartState::StartingSession;
                 },
@@ -148,17 +157,17 @@ impl ProgressReporter<Neovim> for NeovimProgressReporter {
                     );
                     break format!("Connecting to server at {server_addr}");
                 },
-                StartState::ReadingProject { root_path } => {
+                StartState::ReadingProject(root_path) => {
                     break format!("Reading project at {root_path}");
                 },
-                StartState::Done => break "Started session".to_owned(),
+                StartState::Done(_) => break "Started session".to_owned(),
             }
         };
 
         let message = Message {
             level: notify::Level::Info,
             text: text.to_owned(),
-            is_last: matches!(state, StartState::Done),
+            is_last: matches!(state, StartState::Done(_)),
         };
 
         if let Err(err) = self.message_tx.try_send(message) {

@@ -7,6 +7,7 @@ use crate::config::Config;
 use crate::editors::{CollabEditor, SessionId};
 use crate::join::{Join, JoinError};
 use crate::leave::{self, Leave, LeaveError};
+use crate::progress::ProgressReporter;
 use crate::session::{SessionInfos, Sessions};
 use crate::start::{Start, StartError};
 use crate::yank::{Yank, YankError};
@@ -26,7 +27,9 @@ impl<Ed: CollabEditor> Collab<Ed> {
         session_id: SessionId<Ed>,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, JoinError<Ed>> {
-        Join::from(self).call_inner(session_id, ctx).await
+        Join::from(self)
+            .call_inner(session_id, &mut Ed::ProgressReporter::new(ctx), ctx)
+            .await
     }
 
     /// Calls the [`Leave`] action.
@@ -42,7 +45,9 @@ impl<Ed: CollabEditor> Collab<Ed> {
         &self,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, StartError<Ed>> {
-        Start::from(self).call_inner(ctx).await
+        Start::from(self)
+            .call_inner(&mut Ed::ProgressReporter::new(ctx), ctx)
+            .await
     }
 
     /// Calls the [`Yank`] action.

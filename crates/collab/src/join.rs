@@ -49,6 +49,7 @@ impl<Ed: CollabEditor> Join<Ed> {
     pub(crate) async fn call_inner(
         &self,
         session_id: SessionId<Ed>,
+        progress_reporter: &mut Ed::ProgressReporter,
         ctx: &mut Context<Ed>,
     ) -> Result<SessionInfos<Ed>, JoinError<Ed>> {
         let jwt = self
@@ -58,12 +59,8 @@ impl<Ed: CollabEditor> Join<Ed> {
 
         let server_addr = self.config.with(|c| c.server_address.clone());
 
-        let mut progress_reporter = Ed::ProgressReporter::new(ctx);
-
         progress_reporter.report_join_progress(
-            JoinState::ConnectingToServer {
-                server_addr: server_addr.borrow(),
-            },
+            JoinState::ConnectingToServer(server_addr.borrow()),
             ctx,
         );
 
@@ -99,9 +96,7 @@ impl<Ed: CollabEditor> Join<Ed> {
         .join(&welcome.project_name);
 
         progress_reporter.report_join_progress(
-            JoinState::ReceivingProject {
-                project_name: Cow::Borrowed(&welcome.project_name),
-            },
+            JoinState::ReceivingProject(Cow::Borrowed(&welcome.project_name)),
             ctx,
         );
 
@@ -111,9 +106,7 @@ impl<Ed: CollabEditor> Join<Ed> {
                 .map_err(JoinError::RequestProject)?;
 
         progress_reporter.report_join_progress(
-            JoinState::WritingProject {
-                root_path: Cow::Borrowed(&project_root),
-            },
+            JoinState::WritingProject(Cow::Borrowed(&project_root)),
             ctx,
         );
 
@@ -122,7 +115,6 @@ impl<Ed: CollabEditor> Join<Ed> {
                 .await
                 .map_err(JoinError::WriteProject)?;
 
-        progress_reporter.report_join_progress(JoinState::Done, ctx);
 
         let project_filter = Ed::project_filter(&project_root, ctx)
             .map_err(JoinError::ProjectFilter)?;
@@ -193,8 +185,17 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
         command::Parse(session_id): Self::Args,
         ctx: &mut Context<Ed>,
     ) {
-        if let Err(err) = self.call_inner(session_id, ctx).await {
-            Ed::on_join_error(err, ctx)
+        let mut progress_reporter = Ed::ProgressReporter::new(ctx);
+
+        match self.call_inner(session_id, &mut progress_reporter, ctx).await {
+            Ok(_session_infos) => {
+                let state = JoinState::Done(Ok(()));
+                progress_reporter.report_join_progress(state, ctx);
+            },
+            Err(join_error) => {
+                let state = JoinState::Done(Err(join_error));
+                progress_reporter.report_join_progress(state, ctx);
+            },
         }
     }
 }
