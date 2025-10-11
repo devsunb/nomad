@@ -3096,7 +3096,7 @@ dependencies = [
 [[package]]
 name = "puff"
 version = "0.1.0"
-source = "git+ssh://git@github.com/nomad/puff.git#58780673d9f95abba8028b6f350e5285b5690496"
+source = "git+ssh://git@github.com/nomad/puff.git#a75f994b09b464dd4c811627fc2c9bb787d2c244"
 dependencies = [
  "abs-path",
  "fxhash",
@@ -3440,7 +3440,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3520,7 +3520,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

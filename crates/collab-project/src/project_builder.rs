@@ -6,6 +6,7 @@ use collab_types::puff;
 use puff::builder::CreateError;
 use puff::directory::LocalDirectoryId;
 use puff::file::LocalFileId;
+use puff::node::LocalNodeId;
 
 use crate::abs_path::AbsPath;
 use crate::fs::{FileContents, FsBuilder};
@@ -74,6 +75,19 @@ impl ProjectBuilder {
         &mut self,
         directory_path: impl AsRef<AbsPath>,
     ) -> Result<LocalDirectoryId, CreateError> {
-        self.inner.push_directory(directory_path, ())
+        match self.inner.push_directory(directory_path, ()) {
+            Ok(dir_id) => Ok(dir_id),
+            Err(CreateError::PushedRoot) => Err(CreateError::PushedRoot),
+            Err(CreateError::NameConflicts(node_id)) => {
+                match node_id {
+                    LocalNodeId::File(file_id) => {
+                        Err(CreateError::NameConflicts(file_id.into()))
+                    },
+                    // Directories don't have any associated metadata, so they
+                    // can be pushed multiple times without conflicts.
+                    LocalNodeId::Directory(dir_id) => Ok(dir_id),
+                }
+            },
+        }
     }
 }
