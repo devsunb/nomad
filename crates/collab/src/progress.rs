@@ -1,6 +1,8 @@
 //! Contains types and traits related to reporting the progress of long-running
 //! operations to the user.
 
+use std::borrow::Cow;
+
 use abs_path::{AbsPath, NodeName};
 use editor::Context;
 
@@ -54,14 +56,14 @@ pub enum JoinState<'a> {
     /// session.
     ReceivingProject {
         /// The name of the project.
-        project_name: &'a NodeName,
+        project_name: Cow<'a, NodeName>,
     },
 
     /// We've received the project, and are now writing it to disk.
     WritingProject {
         /// The path to the root directory under which the project is being
         /// written.
-        root_path: &'a AbsPath,
+        root_path: Cow<'a, AbsPath>,
     },
 
     /// The project has been written, and we're done.
@@ -89,11 +91,54 @@ pub enum StartState<'a> {
     /// and are now reading the project rooted at the given path.
     ReadingProject {
         /// The path to the root of the project being read.
-        root_path: &'a AbsPath,
+        root_path: Cow<'a, AbsPath>,
     },
 
     /// The project has been read, and we're done.
     Done,
+}
+
+impl JoinState<'_> {
+    /// Returns a `'static` version of this [`JoinState`].
+    pub fn to_owned(&self) -> JoinState<'static> {
+        match self {
+            Self::ConnectingToServer { server_addr } => {
+                JoinState::ConnectingToServer {
+                    server_addr: server_addr.to_owned(),
+                }
+            },
+            Self::JoiningSession => JoinState::JoiningSession,
+            Self::ReceivingProject { project_name } => {
+                JoinState::ReceivingProject {
+                    project_name: Cow::Owned(
+                        project_name.clone().into_owned(),
+                    ),
+                }
+            },
+            Self::WritingProject { root_path } => JoinState::WritingProject {
+                root_path: Cow::Owned(root_path.clone().into_owned()),
+            },
+            Self::Done => JoinState::Done,
+        }
+    }
+}
+
+impl StartState<'_> {
+    /// Returns a `'static` version of this [`StartState`].
+    pub fn to_owned(&self) -> StartState<'static> {
+        match self {
+            Self::ConnectingToServer { server_addr } => {
+                StartState::ConnectingToServer {
+                    server_addr: server_addr.to_owned(),
+                }
+            },
+            Self::StartingSession => StartState::StartingSession,
+            Self::ReadingProject { root_path } => StartState::ReadingProject {
+                root_path: Cow::Owned(root_path.clone().into_owned()),
+            },
+            Self::Done => StartState::Done,
+        }
+    }
 }
 
 impl<Ed: CollabEditor> ProgressReporter<Ed> for () {

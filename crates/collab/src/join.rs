@@ -2,6 +2,7 @@
 
 use core::ops::Deref;
 use core::ptr::NonNull;
+use std::borrow::Cow;
 use std::io;
 
 use abs_path::AbsPathBuf;
@@ -99,7 +100,7 @@ impl<Ed: CollabEditor> Join<Ed> {
 
         progress_reporter.report_join_progress(
             JoinState::ReceivingProject {
-                project_name: &welcome.project_name,
+                project_name: Cow::Borrowed(&welcome.project_name),
             },
             ctx,
         );
@@ -110,7 +111,9 @@ impl<Ed: CollabEditor> Join<Ed> {
                 .map_err(JoinError::RequestProject)?;
 
         progress_reporter.report_join_progress(
-            JoinState::WritingProject { root_path: &project_root },
+            JoinState::WritingProject {
+                root_path: Cow::Borrowed(&project_root),
+            },
             ctx,
         );
 

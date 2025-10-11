@@ -1,6 +1,7 @@
 //! TODO: docs.
 
 use core::convert::Infallible;
+use std::borrow::Cow;
 
 use abs_path::{AbsPath, AbsPathBuf};
 use auth::AuthState;
@@ -238,7 +239,9 @@ impl<Ed: CollabEditor> Start<Ed> {
         let local_peer = welcome.peer;
 
         progress_reporter.report_start_progress(
-            StartState::ReadingProject { root_path: &project_root },
+            StartState::ReadingProject {
+                root_path: Cow::Borrowed(&project_root),
+            },
             ctx,
         );
 
