@@ -19,7 +19,7 @@ use futures_rustls::{TlsConnector, rustls};
 use futures_util::future::Either;
 use mlua::{Function, Table};
 use neovim::buffer::{BufferExt, BufferId, HighlightRangeHandle, Point};
-use neovim::notify::ContextExt;
+use neovim::notify::NotifyContextExt;
 use neovim::{Neovim, mlua, oxi};
 use nomad_collab_params::ulid;
 
@@ -502,11 +502,11 @@ impl CollabEditor for Neovim {
     }
 
     fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>) {
-        ctx.notify_error(error);
+        ctx.notify_error(error.to_string());
     }
 
     fn on_session_error(error: SessionError<Self>, ctx: &mut Context<Self>) {
-        ctx.notify_error(error);
+        ctx.notify_error(error.to_string());
     }
 
     async fn on_session_started(
@@ -546,12 +546,12 @@ impl CollabEditor for Neovim {
                 Collab::<Self>::NAME,
                 yank::Yank::<Self>::NAME,
             )),
-            Err(err) => ctx.notify_error(err),
+            Err(err) => ctx.notify_error(err.to_string()),
         }
     }
 
     fn on_yank_error(error: yank::YankError<Self>, ctx: &mut Context<Self>) {
-        ctx.notify_error(error);
+        ctx.notify_error(error.to_string());
     }
 
     fn project_filter(

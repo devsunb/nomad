@@ -2,7 +2,7 @@ use auth_types::JsonWebToken;
 use editor::context::Borrowed;
 use editor::{Access, Context};
 use neovim::Neovim;
-use neovim::notify::ContextExt;
+use neovim::notify::{self, NotifyContextExt};
 
 use crate::{AuthEditor, config, github, login, logout};
 
@@ -23,10 +23,14 @@ impl AuthEditor for Neovim {
     ) -> Result<JsonWebToken, Self::LoginError> {
         let jwt = github::login(config, ctx).await?;
 
-        ctx.notify_info(format_args!(
-            "Successfully logged in as '{}'",
-            jwt.claims().username,
-        ));
+        let mut chunks = notify::Chunks::default();
+
+        chunks
+            .push("Successfully logged in as '")
+            .push_highlighted(jwt.claims().username.as_str(), "Identifier")
+            .push("'");
+
+        ctx.notify_info(chunks);
 
         Ok(jwt)
     }
@@ -40,5 +44,17 @@ impl AuthEditor for Neovim {
 
     fn on_logout_error(error: logout::LogoutError, ctx: &mut Context<Self>) {
         ctx.notify_error(error);
+    }
+}
+
+impl From<login::LoginError<Neovim>> for notify::Chunks {
+    fn from(error: login::LoginError<Neovim>) -> Self {
+        error.to_string().into()
+    }
+}
+
+impl From<logout::LogoutError> for notify::Chunks {
+    fn from(error: logout::LogoutError) -> Self {
+        error.to_string().into()
     }
 }

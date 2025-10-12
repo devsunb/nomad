@@ -1,14 +1,9 @@
 //! TODO: docs.
 
-use core::fmt;
-
-use editor::Editor;
-use editor::context::{BorrowState, Context};
-use editor::notify::{Emitter, Message, Notification, NotificationId};
-use nvim_oxi::api::types::LogLevel;
+use editor::notify::{Emitter, Notification, NotificationId};
 
 use crate::convert::Convert;
-use crate::{Neovim, oxi, utils};
+use crate::{oxi, utils};
 
 /// TODO: docs.
 pub trait VimNotifyProvider: 'static {
@@ -26,27 +21,6 @@ pub trait VimNotifyProvider: 'static {
         &mut self,
         notify_return: oxi::Object,
     ) -> NotificationId;
-}
-
-/// An extension trait for `Context<Neovim>` providing methods to emit
-/// notifications via the `vim.notify()` API.
-pub trait ContextExt {
-    /// Emits a notification with the given message and level.
-    fn notify(
-        &mut self,
-        notification_message: impl fmt::Display,
-        notification_level: LogLevel,
-    );
-
-    /// Emits a notification at the `ERROR` level with the given message.
-    fn notify_error(&mut self, notification_message: impl fmt::Display) {
-        self.notify(notification_message, LogLevel::Error);
-    }
-
-    /// Emits a notification at the `INFO` level with the given message.
-    fn notify_info(&mut self, notification_message: impl fmt::Display) {
-        self.notify(notification_message, LogLevel::Info);
-    }
 }
 
 /// TODO: docs.
@@ -88,26 +62,6 @@ impl Emitter for NeovimEmitter {
     #[inline]
     fn emit(&mut self, notification: Notification) -> NotificationId {
         self.inner.emit(notification)
-    }
-}
-
-impl<Bs: BorrowState> ContextExt for Context<Neovim, Bs> {
-    #[inline]
-    fn notify(
-        &mut self,
-        notification_message: impl fmt::Display,
-        notification_level: LogLevel,
-    ) {
-        let namespace = self.namespace().clone();
-
-        self.with_editor(|nvim| {
-            nvim.emitter().emit(Notification {
-                level: notification_level.convert(),
-                message: Message::from_display(notification_message),
-                namespace: &namespace,
-                updates_prev: None,
-            })
-        });
     }
 }
 

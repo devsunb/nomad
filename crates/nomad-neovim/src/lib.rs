@@ -8,7 +8,7 @@ use editor::context::Borrowed;
 use editor::module::{ApiCtx, Empty, Module, PanicInfo, Plugin};
 use either::Either;
 use neovim::Neovim;
-use neovim::notify::ContextExt;
+use neovim::notify::NotifyContextExt;
 use tracing::Subscriber;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::layer::{Layer, SubscriberExt};
@@ -49,7 +49,7 @@ impl Nomad {
             )),
             Err(err) => {
                 ctx.notify_error(format_args!(
-                    "couldn't create tracing file appender: {err}"
+                    "Couldn't create tracing file appender: {err}"
                 ));
                 None
             },

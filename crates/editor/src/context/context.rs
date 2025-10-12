@@ -179,6 +179,15 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
 
     /// TODO: docs.
     #[inline]
+    pub fn spawn_and_detach(
+        &mut self,
+        fun: impl AsyncFnOnce(&mut Context<Ed>) + 'static,
+    ) {
+        self.spawn_local_inner(async move |ctx| fun(ctx).await).detach();
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn spawn_background<Fut>(
         &mut self,
         fut: Fut,
@@ -447,15 +456,6 @@ impl<Ed: Editor> Context<Ed, NotBorrowed> {
 }
 
 impl<Ed: Editor> Context<Ed, Borrowed<'_>> {
-    /// TODO: docs.
-    #[inline]
-    pub fn spawn_and_detach(
-        &mut self,
-        fun: impl AsyncFnOnce(&mut Context<Ed>) + 'static,
-    ) {
-        self.spawn_local_inner(async move |ctx| fun(ctx).await).detach();
-    }
-
     #[inline]
     pub(crate) fn state_mut(&mut self) -> &mut State<Ed> {
         self.borrow.state
