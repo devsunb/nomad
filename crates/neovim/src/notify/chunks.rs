@@ -10,6 +10,12 @@ pub struct Chunks {
 }
 
 impl Chunks {
+    /// Concatenates the texts of all chunks into a single string.
+    #[inline]
+    pub fn concat_text(&self) -> String {
+        self.inner.iter().map(|chunk| chunk.text()).collect()
+    }
+
     /// Appends a chunk with no highlight group.
     #[inline]
     pub fn push(&mut self, chunk_text: impl Into<CompactString>) -> &mut Self {
