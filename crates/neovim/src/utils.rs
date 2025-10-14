@@ -8,7 +8,6 @@ use crate::oxi::{self, lua, mlua};
 
 /// Returns whether the given module is available, i.e. whether in can be
 /// `require(..)`d.
-#[inline]
 pub fn is_module_available(module_name: &str) -> bool {
     #[inline]
     fn inner(module_name: &str) -> mlua::Result<bool> {
@@ -22,7 +21,9 @@ pub fn is_module_available(module_name: &str) -> bool {
     inner(module_name).unwrap_or_default()
 }
 
-pub(crate) fn schedule<F>(f: F) -> impl Future<Output = ()> + 'static
+/// Schedules the given function to be executed in the next tick of the event
+/// loop, returning a future that resolves once the function has been called.
+pub fn schedule<F>(f: F) -> impl Future<Output = ()> + 'static
 where
     F: FnOnce() + 'static + Sized,
 {

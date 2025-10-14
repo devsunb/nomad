@@ -513,6 +513,14 @@ impl CollabEditor for Neovim {
         infos: &SessionInfos<Self>,
         ctx: &mut Context<Self>,
     ) {
+        // Skip one tick of the event loop. This seems to mitigate a rendering
+        // bug that can happen if some other text is already being shown in the
+        // message area. See [without] vs [with] for an example.
+        //
+        // [without]: https://github.com/user-attachments/assets/ccca9f36-21fd-46a1-851d-98b321880c54
+        // [with]: https://github.com/user-attachments/assets/031d24e9-e030-4611-872c-1b51d3076e23
+        neovim::utils::schedule(|| ()).await;
+
         let prompt = format!(
             "Started a new collaborative editing session at {} with ID \
              {}.\nYou can share this ID with other peers to let them join \
