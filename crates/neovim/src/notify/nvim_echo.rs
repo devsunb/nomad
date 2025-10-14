@@ -1,3 +1,4 @@
+use core::cell::Cell;
 use core::time::Duration;
 use core::{fmt, iter};
 use std::borrow::Cow;
@@ -20,6 +21,12 @@ type OptsOrMessageId = api::opts::EchoOpts;
 
 #[cfg(feature = "nightly")]
 type OptsOrMessageId = Option<api::types::EchoMessageId>;
+
+thread_local! {
+    /// The initial value of the `cmdheight` option before `NvimEcho` and
+    /// `NvimEchoProgressReporter` mess with it.
+    static INITIAL_CMDHEIGHT: Cell<Option<u16>> = const { Cell::new(None) };
+}
 
 /// TODO: docs.
 pub struct NvimEcho {}
@@ -72,7 +79,7 @@ impl NvimEcho {
             message_chunks,
         };
 
-        let initial_cmdheight = Self::get_cmdheight();
+        let initial_cmdheight = Self::get_initial_cmdheight();
 
         if chunks.num_lines() > initial_cmdheight {
             Self::set_cmdheight(chunks.num_lines());
@@ -88,7 +95,7 @@ impl NvimEcho {
             }))
             .await;
 
-            Self::set_cmdheight(initial_cmdheight);
+            Self::restore_cmdheight(initial_cmdheight);
         });
     }
 
@@ -96,7 +103,7 @@ impl NvimEcho {
     async fn clear_message_area(wait: Duration) {
         async_io::Timer::after(wait).await;
 
-        // Also wait to mess with the message area if the user is currently
+        // Wait to mess with the message area if the user is currently
         // interacting with it (e.g. they're being show the "Press ENTER"
         // prompt, the "-- more --" prompt, etc).
         while api::get_mode().mode.as_bytes().first() == Some(&b'r') {
@@ -113,6 +120,26 @@ impl NvimEcho {
             .expect("couldn't get 'cmdheight'")
     }
 
+    /// Returns the value of [`INITIAL_CMDHEIGHT`], setting it to the current
+    /// `cmdheight` if it's not already set.
+    fn get_initial_cmdheight() -> u16 {
+        INITIAL_CMDHEIGHT.with(|cell| match cell.get() {
+            Some(cmdheight) => cmdheight,
+            None => {
+                let cmdheight = Self::get_cmdheight();
+                cell.set(Some(cmdheight));
+                cmdheight
+            },
+        })
+    }
+
+    /// Restores the `cmdheight` option to the given value, also resetting
+    /// [`INITIAL_CMDHEIGHT`] to `None`.
+    fn restore_cmdheight(initial_cmdheight: u16) {
+        Self::set_cmdheight(initial_cmdheight);
+        INITIAL_CMDHEIGHT.with(|cell| cell.set(None));
+    }
+
     /// Sets the `cmdheight` option to the given value.
     fn set_cmdheight(cmdheight: u16) {
         api::set_option_value("cmdheight", cmdheight, &Default::default())
@@ -126,7 +153,7 @@ impl NvimEchoProgressReporter {
         let (notif_tx, notif_rx) = flume::bounded::<ProgressNotification>(4);
 
         ctx.spawn_and_detach(async move |ctx| {
-            let initial_cmdheight = NvimEcho::get_cmdheight();
+            let initial_cmdheight = NvimEcho::get_initial_cmdheight();
 
             let mut current_cmdheight = initial_cmdheight;
 
@@ -148,7 +175,7 @@ impl NvimEchoProgressReporter {
 
             // Reset the cmdheight to its initial value.
             if current_cmdheight != initial_cmdheight {
-                NvimEcho::set_cmdheight(initial_cmdheight);
+                NvimEcho::restore_cmdheight(initial_cmdheight);
             }
         });
 
