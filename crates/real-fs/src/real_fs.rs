@@ -51,11 +51,9 @@ impl fs::Fs for RealFs {
             return Ok(None);
         };
         Ok(Some(match file_type {
-            fs::NodeKind::File => fs::Node::File(File {
-                file: None,
-                metadata,
-                path: path.to_owned(),
-            }),
+            fs::NodeKind::File => {
+                fs::Node::File(File::new(metadata, path.to_owned()))
+            },
             fs::NodeKind::Directory => fs::Node::Directory(Directory {
                 metadata,
                 path: path.to_owned(),

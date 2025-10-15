@@ -1,9 +1,10 @@
-use std::io;
+use core::pin::Pin;
+use core::task::{Context, Poll};
 use std::path::PathBuf;
+use std::{ffi, io};
 
 use abs_path::{AbsPath, AbsPathBuf, NodeName};
-use futures_util::select_biased;
-use futures_util::stream::{self, Stream, StreamExt};
+use futures_util::stream::{self, FusedStream, Stream};
 
 use crate::{File, IoErrorExt, Metadata, RealFs, Symlink};
 
@@ -12,6 +13,63 @@ use crate::{File, IoErrorExt, Metadata, RealFs, Symlink};
 pub struct Directory {
     pub(crate) metadata: async_fs::Metadata,
     pub(crate) path: AbsPathBuf,
+}
+
+pin_project_lite::pin_project! {
+    /// TODO: docs.
+    pub struct ListMetas {
+        dir_path: AbsPathBuf,
+        #[pin]
+        get_metadata: stream::FuturesUnordered<GetMetadata>,
+        #[pin]
+        read_dir: async_fs::ReadDir,
+        read_dir_is_terminated: bool,
+    }
+}
+
+pin_project_lite::pin_project! {
+    struct GetMetadata {
+        #[pin]
+        symlink_metadata: Pin<Box<
+            dyn Future<Output = io::Result<(async_fs::Metadata, ffi::OsString)>> + Send
+        >>,
+    }
+}
+
+impl ListMetas {
+    #[allow(clippy::disallowed_methods)]
+    async fn new(dir_path: &AbsPath) -> io::Result<Self> {
+        let read_dir =
+            async_fs::read_dir(dir_path).await.with_context(|| {
+                format!("couldn't read directory at {dir_path}")
+            })?;
+
+        Ok(Self {
+            dir_path: dir_path.to_owned(),
+            get_metadata: stream::FuturesUnordered::new(),
+            read_dir,
+            read_dir_is_terminated: false,
+        })
+    }
+}
+
+impl GetMetadata {
+    fn new(dir_path: AbsPathBuf, dir_entry: async_fs::DirEntry) -> Self {
+        let node_name = dir_entry.file_name();
+        let entry_path = PathBuf::from(dir_path.as_str()).join(&node_name);
+        let symlink_metadata = Box::pin(async move {
+            let meta = async_fs::symlink_metadata(&entry_path)
+                .await
+                .with_context(|| {
+                    format!(
+                        "couldn't get metadata for entry at {}",
+                        entry_path.display()
+                    )
+                })?;
+            Ok((meta, node_name))
+        });
+        Self { symlink_metadata }
+    }
 }
 
 impl fs::Directory for Directory {
@@ -46,14 +104,7 @@ impl fs::Directory for Directory {
         &self,
         file_name: &NodeName,
     ) -> Result<File, Self::CreateFileError> {
-        let path = self.path.clone().join(file_name);
-        let file = File::open_options()
-            .create_new(true)
-            .open(&path)
-            .await
-            .with_context(|| format!("couldn't create file at {path}"))?;
-        let metadata = file.metadata().await?;
-        Ok(File { file: file.into(), metadata, path })
+        File::create(self.path.clone().join(file_name)).await
     }
 
     #[inline]
@@ -94,73 +145,8 @@ impl fs::Directory for Directory {
 
     #[allow(clippy::too_many_lines)]
     #[inline]
-    async fn list_metas(
-        &self,
-    ) -> Result<
-        impl Stream<Item = Result<Metadata, Self::ReadMetadataError>> + use<>,
-        Self::ListError,
-    > {
-        let read_dir = async_fs::read_dir(self.path())
-            .await
-            .with_context(|| {
-                format!("couldn't read directory at {}", self.path())
-            })?
-            .fuse();
-        let get_metadata = stream::FuturesUnordered::new();
-        Ok(Box::pin(stream::unfold(
-            (read_dir, get_metadata, self.path().to_owned()),
-            move |(mut read_dir, mut get_metadata, dir_path)| async move {
-                let metadata_res = loop {
-                    select_biased! {
-                        res = read_dir.select_next_some() => {
-                            let dir_entry = match res {
-                                Ok(entry) => entry,
-                                Err(err) => break Err(err),
-                            };
-                            let dir_path = dir_path.clone();
-                            get_metadata.push(async move {
-                                let node_name = dir_entry.file_name();
-                                let entry_path =
-                                    PathBuf::from(dir_path.as_str())
-                                        .join(&node_name);
-                                let meta =
-                                    async_fs::symlink_metadata(&entry_path)
-                                        .await
-                                        .with_context(|| {
-                                            format!(
-                                                "couldn't get metadata for entry at {}", entry_path.display()
-                                            )
-                                        })?;
-                                Ok((meta, node_name))
-                            });
-                        },
-                        res = get_metadata.select_next_some() => {
-                            let (metadata, node_name) = match res {
-                                Ok(tuple) => tuple,
-                                Err(err) => break Err(err),
-                            };
-                            let file_type = metadata.file_type();
-                            let node_kind = if file_type.is_dir() {
-                                fs::NodeKind::Directory
-                            } else if file_type.is_file() {
-                                fs::NodeKind::File
-                            } else if file_type.is_symlink() {
-                                fs::NodeKind::Symlink
-                            } else {
-                                continue
-                            };
-                            break Ok(Metadata {
-                                inner: metadata,
-                                node_kind,
-                                node_name,
-                            })
-                        },
-                        complete => return None,
-                    }
-                };
-                Some((metadata_res, (read_dir, get_metadata, dir_path)))
-            },
-        )))
+    async fn list_metas(&self) -> Result<ListMetas, Self::ListError> {
+        ListMetas::new(self.path()).await
     }
 
     #[inline]
@@ -212,5 +198,97 @@ impl fs::Directory for Directory {
 impl AsRef<RealFs> for Directory {
     fn as_ref(&self) -> &RealFs {
         &RealFs {}
+    }
+}
+
+impl Stream for ListMetas {
+    type Item = io::Result<Metadata>;
+
+    #[inline]
+    fn poll_next(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        loop {
+            let mut read_dir_yielded_entry = false;
+
+            if !*this.read_dir_is_terminated {
+                match this.read_dir.as_mut().poll_next(ctx) {
+                    Poll::Ready(Some(Ok(dir_entry))) => {
+                        read_dir_yielded_entry = true;
+                        this.get_metadata.push(GetMetadata::new(
+                            this.dir_path.clone(),
+                            dir_entry,
+                        ));
+                    },
+                    Poll::Ready(Some(Err(error))) => {
+                        return Poll::Ready(Some(Err(error)));
+                    },
+                    Poll::Ready(None) => {
+                        *this.read_dir_is_terminated = true;
+                    },
+                    Poll::Pending => {},
+                }
+            }
+
+            match this.get_metadata.as_mut().poll_next(ctx) {
+                Poll::Ready(Some(Ok((metadata, node_name)))) => {
+                    let file_type = metadata.file_type();
+                    let node_kind = if file_type.is_dir() {
+                        fs::NodeKind::Directory
+                    } else if file_type.is_file() {
+                        fs::NodeKind::File
+                    } else if file_type.is_symlink() {
+                        fs::NodeKind::Symlink
+                    } else {
+                        continue;
+                    };
+                    return Poll::Ready(Some(Ok(Metadata {
+                        inner: metadata,
+                        node_kind,
+                        node_name,
+                    })));
+                },
+                Poll::Ready(Some(Err(error))) => {
+                    return Poll::Ready(Some(Err(error)));
+                },
+                Poll::Ready(None) => {
+                    debug_assert!(this.get_metadata.is_empty());
+                    return if *this.read_dir_is_terminated {
+                        Poll::Ready(None)
+                    } else {
+                        Poll::Pending
+                    };
+                },
+                Poll::Pending => {
+                    if read_dir_yielded_entry {
+                        continue;
+                    } else {
+                        return Poll::Pending;
+                    }
+                },
+            }
+        }
+    }
+}
+
+impl FusedStream for ListMetas {
+    #[inline]
+    fn is_terminated(&self) -> bool {
+        self.read_dir_is_terminated && self.get_metadata.is_terminated()
+    }
+}
+
+impl Future for GetMetadata {
+    type Output = io::Result<(async_fs::Metadata, ffi::OsString)>;
+
+    #[inline]
+    fn poll(
+        self: Pin<&mut Self>,
+        ctx: &mut Context<'_>,
+    ) -> Poll<Self::Output> {
+        self.project().symlink_metadata.poll(ctx)
     }
 }

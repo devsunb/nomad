@@ -23,3 +23,13 @@ allowed-duplicate-crates = [
 allowed-wildcard-imports = ["super"]
 too-many-arguments-threshold = 4
 too-many-lines-threshold = 60
+
+# These are only intended for the real-fs package, but clippy doesn't support
+# per-package configs yet (see
+# https://github.com/rust-lang/rust-clippy/issues/7353 for more infos).
+disallowed-methods = [
+  { path = "async_fs::File::create", replacement = "crate::File::create" },
+  { path = "async_fs::File::open", replacement = "crate::File::new" },
+  { path = "async_fs::OpenOptions::open", replacement = "crate::File::new" },
+  { path = "async_fs::read_dir", replacement = "crate::Directory::list_metas" },
+]

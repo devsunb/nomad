@@ -1,3 +1,4 @@
+use core::ops::{Deref, DerefMut};
 use std::io;
 
 use abs_path::{AbsPath, AbsPathBuf};
@@ -7,33 +8,69 @@ use crate::{Directory, IoErrorExt, Metadata, RealFs};
 
 /// TODO: docs.
 pub struct File {
-    pub(crate) file: Option<async_fs::File>,
-    pub(crate) metadata: async_fs::Metadata,
-    pub(crate) path: AbsPathBuf,
+    inner: Option<FileInner>,
+    metadata: async_fs::Metadata,
+    path: AbsPathBuf,
+}
+
+struct FileInner {
+    inner: async_fs::File,
 }
 
 impl File {
     #[inline]
-    pub(crate) fn open_options() -> async_fs::OpenOptions {
-        let mut opts = async_fs::OpenOptions::new();
-        opts.read(true).write(true);
-        opts
+    pub(crate) async fn create(path: AbsPathBuf) -> io::Result<Self> {
+        let inner = FileInner::create(&path).await?;
+        let metadata = inner.metadata().await?;
+        Ok(Self { inner: Some(inner), metadata, path })
     }
 
     #[inline]
-    async fn with_file_async<R>(
+    pub(crate) fn new(metadata: async_fs::Metadata, path: AbsPathBuf) -> Self {
+        Self { inner: None, metadata, path }
+    }
+
+    #[inline]
+    async fn with_inner<R>(
         &mut self,
-        fun: impl AsyncFnOnce(&mut async_fs::File) -> R,
-    ) -> Result<R, io::Error> {
+        fun: impl AsyncFnOnce(&mut FileInner) -> R,
+    ) -> io::Result<R> {
         loop {
-            match &mut self.file {
-                Some(file) => break Ok(fun(file).await),
+            match &mut self.inner {
+                Some(inner) => break Ok(fun(inner).await),
                 None => {
-                    self.file =
-                        Some(Self::open_options().open(&self.path).await?);
+                    self.inner = Some(FileInner::open(&self.path).await?);
                 },
             }
         }
+    }
+}
+
+impl FileInner {
+    async fn create(path: &AbsPath) -> io::Result<Self> {
+        Self::new(path, true).await
+    }
+
+    #[allow(clippy::disallowed_methods)]
+    async fn new(path: &AbsPath, create_new: bool) -> io::Result<Self> {
+        let inner = async_fs::OpenOptions::new()
+            .create_new(create_new)
+            .read(true)
+            .write(true)
+            .open(path)
+            .await
+            .with_context(|| {
+                format!(
+                    "couldn't {verb} file at {path}",
+                    verb = if create_new { "create" } else { "open" }
+                )
+            })?;
+
+        Ok(Self { inner })
+    }
+
+    async fn open(path: &AbsPath) -> io::Result<Self> {
+        Self::new(path, false).await
     }
 }
 
@@ -110,7 +147,7 @@ impl fs::File for File {
         Chunks::IntoIter: Send,
         Chunk: AsRef<[u8]> + Send,
     {
-        self.with_file_async(async move |file| {
+        self.with_inner(async move |file| {
             for chunk in chunks {
                 file.write_all(chunk.as_ref()).await?;
             }
@@ -121,5 +158,19 @@ impl fs::File for File {
         .with_context(|| {
             format!("couldn't write to file at {}", self.path())
         })?
+    }
+}
+
+impl Deref for FileInner {
+    type Target = async_fs::File;
+
+    fn deref(&self) -> &async_fs::File {
+        &self.inner
+    }
+}
+
+impl DerefMut for FileInner {
+    fn deref_mut(&mut self) -> &mut async_fs::File {
+        &mut self.inner
     }
 }
