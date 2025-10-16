@@ -197,7 +197,7 @@ impl CollabEditor for Neovim {
     ) -> Self::PeerSelection {
         ctx.with_borrowed(|ctx| {
             let buffer = ctx.buffer(buffer_id).expect("invalid buffer ID");
-            let _hl_group = PeerSelectionHighlightGroup::new(remote_peer.id);
+            let _hl_group = PeerSelectionHighlightGroup::group_id(remote_peer.id);
             let hl_handle = buffer.highlight_range(selected_range, "Visual");
             NeovimPeerSelection { selection_highlight_handle: hl_handle }
         })

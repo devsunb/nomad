@@ -16,12 +16,12 @@ pub struct NeovimPeerCursor {
     /// The ID of the extmark used to display the cursor.
     extmark_id: u32,
 
+    /// The ID of the highlight group used to highlight the cursor.
+    hl_group_id: u32,
+
     /// The ID of the namespace the [`extmark_id`](Self::extmark_id) belongs
     /// to.
     namespace_id: u32,
-
-    /// The remote peer's ID.
-    peer_id: PeerId,
 }
 
 /// The highlight group used to highlight a remote peer's cursor.
@@ -44,13 +44,15 @@ impl NeovimPeerCursor {
     ) -> Self {
         let highlight_range = Self::highlight_range(&buffer, cursor_offset);
 
+        let hl_group_id = PeerCursorHighlightGroup::group_id(peer_id);
+
         let opts = api::opts::SetExtmarkOpts::builder()
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
-            .hl_group(PeerCursorHighlightGroup::new(peer_id))
+            .hl_group(i64::from(hl_group_id))
             .build();
 
-        let cursor_extmark_id = buffer
+        let extmark_id = buffer
             .set_extmark(
                 namespace_id,
                 highlight_range.start.newline_offset,
@@ -59,7 +61,7 @@ impl NeovimPeerCursor {
             )
             .expect("couldn't set extmark");
 
-        Self { buffer, extmark_id: cursor_extmark_id, peer_id, namespace_id }
+        Self { buffer, extmark_id, hl_group_id, namespace_id }
     }
 
     /// Moves the cursor to the given offset.
@@ -71,7 +73,7 @@ impl NeovimPeerCursor {
             .id(self.extmark_id)
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
-            .hl_group(PeerCursorHighlightGroup::new(self.peer_id))
+            .hl_group(i64::from(self.hl_group_id))
             .build();
 
         let new_extmark_id = self

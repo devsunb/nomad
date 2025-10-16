@@ -1,7 +1,7 @@
 use core::cell::Cell;
 use core::ops::Range;
 
-use collab_types::{Peer, PeerHandle, PeerId};
+use collab_types::{Peer, PeerHandle};
 use editor::ByteOffset;
 use neovim::buffer::{BufferExt, Point};
 use neovim::oxi::api;
@@ -17,15 +17,15 @@ pub struct NeovimPeerHandle {
     /// The ID of the extmark used to display the handle.
     extmark_id: u32,
 
+    /// The ID of the highlight group used to highlight the handle.
+    hl_group_id: u32,
+
     /// The ID of the namespace the [`extmark_id`](Self::extmark_id) belongs
     /// to.
     namespace_id: u32,
 
     /// The remote peer's handle.
     peer_handle: PeerHandle,
-
-    /// The remote peer's ID.
-    peer_id: PeerId,
 }
 
 /// The highlight group used to highlight a remote peer's handle.

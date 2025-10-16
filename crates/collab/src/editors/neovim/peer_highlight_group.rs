@@ -5,6 +5,8 @@ use collab_types::PeerId;
 use compact_str::format_compact;
 use neovim::oxi::api;
 
+pub(super) type HlGroupId = u32;
+
 /// A trait implemented by types that represent highlight groups used to
 /// highlight a piece of UI (like a cursor or selection) that belongs to a
 /// remote peer.
@@ -18,7 +20,7 @@ pub(super) trait PeerHighlightGroup {
 
     /// Calls the given function with the (possibly uninitialized) highlight
     /// group IDs used by this type.
-    fn with_group_ids<R>(fun: impl FnOnce(&[Cell<u32>]) -> R) -> R;
+    fn with_group_ids<R>(fun: impl FnOnce(&[Cell<HlGroupId>]) -> R) -> R;
 
     #[track_caller]
     fn create_all() {
@@ -38,7 +40,7 @@ pub(super) trait PeerHighlightGroup {
     /// Returns the highlight group ID to use to highlight UI belonging to
     /// the peer with the given ID.
     #[track_caller]
-    fn new(peer_id: PeerId) -> impl api::SetExtmarkHlGroup {
+    fn group_id(peer_id: PeerId) -> HlGroupId {
         Self::with_group_ids(|group_ids| {
             let group_idx = peer_id.into_u64().saturating_sub(1) as usize
                 % group_ids.len();
@@ -51,7 +53,7 @@ pub(super) trait PeerHighlightGroup {
                 any::type_name::<Self>()
             );
 
-            i64::from(group_id)
+            group_id
         })
     }
 
