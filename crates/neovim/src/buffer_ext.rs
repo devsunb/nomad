@@ -198,10 +198,8 @@ pub trait BufferExt {
     #[inline]
     fn num_bytes(&self) -> ByteOffset {
         let buffer = self.buffer();
-        let byte_len = buffer
-            .line_count()
-            .and_then(|line_count| buffer.get_offset(line_count))
-            .expect("buffer is valid");
+        let line_count = buffer.num_rows();
+        let byte_len = buffer.get_offset(line_count).expect("buffer is valid");
         // Workaround for https://github.com/neovim/neovim/issues/34272.
         if byte_len == 1 && self.num_bytes_in_line_after(0) == 0 {
             0
@@ -247,8 +245,7 @@ pub trait BufferExt {
     /// Returns the number of newline characters in the buffer.
     #[inline]
     fn num_newlines(&self) -> usize {
-        let num_rows = self.buffer().line_count().expect("buffer is valid");
-        num_rows - !self.has_uneditable_eol() as usize
+        self.num_rows() - !self.has_uneditable_eol() as usize
     }
 
     /// Returns the number of newline characters to the left of the given byte
@@ -286,6 +283,14 @@ pub trait BufferExt {
                 line_idx + is_offset_after_newline as usize
             })
             .expect("could not call function in buffer")
+    }
+
+    /// Returns the number of rows in the buffer.
+    ///
+    /// This is what Neovim calls "line count".
+    #[inline]
+    fn num_rows(&self) -> usize {
+        self.buffer().line_count().expect("buffer is valid")
     }
 
     /// Converts the given [`ByteOffset`] into the corresponding [`Point`] in
