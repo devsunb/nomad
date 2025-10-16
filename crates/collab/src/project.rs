@@ -7,7 +7,7 @@ use abs_path::{AbsPath, AbsPathBuf};
 use collab_project::fs::{File, FileMut, FsOp, Node, NodeMut};
 use collab_project::text::{CursorId, SelectionId, TextReplacement};
 use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
-use editor::{Access, AgentId, Buffer, Context, Editor};
+use editor::{Access, AgentId, Buffer, Context, Editor, Replacement};
 use fs::{File as _, Fs as _, Symlink as _};
 use futures_util::FutureExt;
 use fxhash::FxHashMap;
@@ -631,35 +631,8 @@ impl<Ed: CollabEditor> Project<Ed> {
             unreachable!("we know this ID maps to a text file");
         };
 
-        // Update the positions of all the remote peers' tooltips in the
-        // buffer.
-        for cursor in
-            file.cursors().filter(|cur| cur.owner() != self.local_peer.id)
-        {
-            let tooltip = self
-                .peer_tooltips
-                .get_mut(&cursor.id())
-                .expect("there must be a tooltip for each remote cursor");
-
-            Ed::move_peer_tooltip(tooltip, cursor.offset(), ctx);
-        }
-
-        // Update the positions of all the remote peers' selections in the
-        // buffer.
-        for selection in
-            file.selections().filter(|cur| cur.owner() != self.local_peer.id)
-        {
-            let editor_selection = self
-                .peer_selections
-                .get_mut(&selection.id())
-                .expect("there must be a selection for each remote selection");
-
-            Ed::move_peer_selection(
-                editor_selection,
-                selection.offset_range(),
-                ctx,
-            );
-        }
+        Self::update_cursors(&file, &mut self.peer_tooltips, ctx);
+        Self::update_selections(&file, &mut self.peer_selections, ctx);
 
         Ok(Some(buffer_id))
     }
@@ -748,11 +721,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                 None
             },
             event::BufferEvent::Edited(buffer_id, replacements) => {
-                let text_edit = self
-                    .text_file_of_buffer(&buffer_id)
-                    .edit(replacements.into_iter().map(Convert::convert));
-
-                Some(Message::EditedText(text_edit))
+                self.synchronize_buffer_edited(buffer_id, replacements, ctx)
             },
             event::BufferEvent::Removed(buffer_id) => {
                 let ids = &mut self.id_maps;
@@ -818,6 +787,29 @@ impl<Ed: CollabEditor> Project<Ed> {
             );
             self.peer_selections.insert(selection.id(), peer_selection);
         }
+    }
+
+    fn synchronize_buffer_edited(
+        &mut self,
+        buffer_id: Ed::BufferId,
+        replacements: impl IntoIterator<Item = Replacement>,
+        ctx: &mut Context<Ed>,
+    ) -> Option<Message> {
+        let mut file_mut = self.text_file_of_buffer(&buffer_id);
+
+        let text_edit =
+            file_mut.edit(replacements.into_iter().map(Convert::convert));
+
+        let file_id = file_mut.local_id();
+
+        let Some(File::Text(file)) = self.inner.file(file_id) else {
+            unreachable!("we know this ID maps to a text file");
+        };
+
+        Self::update_cursors(&file, &mut self.peer_tooltips, ctx);
+        Self::update_selections(&file, &mut self.peer_selections, ctx);
+
+        Some(Message::EditedText(text_edit))
     }
 
     fn synchronize_cursor(
@@ -1167,6 +1159,47 @@ impl<Ed: CollabEditor> Project<Ed> {
             FileMut::Symlink(_) => {
                 panic!("buffer ID {buffer_id:?} maps to a symlink file")
             },
+        }
+    }
+
+    /// Updates the positions of all the remote peers' cursors in the given
+    /// file.
+    fn update_cursors(
+        file: &collab_project::text::TextFile,
+        peer_cursors: &mut FxHashMap<CursorId, Ed::PeerTooltip>,
+        ctx: &mut Context<Ed>,
+    ) {
+        for cursor in file.cursors() {
+            let Some(editor_cursor) = peer_cursors.get_mut(&cursor.id())
+            else {
+                // This cursor must be owned by the local peer.
+                continue;
+            };
+
+            Ed::move_peer_tooltip(editor_cursor, cursor.offset(), ctx);
+        }
+    }
+
+    /// Updates the positions of all the remote peers' selections in the given
+    /// file.
+    fn update_selections(
+        file: &collab_project::text::TextFile,
+        peer_selections: &mut FxHashMap<SelectionId, Ed::PeerSelection>,
+        ctx: &mut Context<Ed>,
+    ) {
+        for selection in file.selections() {
+            let Some(editor_selection) =
+                peer_selections.get_mut(&selection.id())
+            else {
+                // This selection must be owned by the local peer.
+                continue;
+            };
+
+            Ed::move_peer_selection(
+                editor_selection,
+                selection.offset_range(),
+                ctx,
+            );
         }
     }
 }
