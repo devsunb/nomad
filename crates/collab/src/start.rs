@@ -26,6 +26,7 @@ use crate::config::Config;
 use crate::editors::CollabEditor;
 use crate::event_stream::{EventStream, EventStreamBuilder};
 use crate::leave::StopChannels;
+use crate::pausable_stream::PausableStream;
 use crate::progress::{ProgressReporter, StartState};
 use crate::project::{self, IdMaps};
 use crate::root_markers;
@@ -258,17 +259,20 @@ impl<Ed: CollabEditor> Start<Ed> {
             root_path: project_root.clone(),
         };
 
+        let message_rx = PausableStream::new(welcome.rx);
+
         let session_infos = SessionInfos {
             host_id: welcome.host_id,
             local_peer,
             remote_peers,
+            rx_remote: message_rx.remote(),
             project_root_path: project_root,
             session_id: welcome.session_id,
         };
 
         let session = Session {
             event_stream,
-            message_rx: welcome.rx,
+            message_rx,
             message_tx: welcome.tx,
             project,
             stop_rx: self.stop_channels.insert(welcome.session_id),

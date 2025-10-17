@@ -1,4 +1,5 @@
 use core::cell::Cell;
+use core::fmt;
 use core::pin::Pin;
 use core::task::{Context, Poll, Waker, ready};
 use std::collections::VecDeque;
@@ -114,5 +115,13 @@ impl<S: FusedStream> Stream for PausableStream<S> {
 impl<S: FusedStream> FusedStream for PausableStream<S> {
     fn is_terminated(&self) -> bool {
         self.inner.is_terminated() && self.buffer.is_empty()
+    }
+}
+
+impl fmt::Debug for Remote {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Remote")
+            .field("is_paused", &self.is_paused())
+            .finish_non_exhaustive()
     }
 }

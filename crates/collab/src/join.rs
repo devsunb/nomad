@@ -31,6 +31,7 @@ use crate::config::Config;
 use crate::editors::{CollabEditor, SessionId, Welcome};
 use crate::event_stream::EventStreamBuilder;
 use crate::leave::StopChannels;
+use crate::pausable_stream::PausableStream;
 use crate::progress::{JoinState, ProgressReporter};
 use crate::project::{self, IdMaps};
 use crate::session::{RemotePeers, Session, SessionInfos, Sessions};
@@ -136,17 +137,22 @@ impl<Ed: CollabEditor> Join<Ed> {
             root_path: project_root.path().to_owned(),
         };
 
+        let message_rx = PausableStream::new(
+            stream::iter(buffered).map(Ok).chain(welcome.rx),
+        );
+
         let session_infos = SessionInfos {
             host_id: welcome.host_id,
             local_peer,
             remote_peers,
+            rx_remote: message_rx.remote(),
             project_root_path: project_root.path().to_owned(),
             session_id: welcome.session_id,
         };
 
         let session = Session {
             event_stream,
-            message_rx: stream::iter(buffered).map(Ok).chain(welcome.rx),
+            message_rx,
             message_tx: welcome.tx,
             project,
             stop_rx: self.stop_channels.insert(welcome.session_id),

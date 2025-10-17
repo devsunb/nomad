@@ -5,7 +5,7 @@ use std::io;
 
 use abs_path::{AbsPathBuf, NodeName};
 use collab_server::client as collab_client;
-use collab_types::{Peer, PeerId};
+use collab_types::{Message, Peer, PeerId};
 use editor::{Access, Context, Shared};
 use futures_util::sink::{Sink, SinkExt};
 use futures_util::stream::{FusedStream, StreamExt};
@@ -17,7 +17,7 @@ use crate::editors::ActionForSelectedSession;
 use crate::event_stream::{EventError, EventStream};
 use crate::leave::StopRequest;
 use crate::project::{IntegrateError, Project, SynchronizeError};
-use crate::{CollabEditor, SessionId};
+use crate::{CollabEditor, SessionId, pausable_stream};
 
 /// TODO: docs.
 #[derive(cauchy::Debug, cauchy::Default, cauchy::Clone)]
@@ -37,6 +37,9 @@ pub struct SessionInfos<Ed: CollabEditor> {
 
     /// TODO: docs..
     pub(crate) remote_peers: RemotePeers,
+
+    /// The remote used to pause/resume receiving [`Message`]s.
+    pub(crate) rx_remote: pausable_stream::Remote,
 
     /// The path to the root of the project.
     pub(crate) project_root_path: AbsPathBuf,
@@ -232,10 +235,9 @@ impl RemotePeers {
 impl<Ed, Tx, Rx> Session<Ed, Tx, Rx>
 where
     Ed: CollabEditor,
-    Tx: Sink<collab_types::Message, Error = io::Error> + Unpin,
-    Rx: FusedStream<
-            Item = Result<collab_types::Message, collab_client::ReceiveError>,
-        > + Unpin,
+    Tx: Sink<Message, Error = io::Error> + Unpin,
+    Rx: FusedStream<Item = Result<Message, collab_client::ReceiveError>>
+        + Unpin,
 {
     pub(crate) async fn run(mut self, ctx: &mut Context<Ed>) {
         match self.run_event_loop(ctx).await {
