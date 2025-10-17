@@ -21,11 +21,15 @@ impl Chunks {
     /// Appends a chunk with no highlight group.
     #[inline]
     pub fn push(&mut self, chunk_text: impl Into<CompactString>) -> &mut Self {
-        let chunk_text = chunk_text.into();
-        if chunk_text.is_empty() {
-            return self;
+        self.push_chunk(Chunk::new(chunk_text))
+    }
+
+    /// Appends the given chunk.
+    #[inline]
+    pub fn push_chunk(&mut self, chunk: Chunk) -> &mut Self {
+        if !chunk.text().is_empty() {
+            self.inner.push(chunk);
         }
-        self.inner.push(Chunk::new(chunk_text));
         self
     }
 
@@ -36,12 +40,7 @@ impl Chunks {
         text: impl Into<CompactString>,
         hl_group: impl Into<CompactString>,
     ) -> &mut Self {
-        let text = text.into();
-        if text.is_empty() {
-            return self;
-        }
-        self.inner.push(Chunk::new_highlighted(text, hl_group));
-        self
+        self.push_chunk(Chunk::new_highlighted(text, hl_group))
     }
 
     /// Appends a newline character to the previous chunk (creating a new one

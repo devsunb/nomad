@@ -512,7 +512,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     }
 
     fn integrate_peer_joined(&self, peer: Peer, ctx: &mut Context<Ed>) {
-        Ed::on_peer_joined(&peer, &self, ctx);
+        Ed::on_peer_joined(&peer, self, ctx);
 
         self.remote_peers.insert(peer);
     }
@@ -536,7 +536,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             }
         }
 
-        Ed::on_peer_left(&peer, &self, ctx);
+        Ed::on_peer_left(&peer, self, ctx);
     }
 
     fn integrate_selection_creation(

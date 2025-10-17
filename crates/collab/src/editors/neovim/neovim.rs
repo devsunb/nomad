@@ -1,4 +1,3 @@
-use core::fmt;
 use core::ops::Range;
 use std::ffi::OsString;
 use std::path::PathBuf;
@@ -95,13 +94,6 @@ pub struct NeovimLspRootError {
     root_dir: String,
 }
 
-/// An [`AbsPath`] wrapper whose `Display` impl replaces the path's home
-/// directory with `~`.
-struct TildePath<'a> {
-    path: &'a AbsPath,
-    home_dir: Option<&'a AbsPath>,
-}
-
 impl CollabEditor for Neovim {
     type Io = Either<TlsStream<TcpStream>, TcpStream>;
     type PeerSelection = NeovimPeerSelection;
@@ -122,11 +114,8 @@ impl CollabEditor for Neovim {
         ctx: &mut Context<Self>,
     ) -> bool {
         let prompt = format!(
-            "Start collaborating on the project at \"{}\"?",
-            TildePath {
-                path: project_root,
-                home_dir: Self::home_dir(ctx).await.ok().as_deref(),
-            }
+            "Start collaborating on the project at {}?",
+            notifications::path_chunk(project_root, ctx).text(),
         );
 
         let options = ["Yes", "No"];
@@ -327,10 +316,11 @@ impl CollabEditor for Neovim {
         handle.r#move(new_offset);
     }
 
-    fn on_init(_: &mut Context<Self, Borrowed>) {
+    fn on_init(ctx: &mut Context<Self, Borrowed>) {
         PeerCursorHighlightGroup::create_all();
         PeerHandleHighlightGroup::create_all();
         PeerSelectionHighlightGroup::create_all();
+        notifications::on_init(ctx);
     }
 
     fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>) {
@@ -424,10 +414,7 @@ impl CollabEditor for Neovim {
             "Started a new collaborative editing session at {} with ID \
              {}.\nYou can share this ID with other peers to let them join \
              the session. Would you like to copy it to the clipboard?",
-            TildePath {
-                path: &infos.project_root_path,
-                home_dir: Self::home_dir(ctx).await.ok().as_deref(),
-            },
+            notifications::path_chunk(&infos.project_root_path, ctx).text(),
             infos.session_id,
         );
 
@@ -522,13 +509,11 @@ impl CollabEditor for Neovim {
     ) -> Option<&'pairs (AbsPathBuf, SessionId)> {
         let select = get_lua_value::<Function>(&["vim", "ui", "select"])?;
 
-        let home_dir = Self::home_dir(ctx).await.ok();
-
         let items = {
             let t = mlua::lua().create_table().ok()?;
             for (idx, (path, _)) in sessions.iter().enumerate() {
-                let path = TildePath { path, home_dir: home_dir.as_deref() };
-                t.raw_set(idx, path.to_string()).ok()?;
+                let path = notifications::path_chunk(path, ctx);
+                t.raw_set(idx, path.text()).ok()?;
             }
             t
         };
@@ -610,18 +595,4 @@ async fn tls_connector(
 
     Ok(TLS_CONNECTOR
         .get_or_init(|| TlsConnector::from(Arc::new(client_config))))
-}
-
-impl fmt::Display for TildePath<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some(home_dir) = self.home_dir else {
-            return fmt::Display::fmt(&self.path, f);
-        };
-
-        if self.path.starts_with(home_dir) && self.path != home_dir {
-            write!(f, "~{}", &self.path[home_dir.len()..])
-        } else {
-            fmt::Display::fmt(&self.path, f)
-        }
-    }
 }

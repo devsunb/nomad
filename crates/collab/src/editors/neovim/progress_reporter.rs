@@ -17,16 +17,19 @@ trait DisplayablePipeline: Pipeline {
     fn display_output(
         output: Self::Output<'_>,
         state: &mut ReporterState,
+        ctx: &mut Context<Neovim>,
     ) -> notify::Chunks;
 
     fn display_error(
         error: Self::Error<'_>,
         state: &mut ReporterState,
+        ctx: &mut Context<Neovim>,
     ) -> notify::Chunks;
 
     fn display_state(
         state: Self::State<'_>,
         state: &mut ReporterState,
+        ctx: &mut Context<Neovim>,
     ) -> notify::Chunks;
 }
 
@@ -46,34 +49,47 @@ impl<P: DisplayablePipeline> ProgressReporter<Neovim, P>
     fn report_success(
         mut self,
         output: P::Output<'_>,
-        _: &mut Context<Neovim>,
+        ctx: &mut Context<Neovim>,
     ) {
-        self.inner.report_success(P::display_output(output, &mut self.state));
+        self.inner.report_success(P::display_output(
+            output,
+            &mut self.state,
+            ctx,
+        ));
     }
 
-    fn report_error(mut self, error: P::Error<'_>, _: &mut Context<Neovim>) {
-        self.inner.report_error(P::display_error(error, &mut self.state));
+    fn report_error(mut self, error: P::Error<'_>, ctx: &mut Context<Neovim>) {
+        self.inner.report_error(P::display_error(error, &mut self.state, ctx));
     }
 
     fn report_progress(
         &mut self,
         state: P::State<'_>,
-        _: &mut Context<Neovim>,
+        ctx: &mut Context<Neovim>,
     ) {
-        self.inner.report_progress(P::display_state(state, &mut self.state));
+        self.inner.report_progress(P::display_state(
+            state,
+            &mut self.state,
+            ctx,
+        ));
     }
 
     fn report_cancellation(self, _: &mut Context<Neovim>) {}
 }
 
 impl DisplayablePipeline for join::Join<Neovim> {
-    fn display_output(_: (), _: &mut ReporterState) -> notify::Chunks {
+    fn display_output(
+        _: (),
+        _: &mut ReporterState,
+        _: &mut Context<Neovim>,
+    ) -> notify::Chunks {
         "Joined session".into()
     }
 
     fn display_error(
         error: Self::Error<'_>,
         _: &mut ReporterState,
+        _: &mut Context<Neovim>,
     ) -> notify::Chunks {
         error.into()
     }
@@ -81,11 +97,16 @@ impl DisplayablePipeline for join::Join<Neovim> {
     fn display_state(
         join_state: Self::State<'_>,
         reporter_state: &mut ReporterState,
+        ctx: &mut Context<Neovim>,
     ) -> notify::Chunks {
         match &join_state {
             JoinState::ConnectingToServer(server_addr) => {
                 reporter_state.server_address = Some(server_addr.to_owned());
-                Self::display_state(JoinState::JoiningSession, reporter_state)
+                Self::display_state(
+                    JoinState::JoiningSession,
+                    reporter_state,
+                    ctx,
+                )
             },
 
             JoinState::JoiningSession => {
@@ -121,7 +142,7 @@ impl DisplayablePipeline for join::Join<Neovim> {
                         notifications::PROJ_NAME_HL_GROUP,
                     )
                     .push(" to ")
-                    .push_highlighted(root_path.to_compact_string(), "String");
+                    .push_chunk(notifications::path_chunk(root_path, ctx));
                 chunks
             },
         }
@@ -129,13 +150,18 @@ impl DisplayablePipeline for join::Join<Neovim> {
 }
 
 impl DisplayablePipeline for start::Start<Neovim> {
-    fn display_output(_: (), _: &mut ReporterState) -> notify::Chunks {
+    fn display_output(
+        _: (),
+        _: &mut ReporterState,
+        _: &mut Context<Neovim>,
+    ) -> notify::Chunks {
         "Started session".into()
     }
 
     fn display_error(
         error: Self::Error<'_>,
         _: &mut ReporterState,
+        _: &mut Context<Neovim>,
     ) -> notify::Chunks {
         error.into()
     }
@@ -143,6 +169,7 @@ impl DisplayablePipeline for start::Start<Neovim> {
     fn display_state(
         state: Self::State<'_>,
         reporter_state: &mut ReporterState,
+        ctx: &mut Context<Neovim>,
     ) -> notify::Chunks {
         match state {
             StartState::ConnectingToServer(server_addr) => {
@@ -150,6 +177,7 @@ impl DisplayablePipeline for start::Start<Neovim> {
                 Self::display_state(
                     StartState::StartingSession,
                     reporter_state,
+                    ctx,
                 )
             },
 
@@ -166,7 +194,7 @@ impl DisplayablePipeline for start::Start<Neovim> {
                 let mut chunks = notify::Chunks::default();
                 chunks
                     .push("Reading project at ")
-                    .push_highlighted(root_path.to_compact_string(), "String");
+                    .push_chunk(notifications::path_chunk(&root_path, ctx));
                 chunks
             },
         }
