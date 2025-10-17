@@ -297,6 +297,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     }
 
     /// Returns the project's name.
+    #[cfg(feature = "neovim")]
     pub(crate) fn name(&self) -> &NodeName {
         self.root_path()
             .node_name()
@@ -304,6 +305,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     }
 
     /// Returns the project root's path.
+    #[cfg(feature = "neovim")]
     pub(crate) fn root_path(&self) -> &AbsPath {
         &self.root_path
     }
