@@ -37,7 +37,7 @@ impl<Ed: CollabEditor> Resume<Ed> {
 }
 
 impl<Ed: CollabEditor> AsyncAction<Ed> for Resume<Ed> {
-    const NAME: &str = "leave";
+    const NAME: &str = "resume";
 
     type Args = ();
 

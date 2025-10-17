@@ -37,7 +37,7 @@ impl<Ed: CollabEditor> Pause<Ed> {
 }
 
 impl<Ed: CollabEditor> AsyncAction<Ed> for Pause<Ed> {
-    const NAME: &str = "leave";
+    const NAME: &str = "pause";
 
     type Args = ();
 
