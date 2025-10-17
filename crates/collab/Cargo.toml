@@ -38,6 +38,7 @@ fs = { workspace = true, features = ["filter"] }
 futures-util = { workspace = true }
 fxhash = { workspace = true }
 indexmap = { workspace = true }
+pin-project-lite = { workspace = true }
 rand = { workspace = true }
 rustls-pki-types = { workspace = true, features = ["std"] }
 serde = { workspace = true, features = ["derive"] }

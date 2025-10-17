@@ -11,6 +11,7 @@ mod event_stream;
 pub mod join;
 pub mod leave;
 mod list_ext;
+mod pausable_stream;
 pub mod progress;
 pub mod project;
 mod root_markers;
