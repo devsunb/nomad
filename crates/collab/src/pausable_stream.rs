@@ -31,11 +31,6 @@ struct RemoteInner {
 }
 
 impl<S: Stream> PausableStream<S> {
-    /// Returns whether the stream is currently paused.
-    pub(crate) fn is_paused(&self) -> bool {
-        self.remote.is_paused()
-    }
-
     /// Creates a new [`PausableStream`], which starts unpaused.
     pub(crate) fn new(stream: S) -> Self {
         Self {
@@ -49,6 +44,12 @@ impl<S: Stream> PausableStream<S> {
     /// [`PausableStream`].
     pub(crate) fn remote(&self) -> Remote {
         self.remote.clone()
+    }
+
+    /// Returns whether the stream is currently paused.
+    #[cfg(test)]
+    fn is_paused(&self) -> bool {
+        self.remote.is_paused()
     }
 }
 
@@ -123,5 +124,22 @@ impl fmt::Debug for Remote {
         f.debug_struct("Remote")
             .field("is_paused", &self.is_paused())
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use futures_util::FutureExt;
+    use futures_util::stream::{self, StreamExt};
+
+    use super::*;
+
+    #[test]
+    fn pausable_stream_starts_unpaused() {
+        let iter = 0..3;
+        let stream = PausableStream::new(stream::iter(iter.clone()).fuse());
+        assert!(!stream.is_paused());
+        let collected = stream.collect::<Vec<_>>().now_or_never().unwrap();
+        assert_eq!(collected, iter.collect::<Vec<_>>());
     }
 }
