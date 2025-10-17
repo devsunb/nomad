@@ -17,7 +17,7 @@ use editor::{ByteOffset, Context, Editor};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::project::Project;
-use crate::{config, join, leave, progress, session, start, yank};
+use crate::{config, join, leave, pause, progress, session, start, yank};
 
 /// An [`Editor`] subtrait defining additional capabilities needed by the
 /// actions in this crate.
@@ -143,6 +143,9 @@ pub trait CollabEditor: Editor {
     /// Called when the [`Leave`](leave::Leave) action returns an error.
     fn on_leave_error(error: leave::LeaveError, ctx: &mut Context<Self>);
 
+    /// Called when the [`Pause`](pause::Pause) action returns an error.
+    fn on_pause_error(error: pause::PauseError<Self>, ctx: &mut Context<Self>);
+
     /// Called when a remote peer leaves the session for the given project.
     fn on_peer_left(
         peer: &Peer,
@@ -222,6 +225,12 @@ pub enum ActionForSelectedSession {
 
     /// TODO: docs
     Leave,
+
+    /// TODO: docs
+    Pause,
+
+    /// TODO: docs
+    Resume,
 }
 
 /// TODO: docs.

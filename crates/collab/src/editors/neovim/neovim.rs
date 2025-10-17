@@ -37,7 +37,7 @@ use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::project::Project;
 use crate::session::{SessionError, SessionInfos};
 use crate::tcp_stream_ext::TcpStreamExt;
-use crate::{Collab, config, leave, yank};
+use crate::{Collab, config, leave, pause, yank};
 
 pub type SessionId = ulid::Ulid;
 
@@ -327,6 +327,13 @@ impl CollabEditor for Neovim {
         ctx.notify_error(error.to_string());
     }
 
+    fn on_pause_error(
+        error: pause::PauseError<Self>,
+        ctx: &mut Context<Self>,
+    ) {
+        ctx.notify_error(error.to_string());
+    }
+
     fn on_peer_left(
         peer: &Peer,
         proj: &Project<Self>,
@@ -518,14 +525,14 @@ impl CollabEditor for Neovim {
             t
         };
 
-        let prompt = match action {
-            ActionForSelectedSession::CopySessionId => {
-                "Choose which session to yank the ID of: "
-            },
-            ActionForSelectedSession::Leave => {
-                "Choose which session to leave: "
-            },
+        let prompt_action = match action {
+            ActionForSelectedSession::CopySessionId => "copy the ID of",
+            ActionForSelectedSession::Leave => "leave",
+            ActionForSelectedSession::Pause => "pause",
+            ActionForSelectedSession::Resume => "resume",
         };
+
+        let prompt = format!("Choose the session to {prompt_action}:",);
 
         let opts = {
             let t = mlua::lua().create_table().ok()?;
