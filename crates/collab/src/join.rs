@@ -125,8 +125,7 @@ impl<Ed: CollabEditor> Join<Ed> {
             .push_filter(Either::Left(project_filter))
             .build(ctx);
 
-        let remote_peers =
-            RemotePeers::from_peers(welcome.other_peers, &project);
+        let remote_peers = RemotePeers::new(welcome.other_peers, &project);
 
         let project = project::Project {
             agent_id: event_stream.agent_id(),

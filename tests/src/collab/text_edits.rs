@@ -1,5 +1,6 @@
 use abs_path::{AbsPathBuf, path};
 use collab::editors::mock::CollabMock;
+use collab::peers::RemotePeers;
 use collab::{Peer, PeerHandle, PeerId};
 use mock::{EditorExt, Mock};
 
@@ -97,6 +98,11 @@ fn integrating_text_edit_creates_buffer() {
     CollabMock::new(Mock::new(fs)).block_on(async move |ctx| {
         let agent_id = ctx.new_agent_id();
 
+        let remote_peer = Peer {
+            id: project_1.peer_id(),
+            handle: PeerHandle::GitHub("peer1".parse().unwrap()),
+        };
+
         let mut proj = collab::project::Project {
             agent_id,
             id_maps: Default::default(),
@@ -104,16 +110,11 @@ fn integrating_text_edit_creates_buffer() {
                 id: project_2.peer_id(),
                 handle: PeerHandle::GitHub("peer2".parse().unwrap()),
             },
-            inner: project_2,
             peer_selections: Default::default(),
             peer_tooltips: Default::default(),
-            remote_peers: [Peer {
-                id: project_1.peer_id(),
-                handle: PeerHandle::GitHub("peer1".parse().unwrap()),
-            }]
-            .into_iter()
-            .collect(),
+            remote_peers: RemotePeers::new([remote_peer], &project_2),
             root_path: AbsPathBuf::root(),
+            inner: project_2,
         };
 
         // Make sure there are no open buffers before integrating the text edit.

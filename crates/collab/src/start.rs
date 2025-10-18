@@ -247,8 +247,7 @@ impl<Ed: CollabEditor> Start<Ed> {
                 .map_err(StartError::ReadProject)?;
 
 
-        let remote_peers =
-            RemotePeers::from_peers(welcome.other_peers, &project);
+        let remote_peers = RemotePeers::new(welcome.other_peers, &project);
 
         let project = project::Project {
             agent_id: event_stream.agent_id(),

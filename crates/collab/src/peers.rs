@@ -27,6 +27,20 @@ pub struct RemotePeer {
 }
 
 impl RemotePeers {
+    /// Creates a new [`RemotePeers`] instance from the given peers.
+    pub fn new(
+        peers: impl IntoIterator<Item = Peer>,
+        proj: &collab_project::Project,
+    ) -> Self {
+        let map = peers
+            .into_iter()
+            .map(|peer| RemotePeer::new(peer, proj))
+            .map(|remote_peer| (remote_peer.id, remote_peer))
+            .collect();
+
+        Self { inner: Shared::new(map) }
+    }
+
     /// Calls the given function on all the remote peers.
     pub(crate) fn for_each(&self, mut fun: impl FnMut(&RemotePeer)) {
         self.with(|map| {
@@ -64,19 +78,6 @@ impl RemotePeers {
                 )
             },
         });
-    }
-
-    pub(crate) fn from_peers(
-        peers: collab_types::Peers,
-        proj: &collab_project::Project,
-    ) -> Self {
-        let map = peers
-            .into_iter()
-            .map(|peer| RemotePeer::new(peer, proj))
-            .map(|remote_peer| (remote_peer.id, remote_peer))
-            .collect();
-
-        Self { inner: Shared::new(map) }
     }
 
     #[track_caller]
