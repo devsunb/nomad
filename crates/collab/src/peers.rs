@@ -1,53 +1,34 @@
 //! Contains types used to track the state of remote peers in a
 //! [`Project`](crate::project::Project).
 
+use core::ops::Deref;
 use std::collections::hash_map;
 
-use abs_path::AbsPathBuf;
 use collab_project::text::CursorId;
-use collab_types::puff::file::LocalFileId;
 use collab_types::{Peer, PeerId};
-use editor::{Access, ByteOffset, Editor, Shared};
+use editor::{Access, Shared};
 use fxhash::FxHashMap;
 
 /// TODO: docs.
 #[derive(Debug, Default, Clone)]
 pub struct RemotePeers {
     /// A map of all the remote peers currently in a session.
-    inner: Shared<FxHashMap<PeerId, Peer>>,
+    inner: Shared<FxHashMap<PeerId, RemotePeer>>,
 }
 
-/// The position of a remote peer in a project.
-///
-/// This is defined as the position of the cursor with the smallest
-/// [`CursorId`]. IDs [owned](CursorId::owner) by the same peer are [`Ord`]ered
-/// by their creation time, with the smallest ID representing the oldest
-/// cursor.
-///
-/// This approach should allow us to track a peer's "main" cursor, even in
-/// editors that support multiple cursors.
-#[derive(cauchy::Clone)]
-pub(crate) struct PeerPosition<Ed: Editor> {
-    /// The ID of the buffer corresponding to the file the cursor is in, or
-    /// `None` if that file is not currently opened in the editor.
-    pub(crate) buffer_id: Option<Ed::BufferId>,
-
-    /// The cursor's ID.
-    pub(crate) cursor_id: CursorId,
-
-    /// The cursor's offset in the file/buffer.
-    pub(crate) cursor_offset: ByteOffset,
-
-    /// The ID of the file the cursor is in.
-    pub(crate) file_id: LocalFileId,
-
-    /// The path of the file the cursor is in.
-    pub(crate) file_path: AbsPathBuf,
+/// TODO: docs.
+#[derive(Debug, Clone)]
+pub struct RemotePeer {
+    inner: Peer,
+    // - when a remote cursor is created;
+    // - when a remote cursor is moved;
+    // - when a remote cursor is removed;
+    main_cursor_id: Option<CursorId>,
 }
 
 impl RemotePeers {
     /// Calls the given function on all the remote peers.
-    pub(crate) fn for_each(&self, mut fun: impl FnMut(&Peer)) {
+    pub(crate) fn for_each(&self, mut fun: impl FnMut(&RemotePeer)) {
         self.with(|map| {
             for peer in map.values() {
                 fun(peer);
@@ -55,16 +36,25 @@ impl RemotePeers {
         });
     }
 
+    pub(crate) fn find(
+        &self,
+        mut fun: impl FnMut(&RemotePeer) -> bool,
+    ) -> Option<RemotePeer> {
+        self.with(|map| {
+            map.values().find_map(|peer| fun(peer).then(|| peer.clone()))
+        })
+    }
+
     /// Returns the [`Peer`] with the given ID, if any.
-    pub(crate) fn get(&self, peer_id: PeerId) -> Option<Peer> {
+    pub(crate) fn get(&self, peer_id: PeerId) -> Option<RemotePeer> {
         self.inner.with(|inner| inner.get(&peer_id).cloned())
     }
 
     #[track_caller]
-    pub(crate) fn insert(&self, peer: Peer) {
+    pub(crate) fn insert(&self, peer: Peer, proj: &collab_project::Project) {
         self.inner.with_mut(|inner| match inner.entry(peer.id) {
             hash_map::Entry::Vacant(vacant) => {
-                vacant.insert(peer);
+                vacant.insert(RemotePeer::new(peer, proj));
             },
             hash_map::Entry::Occupied(occupied) => {
                 panic!(
@@ -76,8 +66,21 @@ impl RemotePeers {
         });
     }
 
+    pub(crate) fn from_peers(
+        peers: collab_types::Peers,
+        proj: &collab_project::Project,
+    ) -> Self {
+        let map = peers
+            .into_iter()
+            .map(|peer| RemotePeer::new(peer, proj))
+            .map(|remote_peer| (remote_peer.id, remote_peer))
+            .collect();
+
+        Self { inner: Shared::new(map) }
+    }
+
     #[track_caller]
-    pub(crate) fn remove(&self, peer_id: PeerId) -> Peer {
+    pub(crate) fn remove(&self, peer_id: PeerId) -> RemotePeer {
         self.inner.with_mut(|inner| match inner.remove(&peer_id) {
             Some(peer) => peer,
             None => panic!("no peer with ID {:?} exists", peer_id),
@@ -85,24 +88,42 @@ impl RemotePeers {
     }
 }
 
-impl Access<FxHashMap<PeerId, Peer>> for RemotePeers {
-    fn with<R>(&self, fun: impl FnOnce(&FxHashMap<PeerId, Peer>) -> R) -> R {
+impl RemotePeer {
+    /// This is defined as the position of the cursor with the smallest
+    /// [`CursorId`]. IDs [owned](CursorId::owner) by the same peer are [`Ord`]ered
+    /// by their creation time, with the smallest ID representing the oldest
+    /// cursor.
+    ///
+    /// This approach should allow us to track a peer's "main" cursor, even in
+    /// editors that support multiple cursors.
+    pub fn main_cursor_id(&self) -> Option<CursorId> {
+        self.main_cursor_id
+    }
+
+    fn new(_peer: Peer, _proj: &collab_project::Project) -> Self {
+        todo!();
+    }
+}
+
+impl Access<FxHashMap<PeerId, RemotePeer>> for RemotePeers {
+    fn with<R>(
+        &self,
+        fun: impl FnOnce(&FxHashMap<PeerId, RemotePeer>) -> R,
+    ) -> R {
         self.inner.with(fun)
     }
 }
 
-impl From<collab_types::Peers> for RemotePeers {
-    fn from(peers: collab_types::Peers) -> Self {
-        peers.into_iter().collect::<Self>()
+impl Deref for RemotePeer {
+    type Target = Peer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
-impl FromIterator<Peer> for RemotePeers {
-    fn from_iter<T: IntoIterator<Item = Peer>>(iter: T) -> Self {
-        Self {
-            inner: Shared::new(
-                iter.into_iter().map(|peer| (peer.id, peer)).collect(),
-            ),
-        }
+impl From<RemotePeer> for Peer {
+    fn from(peer: RemotePeer) -> Self {
+        peer.inner
     }
 }

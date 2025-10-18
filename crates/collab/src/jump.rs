@@ -1,5 +1,6 @@
 //! TODO: docs.
 
+use collab_project::text::CursorId;
 use collab_types::{GitHubHandle, PeerHandle};
 use editor::command::{self, CommandArgs, CommandCompletion, CommandCursor};
 use editor::module::AsyncAction;
@@ -7,7 +8,8 @@ use editor::{ByteOffset, Context};
 use smallvec::SmallVec;
 
 use crate::collab::Collab;
-use crate::editors::{ActionForSelectedSession, CollabEditor};
+use crate::editors::CollabEditor;
+use crate::project::Project;
 use crate::session::{NoActiveSessionError, SessionInfos, Sessions};
 
 /// TODO: docs.
@@ -19,9 +21,43 @@ pub struct Jump<Ed: CollabEditor> {
 impl<Ed: CollabEditor> Jump<Ed> {
     pub(crate) async fn call_inner(
         &self,
-        _peer_handle: PeerHandle,
+        peer_handle: PeerHandle,
         _ctx: &mut Context<Ed>,
     ) -> Result<(), JumpError<Ed>> {
+        let mut maybe_cursor_id = None;
+
+        let Some(sesh) = self.sessions.find(|sesh| {
+            match sesh.remote_peers.find(|peer| peer.handle == peer_handle) {
+                Some(peer) => {
+                    maybe_cursor_id = peer.main_cursor_id();
+                    true
+                },
+                None => false,
+            }
+        }) else {
+            return Err(JumpError::UnknownPeer(peer_handle));
+        };
+
+        let Some(_cursor_id) = maybe_cursor_id else {
+            return Err(JumpError::PeerCursorNotInProject(peer_handle, sesh));
+        };
+
+        todo!();
+
+        // sesh.controller()
+        //     .with_proj(async |proj, ctx| {
+        //         Self::jump_to(proj, cursor_id, ctx).await
+        //     })
+        //     .await
+        //     .ok_or(JumpError::UnknownPeer(peer_handle))?
+        //     .map_err(JumpError::CreateBuffer)
+    }
+
+    pub(crate) async fn jump_to(
+        _proj: &Project<Ed>,
+        _cursor_id: CursorId,
+        _ctx: &mut Context<Ed>,
+    ) -> Result<(), Ed::CreateBufferError> {
         todo!();
     }
 }
@@ -49,6 +85,10 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Jump<Ed> {
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
 pub enum JumpError<Ed: CollabEditor> {
+    /// Creating a new buffer failed.
+    #[display("{_0}")]
+    CreateBuffer(Ed::CreateBufferError),
+
     /// There are no active sessions.
     #[display("{}", NoActiveSessionError)]
     NoActiveSession,

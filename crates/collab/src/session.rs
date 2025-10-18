@@ -116,13 +116,18 @@ impl<Ed: CollabEditor> Sessions<Ed> {
         self.with_session(session_id, |infos| infos.cloned())
     }
 
-    /// Calls the given function on the infos of all the current sessions.
-    pub(crate) fn for_each(&self, mut fun: impl FnMut(&SessionInfos<Ed>)) {
+    pub(crate) fn find(
+        &self,
+        mut fun: impl FnMut(&SessionInfos<Ed>) -> bool,
+    ) -> Option<SessionInfos<Ed>> {
         self.with(|map| {
-            for infos in map.values() {
-                fun(infos);
-            }
-        });
+            map.values().find_map(|infos| fun(infos).then(|| infos.clone()))
+        })
+    }
+
+    /// Calls the given function on the infos of all the current sessions.
+    pub(crate) fn for_each(&self, fun: impl FnMut(&SessionInfos<Ed>)) {
+        self.with(|map| map.values().for_each(fun))
     }
 
     /// Inserts the given infos.

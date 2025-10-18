@@ -412,7 +412,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             let buffer_id =
                 self.id_maps.file2buffer.get(&cursor.file().local_id())?;
             let tooltip = Ed::create_peer_tooltip(
-                cursor_owner,
+                cursor_owner.into(),
                 cursor.offset(),
                 buffer_id.clone(),
                 ctx,
@@ -515,8 +515,7 @@ impl<Ed: CollabEditor> Project<Ed> {
 
     fn integrate_peer_joined(&self, peer: Peer, ctx: &mut Context<Ed>) {
         Ed::on_peer_joined(&peer, self, ctx);
-
-        self.remote_peers.insert(peer);
+        self.remote_peers.insert(peer, &self.inner);
     }
 
     fn integrate_peer_left(&mut self, peer_id: PeerId, ctx: &mut Context<Ed>) {
@@ -553,7 +552,7 @@ impl<Ed: CollabEditor> Project<Ed> {
             let buffer_id = self.id_maps.file2buffer.get(&file_id)?;
             let selection_owner = self.remote_peers.get(selection.owner())?;
             let peer_selection = Ed::create_peer_selection(
-                selection_owner,
+                selection_owner.into(),
                 selection.offset_range(),
                 buffer_id.clone(),
                 ctx,
@@ -662,6 +661,7 @@ impl<Ed: CollabEditor> Project<Ed> {
         self.remote_peers.with(|remote_peers| {
             remote_peers
                 .values()
+                .map(core::ops::Deref::deref)
                 .chain(iter::once(&self.local_peer))
                 .map(fun)
                 .collect()
@@ -784,7 +784,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                 continue;
             };
             let tooltip = Ed::create_peer_tooltip(
-                owner,
+                owner.into(),
                 cursor.offset(),
                 buffer_id.clone(),
                 ctx,
@@ -798,7 +798,7 @@ impl<Ed: CollabEditor> Project<Ed> {
                 continue;
             };
             let peer_selection = Ed::create_peer_selection(
-                owner,
+                owner.into(),
                 selection.offset_range(),
                 buffer_id.clone(),
                 ctx,
