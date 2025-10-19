@@ -6,7 +6,7 @@ use std::collections::hash_map;
 
 use collab_project::text::CursorId;
 use collab_types::{Peer, PeerId};
-use editor::{Access, Shared};
+use editor::{Access, AccessMut, Shared};
 use fxhash::FxHashMap;
 
 /// TODO: docs.
@@ -97,10 +97,11 @@ impl RemotePeers {
 }
 
 impl RemotePeer {
-    /// This is defined as the position of the cursor with the smallest
-    /// [`CursorId`]. IDs [owned](CursorId::owner) by the same peer are [`Ord`]ered
-    /// by their creation time, with the smallest ID representing the oldest
-    /// cursor.
+    /// Returns the ID of the peer's main cursor, if any.
+    ///
+    /// This is defined as the smallest [`CursorId`]. IDs
+    /// [owned](CursorId::owner) by the same peer are [`Ord`]ered by their
+    /// creation time, with the smallest ID representing the oldest cursor.
     ///
     /// This approach should allow us to track a peer's "main" cursor, even in
     /// editors that support multiple cursors.
@@ -110,6 +111,16 @@ impl RemotePeer {
 
     pub(crate) fn into_inner(self) -> Peer {
         self.inner
+    }
+
+    pub(crate) fn remove_main_cursor(&mut self) {
+        self.main_cursor_id = None;
+    }
+
+    pub(crate) fn set_main_cursor_id(&mut self, new_id: CursorId) {
+        debug_assert!(self.inner.id == new_id.owner());
+        debug_assert!(self.main_cursor_id.is_none_or(|id| new_id < id));
+        self.main_cursor_id = Some(new_id);
     }
 
     fn new(peer: Peer, proj: &collab_project::Project) -> Self {
@@ -128,6 +139,15 @@ impl Access<FxHashMap<PeerId, RemotePeer>> for RemotePeers {
         fun: impl FnOnce(&FxHashMap<PeerId, RemotePeer>) -> R,
     ) -> R {
         self.inner.with(fun)
+    }
+}
+
+impl AccessMut<FxHashMap<PeerId, RemotePeer>> for RemotePeers {
+    fn with_mut<R>(
+        &mut self,
+        fun: impl FnOnce(&mut FxHashMap<PeerId, RemotePeer>) -> R,
+    ) -> R {
+        self.inner.with_mut(fun)
     }
 }
 

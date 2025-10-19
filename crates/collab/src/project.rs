@@ -7,7 +7,7 @@ use abs_path::{AbsPath, AbsPathBuf};
 use collab_project::fs::{File, FileMut, FsOp, Node, NodeMut};
 use collab_project::text::{CursorId, SelectionId, TextReplacement};
 use collab_types::{Message, Peer, PeerId, binary, crop, puff, text};
-use editor::{Access, AgentId, Buffer, Context, Editor, Replacement};
+use editor::{Access, AccessMut, AgentId, Buffer, Context, Editor};
 use fs::{File as _, Fs as _, Symlink as _};
 use futures_util::FutureExt;
 use fxhash::FxHashMap;
@@ -408,16 +408,31 @@ impl<Ed: CollabEditor> Project<Ed> {
     ) {
         let mut try_block = || {
             let cursor = self.inner.integrate_cursor_creation(creation)?;
-            let cursor_owner = self.remote_peers.get(cursor.owner())?;
+
+            let cursor_owner = self.remote_peers.with_mut(|map| {
+                let peer = map.get_mut(&cursor.owner())?;
+
+                // Check if the new cursor should become the peer's main
+                // cursor.
+                if peer.main_cursor_id().is_none_or(|id| cursor.id() < id) {
+                    peer.set_main_cursor_id(cursor.id());
+                }
+
+                Some(peer.clone())
+            })?;
+
             let buffer_id =
                 self.id_maps.file2buffer.get(&cursor.file().local_id())?;
+
             let tooltip = Ed::create_peer_tooltip(
                 cursor_owner.into(),
                 cursor.offset(),
                 buffer_id.clone(),
                 ctx,
             );
+
             self.peer_tooltips.insert(cursor.id(), tooltip);
+
             Some(())
         };
 
@@ -433,6 +448,14 @@ impl<Ed: CollabEditor> Project<Ed> {
             let cursor_id = self.inner.integrate_cursor_removal(removal)?;
             let tooltip = self.peer_tooltips.remove(&cursor_id)?;
             Ed::remove_peer_tooltip(tooltip, ctx);
+            // Check if this was a peer's main cursor.
+            self.remote_peers.with_mut(|map| {
+                if let Some(peer) = map.get_mut(&cursor_id.owner())
+                    && peer.main_cursor_id() == Some(cursor_id)
+                {
+                    peer.remove_main_cursor();
+                }
+            });
             Some(())
         };
 
@@ -810,7 +833,7 @@ impl<Ed: CollabEditor> Project<Ed> {
     fn synchronize_buffer_edited(
         &mut self,
         buffer_id: Ed::BufferId,
-        replacements: impl IntoIterator<Item = Replacement>,
+        replacements: impl IntoIterator<Item = editor::Replacement>,
         ctx: &mut Context<Ed>,
     ) -> Option<Message> {
         let mut file_mut = self.text_file_of_buffer(&buffer_id);
