@@ -2,6 +2,7 @@ use core::fmt::Debug;
 use core::hash::Hash;
 
 use abs_path::AbsPath;
+use clipboard::Clipboard;
 use executor::Executor;
 use serde::Serialize;
 use serde::de::Deserialize;
@@ -37,6 +38,9 @@ pub trait Editor: 'static + Sized {
 
     /// TODO: docs.
     type CursorId: Clone + Debug + Eq + Hash;
+
+    /// TODO: docs.
+    type Clipboard: Clipboard;
 
     /// TODO: docs.
     type Fs: fs::Fs;
@@ -104,6 +108,9 @@ pub trait Editor: 'static + Sized {
 
     /// TODO: docs.
     fn cursor(&mut self, id: Self::CursorId) -> Option<Self::Cursor<'_>>;
+
+    /// TODO: docs.
+    fn clipboard(&mut self) -> &mut Self::Clipboard;
 
     /// TODO: docs.
     fn fs(&mut self) -> Self::Fs;

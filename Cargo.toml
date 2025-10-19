@@ -13,6 +13,7 @@ publish = false
 # Third-party dependencies.
 abs-path = { git = "ssh://git@github.com/nomad/abs-path.git" }
 anyhow = "1.0"
+arboard = { version = "3", default-features = false }
 async-broadcast = "0.7"
 async-fs = "2"
 async-io = "2"
@@ -30,7 +31,6 @@ collab-server = { git = "ssh://git@github.com/nomad/collab-server.git", default-
 collab-types = { git = "ssh://git@github.com/nomad/collab-server.git" }
 compact_str = "0.9"
 concurrent-queue = "2.5"
-copypasta = "0.10"
 criterion = "0.7"
 derive_more = { version = "2", features = ["display"] }
 duplex-stream = { git = "ssh://git@github.com/nomad/collab-server.git" }

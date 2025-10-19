@@ -175,7 +175,7 @@ impl CollabEditor for Neovim {
         chunks
             .push("Copied '")
             .push_highlighted(session_id.to_compact_string(), "Title")
-            .push("' to clipboard");
+            .push("'");
 
         ctx.notify_info(chunks);
 
@@ -356,7 +356,7 @@ impl CollabEditor for Neovim {
                 chunks
                     .push("Couldn't copy '")
                     .push_highlighted(session_id.to_string().as_str(), "Title")
-                    .push(format_compact!("' to clipboard: {err}"));
+                    .push(format_compact!("': {err}"));
                 ctx.notify_error(chunks);
             },
 

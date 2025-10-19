@@ -6,6 +6,7 @@
 
 pub mod api;
 pub mod buffer;
+pub mod clipboard;
 mod editor_ext;
 pub mod emitter;
 pub mod executor;

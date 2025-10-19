@@ -78,6 +78,7 @@ impl<Ed: EditorAdapter> Editor for Ed {
     type BufferId = <<Self as Deref>::Target as Editor>::BufferId;
     type Cursor<'a> = CursorAdapter<'a, Self>;
     type CursorId = <<Self as Deref>::Target as Editor>::CursorId;
+    type Clipboard = <<Self as Deref>::Target as Editor>::Clipboard;
     type Fs = <<Self as Deref>::Target as Editor>::Fs;
     type Emitter<'a> = <<Self as Deref>::Target as Editor>::Emitter<'a>;
     type Executor = <<Self as Deref>::Target as Editor>::Executor;
@@ -135,6 +136,11 @@ impl<Ed: EditorAdapter> Editor for Ed {
     #[inline]
     fn cursor(&mut self, id: Self::CursorId) -> Option<Self::Cursor<'_>> {
         self.deref_mut().cursor(id).map(CursorAdapter::new)
+    }
+
+    #[inline]
+    fn clipboard(&mut self) -> &mut Self::Clipboard {
+        self.deref_mut().clipboard()
     }
 
     #[inline]

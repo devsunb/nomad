@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 abs-path = { workspace = true, features = ["serde"] }
 cauchy = { workspace = true }
+clipboard = { workspace = true }
 compact_str = { workspace = true }
 derive_more = { workspace = true }
 executor = { workspace = true }

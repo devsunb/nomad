@@ -4,6 +4,7 @@ use core::mem;
 use ::executor::Executor;
 use ::serde::{Deserialize, Serialize};
 use abs_path::AbsPath;
+use clipboard::{FallibleInitClipboard, arboard};
 use editor::module::Plugin;
 use editor::notify::Namespace;
 use editor::{AccessMut, AgentId, Buffer, Editor};
@@ -29,15 +30,11 @@ type HttpClient = http_client::UreqClient<
 pub struct Neovim {
     /// TODO: docs.
     pub(crate) decoration_provider: DecorationProvider,
-
     /// TODO: docs.
     pub(crate) events: Events,
-
-    /// TODO: docs.
+    clipboard: FallibleInitClipboard<arboard::Clipboard>,
     executor: executor::NeovimExecutor,
-
     http_client: HttpClient,
-
     #[cfg(feature = "test")]
     pub(crate) scratch_buffer_count: u32,
 }
@@ -82,6 +79,7 @@ impl Neovim {
         let mut executor = executor::NeovimExecutor::default();
 
         Self {
+            clipboard: Default::default(),
             decoration_provider: DecorationProvider::new(namespace_id),
             events: Events::new(augroup_id),
             http_client: HttpClient::new(
@@ -131,6 +129,7 @@ impl Editor for Neovim {
     type BufferId = BufferId;
     type Cursor<'a> = NeovimCursor<'a>;
     type CursorId = BufferId;
+    type Clipboard = FallibleInitClipboard<arboard::Clipboard>;
     type Fs = real_fs::RealFs;
     type Emitter<'ex> = notify::NeovimEmitter<'ex>;
     type Executor = executor::NeovimExecutor;
@@ -201,6 +200,11 @@ impl Editor for Neovim {
     fn cursor(&mut self, buf_id: Self::CursorId) -> Option<Self::Cursor<'_>> {
         let buffer = self.buffer(buf_id)?;
         buffer.is_focused().then(|| buffer.into())
+    }
+
+    #[inline]
+    fn clipboard(&mut self) -> &mut Self::Clipboard {
+        &mut self.clipboard
     }
 
     #[inline]

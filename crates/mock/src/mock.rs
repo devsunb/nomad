@@ -16,6 +16,7 @@ use crate::buffer::{
     Selection,
     SelectionId,
 };
+use crate::clipboard::MockClipboard;
 use crate::emitter::Emitter;
 use crate::executor::{Executor, Spawner};
 use crate::fs::MockFs;
@@ -25,6 +26,7 @@ use crate::serde::{DeserializeError, SerializeError};
 pub struct Mock<Fs = MockFs, BgSpawner = Spawner> {
     buffers: FxHashMap<BufferId, BufferInner>,
     callbacks: Callbacks,
+    clipboard: MockClipboard,
     current_buffer: Option<BufferId>,
     emitter: Emitter,
     executor: Executor<BgSpawner>,
@@ -91,6 +93,7 @@ impl<Fs> Mock<Fs> {
         Self {
             buffers: Default::default(),
             callbacks: Default::default(),
+            clipboard: Default::default(),
             current_buffer: None,
             emitter: Default::default(),
             executor: Default::default(),
@@ -113,6 +116,7 @@ where
         Mock {
             buffers: self.buffers,
             callbacks: self.callbacks,
+            clipboard: self.clipboard,
             current_buffer: self.current_buffer,
             emitter: self.emitter,
             executor: self.executor.with_background_spawner(spawner),
@@ -149,6 +153,7 @@ impl Editor for Mock {
     type BufferId = BufferId;
     type Cursor<'a> = Cursor<'a>;
     type CursorId = CursorId;
+    type Clipboard = MockClipboard;
     type EventHandle = EventHandle;
     type Executor = Executor<Spawner>;
     type Fs = MockFs;
@@ -247,6 +252,10 @@ impl Editor for Mock {
     ) -> Option<Self::Cursor<'_>> {
         self.buffer(cursor_id.buffer_id())
             .and_then(|buf| buf.into_cursor(cursor_id))
+    }
+
+    fn clipboard(&mut self) -> &mut Self::Clipboard {
+        &mut self.clipboard
     }
 
     fn fs(&mut self) -> Self::Fs {

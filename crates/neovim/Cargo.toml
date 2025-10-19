@@ -16,6 +16,7 @@ abs-path = { workspace = true }
 async-io = { workspace = true }
 async-task = { workspace = true }
 cauchy = { workspace = true }
+clipboard = { workspace = true, features = ["arboard", "fallible-init"] }
 compact_str = { workspace = true }
 concurrent-queue = { workspace = true }
 derive_more = { workspace = true }
