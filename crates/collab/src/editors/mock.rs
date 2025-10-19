@@ -202,7 +202,6 @@ where
     type ServerParams = MockParams;
 
     type ConnectToServerError = AnyError;
-    type CopySessionIdError = Infallible;
     type DefaultDirForRemoteProjectsError = NoDefaultDirForRemoteProjectsError;
     type HomeDirError = AnyError;
     type LspRootError = Infallible;
@@ -231,14 +230,6 @@ where
         server_tx.send(server_io)?;
 
         Ok(client_io)
-    }
-
-    async fn copy_session_id(
-        session_id: MockSessionId,
-        ctx: &mut Context<Self>,
-    ) -> Result<(), Self::CopySessionIdError> {
-        ctx.with_editor(|this| this.clipboard = Some(session_id));
-        Ok(())
     }
 
     fn create_peer_selection(
@@ -307,6 +298,8 @@ where
     ) {
         *tooltip = tooltip_offset;
     }
+
+    fn on_copied_session_id(_: MockSessionId, _: &mut Context<Self>) {}
 
     fn on_copy_session_id_error(
         _: copy_id::CopyIdError<Self>,

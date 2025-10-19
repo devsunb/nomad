@@ -783,7 +783,7 @@ dependencies = [
 [[package]]
 name = "collab-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#22b5f3ea45b07f865ae0963864d2038fc3e62a76"
+source = "git+ssh://git@github.com/nomad/collab-server.git#811485e6661379926646ab27962c0586b04ba993"
 dependencies = [
  "cauchy",
  "collab-types",
@@ -801,7 +801,7 @@ dependencies = [
 [[package]]
 name = "collab-types"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#22b5f3ea45b07f865ae0963864d2038fc3e62a76"
+source = "git+ssh://git@github.com/nomad/collab-server.git#811485e6661379926646ab27962c0586b04ba993"
 dependencies = [
  "bytes",
  "cauchy",
@@ -1140,7 +1140,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "duplex-stream"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#22b5f3ea45b07f865ae0963864d2038fc3e62a76"
+source = "git+ssh://git@github.com/nomad/collab-server.git#811485e6661379926646ab27962c0586b04ba993"
 dependencies = [
  "async-compat",
  "futures-util",
@@ -1520,7 +1520,7 @@ dependencies = [
 [[package]]
 name = "generic-server"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#22b5f3ea45b07f865ae0963864d2038fc3e62a76"
+source = "git+ssh://git@github.com/nomad/collab-server.git#811485e6661379926646ab27962c0586b04ba993"
 dependencies = [
  "flume",
  "futures-util",
@@ -2254,7 +2254,7 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 [[package]]
 name = "message-channel"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#22b5f3ea45b07f865ae0963864d2038fc3e62a76"
+source = "git+ssh://git@github.com/nomad/collab-server.git#811485e6661379926646ab27962c0586b04ba993"
 dependencies = [
  "bincode",
  "cauchy",
@@ -2884,7 +2884,7 @@ checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 [[package]]
 name = "peer-handle"
 version = "0.0.9"
-source = "git+ssh://git@github.com/nomad/collab-server.git#22b5f3ea45b07f865ae0963864d2038fc3e62a76"
+source = "git+ssh://git@github.com/nomad/collab-server.git#811485e6661379926646ab27962c0586b04ba993"
 dependencies = [
  "cauchy",
  "derive_more",
@@ -3490,7 +3490,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

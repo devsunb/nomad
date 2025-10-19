@@ -6,7 +6,7 @@ pub mod mock;
 pub mod neovim;
 
 use core::error::Error;
-use core::fmt::Debug;
+use core::fmt::{Debug, Display};
 use core::ops::Range;
 use core::str::FromStr;
 
@@ -45,16 +45,12 @@ pub trait CollabEditor: Editor {
     /// TODO: docs.
     type ServerParams: collab_server::Params<
             AuthenticateInfos: From<auth::JsonWebToken>,
-            SessionId: FromStr<Err: Error>,
+            SessionId: Display + FromStr<Err: Error>,
         >;
 
     /// The type of error returned by
     /// [`connect_to_server`](CollabEditor::connect_to_server).
     type ConnectToServerError: Debug;
-
-    /// The type of error returned by
-    /// [`copy_session_id`](CollabEditor::copy_session_id).
-    type CopySessionIdError: Debug;
 
     /// The type of error returned by
     /// [`default_dir_for_remote_projects`](CollabEditor::default_dir_for_remote_projects).
@@ -82,12 +78,6 @@ pub trait CollabEditor: Editor {
         server_addr: config::ServerAddress<'static>,
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = Result<Self::Io, Self::ConnectToServerError>>;
-
-    /// Copies the given [`SessionId`] to the user's clipboard.
-    fn copy_session_id(
-        session_id: SessionId<Self>,
-        ctx: &mut Context<Self>,
-    ) -> impl Future<Output = Result<(), Self::CopySessionIdError>>;
 
     /// TODO: docs.
     fn create_peer_selection(
@@ -145,6 +135,12 @@ pub trait CollabEditor: Editor {
     fn move_peer_tooltip(
         tooltip: &mut Self::PeerTooltip,
         tooltip_offset: ByteOffset,
+        ctx: &mut Context<Self>,
+    );
+
+    /// Called after the given session ID has been copied to the clipboard.
+    fn on_copied_session_id(
+        session_id: SessionId<Self>,
         ctx: &mut Context<Self>,
     );
 

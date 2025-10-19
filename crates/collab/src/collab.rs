@@ -29,7 +29,7 @@ impl<Ed: CollabEditor> Collab<Ed> {
     pub async fn copy_id(
         &self,
         ctx: &mut Context<Ed>,
-    ) -> Result<(), CopyIdError<Ed>> {
+    ) -> Result<Option<SessionId<Ed>>, CopyIdError<Ed>> {
         CopyId::from(self).call_inner(ctx).await
     }
 

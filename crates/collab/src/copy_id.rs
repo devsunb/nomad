@@ -1,9 +1,12 @@
 //! TODO: docs.
 
+use clipboard::Clipboard;
+use compact_str::ToCompactString;
 use editor::Context;
 use editor::command::ToCompletionFn;
 use editor::module::AsyncAction;
 
+use crate::SessionId;
 use crate::collab::Collab;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::session::{NoActiveSessionError, Sessions};
@@ -19,18 +22,28 @@ impl<Ed: CollabEditor> CopyId<Ed> {
     pub(crate) async fn call_inner(
         &self,
         ctx: &mut Context<Ed>,
-    ) -> Result<(), CopyIdError<Ed>> {
+    ) -> Result<Option<SessionId<Ed>>, CopyIdError<Ed>> {
         let Some((_, session_id)) = self
             .sessions
             .select(ActionForSelectedSession::CopySessionId, ctx)
             .await?
         else {
-            return Ok(());
+            return Ok(None);
         };
 
-        Ed::copy_session_id(session_id, ctx)
-            .await
-            .map_err(CopyIdError::CopySessionId)
+        match Self::copy_id(&session_id, ctx) {
+            Ok(()) => Ok(Some(session_id)),
+            Err(err) => Err(CopyIdError::CopySessionId(err, session_id)),
+        }
+    }
+
+    pub(crate) fn copy_id(
+        session_id: &SessionId<Ed>,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), <Ed::Clipboard as Clipboard>::SetError> {
+        ctx.with_editor(|ed| {
+            ed.clipboard().set(session_id.to_compact_string())
+        })
     }
 }
 
@@ -40,8 +53,10 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for CopyId<Ed> {
     type Args = ();
 
     async fn call(&mut self, _: Self::Args, ctx: &mut Context<Ed>) {
-        if let Err(err) = self.call_inner(ctx).await {
-            Ed::on_copy_session_id_error(err, ctx);
+        match self.call_inner(ctx).await {
+            Ok(Some(session_id)) => Ed::on_copied_session_id(session_id, ctx),
+            Ok(None) => {},
+            Err(err) => Ed::on_copy_session_id_error(err, ctx),
         }
     }
 }
@@ -52,8 +67,8 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for CopyId<Ed> {
 )]
 pub enum CopyIdError<Ed: CollabEditor> {
     /// TODO: docs.
-    #[display("{_0}")]
-    CopySessionId(Ed::CopySessionIdError),
+    #[display("Couldn't copy {_0} to clipboard: {_1}")]
+    CopySessionId(<Ed::Clipboard as Clipboard>::SetError, SessionId<Ed>),
 
     /// TODO: docs.
     #[display("{}", NoActiveSessionError)]

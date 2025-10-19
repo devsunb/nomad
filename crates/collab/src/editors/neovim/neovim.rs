@@ -95,7 +95,6 @@ impl CollabEditor for Neovim {
     type ServerParams = nomad_collab_params::NomadParams;
 
     type ConnectToServerError = NeovimConnectToServerError;
-    type CopySessionIdError = (clipboard::ClipboardError, SessionId);
     type DefaultDirForRemoteProjectsError = NeovimDataDirError;
     type HomeDirError = NeovimHomeDirError;
     type LspRootError = NeovimLspRootError;
@@ -162,24 +161,6 @@ impl CollabEditor for Neovim {
             .await
             .map(Either::Left)
             .map_err(NeovimConnectToServerError::ConnectTls)
-    }
-
-    async fn copy_session_id(
-        session_id: SessionId,
-        ctx: &mut Context<Self>,
-    ) -> Result<(), Self::CopySessionIdError> {
-        clipboard::set(session_id).map_err(|err| (err, session_id))?;
-
-        let mut chunks = notify::Chunks::default();
-
-        chunks
-            .push("Copied '")
-            .push_highlighted(session_id.to_compact_string(), "Title")
-            .push("'");
-
-        ctx.notify_info(chunks);
-
-        Ok(())
     }
 
     fn create_peer_selection(
@@ -346,16 +327,30 @@ impl CollabEditor for Neovim {
         handle.r#move(new_offset);
     }
 
+    fn on_copied_session_id(
+        session_id: crate::SessionId<Self>,
+        ctx: &mut Context<Self>,
+    ) {
+        let mut chunks = notify::Chunks::default();
+
+        chunks
+            .push("Copied '")
+            .push_highlighted(session_id.to_compact_string(), "Title")
+            .push("'");
+
+        ctx.notify_info(chunks);
+    }
+
     fn on_copy_session_id_error(
         error: copy_id::CopyIdError<Self>,
         ctx: &mut Context<Self>,
     ) {
         match error {
-            copy_id::CopyIdError::CopySessionId((err, session_id)) => {
+            copy_id::CopyIdError::CopySessionId(err, session_id) => {
                 let mut chunks = notify::Chunks::default();
                 chunks
                     .push("Couldn't copy '")
-                    .push_highlighted(session_id.to_string().as_str(), "Title")
+                    .push_highlighted(session_id.to_compact_string(), "Title")
                     .push(format_compact!("': {err}"));
                 ctx.notify_error(chunks);
             },
@@ -555,12 +550,14 @@ impl CollabEditor for Neovim {
         // [with]: https://github.com/user-attachments/assets/031d24e9-e030-4611-872c-1b51d3076e23
         neovim::utils::schedule(|| ()).await;
 
+        let session_id = &infos.session_id;
+
         let prompt = format!(
             "Started a new collaborative editing session at {} with ID \
-             {}.\nYou can share this ID with other peers to let them join \
-             the session. Would you like to copy it to the clipboard?",
+             {session_id}.\nYou can share this ID with other peers to let \
+             them join the session. Would you like to copy it to the \
+             clipboard?",
             notifications::path_chunk(&infos.project_root_path, ctx).text(),
-            infos.session_id,
         );
 
         let options = ["Yes", "No"];
@@ -578,9 +575,9 @@ impl CollabEditor for Neovim {
             _ => unreachable!("only provided {} options", options.len()),
         }
 
-        if let Err(err) = Self::copy_session_id(infos.session_id, ctx).await {
+        if let Err(err) = copy_id::CopyId::copy_id(session_id, ctx) {
             Self::on_copy_session_id_error(
-                copy_id::CopyIdError::CopySessionId(err),
+                copy_id::CopyIdError::CopySessionId(err, session_id.clone()),
                 ctx,
             );
         }
