@@ -31,6 +31,7 @@ compact_str = { workspace = true }
 derive_more = { workspace = true }
 editor = { workspace = true }
 either = { workspace = true }
+event-listener = { workspace = true }
 executor = { workspace = true }
 fastrand = { workspace = true }
 flume = { workspace = true, features = ["async"] }

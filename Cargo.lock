@@ -756,6 +756,7 @@ dependencies = [
  "duplex-stream",
  "editor",
  "either",
+ "event-listener",
  "executor",
  "fastrand",
  "flume",

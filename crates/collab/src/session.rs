@@ -1,14 +1,17 @@
 //! TODO: docs.
 
-use std::collections::hash_map;
+use core::pin::Pin;
+use core::task::{self, Poll, ready};
+use std::collections::{VecDeque, hash_map};
 use std::io;
+use std::rc::Rc;
 
 use abs_path::{AbsPathBuf, NodeName};
 use collab_server::client as collab_client;
 use collab_types::{Message, Peer, PeerId};
 use editor::{Access, Context, Shared};
 use futures_util::sink::{Sink, SinkExt};
-use futures_util::stream::{FusedStream, StreamExt};
+use futures_util::stream::{FusedStream, Stream, StreamExt};
 use futures_util::{FutureExt, select_biased};
 use fxhash::FxHashMap;
 use smallvec::SmallVec;
@@ -19,6 +22,15 @@ use crate::leave::StopRequest;
 use crate::peers::RemotePeers;
 use crate::project::{IntegrateError, Project, SynchronizeError};
 use crate::{CollabEditor, SessionId, pausable_stream};
+
+/// The type-erased version of the async callbacks given to
+/// [`ProjectAccess::with()`].
+type ProjectAccessCallback<Ed> = Box<
+    dyn for<'a> FnOnce(
+        &'a Project<Ed>,
+        &'a mut Context<Ed>,
+    ) -> Pin<Box<dyn Future<Output = ()> + 'a>>,
+>;
 
 /// TODO: docs.
 #[derive(cauchy::Debug, cauchy::Default, cauchy::Clone)]
@@ -100,7 +112,9 @@ pub(crate) struct Session<Ed: CollabEditor, Tx, Rx> {
 #[derive(cauchy::Debug, cauchy::Default, cauchy::Clone)]
 pub(crate) struct ProjectAccess<Ed: CollabEditor> {
     #[debug(skip)]
-    inner: Option<Shared<Project<Ed>>>,
+    callbacks: Shared<VecDeque<ProjectAccessCallback<Ed>>>,
+    #[debug(skip)]
+    event: Rc<event_listener::Event>,
 }
 
 /// TODO: docs.
@@ -251,10 +265,12 @@ where
             message_rx,
             message_tx,
             project,
+            project_access,
             stop_rx,
             ..
         } = self;
 
+        let mut callback_stream = project_access.callback_stream();
         let mut stop_stream = stop_rx.stream();
 
         loop {
@@ -277,6 +293,9 @@ where
                         message_tx.send(message).await?;
                     }
                 },
+                callback = callback_stream.select_next_some() => {
+                    callback(project, ctx).await;
+                },
                 stop_request = stop_stream.select_next_some() => {
                     stop_request.send_stopped();
                     return Ok(SessionEndReason::UserLeft);
@@ -298,11 +317,78 @@ where
 
 impl<Ed: CollabEditor> ProjectAccess<Ed> {
     /// TODO: docs.
-    pub(crate) async fn with<R>(
+    pub(crate) async fn with<R: 'static>(
         &self,
-        _fun: impl AsyncFnOnce(&Project<Ed>, &mut Context<Ed>) -> R + 'static,
+        fun: impl AsyncFnOnce(&Project<Ed>, &mut Context<Ed>) -> R + 'static,
     ) -> Option<R> {
-        todo!();
+        let (tx, rx) = flume::bounded(1);
+
+        let callback: ProjectAccessCallback<Ed> =
+            Box::new(move |project, ctx| {
+                Box::pin(async move {
+                    let _ = tx.send(fun(project, ctx).await);
+                })
+            });
+
+        self.callbacks.with_mut(|queue| queue.push_back(callback));
+
+        let num_notified = self.event.notify(1);
+
+        debug_assert!(
+            num_notified <= 1,
+            "only the session's event loop should be notified"
+        );
+
+        // If no one was notified it means the event loop is not running.
+        if num_notified == 0 {
+            let _ = self
+                .callbacks
+                .with_mut(|queue| queue.pop_back().expect("just pushed"));
+            return None;
+        }
+
+        rx.into_recv_async().await.ok()
+    }
+
+    fn callback_stream(
+        &self,
+    ) -> impl FusedStream<Item = ProjectAccessCallback<Ed>> {
+        pin_project_lite::pin_project! {
+            struct CallbackStream<'queue, Ed: CollabEditor> {
+                queue: &'queue Shared<VecDeque<ProjectAccessCallback<Ed>>>,
+                #[pin]
+                listener: event_listener::EventListener,
+            }
+        }
+
+        impl<Ed: CollabEditor> Stream for CallbackStream<'_, Ed> {
+            type Item = ProjectAccessCallback<Ed>;
+
+            fn poll_next(
+                self: Pin<&mut Self>,
+                ctx: &mut task::Context<'_>,
+            ) -> Poll<Option<Self::Item>> {
+                let mut this = self.project();
+
+                loop {
+                    match this.queue.with_mut(|queue| queue.pop_front()) {
+                        Some(callback) => return Poll::Ready(Some(callback)),
+                        None => ready!(this.listener.as_mut().poll(ctx)),
+                    }
+                }
+            }
+        }
+
+        impl<Ed: CollabEditor> FusedStream for CallbackStream<'_, Ed> {
+            fn is_terminated(&self) -> bool {
+                false
+            }
+        }
+
+        CallbackStream {
+            queue: &self.callbacks,
+            listener: self.event.listen(),
+        }
     }
 }
 
