@@ -15,6 +15,7 @@ auth-types = { workspace = true }
 cauchy = { workspace = true }
 collab-server = { workspace = true }
 derive_more = { workspace = true }
+rand = { workspace = true }
 ulid = { workspace = true, features = ["serde"] }
 
 serde = { workspace = true, optional = true, features = ["derive"] }

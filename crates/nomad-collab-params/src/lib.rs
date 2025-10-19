@@ -4,11 +4,13 @@
 mod auth_error;
 mod auth_infos;
 mod nomad_params;
+mod session_id;
 
 pub use auth_error::AuthError;
 pub use auth_infos::AuthInfos;
+pub use auth_types;
 pub use nomad_params::NomadParams;
-pub use {auth_types, ulid};
+pub use session_id::SessionId;
 
 /// TODO: docs.
-pub const API_VERSION: u32 = 1;
+pub const API_VERSION: u32 = 2;

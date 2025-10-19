@@ -7,5 +7,5 @@ impl collab_server::Params for NomadParams {
 
     type AuthenticateInfos = crate::AuthInfos;
     type AuthenticateError = crate::AuthError;
-    type SessionId = ulid::Ulid;
+    type SessionId = crate::SessionId;
 }
