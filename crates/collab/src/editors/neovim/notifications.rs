@@ -62,8 +62,8 @@ impl fmt::Display for TildePath<'_> {
 }
 
 /// Calls the given function with the path to the user's home directory, or
-/// `None` if the function has never been called before or if it getting the
-/// home path returned an error.
+/// `None` if the function has never been called before or if getting the home
+/// path returned an error.
 fn with_home_path<R>(
     fun: impl FnOnce(Option<&AbsPath>) -> R,
     ctx: &mut Context<Neovim, impl BorrowState>,

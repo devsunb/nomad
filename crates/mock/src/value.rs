@@ -3,7 +3,9 @@ use indexmap::IndexMap;
 use serde_json::Number;
 
 /// TODO: docs.
+#[derive(Default)]
 pub enum Value {
+    #[default]
     Null,
     Bool(bool),
     Number(Number),
@@ -66,12 +68,6 @@ impl editor::Value for Value {
             Self::Map(map) => Ok(MapAccess { map, idx: None }),
             _ => Err(MapAccessError { kind: self.kind() }),
         }
-    }
-}
-
-impl Default for Value {
-    fn default() -> Self {
-        Self::Null
     }
 }
 
