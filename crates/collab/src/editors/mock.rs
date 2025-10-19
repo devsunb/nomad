@@ -10,7 +10,7 @@ pub use collab_server::test::TestSessionId as MockSessionId;
 use collab_types::{Peer, PeerHandle};
 use duplex_stream::{DuplexStream, duplex};
 use editor::context::Borrowed;
-use editor::{ByteOffset, Context, Editor, EditorAdapter};
+use editor::{AgentId, ByteOffset, Context, Editor, EditorAdapter};
 
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::project::Project;
@@ -275,6 +275,15 @@ where
             Some(path) => Ok(path.clone()),
             None => Err(AnyError::from_str("no home directory configured")),
         })
+    }
+
+    async fn jump_to(
+        _buffer_id: Self::BufferId,
+        _offset: ByteOffset,
+        _agent_id: AgentId,
+        _ctx: &mut Context<Self>,
+    ) {
+        todo!();
     }
 
     fn lsp_root(

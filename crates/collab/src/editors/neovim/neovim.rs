@@ -10,12 +10,12 @@ use collab_types::Peer;
 use compact_str::format_compact;
 use editor::context::Borrowed;
 use editor::module::{Action, Module};
-use editor::{ByteOffset, Context, Editor};
+use editor::{AgentId, Buffer, ByteOffset, Context, Cursor, Editor};
 use executor::Executor;
 use fs::Directory;
 use futures_rustls::client::TlsStream;
 use futures_rustls::{TlsConnector, rustls};
-use futures_util::future::Either;
+use futures_util::future::{self, Either, FutureExt};
 use mlua::{Function, Table};
 use neovim::buffer::{BufferExt, BufferId};
 use neovim::notify::{self, NotifyContextExt};
@@ -267,6 +267,34 @@ impl CollabEditor for Neovim {
         }
     }
 
+    async fn jump_to(
+        buffer_id: Self::BufferId,
+        offset: ByteOffset,
+        agent_id: AgentId,
+        ctx: &mut Context<Self>,
+    ) {
+        let Some(focus_buffer) = ctx.with_editor(|nvim| {
+            let mut buffer = nvim.buffer(buffer_id)?;
+
+            Some(if buffer.is_focused() {
+                Either::Left(future::ready(()))
+            } else {
+                Either::Right(buffer.schedule_focus(agent_id).boxed_local())
+            })
+        }) else {
+            return;
+        };
+
+        focus_buffer.await;
+
+        ctx.with_editor(|nvim| {
+            let _ = nvim
+                .cursor(buffer_id)
+                .expect("buffer was just focused")
+                .schedule_move(offset, agent_id);
+        });
+    }
+
     fn lsp_root(
         buffer_id: BufferId,
         _: &mut Context<Self>,
@@ -466,18 +494,19 @@ impl CollabEditor for Neovim {
             _ => unreachable!("only provided {} options", options.len()),
         }
 
-        match infos
+        let Some(jump_res) = infos
             .project_access
             .with(async move |proj, ctx| {
                 jump::Jump::jump_to(proj, cursor_id, ctx).await
             })
             .await
-        {
-            Some(Ok(())) => {},
-            Some(Err(err)) => {
-                Self::on_jump_error(jump::JumpError::CreateBuffer(err), ctx)
-            },
-            None => ctx.notify_warn("The session has ended"),
+        else {
+            ctx.notify_warn("The session has ended");
+            return;
+        };
+
+        if let Err(err) = jump_res.map_err(jump::JumpError::Jump) {
+            Self::on_jump_error(err, ctx);
         }
     }
 

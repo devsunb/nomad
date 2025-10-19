@@ -13,7 +13,7 @@ use core::str::FromStr;
 use abs_path::{AbsPath, AbsPathBuf};
 use collab_types::Peer;
 use editor::context::Borrowed;
-use editor::{ByteOffset, Context, Editor};
+use editor::{AgentId, ByteOffset, Context, Editor};
 use futures_util::{AsyncRead, AsyncWrite};
 
 use crate::progress::ProgressReporter;
@@ -115,6 +115,15 @@ pub trait CollabEditor: Editor {
     fn home_dir(
         ctx: &mut Context<Self>,
     ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
+
+    /// Moves the user's main cursor to the given byte offset in the buffer
+    /// with the given ID.
+    fn jump_to(
+        buffer_id: Self::BufferId,
+        offset: ByteOffset,
+        agent_id: AgentId,
+        ctx: &mut Context<Self>,
+    ) -> impl Future<Output = ()>;
 
     /// Returns the path to the root of the workspace containing the buffer
     /// with the given ID, or `None` if there's no language server attached to

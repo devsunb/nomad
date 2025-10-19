@@ -4,7 +4,7 @@ use collab_project::text::CursorId;
 use collab_types::{GitHubHandle, PeerHandle};
 use editor::command::{self, CommandArgs, CommandCompletion, CommandCursor};
 use editor::module::AsyncAction;
-use editor::{ByteOffset, Context};
+use editor::{AgentId, ByteOffset, Context};
 use smallvec::SmallVec;
 
 use crate::collab::Collab;
@@ -47,14 +47,42 @@ impl<Ed: CollabEditor> Jump<Ed> {
             })
             .await
             .ok_or(JumpError::UnknownPeer(peer_handle))?
-            .map_err(JumpError::CreateBuffer)
+            .map_err(JumpError::Jump)
     }
 
     pub(crate) async fn jump_to(
-        _proj: &Project<Ed>,
-        _cursor_id: CursorId,
-        _ctx: &mut Context<Ed>,
-    ) -> Result<(), Ed::CreateBufferError> {
+        proj: &Project<Ed>,
+        cursor_id: CursorId,
+        ctx: &mut Context<Ed>,
+    ) -> Result<(), JumpToCursorError<Ed>> {
+        let cursor = proj
+            .inner
+            .cursor(cursor_id)
+            .ok_or(JumpToCursorError::UnknownId(cursor_id))?;
+
+        let file = cursor.file();
+
+        let agent_id = Self::agent_id(ctx);
+
+        let buffer_id = match proj.id_maps.file2buffer.get(&file.local_id()) {
+            Some(buffer_id) => buffer_id.clone(),
+            // If there's no open buffer for the file the cursor is in, create
+            // one.
+            None => {
+                let file_path_in_proj = file.path();
+                let file_path = proj.root_path().concat(&file_path_in_proj);
+                ctx.create_buffer(&file_path, agent_id)
+                    .await
+                    .map_err(JumpToCursorError::CreateBuffer)?
+            },
+        };
+
+        Ed::jump_to(buffer_id, cursor.offset(), agent_id, ctx).await;
+
+        Ok(())
+    }
+
+    fn agent_id(_ctx: &mut Context<Ed>) -> AgentId {
         todo!();
     }
 }
@@ -82,9 +110,9 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Jump<Ed> {
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]
 pub enum JumpError<Ed: CollabEditor> {
-    /// Creating a new buffer failed.
+    /// Jumping failed.
     #[display("{_0}")]
-    CreateBuffer(Ed::CreateBufferError),
+    Jump(JumpToCursorError<Ed>),
 
     /// There are no active sessions.
     #[display("{}", NoActiveSessionError)]
@@ -98,6 +126,21 @@ pub enum JumpError<Ed: CollabEditor> {
     /// There's no peer with the given handle in any of the sessions.
     #[display("There's no peer with handle '{_0}' in any of the sessions")]
     UnknownPeer(PeerHandle),
+}
+
+/// The type of error that can occur when [`jumping`](Jump::jump_to) to the
+/// position of a remote peer's cursor.
+#[derive(
+    cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
+)]
+pub enum JumpToCursorError<Ed: CollabEditor> {
+    /// Creating a new buffer failed.
+    #[display("{_0}")]
+    CreateBuffer(Ed::CreateBufferError),
+
+    /// The given [`CursorId`] doesn't exist in the project.
+    #[display("There's no cursor with ID '{_0:?}' in the project")]
+    UnknownId(CursorId),
 }
 
 impl<Ed: CollabEditor> From<&Collab<Ed>> for Jump<Ed> {
