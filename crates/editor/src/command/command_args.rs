@@ -21,9 +21,9 @@ pub struct CommandArgs<'a, CursorOffset = ()> {
 pub struct CommandArg<'a> {
     /// The argument's text, guaranteed to be non-empty and not contain
     /// whitespace.
-    word: &'a str,
+    inner: &'a str,
 
-    /// The offset of argument word in the original [`CommandArgs`].
+    /// The offset of [`Self::inner`] in the original [`CommandArgs`].
     offset: ByteOffset,
 
     /// The index of this argument in the original [`CommandArgs`].
@@ -184,7 +184,7 @@ impl<'a> CommandArg<'a> {
     /// TODO: docs.
     #[inline]
     pub fn as_str(&self) -> &'a str {
-        self.word
+        self.inner
     }
 
     /// The index of this argument in the original [`CommandArgs`].
@@ -200,7 +200,7 @@ impl<'a> CommandArg<'a> {
         self.index == 0
     }
 
-    /// The offset of argument word in the original [`CommandArgs`].
+    /// The offset of the argument in the original [`CommandArgs`].
     #[inline]
     pub fn offset(&self) -> ByteOffset {
         self.offset
@@ -254,7 +254,7 @@ impl Deref for CommandArg<'_> {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.word
+        self.inner
     }
 }
 
@@ -313,7 +313,7 @@ impl<'a> Iterator for CommandArgsIter<'a> {
         let index = self.num_yielded;
         self.num_yielded += 1;
         (arg_len > 0).then_some(CommandArg {
-            word: arg,
+            inner: arg,
             offset: arg_offset,
             index,
         })
