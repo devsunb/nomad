@@ -9,7 +9,7 @@ pub enum AuthError {
 
     /// The client is out of date.
     #[display(
-        "your Nomad version is out of date. Please update Nomad to the \
+        "Your Nomad version is out of date. Please update Nomad to the \
          latest version to continue using the collaboration features"
     )]
     OutdatedClient,

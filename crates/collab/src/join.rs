@@ -187,12 +187,13 @@ impl<Ed: CollabEditor> AsyncAction<Ed> for Join<Ed> {
             <Ed::ProgressReporter as ProgressReporter<Ed, Self>>::new(ctx);
 
         match self.call_inner(session_id, &mut progress_reporter, ctx).await {
-            Ok(_session_infos) => {
+            Ok(session_infos) => {
                 ProgressReporter::<Ed, Self>::report_success(
                     progress_reporter,
                     (),
                     ctx,
                 );
+                Ed::on_session_joined(&session_infos, ctx).await;
             },
             Err(join_error) => {
                 ProgressReporter::<Ed, Self>::report_error(
