@@ -4,6 +4,9 @@ use executor::Executor;
 
 use crate::{Neovim, notify};
 
+/// A percentage value between `0` and `100`.
+pub type Percentage = u8;
+
 /// TODO: docs.
 pub enum ProgressReporter {
     /// TODO: docs.
@@ -44,10 +47,16 @@ impl ProgressReporter {
     }
 
     /// TODO: docs.
-    pub fn report_progress(&self, chunks: notify::Chunks) {
+    pub fn report_progress(
+        &self,
+        chunks: notify::Chunks,
+        percentage: Option<Percentage>,
+    ) {
         match self {
-            Self::NvimEcho(inner) => inner.report_progress(chunks),
-            Self::NvimNotify(inner) => inner.report_progress(chunks),
+            Self::NvimEcho(inner) => inner.report_progress(chunks, percentage),
+            Self::NvimNotify(inner) => {
+                inner.report_progress(chunks, percentage)
+            },
         }
     }
 

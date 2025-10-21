@@ -36,7 +36,7 @@ struct ProgressNotification {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(super) enum ProgressNotificationKind {
-    Progress,
+    Progress(Option<notify::Percentage>),
     Success,
     Error,
 }
@@ -99,10 +99,14 @@ impl NvimNotifyProgressReporter {
     }
 
     /// TODO: docs.
-    pub fn report_progress(&self, chunks: notify::Chunks) {
+    pub fn report_progress(
+        &self,
+        chunks: notify::Chunks,
+        perc: Option<notify::Percentage>,
+    ) {
         self.send_notification(ProgressNotification {
             message: chunks.concat_text(),
-            kind: ProgressNotificationKind::Progress,
+            kind: ProgressNotificationKind::Progress(perc),
         });
     }
 
@@ -155,7 +159,7 @@ impl NvimNotifyProgressReporter {
                 ))
                 .expect("failed to call 'notify'");
 
-            if notif.kind != ProgressNotificationKind::Progress {
+            if !matches!(notif.kind, ProgressNotificationKind::Progress(_)) {
                 break;
             }
 
@@ -193,7 +197,7 @@ impl NvimNotifyProgressReporter {
 impl ProgressNotificationKind {
     pub(super) fn icon(self, spinner_frame_idx: usize) -> char {
         match self {
-            Self::Progress => SPINNER_FRAMES[spinner_frame_idx],
+            Self::Progress(_) => SPINNER_FRAMES[spinner_frame_idx],
             Self::Success => '✔',
             Self::Error => '✘',
         }
@@ -201,7 +205,7 @@ impl ProgressNotificationKind {
 
     fn log_level(self) -> notify::Level {
         match self {
-            Self::Progress | Self::Success => notify::Level::Info,
+            Self::Progress(_) | Self::Success => notify::Level::Info,
             Self::Error => notify::Level::Error,
         }
     }
@@ -213,7 +217,7 @@ impl From<ProgressNotificationKind>
 {
     fn from(kind: ProgressNotificationKind) -> Self {
         match kind {
-            ProgressNotificationKind::Progress => Self::Running,
+            ProgressNotificationKind::Progress(_) => Self::Running,
             ProgressNotificationKind::Success => Self::Success,
             ProgressNotificationKind::Error => Self::Failed,
         }

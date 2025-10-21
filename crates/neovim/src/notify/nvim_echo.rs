@@ -199,10 +199,14 @@ impl NvimEchoProgressReporter {
     }
 
     /// TODO: docs.
-    pub fn report_progress(&self, chunks: notify::Chunks) {
+    pub fn report_progress(
+        &self,
+        chunks: notify::Chunks,
+        perc: Option<notify::Percentage>,
+    ) {
         self.send_notification(ProgressNotification {
             chunks,
-            kind: ProgressNotificationKind::Progress,
+            kind: ProgressNotificationKind::Progress(perc),
         });
     }
 
@@ -299,7 +303,7 @@ impl NvimEchoProgressReporter {
                 ProgressNotificationKind::Error => {
                     return EventLoopOutput::Error;
                 },
-                ProgressNotificationKind::Progress => {},
+                ProgressNotificationKind::Progress(_) => {},
             }
 
             'spin: loop {
@@ -340,7 +344,7 @@ impl NvimEchoProgressReporter {
 impl ProgressNotificationKind {
     fn hl_group(self) -> &'static str {
         match self {
-            Self::Progress => "DiagnosticInfo",
+            Self::Progress(_) => "DiagnosticInfo",
             Self::Success => "DiagnosticOk",
             Self::Error => "DiagnosticError",
         }

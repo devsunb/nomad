@@ -15,4 +15,4 @@ pub use emitter::NeovimEmitter;
 pub use nvim_echo::{NvimEcho, NvimEchoProgressReporter};
 pub use nvim_notify::{NvimNotify, NvimNotifyProgressReporter};
 pub use nvim_oxi::api::types::LogLevel as Level;
-pub use progress_reporter::ProgressReporter;
+pub use progress_reporter::{Percentage, ProgressReporter};

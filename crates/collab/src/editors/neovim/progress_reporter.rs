@@ -1,8 +1,8 @@
-use abs_path::NodeNameBuf;
+use abs_path::{NodeName, NodeNameBuf};
 use compact_str::{ToCompactString, format_compact};
 use editor::Context;
 use neovim::Neovim;
-use neovim::notify::{self, NotifyContextExt};
+use neovim::notify::{self, NotifyContextExt, Percentage};
 
 use crate::editors::neovim::notifications;
 use crate::progress::{JoinState, Pipeline, ProgressReporter, StartState};
@@ -30,13 +30,14 @@ trait DisplayablePipeline: Pipeline {
         state: Self::State<'_>,
         state: &mut ReporterState,
         ctx: &mut Context<Neovim>,
-    ) -> notify::Chunks;
+    ) -> Option<notify::Chunks>;
 }
 
 #[derive(Default)]
 struct ReporterState {
     project_name: Option<NodeNameBuf>,
     server_address: Option<config::ServerAddress<'static>>,
+    percentage: Option<Percentage>,
 }
 
 impl<P: DisplayablePipeline> ProgressReporter<Neovim, P>
@@ -67,11 +68,9 @@ impl<P: DisplayablePipeline> ProgressReporter<Neovim, P>
         state: P::State<'_>,
         ctx: &mut Context<Neovim>,
     ) {
-        self.inner.report_progress(P::display_state(
-            state,
-            &mut self.state,
-            ctx,
-        ));
+        if let Some(chunks) = P::display_state(state, &mut self.state, ctx) {
+            self.inner.report_progress(chunks, self.state.percentage);
+        }
     }
 
     fn report_cancellation(self, _: &mut Context<Neovim>) {}
@@ -98,15 +97,17 @@ impl DisplayablePipeline for join::Join<Neovim> {
         join_state: Self::State<'_>,
         reporter_state: &mut ReporterState,
         ctx: &mut Context<Neovim>,
-    ) -> notify::Chunks {
-        match &join_state {
+    ) -> Option<notify::Chunks> {
+        let mut chunks = Default::default();
+
+        match join_state {
             JoinState::ConnectingToServer(server_addr) => {
                 reporter_state.server_address = Some(server_addr.to_owned());
-                Self::display_state(
+                return Self::display_state(
                     JoinState::JoiningSession,
                     reporter_state,
                     ctx,
-                )
+                );
             },
 
             JoinState::JoiningSession => {
@@ -115,30 +116,45 @@ impl DisplayablePipeline for join::Join<Neovim> {
                         "JoiningSession must be preceded by \
                          ConnectingToServer",
                     );
-                connecting_to_server(server_addr)
+
+                chunks = connecting_to_server(server_addr);
             },
 
             JoinState::ReceivedWelcome(project_name) => {
-                reporter_state.project_name =
-                    Some((**project_name).to_owned());
-                let mut chunks = notify::Chunks::default();
-                chunks.push("Receiving files for project ").push_highlighted(
-                    project_name.to_string(),
-                    notifications::PROJ_NAME_HL_GROUP,
-                );
-                chunks
+                let project_name = &*project_name;
+                chunks = receiving_files(project_name);
+                reporter_state.project_name = Some(project_name.to_owned());
             },
 
-            JoinState::ReceivingProject(_bytes_received, _bytes_total) => {
-                todo!();
+            JoinState::ReceivingProject(bytes_received, bytes_total) => {
+                let new_percentage =
+                    (bytes_received as f32 / bytes_total as f32).round()
+                        as Percentage;
+
+                match reporter_state.percentage {
+                    // Only emit an update when the progress percentage
+                    // changes.
+                    Some(old) if old == new_percentage => return None,
+                    _ => reporter_state.percentage = Some(new_percentage),
+                }
+
+                let project_name =
+                    reporter_state.project_name.as_deref().expect(
+                        "ReceivingProject must be preceded by ReceivedWelcome",
+                    );
+
+                chunks = receiving_files(project_name);
             },
 
             JoinState::WritingProject(root_path) => {
+                // Clear the percentage set while receiving the project.
+                reporter_state.percentage = None;
+
                 let project_name =
                     reporter_state.project_name.as_ref().expect(
                         "WritingProject must be preceded by ReceivingProject",
                     );
-                let mut chunks = notify::Chunks::default();
+
                 chunks
                     .push("Writing project ")
                     .push_highlighted(
@@ -146,10 +162,11 @@ impl DisplayablePipeline for join::Join<Neovim> {
                         notifications::PROJ_NAME_HL_GROUP,
                     )
                     .push(" to ")
-                    .push_chunk(notifications::path_chunk(root_path, ctx));
-                chunks
+                    .push_chunk(notifications::path_chunk(&root_path, ctx));
             },
         }
+
+        Some(chunks)
     }
 }
 
@@ -171,18 +188,20 @@ impl DisplayablePipeline for start::Start<Neovim> {
     }
 
     fn display_state(
-        state: Self::State<'_>,
+        start_state: Self::State<'_>,
         reporter_state: &mut ReporterState,
         ctx: &mut Context<Neovim>,
-    ) -> notify::Chunks {
-        match state {
+    ) -> Option<notify::Chunks> {
+        let mut chunks = Default::default();
+
+        match start_state {
             StartState::ConnectingToServer(server_addr) => {
                 reporter_state.server_address = Some(server_addr.to_owned());
-                Self::display_state(
+                return Self::display_state(
                     StartState::StartingSession,
                     reporter_state,
                     ctx,
-                )
+                );
             },
 
             StartState::StartingSession => {
@@ -191,17 +210,17 @@ impl DisplayablePipeline for start::Start<Neovim> {
                         "StartingSession must be preceded by \
                          ConnectingToServer",
                     );
-                connecting_to_server(server_addr)
+                chunks = connecting_to_server(server_addr);
             },
 
             StartState::ReadingProject(root_path) => {
-                let mut chunks = notify::Chunks::default();
                 chunks
                     .push("Reading project at ")
                     .push_chunk(notifications::path_chunk(&root_path, ctx));
-                chunks
             },
         }
+
+        Some(chunks)
     }
 }
 
@@ -213,6 +232,15 @@ fn connecting_to_server(
         .push("Connecting to server at ")
         .push_highlighted(server_addr.host.to_compact_string(), "Identifier")
         .push_highlighted(format_compact!(":{}", server_addr.port), "Comment");
+    chunks
+}
+
+fn receiving_files(project_name: &NodeName) -> notify::Chunks {
+    let mut chunks = notify::Chunks::default();
+    chunks.push("Receiving files for project ").push_highlighted(
+        project_name.as_str(),
+        notifications::PROJ_NAME_HL_GROUP,
+    );
     chunks
 }
 
