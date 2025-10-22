@@ -145,8 +145,6 @@ impl NvimNotifyProgressReporter {
         opts.raw_set("title", namespace.dot_separated().to_string())
             .expect("failed to set 'title'");
 
-        let mut record_id = None;
-
         let mut notif = first_notif;
 
         loop {
@@ -162,7 +160,7 @@ impl NvimNotifyProgressReporter {
             )
             .expect("failed to set 'icon'");
 
-            Self::notify(&notif, &opts, &mut record_id, &notify);
+            Self::notify(&notif, &opts, &notify);
 
             if !matches!(notif.kind, ProgressNotificationKind::Progress(_)) {
                 break;
@@ -175,7 +173,7 @@ impl NvimNotifyProgressReporter {
                         spinner_frame_idx %= SPINNER_FRAMES.len();
                         let frame = SPINNER_FRAMES[spinner_frame_idx];
                         opts.raw_set("icon", frame).expect("failed to set 'icon'");
-                        Self::notify(&notif, &opts, &mut record_id, &notify);
+                        Self::notify(&notif, &opts, &notify);
                         continue 'spin;
                     },
 
@@ -211,7 +209,6 @@ impl NvimNotifyProgressReporter {
     fn notify(
         notif: &ProgressNotification,
         opts: &mlua::Table,
-        record_id: &mut Option<mlua::Integer>,
         notify: &mlua::Function,
     ) {
         let record = notify
@@ -226,10 +223,7 @@ impl NvimNotifyProgressReporter {
             .get::<mlua::Integer>("id")
             .expect("failed to get notification ID from record");
 
-        if record_id.is_none_or(|id| id != new_id) {
-            opts.raw_set("replace", new_id).expect("failed to set 'replace'");
-            *record_id = Some(new_id);
-        }
+        opts.raw_set("replace", new_id).expect("failed to set 'replace'");
     }
 }
 
