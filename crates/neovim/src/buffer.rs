@@ -436,6 +436,24 @@ fn apply_replacement(
     let deletion_end = buffer.point_of_byte(deletion_range.end);
 
     if !buffer.is_point_after_uneditable_eol(deletion_end) {
+        let mut insert_text = insert_text;
+
+        if let Some(stripped) = insert_text.strip_suffix('\n')
+            && buffer.is_empty()
+            && buffer.has_uneditable_eol()
+        {
+            if let Some(buffer_edited) = buffer_edited {
+                buffer_edited.enqueue(Edit {
+                    made_by: agent_id,
+                    replacements: smallvec_inline![Replacement::new(
+                        0..0,
+                        insert_text
+                    )],
+                });
+            }
+            insert_text = stripped;
+        }
+
         apply_replacement_whose_deletion_ends_before_fixeol(
             buffer,
             deletion_start..deletion_end,
@@ -527,7 +545,6 @@ fn apply_replacement(
     );
 }
 
-#[allow(clippy::too_many_arguments)]
 fn apply_replacement_whose_deletion_ends_before_fixeol(
     buffer: &mut api::Buffer,
     delete_range: Range<Point>,

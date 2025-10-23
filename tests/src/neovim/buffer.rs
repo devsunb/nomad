@@ -206,6 +206,11 @@ async fn single_insertion_ending_in_newline_in_empty_buf_with_eol_doesnt_cause_e
     let edit = edit_stream.next().await.unwrap();
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(0, "foo\n")]);
+
+    ctx.with_borrowed(|ctx| {
+        let buf = ctx.buffer(buffer_id).unwrap();
+        assert_eq!(buf.get_text(), "foo\n");
+    });
 }
 
 #[neovim::test]
@@ -232,6 +237,11 @@ async fn multiple_insertions_ending_in_newline_in_empty_buf_with_eol_doesnt_caus
     let edit = edit_stream.next().await.unwrap();
     assert_eq!(edit.made_by, agent_id);
     assert_eq!(&*edit.replacements, &[Replacement::insertion(0, "foo\n")]);
+
+    ctx.with_borrowed(|ctx| {
+        let buf = ctx.buffer(buffer_id).unwrap();
+        assert_eq!(buf.get_text(), "foo\n");
+    });
 }
 
 #[neovim::test]
