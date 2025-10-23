@@ -1,5 +1,5 @@
-use core::fmt;
 use core::time::Duration;
+use core::{any, fmt};
 
 use compact_str::ToCompactString;
 use executor::LocalSpawner;
@@ -32,7 +32,7 @@ pub struct NvimNotify;
 
 /// TODO: docs.
 pub struct NvimNotifyProgressReporter {
-    notification_tx: flume::Sender<ProgressNotification>,
+    notif_tx: flume::Sender<ProgressNotification>,
 }
 
 pub(super) enum Icon {
@@ -78,7 +78,7 @@ impl NvimNotifyProgressReporter {
         namespace: editor::notify::Namespace,
         spawner: &mut NeovimLocalSpawner,
     ) -> Self {
-        let (notif_tx, notif_rx) = flume::bounded::<ProgressNotification>(4);
+        let (notif_tx, notif_rx) = flume::unbounded();
 
         spawner
             .spawn(async move {
@@ -86,7 +86,7 @@ impl NvimNotifyProgressReporter {
             })
             .detach();
 
-        Self { notification_tx: notif_tx }
+        Self { notif_tx }
     }
 
     /// TODO: docs.
@@ -118,10 +118,13 @@ impl NvimNotifyProgressReporter {
     }
 
     pub(super) fn send_notification(&self, notif: ProgressNotification) {
-        if let Err(err) = self.notification_tx.try_send(notif) {
+        if let Err(err) = self.notif_tx.try_send(notif) {
             match err {
-                TrySendError::Disconnected(_) => unreachable!(),
-                TrySendError::Full(_) => {},
+                TrySendError::Disconnected(_) => tracing::error!(
+                    "{}'s event loop panicked",
+                    any::type_name::<Self>()
+                ),
+                TrySendError::Full(_) => unreachable!("channel is unbounded"),
             }
         }
     }
@@ -186,21 +189,21 @@ impl NvimNotifyProgressReporter {
                             (
                                 ProgressNotificationKind::Progress(None),
                                 ProgressNotificationKind::Progress(Some(_)),
-                            ) => spin = async_io::Timer::never(),
+                            ) => spin.clear(),
 
                             // Start spinning if we've stopped showing
                             // percentages.
                             (
                                 ProgressNotificationKind::Progress(Some(_)),
                                 ProgressNotificationKind::Progress(None),
-                            ) => spin = async_io::Timer::interval(SPINNER_UPDATE_INTERVAL),
+                            ) => spin.set_interval(SPINNER_UPDATE_INTERVAL),
 
                             _ => {},
                         }
 
                         notif = new_notif;
                         break 'spin;
-                    }
+                    },
                 }
             }
         }
