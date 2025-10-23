@@ -320,12 +320,14 @@ impl<'a> editor::Buffer for NeovimBuffer<'a> {
 
             for replacement in replacements {
                 if let Some(buffer_edited) = buffer_edited {
-                    buffer_edited.enqueue(Edit {
-                        made_by: agent_id,
-                        replacements: smallvec_inline![replacement.clone()],
-                    });
+                    buffer_edited.set_agent_id(agent_id);
                 }
-                apply_replacement(&mut buffer, replacement, buffer_edited);
+                apply_replacement(
+                    &mut buffer,
+                    replacement,
+                    buffer_edited,
+                    agent_id,
+                );
             }
         })
     }
@@ -400,6 +402,7 @@ fn apply_replacement(
     buffer: &mut api::Buffer,
     replacement: Replacement,
     buffer_edited: Option<&events::BufferEditedRegisterOutput>,
+    agent_id: AgentId,
 ) {
     debug_assert!(!replacement.is_no_op());
 
@@ -418,7 +421,6 @@ fn apply_replacement(
             deletion_start..deletion_end,
             deletion_range.len(),
             insert_text,
-            buffer_edited,
         );
         return;
     }
@@ -430,6 +432,7 @@ fn apply_replacement(
             deletion_start,
             insert_text,
             buffer_edited,
+            agent_id,
         );
         return;
     }
@@ -441,6 +444,7 @@ fn apply_replacement(
             deletion_start..deletion_end,
             deletion_range.len(),
             buffer_edited,
+            agent_id,
         );
         return;
     }
@@ -466,20 +470,33 @@ fn apply_replacement(
             deletion_start..clamped_end,
             deletion_len,
             stripped,
-            buffer_edited,
         );
         return;
     }
 
     // Enqueue the re-insertion of the newline that this replacement deletes.
     if let Some(buffer_edited) = buffer_edited {
-        let len_after_edit =
+        let len_after_replacement =
             buffer.num_bytes() - deletion_range.len() + insert_text.len();
-        let re_insert_newline = Replacement::insertion(len_after_edit, "\n");
-        buffer_edited.enqueue(Edit {
+
+        let replace_text = Edit {
+            made_by: agent_id,
+            replacements: smallvec_inline![Replacement::new(
+                deletion_range,
+                insert_text
+            )],
+        };
+
+        let re_insert_newline = Edit {
             made_by: AgentId::UNKNOWN,
-            replacements: smallvec_inline![re_insert_newline],
-        });
+            replacements: smallvec_inline![Replacement::insertion(
+                len_after_replacement,
+                "\n"
+            )],
+        };
+
+        buffer_edited.enqueue(replace_text);
+        buffer_edited.enqueue(re_insert_newline);
     }
 
     apply_replacement_whose_deletion_ends_before_fixeol(
@@ -487,7 +504,6 @@ fn apply_replacement(
         deletion_start..clamped_end,
         deletion_len,
         insert_text,
-        buffer_edited,
     );
 }
 
@@ -497,7 +513,6 @@ fn apply_replacement_whose_deletion_ends_before_fixeol(
     delete_range: Range<Point>,
     deletion_len: ByteOffset,
     insert_text: &str,
-    buffer_edited: Option<&events::BufferEditedRegisterOutput>,
 ) {
     debug_assert!(!buffer.is_point_after_uneditable_eol(delete_range.end));
     debug_assert!(!(delete_range.is_empty() && insert_text.is_empty()));
@@ -513,31 +528,6 @@ fn apply_replacement_whose_deletion_ends_before_fixeol(
         // empty line to be included.
         .chain(insert_text.ends_with('\n').then_some(""));
 
-    if let Some(buffer_edited) = buffer_edited
-        && buffer.has_uneditable_eol()
-    {
-        // If the buffer goes from empty to not empty, the trailing EOL
-        // "activates".
-        if buffer.is_empty() {
-            let insert_newline =
-                Replacement::insertion(insert_text.len(), "\n");
-            buffer_edited.enqueue(Edit {
-                made_by: AgentId::UNKNOWN,
-                replacements: smallvec_inline![insert_newline],
-            });
-        }
-
-        // Viceversa, if the buffer goes from not empty to empty, the trailing
-        // EOL "deactivates".
-        if deletion_len + 1 == buffer.num_bytes() && insert_text.is_empty() {
-            let delete_newline = Replacement::deletion(0..1);
-            buffer_edited.enqueue(Edit {
-                made_by: AgentId::UNKNOWN,
-                replacements: smallvec_inline![delete_newline],
-            });
-        }
-    }
-
     buffer
         .set_text(
             delete_range.start.newline_offset..delete_range.end.newline_offset,
@@ -548,25 +538,39 @@ fn apply_replacement_whose_deletion_ends_before_fixeol(
         .expect("replacing text failed");
 }
 
+#[allow(clippy::too_many_arguments)]
 fn apply_insertion_after_fixeol(
     buffer: &mut api::Buffer,
     insert_point: Point,
     insert_text: &str,
     buffer_edited: Option<&events::BufferEditedRegisterOutput>,
+    agent_id: AgentId,
 ) {
     debug_assert!(buffer.is_point_after_uneditable_eol(insert_point));
     debug_assert!(!insert_text.is_empty());
 
-    if !insert_text.ends_with('\n') {
-        // Enqueue the insertion of a newline after the inserted text.
-        if let Some(buffer_edited) = buffer_edited {
-            let len_after_edit = buffer.num_bytes() + insert_text.len();
-            let insert_newline = Replacement::insertion(len_after_edit, "\n");
-            buffer_edited.enqueue(Edit {
-                made_by: AgentId::UNKNOWN,
-                replacements: smallvec_inline![insert_newline],
-            });
-        }
+    // Enqueue the insertion of a newline after the inserted text.
+    if !insert_text.ends_with('\n')
+        && let Some(buffer_edited) = buffer_edited
+    {
+        let byte_len = buffer.num_bytes();
+        let insert_text_len = insert_text.len();
+        let insert_text = Edit {
+            made_by: agent_id,
+            replacements: smallvec_inline![Replacement::insertion(
+                byte_len,
+                insert_text
+            )],
+        };
+        let insert_newline = Edit {
+            made_by: AgentId::UNKNOWN,
+            replacements: smallvec_inline![Replacement::insertion(
+                byte_len + insert_text_len,
+                "\n"
+            )],
+        };
+        buffer_edited.enqueue(insert_text);
+        buffer_edited.enqueue(insert_newline);
     }
 
     let num_newlines = insert_point.newline_offset;
@@ -576,11 +580,14 @@ fn apply_insertion_after_fixeol(
         .expect("couldn't insert lines");
 }
 
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments)]
 fn apply_deletion_ending_after_fixeol(
     buffer: &mut api::Buffer,
     Range { start, end }: Range<Point>,
     deletion_len: ByteOffset,
     buffer_edited: Option<&events::BufferEditedRegisterOutput>,
+    agent_id: AgentId,
 ) {
     debug_assert!(start < end);
     debug_assert!(buffer.is_point_after_uneditable_eol(end));
@@ -595,7 +602,7 @@ fn apply_deletion_ending_after_fixeol(
         let line_range = start.newline_offset..end.newline_offset;
         buffer
             .set_lines(line_range, true, iter::empty::<&str>())
-            .expect("couldn't set lines");
+            .expect("couldn't delete lines");
         return;
     }
 
@@ -604,37 +611,57 @@ fn apply_deletion_ending_after_fixeol(
         byte_offset: buffer.num_bytes_in_line_after(end.newline_offset - 1),
     };
 
-    // We've clamped the end of the deletion range, so it's 1 byte shorter.
-    let deletion_len = deletion_len - 1;
-
+    // If the deletion only includes the last newline, we can just queue two
+    // fake edits without modifying the buffer.
     if clamped_end == start {
         let Some(buffer_edited) = buffer_edited else { return };
         let num_bytes = buffer.num_bytes();
-        let insert_newline = Replacement::insertion(num_bytes - 1, "\n");
-        buffer_edited.enqueue(Edit {
+        let delete_newline = Edit {
+            made_by: agent_id,
+            replacements: smallvec_inline![Replacement::deletion(
+                num_bytes - 1..num_bytes
+            )],
+        };
+        let insert_newline = Edit {
             made_by: AgentId::UNKNOWN,
-            replacements: smallvec_inline![insert_newline],
-        });
+            replacements: smallvec_inline![Replacement::insertion(
+                num_bytes - 1,
+                "\n"
+            )],
+        };
+        buffer_edited.enqueue(delete_newline);
+        buffer_edited.enqueue(insert_newline);
         buffer_edited.trigger();
         return;
     }
 
     // Enqueue the re-insertion of the newline that this deletion deletes.
     if let Some(buffer_edited) = buffer_edited {
-        let len_after_edit = buffer.num_bytes() - deletion_len;
-        let re_insert_newline = Replacement::insertion(len_after_edit, "\n");
-        buffer_edited.enqueue(Edit {
+        let byte_len = buffer.num_bytes();
+        let deletion_start = byte_len - deletion_len;
+        let delete_text = Edit {
+            made_by: agent_id,
+            replacements: smallvec_inline![Replacement::deletion(
+                deletion_start..byte_len
+            )],
+        };
+        let re_insert_newline = Edit {
             made_by: AgentId::UNKNOWN,
-            replacements: smallvec_inline![re_insert_newline],
-        });
+            replacements: smallvec_inline![Replacement::insertion(
+                deletion_start,
+                "\n"
+            )],
+        };
+        buffer_edited.enqueue(delete_text);
+        buffer_edited.enqueue(re_insert_newline);
     }
 
     apply_replacement_whose_deletion_ends_before_fixeol(
         buffer,
         start..clamped_end,
-        deletion_len,
+        // We've clamped the end of the deletion range, so it's 1 byte shorter.
+        deletion_len - 1,
         "",
-        buffer_edited,
     );
 }
 

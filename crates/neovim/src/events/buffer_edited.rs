@@ -1,4 +1,6 @@
+use core::cell::Cell;
 use core::iter;
+use std::rc::Rc;
 
 use editor::{AccessMut, AgentId, Edit, Editor, Replacement, Shared};
 use nohash::IntMap as NoHashMap;
@@ -18,6 +20,71 @@ const TRIGGER_AUTOCMD_PATTERN: &str = "BufferEditedEventTrigger";
 pub(crate) struct BufferEdited(pub(crate) BufferId);
 
 impl BufferEdited {
+    fn on_bytes(
+        nvim: &mut impl AccessMut<Neovim>,
+        args: api::opts::OnBytesArgs,
+        queued_edits: SmallVec<[Edit; 2]>,
+    ) -> ShouldDetach {
+        let buffer = args.1.clone();
+
+        // If there are queued edits, process them instead.
+        if !queued_edits.is_empty() {
+            return Self::on_edits(nvim, buffer.into(), &queued_edits);
+        }
+
+        let replacement = replacement_of_on_bytes(args);
+
+        let inserted_text = replacement.inserted_text();
+
+        let extra_replacement =
+            if buffer.has_uneditable_eol() && !inserted_text.ends_with('\n') {
+                let was_empty = buffer.num_bytes() == inserted_text.len() + 1;
+                let is_empty = buffer.is_empty();
+
+                match (was_empty, is_empty) {
+                    // If the buffer goes from empty to not empty, the trailing
+                    // EOL "activates".
+                    (true, false) => {
+                        Some(Replacement::insertion(inserted_text.len(), "\n"))
+                    },
+
+                    // Viceversa, if the buffer goes from not empty to empty,
+                    // the trailing EOL "deactivates".
+                    (false, true) => Some(Replacement::deletion(0..1)),
+
+                    _ => None,
+                }
+            } else {
+                None
+            };
+
+        let buffer_id = BufferId::from(buffer.clone());
+
+        let edited_by = nvim.with_mut(|nvim| {
+            nvim.events
+                .on_buffer_edited
+                .get(&buffer_id)
+                .map(|callbacks| callbacks.register_output().agent_id.take())
+                .unwrap_or(AgentId::UNKNOWN)
+        });
+
+        let mut edits = SmallVec::<[Edit; 2]>::new();
+
+        edits.push(Edit {
+            made_by: edited_by,
+            replacements: smallvec_inline![replacement],
+        });
+
+        if let Some(replacement) = extra_replacement {
+            edits.push(Edit {
+                made_by: AgentId::UNKNOWN,
+                replacements: smallvec_inline![replacement],
+            });
+        }
+
+        Self::on_edits(nvim, buffer.into(), &edits)
+    }
+
     fn on_edits<'a>(
         nvim: &mut impl AccessMut<Neovim>,
         buffer_id: BufferId,
@@ -60,11 +127,16 @@ impl BufferEdited {
 pub(crate) struct BufferEditedRegisterOutput {
     autocmd_ids: [AutocmdId; 2],
     queued_edits: Shared<SmallVec<[Edit; 2]>>,
+    agent_id: Rc<Cell<AgentId>>,
 }
 
 impl BufferEditedRegisterOutput {
     pub(crate) fn enqueue(&self, edit: Edit) {
         self.queued_edits.with_mut(|vec| vec.push(edit));
+    }
+
+    pub(crate) fn set_agent_id(&self, agent_id: AgentId) {
+        self.agent_id.set(agent_id);
     }
 
     pub(crate) fn trigger(&self) {
@@ -108,22 +180,10 @@ impl Event for BufferEdited {
         let queued_edits = Shared::<SmallVec<_>>::default();
 
         let on_bytes = {
-            let queued_edits = queued_edits.clone();
             let mut nvim = nvim.clone();
+            let queued_edits = queued_edits.clone();
             move |args: api::opts::OnBytesArgs| {
-                let queued = queued_edits.take();
-
-                if queued.is_empty() {
-                    let edit = Edit {
-                        made_by: AgentId::UNKNOWN,
-                        replacements: smallvec_inline![
-                            replacement_of_on_bytes(args)
-                        ],
-                    };
-                    Self::on_edits(&mut nvim, buffer_id, iter::once(&edit))
-                } else {
-                    Self::on_edits(&mut nvim, buffer_id, &queued)
-                }
+                Self::on_bytes(&mut nvim, args, queued_edits.take())
             }
         }
         .catch_unwind()
@@ -214,6 +274,7 @@ impl Event for BufferEdited {
         BufferEditedRegisterOutput {
             autocmd_ids: [option_set_autocmd_id, user_autocmd_id],
             queued_edits,
+            agent_id: Rc::new(Cell::new(AgentId::UNKNOWN)),
         }
     }
 
