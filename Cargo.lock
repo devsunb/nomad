@@ -4300,8 +4300,8 @@ dependencies = [
  "chrono",
  "editor",
  "git2",
+ "neovim",
  "serde",
- "tracing",
 ]
 
 [[package]]

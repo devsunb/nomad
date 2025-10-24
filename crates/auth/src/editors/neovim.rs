@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use auth_types::JsonWebToken;
 use editor::context::Borrowed;
 use editor::{Access, Context};

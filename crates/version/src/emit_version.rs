@@ -1,9 +1,9 @@
+use editor::Context;
 use editor::command::ToCompletionFn;
 use editor::context::Borrowed;
 use editor::module::Action;
-use editor::{Context, Editor};
 
-use crate::VERSION;
+use crate::{VERSION, VersionEditor};
 
 /// TODO: docs.
 #[derive(Default)]
@@ -16,17 +16,17 @@ impl EmitVersion {
     }
 }
 
-impl<Ed: Editor> Action<Ed> for EmitVersion {
+impl<Ed: VersionEditor> Action<Ed> for EmitVersion {
     const NAME: &str = "version";
 
     type Args<'args> = ();
     type Return = ();
 
     fn call(&mut self, _: Self::Args<'_>, ctx: &mut Context<Ed, Borrowed>) {
-        tracing::info!(title = %ctx.namespace().dot_separated(), "{VERSION}");
+        Ed::emit_version(VERSION, ctx);
     }
 }
 
-impl<Ed: Editor> ToCompletionFn<Ed> for EmitVersion {
+impl<Ed: VersionEditor> ToCompletionFn<Ed> for EmitVersion {
     fn to_completion_fn(&self) {}
 }

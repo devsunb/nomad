@@ -6,10 +6,15 @@ authors.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+neovim = ["dep:neovim"]
+
 [dependencies]
 editor = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-tracing = { workspace = true }
+
+# Neovim-only dependencies.
+neovim = { workspace = true, optional = true }
 
 [build-dependencies]
 chrono = { workspace = true }

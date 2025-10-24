@@ -24,7 +24,7 @@ neovim = { workspace = true, features = ["tracing"] }
 tracing = { workspace = true }
 tracing-layers = { workspace = true }
 tracing-subscriber = { workspace = true }
-version = { workspace = true }
+version = { workspace = true, features = ["neovim"] }
 
 [lints]
 workspace = true
