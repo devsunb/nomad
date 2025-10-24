@@ -431,6 +431,31 @@ async fn dG_from_first_row_deletes_whole_buffer(ctx: &mut Context<Neovim>) {
 }
 
 #[neovim::test]
+async fn insert_newline_in_empty_buf_with_no_eol(ctx: &mut Context<Neovim>) {
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let opts = opts::OptionOpts::builder().buf(buffer_id.into()).build();
+    api::set_option_value("eol", false, &opts).unwrap();
+    api::set_option_value("fixeol", false, &opts).unwrap();
+
+    let mut edit_stream = Edit::new_stream(buffer_id, ctx);
+
+    ctx.with_borrowed(|ctx| {
+        let mut buf = ctx.buffer(buffer_id).unwrap();
+        let _ = buf.schedule_insertion(0, "\n", AgentId::UNKNOWN);
+    });
+
+    let edit = edit_stream.next().await.unwrap();
+    assert_eq!(edit.made_by, AgentId::UNKNOWN);
+    assert_eq!(&*edit.replacements, &[Replacement::insertion(0, "\n")]);
+
+    ctx.with_borrowed(|ctx| {
+        let buf = ctx.buffer(buffer_id).unwrap();
+        assert_eq!(buf.get_text(), "\n");
+    });
+}
+
+#[neovim::test]
 fn grapheme_offsets_empty(ctx: &mut Context<Neovim>) {
     let buffer_id = ctx.create_and_focus_scratch_buffer();
 

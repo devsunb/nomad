@@ -201,7 +201,10 @@ pub trait BufferExt {
         let line_count = buffer.num_rows();
         let byte_len = buffer.get_offset(line_count).expect("buffer is valid");
         // Workaround for https://github.com/neovim/neovim/issues/34272.
-        if byte_len == 1 && self.num_bytes_in_line_after(0) == 0 {
+        if byte_len == 1
+            && line_count == 1
+            && self.num_bytes_in_line_after(0) == 0
+        {
             0
         } else {
             byte_len
