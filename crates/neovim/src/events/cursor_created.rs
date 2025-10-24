@@ -65,6 +65,7 @@ impl Event for CursorCreated {
                 let buffer_id = BufferId::from(args.buffer.clone());
 
                 let Some(mut buffer) = nvim.buffer(buffer_id) else {
+                    old_buffer_id.set(buffer_id);
                     return false;
                 };
 
@@ -82,10 +83,10 @@ impl Event for CursorCreated {
                     return false;
                 }
 
+                let old_buffer_id = old_buffer_id.replace(buffer_id);
+
                 let old_buffer_was_unnamed = old_buffer_was_unnamed
                     .replace(args.buffer.name().is_empty());
-
-                let old_buffer_id = old_buffer_id.replace(buffer_id);
 
                 // Some commands like ":edit" or ":split" can cause BufEnter to
                 // be fired multiple times for the same buffer, so we need to

@@ -1,14 +1,15 @@
 use core::mem;
 use core::time::Duration;
 
-use editor::{AgentId, ByteOffset, Context, Cursor};
+use editor::{AgentId, Buffer, ByteOffset, Context, Cursor, Editor};
+use futures_util::future::FutureExt as _;
 use futures_util::stream::{FusedStream, StreamExt};
 use neovim::Neovim;
 use neovim::buffer::BufferId;
 use neovim::tests::NeovimExt;
 
-use crate::editor::{CursorCreation, CursorEvent};
-use crate::utils::FutureExt;
+use crate::editor::cursor::{CursorCreation, CursorEvent, CursorRemoval};
+use crate::utils::FutureExt as _;
 
 #[neovim::test]
 async fn normal_to_insert_with_i(ctx: &mut Context<Neovim>) {
@@ -69,25 +70,59 @@ async fn cursor_is_removed_from_old_and_created_in_new_when_switching_buffers(
     ctx: &mut Context<Neovim>,
 ) {
     // Create the first buffer and put some text in it.
-    ctx.create_and_focus_scratch_buffer();
+    let first_buffer_id = ctx.create_and_focus_scratch_buffer();
     ctx.feedkeys("ihello<Esc>");
 
     let mut events = CursorEvent::new_stream(ctx);
 
     // Create and focus a second buffer.
-    let new_buffer_id = ctx.create_and_focus_scratch_buffer();
+    let second_buffer_id = ctx.create_and_focus_scratch_buffer();
 
     assert_eq!(
         events.next().await.unwrap(),
-        CursorEvent::Removed(AgentId::UNKNOWN)
+        CursorEvent::Removed(CursorRemoval {
+            cursor_id: first_buffer_id,
+            removed_by: AgentId::UNKNOWN
+        })
     );
 
     assert_eq!(
         events.next().await.unwrap(),
         CursorEvent::Created(CursorCreation {
-            buffer_id: new_buffer_id,
+            buffer_id: second_buffer_id,
             byte_offset: 0,
             created_by: AgentId::UNKNOWN,
+        })
+    );
+}
+
+#[neovim::test]
+async fn cursor_is_created_when_switching_focus_back_from_terminal(
+    ctx: &mut Context<Neovim>,
+) {
+    // Create a focus a normal buffer (buftype=).
+    let buffer_id = ctx.create_and_focus_scratch_buffer();
+
+    let mut events = CursorEvent::new_stream(ctx);
+
+    // Create a focus a terminal buffer (buftype=terminal).
+    ctx.command("terminal");
+    assert!(matches!(events.next().await.unwrap(), CursorEvent::Removed(_)));
+
+    let agent_id = ctx.new_agent_id();
+
+    // Switch focus back to the normal buffer.
+    ctx.with_editor(|nvim| {
+        nvim.buffer(buffer_id).unwrap().schedule_focus(agent_id).boxed_local()
+    })
+    .await;
+
+    assert_eq!(
+        events.next().await.unwrap(),
+        CursorEvent::Created(CursorCreation {
+            buffer_id,
+            byte_offset: 0,
+            created_by: agent_id,
         })
     );
 }

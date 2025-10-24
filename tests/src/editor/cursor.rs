@@ -41,7 +41,7 @@ pub(crate) async fn on_cursor_moved_1(ctx: &mut Context<impl TestEditor>) {
 pub(crate) enum CursorEvent<Ed: Editor> {
     Created(CursorCreation<Ed>),
     Moved(CursorMovement<Ed>),
-    Removed(AgentId),
+    Removed(CursorRemoval<Ed>),
 }
 
 #[derive(cauchy::Debug, cauchy::PartialEq)]
@@ -56,6 +56,12 @@ pub(crate) struct CursorMovement<Ed: Editor> {
     pub(crate) buffer_id: Ed::BufferId,
     pub(crate) byte_offset: ByteOffset,
     pub(crate) moved_by: AgentId,
+}
+
+#[derive(cauchy::Debug, cauchy::PartialEq)]
+pub(crate) struct CursorRemoval<Ed: Editor> {
+    pub(crate) cursor_id: Ed::CursorId,
+    pub(crate) removed_by: AgentId,
 }
 
 impl<Ed: Editor> CursorEvent<Ed> {
@@ -104,8 +110,10 @@ fn subscribe<Ed: Editor>(
     }));
 
     let tx2 = tx.clone();
-    mem::forget(cursor.on_removed(move |_cursor_id, removed_by| {
-        let event = CursorEvent::Removed(removed_by);
-        let _ = tx2.send(event);
+    mem::forget(cursor.on_removed(move |cursor_id, removed_by| {
+        let _ = tx2.send(CursorEvent::Removed(CursorRemoval {
+            cursor_id,
+            removed_by,
+        }));
     }));
 }
