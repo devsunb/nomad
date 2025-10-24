@@ -21,6 +21,7 @@ compact_str = { workspace = true }
 concurrent-queue = { workspace = true }
 derive_more = { workspace = true }
 editor = { workspace = true }
+either = { workspace = true }
 executor = { workspace = true, features = ["async-task"] }
 flume = { workspace = true }
 fs = { workspace = true }

@@ -23,7 +23,6 @@ pub struct CollabMock<Ed: Editor, F = ()> {
     confirm_start_with: Option<Box<dyn FnMut(&AbsPath) -> bool>>,
     clipboard: Option<MockSessionId>,
     default_dir_for_remote_projects: Option<AbsPathBuf>,
-    home_dir: Option<AbsPathBuf>,
     lsp_root_with: Option<Box<dyn FnMut(Ed::BufferId) -> Option<AbsPathBuf>>>,
     project_filter_with: Box<dyn FnMut(&<Ed::Fs as fs::Fs>::Directory) -> F>,
     select_session_with: Option<
@@ -68,7 +67,6 @@ impl<Ed: Editor> CollabMock<Ed, ()> {
             clipboard: None,
             confirm_start_with: None,
             default_dir_for_remote_projects: None,
-            home_dir: None,
             inner,
             lsp_root_with: None,
             project_filter_with: Box::new(|_| ()),
@@ -120,11 +118,6 @@ where
         self
     }
 
-    pub fn with_home_dir(mut self, dir_path: AbsPathBuf) -> Self {
-        self.home_dir = Some(dir_path);
-        self
-    }
-
     pub fn with_project_filter<Fun, NewF>(
         self,
         project_filter: Fun,
@@ -139,7 +132,6 @@ where
             clipboard: self.clipboard,
             default_dir_for_remote_projects: self
                 .default_dir_for_remote_projects,
-            home_dir: self.home_dir,
             lsp_root_with: self.lsp_root_with,
             project_filter_with: Box::new(project_filter),
             select_session_with: self.select_session_with,
@@ -203,7 +195,6 @@ where
 
     type ConnectToServerError = AnyError;
     type DefaultDirForRemoteProjectsError = NoDefaultDirForRemoteProjectsError;
-    type HomeDirError = AnyError;
     type LspRootError = Infallible;
     type ProjectFilterError = Infallible;
 
@@ -256,15 +247,6 @@ where
             this.default_dir_for_remote_projects
                 .clone()
                 .ok_or(NoDefaultDirForRemoteProjectsError)
-        })
-    }
-
-    async fn home_dir(
-        ctx: &mut Context<Self>,
-    ) -> Result<AbsPathBuf, Self::HomeDirError> {
-        ctx.with_editor(|this| match &this.home_dir {
-            Some(path) => Ok(path.clone()),
-            None => Err(AnyError::from_str("no home directory configured")),
         })
     }
 

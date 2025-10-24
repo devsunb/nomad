@@ -24,7 +24,7 @@ pub mod utils;
 pub mod value;
 
 pub use api::NeovimApi;
-pub use neovim::Neovim;
+pub use neovim::{DataDirError, Neovim};
 #[doc(inline)]
 pub use neovim_macros::plugin;
 #[doc(inline)]

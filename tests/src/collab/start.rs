@@ -1,4 +1,4 @@
-use abs_path::{AbsPathBuf, path};
+use abs_path::{AbsPath, path};
 use auth::Auth;
 use collab::Collab;
 use collab::editors::mock::CollabMock;
@@ -29,10 +29,10 @@ fn cannot_start_session_if_no_buffer_is_focused() {
 fn cannot_start_session_if_project_root_is_fs_root() {
     let fs = mock::fs! {
         "foo.txt": "",
-    };
+    }
+    .with_home_dir(AbsPath::root());
 
-    let editor =
-        CollabMock::new(Mock::new(fs)).with_home_dir(AbsPathBuf::root());
+    let editor = CollabMock::new(Mock::new(fs));
 
     editor.block_on(async |ctx| {
         let collab = Collab::from(&Auth::logged_in("peer1"));

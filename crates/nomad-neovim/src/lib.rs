@@ -1,12 +1,9 @@
 //! TODO: docs.
 
-use core::error::Error;
-
-use abs_path::{AbsPathBuf, NodeName, node};
+use abs_path::{NodeName, node};
 use editor::Context;
 use editor::context::Borrowed;
 use editor::module::{ApiCtx, Empty, Module, PanicInfo, Plugin};
-use either::Either;
 use neovim::Neovim;
 use neovim::notify::NotifyContextExt;
 use tracing::Subscriber;
@@ -28,15 +25,6 @@ impl Nomad {
     /// The [tracing target](tracing::Metadata::target) used for panic events.
     const TRACING_TARGET_PANIC: &str = "nomad::panic";
 
-    /// Returns the directory path under which files that need to be persisted
-    /// over Neovim restarts should be stored.
-    fn data_dir(&self) -> Result<AbsPathBuf, impl Error> {
-        neovim::oxi::api::call_function::<_, String>("stdpath", ("data",))
-            .map_err(Either::Left)
-            .and_then(|path| path.parse::<AbsPathBuf>().map_err(Either::Right))
-            .map(|neovim_data_dir| neovim_data_dir.join(node!("nomad")))
-    }
-
     fn file_appender<S>(
         &self,
         ctx: &mut Context<Neovim, Borrowed>,
@@ -44,9 +32,9 @@ impl Nomad {
     where
         S: Subscriber + for<'a> LookupSpan<'a>,
     {
-        match self.log_dir() {
-            Ok(dir) => Some(tracing_layers::FileAppender::new(
-                dir,
+        match ctx.data_dir_path() {
+            Ok(dir_path) => Some(tracing_layers::FileAppender::new(
+                dir_path.join(node!("nomad")).join(node!("logs")),
                 Self::LOG_FILENAME_PREFIX.to_owned(),
                 ctx,
             )),
@@ -57,11 +45,6 @@ impl Nomad {
                 None
             },
         }
-    }
-
-    /// Returns the directory path under which the log files should be stored.
-    fn log_dir(&self) -> Result<AbsPathBuf, impl Error> {
-        self.data_dir().map(|dir| dir.join(node!("logs")))
     }
 }
 

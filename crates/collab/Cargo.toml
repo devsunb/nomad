@@ -13,7 +13,6 @@ neovim = [
   "dep:async-io",
   "dep:async-net",
   "dep:gitignore",
-  "dep:home",
   "dep:neovim",
   "dep:nomad-collab-params",
 ]
@@ -53,7 +52,6 @@ duplex-stream = { workspace = true, optional = true }
 async-io = { workspace = true, optional = true }
 async-net = { workspace = true, optional = true }
 gitignore = { workspace = true, optional = true }
-home = { workspace = true, optional = true }
 neovim = { workspace = true, optional = true }
 nomad-collab-params = { workspace = true, optional = true }
 

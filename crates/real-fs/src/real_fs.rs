@@ -3,7 +3,8 @@
 use std::io;
 use std::time::SystemTime;
 
-use abs_path::AbsPath;
+use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError};
+use either::Either;
 
 use crate::{Directory, File, Metadata, Symlink};
 
@@ -23,6 +24,7 @@ impl fs::Fs for RealFs {
     type Timestamp = SystemTime;
 
     type CreateDirectoriesError = io::Error;
+    type HomeError = Either<io::Error, fs::GetDirError<Self>>;
     type NodeAtPathError = io::Error;
 
     #[inline]
@@ -34,6 +36,14 @@ impl fs::Fs for RealFs {
         async_fs::create_dir_all(path).await?;
         let metadata = async_fs::metadata(path).await?;
         Ok(Directory { path: path.to_owned(), metadata })
+    }
+
+    #[inline]
+    async fn home(&self) -> Result<Option<Self::Directory>, Self::HomeError> {
+        let Some(home_path) = home_path().map_err(Either::Left)? else {
+            return Ok(None);
+        };
+        self.dir(home_path).await.map_err(Either::Right).map(Some)
     }
 
     #[inline]
@@ -68,4 +78,26 @@ impl fs::Fs for RealFs {
     fn now(&self) -> Self::Timestamp {
         SystemTime::now()
     }
+}
+
+fn home_path() -> io::Result<Option<AbsPathBuf>> {
+    let path = match home::home_dir() {
+        Some(path) if !path.as_os_str().is_empty() => path,
+        _ => return Ok(None),
+    };
+
+    (&*path)
+        .try_into()
+        .map_err(|err| {
+            let msg = match err {
+                AbsPathFromPathError::NotAbsolute => {
+                    format!("home directory path is not absolute: {path:?}")
+                },
+                AbsPathFromPathError::NotUtf8 => {
+                    format!("home directory path is not valid UTF-8: {path:?}")
+                },
+            };
+            io::Error::new(io::ErrorKind::InvalidInput, msg)
+        })
+        .map(Some)
 }

@@ -8,9 +8,8 @@ use abs_path::{AbsPath, AbsPathBuf};
 use compact_str::ToCompactString;
 use editor::Context;
 use editor::context::BorrowState;
+use fs::{Directory, Fs};
 use neovim::{Neovim, notify};
-
-use crate::CollabEditor;
 
 /// The highlight group used to highlight a peer's handle in notifications.
 pub(super) const PEER_HANDLE_HL_GROUP: &str = "Identifier";
@@ -79,8 +78,9 @@ fn with_home_path<R>(
 
     if !was_set {
         ctx.spawn_and_detach(async |ctx| {
-            let Ok(home_dir) = Neovim::home_dir(ctx).await else { return };
-            HOME_DIR.with(|cell| cell.set(home_dir)).ok();
+            if let Ok(Some(home)) = ctx.fs().home().await {
+                HOME_DIR.with(|cell| cell.set(home.path().to_owned())).ok();
+            }
         });
     }
 

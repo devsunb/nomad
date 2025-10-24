@@ -244,7 +244,6 @@ impl<Ed: CollabEditor> Start<Ed> {
                 .await
                 .map_err(StartError::ReadProject)?;
 
-
         let remote_peers = RemotePeers::new(welcome.other_peers, &project);
 
         let project = project::Project {
@@ -359,16 +358,16 @@ async fn search_project_root<Ed: CollabEditor>(
             .ok_or(SearchProjectRootError::InvalidBufId(buffer_id))
     })?;
 
-    let home_dir =
-        Ed::home_dir(ctx).await.map_err(SearchProjectRootError::HomeDir)?;
+    let mut fs = ctx.fs();
+
+    let maybe_home =
+        fs.home().await.map_err(SearchProjectRootError::HomeDir)?;
 
     let args = root_markers::FindRootArgs {
         marker: root_markers::GitDirectory,
         start_from: &buffer_path,
-        stop_at: Some(&home_dir),
+        stop_at: maybe_home.as_ref().map(|dir| dir.path()),
     };
-
-    let mut fs = ctx.fs();
 
     if let Some(res) = args.find(&mut fs).await.transpose() {
         return res.map_err(SearchProjectRootError::FindRoot);
@@ -572,7 +571,7 @@ pub enum SearchProjectRootError<Ed: CollabEditor> {
     FindRoot(root_markers::FindRootError<Ed::Fs, Markers>),
 
     /// TODO: docs.
-    HomeDir(Ed::HomeDirError),
+    HomeDir(<Ed::Fs as fs::Fs>::HomeError),
 
     /// TODO: docs.
     #[display("There's no buffer with ID {_0:?}")]

@@ -1,3 +1,4 @@
+use core::fmt;
 use core::ops::{Deref, DerefMut};
 use std::io;
 
@@ -205,6 +206,12 @@ impl Deref for FileInner {
 impl DerefMut for FileInner {
     fn deref_mut(&mut self) -> &mut async_fs::File {
         &mut self.inner
+    }
+}
+
+impl fmt::Debug for File {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("File").field(&self.path).finish()
     }
 }
 

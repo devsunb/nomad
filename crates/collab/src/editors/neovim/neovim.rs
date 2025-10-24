@@ -1,10 +1,8 @@
 use core::ops::Range;
-use std::ffi::OsString;
-use std::path::PathBuf;
+use std::io;
 use std::sync::{Arc, OnceLock};
-use std::{env, io};
 
-use abs_path::{AbsPath, AbsPathBuf, AbsPathFromPathError, node};
+use abs_path::{AbsPath, AbsPathBuf, node};
 use async_net::TcpStream;
 use collab_types::Peer;
 use compact_str::{ToCompactString, format_compact};
@@ -50,34 +48,6 @@ pub enum NeovimConnectToServerError {
 }
 
 #[derive(Debug, derive_more::Display, cauchy::Error)]
-pub enum NeovimDataDirError {
-    #[display("{_0}")]
-    Home(NeovimHomeDirError),
-
-    #[display("found data directory at {_0:?}, but it's not an absolute path")]
-    XdgDataHomeNotAbsolute(String),
-
-    #[display(
-        "found data directory at {_0:?}, but it's not a valid UTF-8 string"
-    )]
-    XdgDataHomeNotUtf8(OsString),
-}
-
-#[derive(Debug, derive_more::Display, cauchy::Error)]
-pub enum NeovimHomeDirError {
-    #[display("Couldn't find the home directory")]
-    CouldntFindHome,
-
-    #[display("Found home directory at {_0:?}, but it's not an absolute path")]
-    HomeDirNotAbsolute(PathBuf),
-
-    #[display(
-        "Found home directory at {_0:?}, but it's not a valid UTF-8 string"
-    )]
-    HomeDirNotUtf8(PathBuf),
-}
-
-#[derive(Debug, derive_more::Display, cauchy::Error)]
 #[display("LSP root at {root_dir} is not an absolute path")]
 pub struct NeovimLspRootError {
     root_dir: String,
@@ -92,8 +62,7 @@ impl CollabEditor for Neovim {
     type ServerParams = nomad_collab_params::NomadParams;
 
     type ConnectToServerError = NeovimConnectToServerError;
-    type DefaultDirForRemoteProjectsError = NeovimDataDirError;
-    type HomeDirError = NeovimHomeDirError;
+    type DefaultDirForRemoteProjectsError = neovim::DataDirError;
     type LspRootError = NeovimLspRootError;
     type ProjectFilterError = gitignore::CreateError;
 
@@ -208,43 +177,12 @@ impl CollabEditor for Neovim {
     async fn default_dir_for_remote_projects(
         ctx: &mut Context<Self>,
     ) -> Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError> {
-        let data_dir = match env::var("XDG_DATA_HOME") {
-            Ok(xdg_data_home) => {
-                xdg_data_home.parse::<AbsPathBuf>().map_err(|_| {
-                    NeovimDataDirError::XdgDataHomeNotAbsolute(xdg_data_home)
-                })?
-            },
-            Err(env::VarError::NotPresent) => Self::home_dir(ctx)
-                .await
-                .map_err(NeovimDataDirError::Home)?
-                .join(node!(".local"))
-                .join(node!("share")),
-            Err(env::VarError::NotUnicode(xdg_data_home)) => {
-                return Err(NeovimDataDirError::XdgDataHomeNotUtf8(
-                    xdg_data_home,
-                ));
-            },
-        };
+        let data_dir_path = ctx.with_editor(|nvim| nvim.data_dir_path())?;
 
-        Ok(data_dir.join(node!("nomad")).join(node!("remote-projects")))
-    }
-
-    async fn home_dir(
-        _: &mut Context<Self>,
-    ) -> Result<AbsPathBuf, Self::HomeDirError> {
-        match home::home_dir() {
-            Some(home_dir) if !home_dir.as_os_str().is_empty() => {
-                home_dir.as_path().try_into().map_err(|err| match err {
-                    AbsPathFromPathError::NotAbsolute => {
-                        NeovimHomeDirError::HomeDirNotAbsolute(home_dir)
-                    },
-                    AbsPathFromPathError::NotUtf8 => {
-                        NeovimHomeDirError::HomeDirNotUtf8(home_dir)
-                    },
-                })
-            },
-            _ => Err(NeovimHomeDirError::CouldntFindHome),
-        }
+        Ok(data_dir_path
+            .join(node!("nomad"))
+            .join(node!("collab"))
+            .join(node!("remote-projects")))
     }
 
     async fn jump_to(

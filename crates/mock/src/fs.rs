@@ -67,6 +67,7 @@ struct FsInner {
     next_node_id: MockNodeId,
     root: Node,
     timestamp: MockTimestamp,
+    home_path: Option<AbsPathBuf>,
 }
 
 #[derive(cauchy::Debug, cauchy::PartialEq, cauchy::Eq)]
@@ -133,6 +134,14 @@ impl MockFs {
     #[doc(hidden)]
     pub fn new(root: DirectoryInner) -> Self {
         Self { inner: Shared::new(FsInner::new(root)) }
+    }
+
+    /// Sets the user's home directory to the given path.
+    pub fn with_home_dir(self, path: impl AsRef<AbsPath>) -> Self {
+        self.with_inner(|inner| {
+            inner.home_path = Some(path.as_ref().to_owned());
+        });
+        self
     }
 
     fn delete_node_inner(
@@ -323,6 +332,7 @@ impl FsInner {
             next_node_id,
             root: Node::Directory(root),
             timestamp: MockTimestamp(0),
+            home_path: None,
         }
     }
 
@@ -599,6 +609,7 @@ impl fs::Fs for MockFs {
     type Timestamp = MockTimestamp;
 
     type CreateDirectoriesError = CreateNodeError;
+    type HomeError = fs::GetDirError<Self>;
     type NodeAtPathError = Infallible;
 
     async fn create_all_missing_directories<P: AsRef<AbsPath>>(
@@ -642,6 +653,13 @@ impl fs::Fs for MockFs {
                 Some(dir_name) => dir = dir.create_directory(dir_name).await?,
                 None => return Ok(dir),
             }
+        }
+    }
+
+    async fn home(&self) -> Result<Option<Self::Directory>, Self::HomeError> {
+        match self.with_inner(|inner| inner.home_path.clone()) {
+            Some(home_path) => self.dir(home_path).await.map(Some),
+            None => Ok(None),
         }
     }
 

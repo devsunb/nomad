@@ -3,11 +3,12 @@ use core::mem;
 
 use ::executor::Executor;
 use ::serde::{Deserialize, Serialize};
-use abs_path::AbsPath;
+use abs_path::{AbsPath, AbsPathBuf};
 use clipboard::{FallibleInitClipboard, arboard};
 use editor::module::Plugin;
 use editor::notify::Namespace;
 use editor::{AccessMut, AgentId, Buffer, Editor};
+use either::Either;
 
 use crate::buffer::{
     BufferId,
@@ -21,6 +22,10 @@ use crate::decoration_provider::DecorationProvider;
 use crate::events::{self, EventHandle, Events};
 use crate::selection::NeovimSelection;
 use crate::{api, executor, notify, oxi, serde, value};
+
+/// The type of error returned by [`Neovim::data_dir`].
+pub type DataDirError =
+    Either<oxi::api::Error, abs_path::AbsPathNotAbsoluteError>;
 
 type HttpClient = http_client::UreqClient<
     <<Neovim as Editor>::Executor as Executor>::BackgroundSpawner,
@@ -40,6 +45,14 @@ pub struct Neovim {
 }
 
 impl Neovim {
+    /// Returns the path to the user's data directory used by Neovim.
+    #[inline]
+    pub fn data_dir_path(&self) -> Result<AbsPathBuf, DataDirError> {
+        oxi::api::call_function::<_, String>("stdpath", ("data",))
+            .map_err(Either::Left)
+            .and_then(|path| path.parse::<AbsPathBuf>().map_err(Either::Right))
+    }
+
     /// TODO: docs.
     #[inline]
     pub fn highlight_range<'a>(

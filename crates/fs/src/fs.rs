@@ -30,6 +30,10 @@ pub trait Fs: Clone + Send + Sync + 'static {
     /// TODO: docs.
     type CreateDirectoriesError: Error + Send;
 
+    /// The type of error that can occur when getting the user's home
+    /// directory.
+    type HomeError: Error + Send;
+
     /// TODO: docs.
     type NodeAtPathError: Error + Send;
 
@@ -40,6 +44,11 @@ pub trait Fs: Clone + Send + Sync + 'static {
     ) -> impl Future<
         Output = Result<Self::Directory, Self::CreateDirectoriesError>,
     > + Send;
+
+    /// Returns the user's home directory, or `None` if they don't have one.
+    fn home(
+        &self,
+    ) -> impl Future<Output = Result<Option<Self::Directory>, Self::HomeError>> + Send;
 
     /// TODO: docs.
     fn node_at_path<P: AsRef<AbsPath> + Send>(

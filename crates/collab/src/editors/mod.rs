@@ -56,9 +56,6 @@ pub trait CollabEditor: Editor {
     /// [`default_dir_for_remote_projects`](CollabEditor::default_dir_for_remote_projects).
     type DefaultDirForRemoteProjectsError: Debug;
 
-    /// The type of error returned by [`home_dir`](CollabEditor::home_dir).
-    type HomeDirError: Debug;
-
     /// The type of error returned by [`lsp_root`](CollabEditor::lsp_root).
     type LspRootError: Debug;
 
@@ -101,11 +98,6 @@ pub trait CollabEditor: Editor {
     ) -> impl Future<
         Output = Result<AbsPathBuf, Self::DefaultDirForRemoteProjectsError>,
     >;
-
-    /// Returns the absolute path to the user's home directory.
-    fn home_dir(
-        ctx: &mut Context<Self>,
-    ) -> impl Future<Output = Result<AbsPathBuf, Self::HomeDirError>>;
 
     /// Moves the user's main cursor to the given byte offset in the buffer
     /// with the given ID.

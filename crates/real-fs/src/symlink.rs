@@ -1,3 +1,4 @@
+use core::fmt;
 use std::io;
 use std::path::PathBuf;
 
@@ -95,5 +96,11 @@ impl fs::Symlink for Symlink {
     #[inline]
     async fn read_path(&self) -> Result<String, Self::ReadError> {
         self.read_link().await.map(|path| path.display().to_string())
+    }
+}
+
+impl fmt::Debug for Symlink {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("Symlink").field(&self.path).finish()
     }
 }

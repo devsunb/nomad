@@ -1,4 +1,4 @@
-use abs_path::{AbsPathBuf, path};
+use abs_path::{AbsPath, path};
 use auth::Auth;
 use collab::Collab;
 use collab::editors::mock::{CollabMock, CollabServer};
@@ -15,13 +15,12 @@ fn replicate_simple_project() {
             "world.txt": "Hello, world!",
             "mars.txt": "Hello, mars!",
         },
-    };
+    }
+    .with_home_dir(AbsPath::root());
 
     let server = CollabServer::default();
 
-    let peer1 = CollabMock::new(Mock::new(fs1.clone()))
-        .with_home_dir(AbsPathBuf::root())
-        .with_server(&server);
+    let peer1 = CollabMock::new(Mock::new(fs1.clone())).with_server(&server);
 
     let peer2 = CollabMock::<Mock>::default()
         .with_default_dir_for_remote_projects(path!("/remote"))

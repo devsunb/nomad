@@ -8,12 +8,7 @@ mod peer_highlight_group;
 mod peer_selection;
 mod progress_reporter;
 
-pub use neovim::{
-    NeovimConnectToServerError,
-    NeovimDataDirError,
-    NeovimHomeDirError,
-    NeovimLspRootError,
-};
+pub use neovim::{NeovimConnectToServerError, NeovimLspRootError};
 pub use peer_cursor::NeovimPeerCursor;
 use peer_cursor::PeerCursorHighlightGroup;
 pub use peer_handle::NeovimPeerHandle;

@@ -13,8 +13,10 @@ temp = ["dep:tempfile"]
 abs-path = { workspace = true }
 async-fs = { workspace = true }
 async-lock = { workspace = true }
+either = { workspace = true }
 fs = { workspace = true }
 futures-util = { workspace = true, features = ["io"] }
+home = { workspace = true }
 notify = { workspace = true, optional = true }
 pin-project-lite = { workspace = true }
 
