@@ -31,7 +31,7 @@ impl BufferEdited {
         let inserted_text = replacement.inserted_text();
 
         let extra_replacement = if buffer.has_uneditable_eol()
-            && !inserted_text.ends_with('\n')
+            && (!inserted_text.ends_with('\n') || inserted_text == "\n")
         {
             let was_empty = buffer.num_bytes() == inserted_text.len() + 1;
             let is_empty = buffer.is_empty();
