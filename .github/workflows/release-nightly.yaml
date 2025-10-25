@@ -3,7 +3,7 @@ name: Release Nightly
 on:
   schedule:
    # Every night at 4AM UTC+0.
-   # - cron: "0 4 * * *"
+   - cron: "0 4 * * *"
   workflow_dispatch:
 
 permissions:
