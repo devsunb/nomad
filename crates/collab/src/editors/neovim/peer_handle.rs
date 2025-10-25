@@ -16,7 +16,7 @@ thread_local! {
 }
 
 /// A remote peer's handle in a buffer, displayed either directly above or
-/// below their [`cursor`](crate::editors::neovim::PeerCursor).
+/// below their [`cursor`](crate::editors::neovim::NeovimPeerCursor).
 pub struct NeovimPeerHandle {
     /// The buffer the cursor is in.
     buffer: api::Buffer,

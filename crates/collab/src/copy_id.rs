@@ -11,8 +11,8 @@ use crate::collab::Collab;
 use crate::editors::{ActionForSelectedSession, CollabEditor};
 use crate::session::{NoActiveSessionError, Sessions};
 
-/// An `Action` that pastes the [`SessionId`](crate::editors::SessionId) of any
-/// active session to the user's clipboard.
+/// An `Action` that pastes the [`SessionId`] of any active session to the
+/// user's clipboard.
 #[derive(cauchy::Clone)]
 pub struct CopyId<Ed: CollabEditor> {
     sessions: Sessions<Ed>,

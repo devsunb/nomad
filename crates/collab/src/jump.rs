@@ -133,8 +133,8 @@ pub enum JumpError<Ed: CollabEditor> {
     UnknownPeer(PeerHandle),
 }
 
-/// The type of error that can occur when [`jumping`](Jump::jump_to) to the
-/// position of a remote peer's cursor.
+/// The type of error that can occur when jumping to the position of a remote
+/// peer's cursor.
 #[derive(
     cauchy::Debug, derive_more::Display, cauchy::Error, cauchy::PartialEq,
 )]

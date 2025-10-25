@@ -23,7 +23,7 @@ use crate::events::{self, EventHandle, Events};
 use crate::selection::NeovimSelection;
 use crate::{api, executor, notify, oxi, serde, value};
 
-/// The type of error returned by [`Neovim::data_dir`].
+/// The type of error returned by [`Neovim::data_dir_path()`].
 pub type DataDirError =
     Either<oxi::api::Error, abs_path::AbsPathNotAbsoluteError>;
 

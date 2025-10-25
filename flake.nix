@@ -76,7 +76,7 @@
               type = "app";
               program =
                 (pkgs.writeShellScript "check-${name}" ''
-                  # Force evaluation of check ${check}.
+                  # Force evaluation of ${check}.
                   echo -e "\033[1;32m✓\033[0m Check '${name}' passed"
                 '').outPath;
             };
