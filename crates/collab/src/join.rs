@@ -117,7 +117,6 @@ impl<Ed: CollabEditor> Join<Ed> {
                 .await
                 .map_err(JoinError::WriteProject)?;
 
-
         let project_filter = Ed::project_filter(&project_root, ctx)
             .map_err(JoinError::ProjectFilter)?;
 
