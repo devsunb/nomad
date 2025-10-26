@@ -12,8 +12,7 @@ jobs:
     uses: ./.github/workflows/build-and-release.yaml
     secrets: inherit
     with:
-      checkout-ref: ${{ github.ref_name }}
+      changelog-entry: ${{ github.ref_name }}
       is-stable: true
       release-name: "Nomad ${{ github.ref_name }}"
-      release-body: "TODO"
       release-tag: ${{ github.ref_name }}

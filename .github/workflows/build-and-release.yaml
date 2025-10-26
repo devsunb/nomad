@@ -3,8 +3,8 @@ name: "Build and Release"
 on:
   workflow_call:
     inputs:
-      checkout-ref:
-        description: "Branch, tag, or commit to checkout and build from"
+      changelog-entry:
+        description: "The name of the CHANGELOG entry to build the release notes from"
         required: true
         type: string
       is-stable:
@@ -15,10 +15,6 @@ on:
         description: "Name of the release"
         required: true
         type: string
-      release-body:
-        description: "A markdown-formatted string describing changes in this release"
-        required: true
-        type: string
       release-tag:
         description: "The tag to attach the release to"
         required: true
@@ -26,7 +22,7 @@ on:
 
 jobs:
   build-neovim:
-    name: build Neovim plugins
+    name: Build Neovim plugins
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -39,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.checkout-ref }}
+          ref: ${{ inputs.release-tag }}
 
       - name: Install Nix
         uses: ./.github/actions/setup-nix
@@ -76,12 +72,19 @@ jobs:
         with:
           path: artifacts/
 
+      - name: Get the Changelog entry
+        id: changelog-entry
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          version: ${{ inputs.changelog-entry }}
+          validation_level: warn
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
           name: ${{ inputs.release-name }}
-          body: ${{ inputs.release-body }}
+          body: ${{ steps.changelog-entry.outputs.changes }}
           make_latest: ${{ inputs.is-stable && 'true' || 'false' }}
           prerelease: ${{ !inputs.is-stable }}
           tag_name: ${{ inputs.release-tag }}

@@ -74,8 +74,7 @@ jobs:
     uses: ./.github/workflows/build-and-release.yaml
     secrets: inherit
     with:
-      checkout-ref: main
+      changelog-entry: "Unreleased"
       is-stable: false
       release-name: "Nomad Nightly – ${{ needs.setup.outputs.formatted_date }}"
-      release-body: "TODO"
       release-tag: ${{ needs.setup.outputs.nightly_tag }}
