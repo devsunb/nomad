@@ -53,6 +53,11 @@ jobs:
             ${{ secrets.PANDO_DEPLOY_KEY }}
             ${{ secrets.PUFF_DEPLOY_KEY }}
 
+      - name: Create /RELEASE_TAG
+        run: |
+          printf "${{ inputs.release-tag }}" > ./RELEASE_TAG
+          git add ./RELEASE_TAG
+
       - name: Build the Neovim release artifacts
         run: nix build ${{ matrix.release-artifacts-package }}
 
