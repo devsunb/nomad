@@ -16,14 +16,14 @@
         lua =
           path: type: craneLib:
           (
-            (lib.hasSuffix ".lua" (builtins.baseNameOf path))
+            (lib.hasSuffix ".lua" path)
             || (type == "symlink" && lib.hasPrefix "${repoRoot craneLib}/lua/nomad" path)
           );
 
         # Keeps all the Rust-related files in the whole repo.
         rust =
           path: type: craneLib:
-          craneLib.filterCargoSources path type;
+          (craneLib.filterCargoSources path type) || (lib.hasSuffix ".pem" path);
 
         # Keeps all the Rust-related files under /xtask (and the workspace
         # manifest).
