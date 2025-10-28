@@ -106,8 +106,19 @@ impl RemotePeer {
     ///
     /// This approach should allow us to track a peer's "main" cursor, even in
     /// editors that support multiple cursors.
-    pub fn main_cursor_id(&self) -> Option<CursorId> {
+    pub fn main_cursor(&self) -> Option<CursorId> {
         self.main_cursor_id
+    }
+
+    /// Returns the ID of the main cursor for the given peer in the given
+    /// project, or `None` if the peer has no cursors in the project.
+    pub(crate) fn get_main_cursor(
+        peer_id: PeerId,
+        proj: &collab_project::Project,
+    ) -> Option<CursorId> {
+        proj.cursors()
+            .filter_map(|cur| (cur.owner() == peer_id).then_some(cur.id()))
+            .min()
     }
 
     #[cfg_attr(not(feature = "neovim"), expect(unused))]
@@ -119,19 +130,17 @@ impl RemotePeer {
         self.main_cursor_id = None;
     }
 
-    pub(crate) fn set_main_cursor_id(&mut self, new_id: CursorId) {
+    pub(crate) fn set_main_cursor(&mut self, new_id: CursorId) {
         debug_assert!(self.inner.id == new_id.owner());
         debug_assert!(self.main_cursor_id.is_none_or(|id| new_id < id));
         self.main_cursor_id = Some(new_id);
     }
 
     fn new(peer: Peer, proj: &collab_project::Project) -> Self {
-        let main_cursor_id = proj
-            .cursors()
-            .filter_map(|cur| (cur.owner() == peer.id).then_some(cur.id()))
-            .min();
-
-        Self { inner: peer, main_cursor_id }
+        Self {
+            main_cursor_id: Self::get_main_cursor(peer.id, proj),
+            inner: peer,
+        }
     }
 }
 

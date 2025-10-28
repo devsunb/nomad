@@ -19,7 +19,7 @@ use smallvec::SmallVec;
 use crate::CollabEditor;
 use crate::convert::Convert;
 use crate::event::{self, Event};
-use crate::peers::RemotePeers;
+use crate::peers::{RemotePeer, RemotePeers};
 
 /// TODO: docs.
 pub struct Project<Ed: CollabEditor> {
@@ -423,8 +423,8 @@ impl<Ed: CollabEditor> Project<Ed> {
 
                 // Check if the new cursor should become the peer's main
                 // cursor.
-                if peer.main_cursor_id().is_none_or(|id| cursor.id() < id) {
-                    peer.set_main_cursor_id(cursor.id());
+                if peer.main_cursor().is_none_or(|id| cursor.id() < id) {
+                    peer.set_main_cursor(cursor.id());
                 }
 
                 Some(peer.clone())
@@ -462,12 +462,20 @@ impl<Ed: CollabEditor> Project<Ed> {
                 Ed::remove_peer_tooltip(tooltip, ctx);
             }
 
-            // Check if this was a peer's main cursor.
+            // Update the cursor owner's main cursor.
             self.remote_peers.with_mut(|map| {
-                if let Some(peer) = map.get_mut(&cursor_id.owner())
-                    && peer.main_cursor_id() == Some(cursor_id)
+                let Some(owner) = map.get_mut(&cursor_id.owner()) else {
+                    return;
+                };
+
+                if owner.main_cursor() == Some(cursor_id) {
+                    owner.remove_main_cursor();
+                }
+
+                if let Some(new_main_cursor_id) =
+                    RemotePeer::get_main_cursor(owner.id, &self.inner)
                 {
-                    peer.remove_main_cursor();
+                    owner.set_main_cursor(new_main_cursor_id);
                 }
             });
 

@@ -394,11 +394,11 @@ impl CollabEditor for Neovim {
             .expect("session must have host peer");
 
         let Some((peer_handle, cursor_id)) = host
-            .main_cursor_id()
+            .main_cursor()
             .map(|cursor_id| (host.into_inner().handle, cursor_id))
             .or_else(|| {
                 infos.remote_peers.find_map(|peer| {
-                    peer.main_cursor_id()
+                    peer.main_cursor()
                         .map(|cursor_id| (peer.handle.clone(), cursor_id))
                 })
             })

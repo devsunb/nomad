@@ -294,8 +294,8 @@ async fn write_project<Ed: CollabEditor>(
     let fs = ctx.fs();
 
     // SAFETY: we're awaiting on the following background task and not
-    // detaching it, so the pointer is guaranteed to point to a `Project`
-    // for its entire duration.
+    // detaching it, so the pointer is guaranteed to point to a `Project` for
+    // its entire duration.
     let project_ptr = unsafe { ProjectPtr::new(project) };
 
     ctx.spawn_background(async move {

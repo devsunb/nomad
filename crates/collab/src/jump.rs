@@ -30,7 +30,7 @@ impl<Ed: CollabEditor> Jump<Ed> {
         let Some(sesh) = self.sessions.find(|sesh| {
             match sesh.remote_peers.find(|peer| peer.handle == peer_handle) {
                 Some(peer) => {
-                    maybe_cursor_id = peer.main_cursor_id();
+                    maybe_cursor_id = peer.main_cursor();
                     true
                 },
                 None => false,
