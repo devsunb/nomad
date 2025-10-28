@@ -6,7 +6,7 @@ use editor::ByteOffset;
 use neovim::buffer::{BufferExt, Point};
 use neovim::oxi::api;
 
-use crate::editors::neovim::PeerHighlightGroup;
+use crate::editors::neovim::{NeovimPeerSelection, PeerHighlightGroup};
 
 /// A remote peer's cursor in a buffer.
 pub struct NeovimPeerCursor {
@@ -37,6 +37,10 @@ impl PeerCursorHighlightGroup {
 }
 
 impl NeovimPeerCursor {
+    // Cursors should be drawn above selections, so set the extmark priority
+    // accordingly.
+    const EXTMARK_PRIORITY: u8 = NeovimPeerSelection::EXTMARK_PRIORITY + 1;
+
     /// Creates a new cursor for the remote peer with given ID at the given
     /// byte offset in the given buffer.
     pub(super) fn create(
@@ -53,6 +57,7 @@ impl NeovimPeerCursor {
             .end_row(highlight_range.end.newline_offset)
             .end_col(highlight_range.end.byte_offset)
             .hl_group(hl_group_id)
+            .priority(Self::EXTMARK_PRIORITY.into())
             .build();
 
         let extmark_id = buffer

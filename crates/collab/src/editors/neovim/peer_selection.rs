@@ -35,6 +35,8 @@ impl PeerSelectionHighlightGroup {
 }
 
 impl NeovimPeerSelection {
+    pub(super) const EXTMARK_PRIORITY: u8 = 100;
+
     /// Creates a new selection for the remote peer with given ID encompassing
     /// the given byte offset range in the given buffer.
     pub(super) fn create(
@@ -79,6 +81,7 @@ impl NeovimPeerSelection {
             .end_row(selection_end.newline_offset)
             .end_col(selection_end.byte_offset)
             .hl_group(self.hl_group_id)
+            .priority(Self::EXTMARK_PRIORITY.into())
             .build();
 
         let new_extmark_id = self
