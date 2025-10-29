@@ -7,10 +7,10 @@ Nomad brings real-time collaborative editing to Neovim. Create a session with
 `:Mad collab start`, share the session ID with others, and they can join with
 `:Mad collab join <session_id>`. Every peer in the session sees live cursor
 positions, selections, text edits, and file system changes as they happen — all
-[powered][crdt-cola] [by][crdt-puff] [custom][crdt-pando] [CRDTs][crdt-wiki] that keep everything
-in sync.
+[powered][crdt-cola] [by][crdt-puff] [custom][crdt-pando] [CRDTs][crdt-wiki]
+that keep everything in sync.
 
-But real-time editing is just the beginning. Nomad's vision is to make
+But real-time editing is just the first step. Nomad's vision is to make
 collaborative coding truly universal: across different editors, across time
 (both synchronous and asynchronous collaboration), and across different types
 of contributors — human and machine alike. Whether you're pair programming with
