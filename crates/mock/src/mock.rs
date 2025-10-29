@@ -164,6 +164,7 @@ impl Editor for Mock {
 
     type BufferSaveError = anyhow::Error;
     type CreateBufferError = fs::ReadFileToStringError<MockFs>;
+    type OpenUrlError = core::convert::Infallible;
     type SerializeError = SerializeError;
     type DeserializeError = DeserializeError;
 
@@ -309,6 +310,13 @@ impl Editor for Mock {
         let cb_kind =
             CallbackKind::SelectionCreated(Shared::new(Box::new(fun)));
         self.callbacks.insert(cb_kind)
+    }
+
+    fn open_url(
+        &mut self,
+        _: url::Url,
+    ) -> impl Future<Output = Result<(), Self::OpenUrlError>> + use<> {
+        async { unimplemented!() }
     }
 
     fn reinstate_panic_hook(&self) -> bool {

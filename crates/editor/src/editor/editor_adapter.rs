@@ -90,6 +90,7 @@ impl<Ed: EditorAdapter> Editor for Ed {
         <<Self as Deref>::Target as Editor>::BufferSaveError;
     type CreateBufferError =
         <<Self as Deref>::Target as Editor>::CreateBufferError;
+    type OpenUrlError = <<Self as Deref>::Target as Editor>::OpenUrlError;
     type SerializeError = <<Self as Deref>::Target as Editor>::SerializeError;
     type DeserializeError =
         <<Self as Deref>::Target as Editor>::DeserializeError;
@@ -212,6 +213,14 @@ impl<Ed: EditorAdapter> Editor for Ed {
             },
             this.map_mut(Deref::deref, DerefMut::deref_mut),
         )
+    }
+
+    #[inline]
+    fn open_url(
+        &mut self,
+        url: url::Url,
+    ) -> impl Future<Output = Result<(), Self::OpenUrlError>> + use<Ed> {
+        self.deref_mut().open_url(url)
     }
 
     #[inline]

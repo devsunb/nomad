@@ -56,7 +56,6 @@ memchr = "2"
 nohash = "0.2"
 notify = "8"
 nvim-oxi = { git = "https://github.com/noib3/nvim-oxi" }
-open = "5"
 peer-handle = { git = "ssh://git@github.com/nomad/collab-server.git" }
 pin-project-lite = "0.2"
 rand = "0.9"
@@ -79,6 +78,7 @@ tracing-subscriber = "0.3"
 ulid = "1"
 ureq = "3"
 url = "2.5"
+webbrowser = "1"
 
 # Internal dependencies.
 auth = { path = "./crates/auth" }

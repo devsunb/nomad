@@ -69,6 +69,10 @@ pub trait Editor: 'static + Sized {
     /// TODO: docs.
     type CreateBufferError: Debug;
 
+    /// The type of error that can occur when opening a URL in the user's
+    /// default web browser.
+    type OpenUrlError: Debug;
+
     /// TODO: docs.
     type SerializeError: Debug + notify::Error;
 
@@ -150,6 +154,13 @@ pub trait Editor: 'static + Sized {
     ) -> Self::EventHandle
     where
         Fun: FnMut(Self::Selection<'_>, AgentId) + 'static;
+
+    /// Opens the given URL in the user's default web browser, returning a
+    /// future that resolves once the URL has been opened.
+    fn open_url(
+        &mut self,
+        url: url::Url,
+    ) -> impl Future<Output = Result<(), Self::OpenUrlError>> + use<Self>;
 
     /// TODO: docs.
     fn reinstate_panic_hook(&self) -> bool;

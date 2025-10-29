@@ -1,7 +1,8 @@
 use core::convert::Infallible;
 use core::mem;
+use std::io;
 
-use ::executor::Executor;
+use ::executor::{BackgroundSpawner, Executor};
 use ::serde::{Deserialize, Serialize};
 use abs_path::{AbsPath, AbsPathBuf};
 use clipboard::{FallibleInitClipboard, arboard};
@@ -161,6 +162,7 @@ impl Editor for Neovim {
 
     type BufferSaveError = Infallible;
     type CreateBufferError = core::convert::Infallible;
+    type OpenUrlError = io::Error;
     type SerializeError = serde::NeovimSerializeError;
     type DeserializeError = serde::NeovimDeserializeError;
 
@@ -326,6 +328,38 @@ impl Editor for Neovim {
             },
             this,
         )
+    }
+
+    #[inline]
+    fn open_url(
+        &mut self,
+        url: url::Url,
+    ) -> impl Future<Output = Result<(), Self::OpenUrlError>> + use<> {
+        let spawner = self.executor().background_spawner().clone();
+
+        #[cfg(not(target_os = "macos"))]
+        let future = async move { webbrowser::open(url.as_str()) };
+
+        #[cfg(target_os = "macos")]
+        let future = async move {
+            use objc2_app_kit::NSWorkspace;
+            use objc2_foundation::{NSString, NSURL};
+            let try_block = || {
+                let str = NSString::from_str(url.as_str());
+                let url = NSURL::URLWithString(&str).ok_or("invalid URL")?;
+                let workspace = NSWorkspace::sharedWorkspace();
+                let success = workspace.openURL(&url);
+                if success { Ok(()) } else { Err("operation failed") }
+            };
+            try_block().map_err(|err_msg| {
+                io::Error::other(format!(
+                    "couldn't open {}: {err_msg}",
+                    url.as_str()
+                ))
+            })
+        };
+
+        async move { spawner.spawn(future).await }
     }
 
     #[inline]

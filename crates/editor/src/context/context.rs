@@ -167,6 +167,15 @@ impl<Ed: Editor, Bs: BorrowState> Context<Ed, Bs> {
 
     /// TODO: docs.
     #[inline]
+    pub fn open_url(
+        &mut self,
+        url: url::Url,
+    ) -> impl Future<Output = Result<(), Ed::OpenUrlError>> + use<Ed, Bs> {
+        self.with_editor(move |ed| ed.open_url(url))
+    }
+
+    /// TODO: docs.
+    #[inline]
     pub fn namespace(&self) -> &Namespace {
         self.borrow.namespace()
     }

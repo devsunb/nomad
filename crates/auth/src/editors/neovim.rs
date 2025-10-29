@@ -9,7 +9,7 @@ use neovim::notify::{self, NotifyContextExt};
 use crate::{AuthEditor, config, github, login, logout};
 
 impl AuthEditor for Neovim {
-    type LoginError = github::GitHubLoginError<Self::HttpClient>;
+    type LoginError = github::GitHubLoginError<Self>;
 
     #[allow(clippy::manual_async_fn)]
     fn credential_builder(
