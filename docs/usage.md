@@ -27,18 +27,79 @@ For brevity, the rest of this document will only show commands in the `:Mad
 
 ## `:Mad auth login`
 
+This command opens a new browser window, prompting you to authenticate with
+Nomad using your GitHub credentials. Logging in is necessary to start and join
+collaborative editing sessions.
+
+After a successfull login, the corresponding credentials will be persisted on
+your machine using the system credential store.
+
 ## `:Mad auth logout`
+
+This command removes any credentials stored by `:Mad auth login` from the
+credential store.
 
 ## `:Mad collab start`
 
-## `:Mad collab join`
+This command starts a new collaborative editing session. Before you run it,
+make sure to place your cursor anywhere in any file that's under the root of
+the project you want to start collaborating on.
+
+When you run this command, Nomad will index all files under the project root
+and ask the [collab server][collab-server] to start a new session. If the
+request succeeds, a new, unique session ID will be returned.
+
+The session ID should be treated as a secret, as it allows anyone to join the
+session and receive a copy of the project.
+
+NOTE: the collab server never stores any of your files, neither during the
+session nor after it completes. It simply acts as a one-to-many network channel
+that forwards every peer's events to every other peer.
+
+By default, Nomad will reach out to the server running at `collab.nomad.foo`.
+Like the rest of our code, the server is open source and MIT licensed, so you
+can take it and run it on your own infrastructure if you don't trust us.
+
+## `:Mad collab join <session_id>`
 
 ## `:Mad collab copy-id`
 
+This command copies the session ID of the collaborative session you're
+currently in to your clipboard.
+
 ## `:Mad collab jump <github_handle>`
+
+This command lets you "jump" to the current position of the peer with the given
+GitHub handle, wherever they currently are in the project you're collaborating
+on. This will create a new buffer if necessary.
 
 ## `:Mad collab leave`
 
+This command lets you leave the collaborative editing session you're currently
+in. Note that if the host of the session leaves, the session will end for all
+remaining peers currently in it (this limitation may be removed in the future).
+
 ## `:Mad collab pause`
 
+This command causes Nomad to stop applying all remote events being received
+from the other peers. While a session is paused, all incoming events are
+buffered in memory until the session is resumed (see the following command).
+
+This is mostly useful when debugging the CRDT machinery that keeps the project
+state synchronized between peers. For example, several peers could pause the
+session, apply different edits that would usually cause conflicts when using
+more traditional version control tools (e.g. Git), and resume the session.
+
+When resumed, the final state should converge across all peers, regardless of
+what operations each peer applied while paused or the order in which those
+operations are received.
+
+It's also a cool party trick.
+
 ## `:Mad collab resume`
+
+This command resumes a session previously paused by `:Mad collab pause`. All
+events that had been buffered while the session was paused will be applied at
+once.
+
+[collab-server]: https://github.com/nomad/collab-server
