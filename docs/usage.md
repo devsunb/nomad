@@ -31,13 +31,13 @@ This command opens a new browser window, prompting you to authenticate with
 Nomad using your GitHub credentials. Logging in is necessary to start and join
 collaborative editing sessions.
 
-After a successfull login, the corresponding credentials will be persisted on
+After a successful login, the corresponding credentials will be persisted on
 your machine using the system credential store.
 
 ## `:Mad auth logout`
 
-This command removes any credentials stored by `:Mad auth login` from the
-credential store.
+This command removes any credentials previously stored by `:Mad auth login`
+from the credential store.
 
 ## `:Mad collab start`
 
@@ -63,7 +63,7 @@ can take it and run it on your own infrastructure if you don't trust us.
 ## `:Mad collab join <session_id>`
 
 This command lets you join an existing collaborative editing session. When you
-run it, it ask the collab server to add you to the session with the given ID.
+run it, it asks the collab server to add you to the session with the given ID.
 If that succeeds, a copy of the project will be requested from one of the other
 peers currently in the session.
 
@@ -110,7 +110,7 @@ session, apply different edits that would usually cause conflicts when using
 more traditional version control tools (e.g. Git), and resume the session.
 
 When resumed, the final state should converge across all peers, regardless of
-what operations each peer applied while paused or the order in which those
+what operations each of them applied while paused or the order in which those
 operations are received.
 
 It's also a cool party trick.
