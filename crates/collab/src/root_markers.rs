@@ -160,14 +160,18 @@ impl<M> FindRootArgs<'_, M> {
 }
 
 impl<Fs: fs::Fs> RootMarker<Fs> for GitDirectory {
-    type Error = ReadMetadataError<Fs>;
+    type Error = core::convert::Infallible;
 
     async fn matches(
         &self,
         metadata: &Fs::Metadata,
     ) -> Result<bool, Self::Error> {
         use fs::Metadata;
-        Ok(metadata.name().map_err(ReadMetadataError::Name)? == ".git"
-            && metadata.node_kind().is_dir())
+        Ok(match metadata.name() {
+            Ok(name) => name == ".git" && metadata.node_kind().is_dir(),
+            Err(MetadataNameError::Invalid(_, _)) => false,
+            Err(MetadataNameError::NotUtf8(_)) => false,
+            Err(MetadataNameError::MetadataIsForRoot) => false,
+        })
     }
 }
