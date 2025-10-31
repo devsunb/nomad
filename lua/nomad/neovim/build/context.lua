@@ -9,12 +9,12 @@ local path = require("nomad.path")
 
 ---@generic T
 ---@param list [T]
----@param start_idx integer
----@param end_idx integer
+---@param start_offset integer
+---@param end_offset integer
 ---@return [T]
-local slice = function(list, start_idx, end_idx)
+local slice = function(list, start_offset, end_offset)
   local sliced = {}
-  for idx = start_idx, end_idx do
+  for idx = start_offset + 1, end_offset do
     sliced[#sliced + 1] = list[idx]
   end
   return sliced
@@ -38,8 +38,11 @@ function Context:repo_dir()
     if src:sub(1, 1) ~= "@" then
       error("not a in file source", 2)
     end
-    local file_components = vim.split(src:sub(2), path.separator)
-    local repo_components = slice(file_components, 1, #file_components - 5)
+    if src:sub(2, 2) ~= path.separator then
+      error(("'%s' is not an absolute path"):format(src:sub(2)), 2)
+    end
+    local file_components = vim.split(src:sub(3), path.separator)
+    local repo_components = slice(file_components, 0, #file_components - 5)
     self._repo_dir = path.Path.from_components(repo_components)
   end
   return self._repo_dir
