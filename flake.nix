@@ -4,8 +4,6 @@
 
     flake-parts.url = "github:hercules-ci/flake-parts";
 
-    flake-root.url = "github:srid/flake-root";
-
     crane.url = "github:ipetkov/crane";
 
     rust-overlay = {
@@ -42,7 +40,6 @@
       ];
 
       imports = [
-        inputs.flake-root.flakeModule
         inputs.treefmt-nix.flakeModule
         ./nix/ci.nix
         ./nix/clippy.nix

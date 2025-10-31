@@ -22,7 +22,7 @@
         {
           # We've already added a 'format' check.
           flakeCheck = false;
-          inherit (config.flake-root) projectRootFile;
+          projectRootFile = "flake.nix";
           programs.nixfmt.enable = true;
           programs.rustfmt = {
             enable = true;
