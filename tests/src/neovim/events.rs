@@ -127,8 +127,8 @@ fn on_buffer_removed_fires_when_named_buffer_is_renamed_to_empty_name(
     });
 
     // In our model of an editor, a buffer is always associated with an
-    // absolute file path, so giving the buffer an empty name should
-    // be the same as removing it.
+    // absolute file path, so giving the buffer an empty name should be the
+    // same as removing it.
     oxi::api::Buffer::from(buffer_id).set_name("").unwrap();
 
     assert_eq!(num_times_fired.take(), 1);

@@ -5,7 +5,7 @@ use core::error::Error;
 use core::ops::Range;
 use core::{fmt, ops};
 
-use abs_path::{AbsPath, AbsPathBuf};
+use abs_path::{AbsPath, AbsPathBuf, NodeName};
 pub use collab_server::test::TestSessionId as MockSessionId;
 use collab_types::{Peer, PeerHandle};
 use duplex_stream::{DuplexStream, duplex};
@@ -399,6 +399,7 @@ impl collab_server::Config for MockConfig {
     type Executor =
         <collab_server::test::TestConfig as collab_server::Config>::Executor;
     type Params = MockParams;
+    type SessionObserver = ();
 
     fn authenticator(&self) -> &Self::Authenticator {
         &MockAuthenticator
@@ -410,6 +411,14 @@ impl collab_server::Config for MockConfig {
 
     fn new_session_id(&self) -> MockSessionId {
         self.inner.new_session_id()
+    }
+
+    fn new_session_observer(
+        &self,
+        _: &Peer,
+        _: &NodeName,
+        _: &MockSessionId,
+    ) -> Self::SessionObserver {
     }
 }
 
