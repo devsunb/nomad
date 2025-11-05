@@ -8,10 +8,6 @@ on:
     branches:
       - main
 
-# TODO: remove after publishing private crates.
-env:
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
-
 jobs:
   clippy:
     name: clippy
@@ -29,13 +25,6 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           devshell: ".#ci-clippy"
-          ssh-private-keys: |
-            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-            ${{ secrets.CAUCHY_DEPLOY_KEY }}
-            ${{ secrets.COLLAB_DEPLOY_KEY }}
-            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-            ${{ secrets.PANDO_DEPLOY_KEY }}
-            ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Run Clippy
         run: cargo clippy --all-features --all-targets --no-deps --workspace
 
@@ -51,13 +40,6 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           devshell: ".#ci-coverage"
-          ssh-private-keys: |
-            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-            ${{ secrets.CAUCHY_DEPLOY_KEY }}
-            ${{ secrets.COLLAB_DEPLOY_KEY }}
-            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-            ${{ secrets.PANDO_DEPLOY_KEY }}
-            ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Generate coverage report
         run: |
           cargo llvm-cov --no-report --workspace
@@ -81,13 +63,6 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           devshell: ".#ci-docs"
-          ssh-private-keys: |
-            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-            ${{ secrets.CAUCHY_DEPLOY_KEY }}
-            ${{ secrets.COLLAB_DEPLOY_KEY }}
-            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-            ${{ secrets.PANDO_DEPLOY_KEY }}
-            ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Run Rustdoc
         run: cargo doc --all-features --no-deps --workspace
 
@@ -119,13 +94,6 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           devshell: ".#ci-tests"
-          ssh-private-keys: |
-            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-            ${{ secrets.CAUCHY_DEPLOY_KEY }}
-            ${{ secrets.COLLAB_DEPLOY_KEY }}
-            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-            ${{ secrets.PANDO_DEPLOY_KEY }}
-            ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Run unit tests
         run: cargo nextest run --workspace --exclude tests --no-fail-fast
       - name: Run integration tests
@@ -155,13 +123,6 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           devshell: ${{ matrix.devshell }}
-          ssh-private-keys: |
-            ${{ secrets.ABS_PATH_DEPLOY_KEY }}
-            ${{ secrets.CAUCHY_DEPLOY_KEY }}
-            ${{ secrets.COLLAB_DEPLOY_KEY }}
-            ${{ secrets.LAZY_AWAIT_DEPLOY_KEY }}
-            ${{ secrets.PANDO_DEPLOY_KEY }}
-            ${{ secrets.PUFF_DEPLOY_KEY }}
       - name: Run Neovim tests
         run: |
           cargo nextest run \
