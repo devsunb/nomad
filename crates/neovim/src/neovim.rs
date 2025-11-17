@@ -160,7 +160,7 @@ impl Editor for Neovim {
     type CursorId = BufferId;
     type Clipboard = FallibleInitClipboard<arboard::Clipboard>;
     type Fs = real_fs::RealFs;
-    type Emitter<'ex> = notify::NeovimEmitter<'ex>;
+    type Emitter<'ex> = notify::NeovimEmitter;
     type Executor = executor::NeovimExecutor;
     type EventHandle = EventHandle;
     type HttpClient = HttpClient;
@@ -240,10 +240,7 @@ impl Editor for Neovim {
     #[inline]
     fn emitter(&mut self) -> Self::Emitter<'_> {
         let namespace_id = self.namespace_id();
-        notify::NeovimEmitter::new(
-            self.executor().local_spawner(),
-            namespace_id,
-        )
+        notify::NeovimEmitter::new(namespace_id)
     }
 
     #[inline]

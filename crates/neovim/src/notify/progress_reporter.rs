@@ -10,7 +10,7 @@ pub type Percentage = u8;
 /// TODO: docs.
 pub enum ProgressReporter {
     /// TODO: docs.
-    NvimEcho(notify::NvimEchoProgressReporter),
+    VimNotify(notify::VimNotifyProgressReporter),
 
     /// TODO: docs.
     NvimNotify(notify::NvimNotifyProgressReporter),
@@ -42,7 +42,8 @@ impl ProgressReporter {
                     local_spawner,
                 ))
             } else {
-                Self::NvimEcho(notify::NvimEchoProgressReporter::new(
+                // Use vim.notify (which can be overridden by Snacks.nvim)
+                Self::VimNotify(notify::VimNotifyProgressReporter::new(
                     namespace,
                     local_spawner,
                 ))
@@ -55,7 +56,7 @@ impl ProgressReporter {
         let notif =
             ProgressNotification { chunks, status: ProgressStatus::Error };
         match self {
-            Self::NvimEcho(inner) => inner.send_notification(notif),
+            Self::VimNotify(inner) => inner.send_notification(notif),
             Self::NvimNotify(inner) => inner.send_notification(notif),
         }
     }
@@ -71,7 +72,7 @@ impl ProgressReporter {
             status: ProgressStatus::Progress(percentage),
         };
         match self {
-            Self::NvimEcho(inner) => inner.send_notification(notif),
+            Self::VimNotify(inner) => inner.send_notification(notif),
             Self::NvimNotify(inner) => inner.send_notification(notif),
         }
     }
@@ -81,7 +82,7 @@ impl ProgressReporter {
         let notif =
             ProgressNotification { chunks, status: ProgressStatus::Success };
         match self {
-            Self::NvimEcho(inner) => inner.send_notification(notif),
+            Self::VimNotify(inner) => inner.send_notification(notif),
             Self::NvimNotify(inner) => inner.send_notification(notif),
         }
     }

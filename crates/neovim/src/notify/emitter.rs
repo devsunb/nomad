@@ -1,25 +1,20 @@
 use editor::notify::{Emitter, Notification, NotificationId};
 
 use crate::convert::Convert;
-use crate::executor::NeovimLocalSpawner;
-use crate::notify::{NvimEcho, NvimNotify};
+use crate::notify::{NvimNotify, VimNotify};
 
 /// TODO: docs.
-pub struct NeovimEmitter<'ex> {
-    local_spawner: &'ex mut NeovimLocalSpawner,
+pub struct NeovimEmitter {
     namespace_id: u32,
 }
 
-impl<'ex> NeovimEmitter<'ex> {
-    pub(crate) fn new(
-        local_spawner: &'ex mut NeovimLocalSpawner,
-        namespace_id: u32,
-    ) -> Self {
-        Self { local_spawner, namespace_id }
+impl NeovimEmitter {
+    pub(crate) fn new(namespace_id: u32) -> Self {
+        Self { namespace_id }
     }
 }
 
-impl Emitter for NeovimEmitter<'_> {
+impl Emitter for NeovimEmitter {
     fn emit(&mut self, notification: Notification) -> NotificationId {
         let namespace = notification.namespace;
         let chunks = notification.message.into();
@@ -27,7 +22,8 @@ impl Emitter for NeovimEmitter<'_> {
         if NvimNotify::is_installed() {
             NvimNotify::notify(namespace, chunks, level, self.namespace_id);
         } else {
-            NvimEcho::notify(namespace, chunks, level, self.local_spawner);
+            // Use vim.notify (which can be overridden by Snacks.nvim)
+            VimNotify::notify(namespace, chunks, level, self.namespace_id);
         }
         NotificationId::new(0)
     }

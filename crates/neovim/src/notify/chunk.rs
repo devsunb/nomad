@@ -37,11 +37,6 @@ impl Chunk {
     }
 
     #[inline]
-    pub(crate) fn text_as_compact_str(&self) -> &CompactString {
-        &self.text
-    }
-
-    #[inline]
     pub(crate) fn text_mut(&mut self) -> &mut CompactString {
         &mut self.text
     }
