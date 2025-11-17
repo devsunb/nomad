@@ -80,6 +80,22 @@ impl<'a> Host<'a> {
             Self::Domain(dns_name) => Host::Domain(dns_name.to_owned()),
         }
     }
+
+    /// Returns true if this host is a loopback or private IP address.
+    /// These addresses don't require TLS for local/internal development.
+    pub(crate) fn is_local_or_private(&self) -> bool {
+        match self {
+            Self::Ip(net::IpAddr::V4(ipv4)) => {
+                ipv4.is_loopback()
+                    || ipv4.is_private()
+                    || ipv4.is_link_local()
+            }
+            Self::Ip(net::IpAddr::V6(ipv6)) => {
+                ipv6.is_loopback() || ipv6.is_unique_local()
+            }
+            Self::Domain(_) => false,
+        }
+    }
 }
 
 impl Default for ServerAddress<'static> {

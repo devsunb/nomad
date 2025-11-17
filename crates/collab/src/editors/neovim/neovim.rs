@@ -110,11 +110,11 @@ impl CollabEditor for Neovim {
                 .await
                 .map_err(NeovimConnectToServerError::ConnectTcp)?;
 
-        // If we're connecting to a loopback address we're probably testing
-        // against a local server without TLS, so use plain TCP.
-        if let config::Host::Ip(ip) = &server_addr.host
-            && ip.is_loopback()
-        {
+        // If we're connecting to a local or private IP address (loopback,
+        // 192.168.x.x, 10.x.x.x, etc.), use plain TCP without TLS.
+        // This allows development and testing on local networks without
+        // requiring TLS certificates.
+        if server_addr.host.is_local_or_private() {
             return Ok(Either::Right(tcp_stream));
         }
 
