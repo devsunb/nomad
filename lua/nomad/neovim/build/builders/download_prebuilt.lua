@@ -68,7 +68,7 @@ local get_archive_name = function(tag)
 end
 
 local get_artifact_url = function(tag, artifact_name)
-  return ("https://github.com/nomad/nomad/releases/download/%s/%s")
+  return ("https://github.com/devsunb/nomad/releases/download/%s/%s")
       :format(tag, artifact_name)
 end
 
